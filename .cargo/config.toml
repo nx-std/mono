@@ -1,0 +1,12 @@
+[build]
+# https://doc.rust-lang.org/rustc/platform-support/aarch64-nintendo-switch-freestanding.html
+target = ["aarch64-nintendo-switch-freestanding"]
+
+[unstable]
+# cargo-std-aware build unstable features
+# https://doc.rust-lang.org/cargo/reference/unstable.html#build-std
+# https://doc.rust-lang.org/cargo/reference/unstable.html#build-std-features
+build-std = ["core", "compiler_builtins", "alloc"]
+build-std-features = ["compiler-builtins-mem"]
+# https://doc.rust-lang.org/cargo/commands/cargo-build.html#output-options
+unstable-options = true
