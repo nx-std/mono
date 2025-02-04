@@ -1,4 +1,4 @@
-[submodule "libnx"]
+[submodule "subprojects/libnx"]
 	path = subprojects/libnx
 	url = git@github.com:LNSD/libnx.git
 [submodule "subprojects/examples"]
