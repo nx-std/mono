@@ -5,6 +5,7 @@
 #![no_std]
 
 pub mod counter;
+pub mod tls;
 
 /// #[panic_handler]
 ///
