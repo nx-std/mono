@@ -233,6 +233,15 @@ pub struct ThreadContext {
     pub tpidr: u64,
 }
 
+impl ThreadContext {
+    /// Determines whether a thread context belong to an AArch64 process based on the PSR.
+    ///
+    /// Returns true if and only if the thread context belongs to an AArch64 process.
+    pub fn is_aarch64(&self) -> bool {
+        (self.psr & 0x10) == 0
+    }
+}
+
 /// Armv8 CPU register
 #[repr(C)]
 pub union CpuRegister {
