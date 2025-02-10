@@ -3,4 +3,5 @@ resolver = "2"
 members = [
     "subprojects/nx-cpu",
     "subprojects/nx-svc",
+    "subprojects/nx-thread",
 ]

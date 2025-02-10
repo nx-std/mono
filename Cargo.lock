@@ -19,6 +19,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-thread"
+version = "0.1.0"
+dependencies = [
+ "nx-cpu",
+ "panic-abort",
+ "panic-halt",
+ "static_assertions",
+]
+
+[[package]]
 name = "panic-abort"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -29,3 +39,9 @@ name = "panic-halt"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a513e167849a384b7f9b746e517604398518590a9142f4846a32e3c2a4de7b11"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
