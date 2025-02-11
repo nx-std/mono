@@ -5,20 +5,17 @@
  * @copyright libnx Authors
  */
 #pragma once
-#include <stdint.h>
+
 #include <stdbool.h>
 #include <sys/lock.h>
 
-/// Kernel object handle.
-typedef uint32_t Handle;
-
-/// Invalid handle.
-#define INVALID_HANDLE ((Handle) 0)
-
-/// Mutex datatype, defined in newlib.
+/// Mutex datatype (defined in newlib).
 typedef _LOCK_T Mutex;
-/// Recursive mutex datatype, defined in newlib.
-typedef _LOCK_RECURSIVE_T RMutex;
+
+// TODO: Port RMutex (Reentrant Mutex) to Rust
+//  Replicate naming like the reentrant mutex in parking_lot crate
+// /// Recursive mutex datatype, defined in newlib.
+// typedef _LOCK_RECURSIVE_T RMutex;
 
 /**
  * @brief Initializes a mutex.
@@ -53,6 +50,8 @@ void __nx_sync_mutex_unlock(Mutex* m);
  */
 bool __nx_sync_mutex_is_locked_by_current_thread(const Mutex* m);
 
+// TODO: Port RMutex (Reentrant Mutex) to Rust
+//  Replicate naming like the reentrant mutex in parking_lot crate
 ///**
 // * @brief Initializes a recursive mutex.
 // * @param m Recursive mutex object.
