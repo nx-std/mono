@@ -2,7 +2,7 @@
 
 #![no_std]
 
-mod condvar;
+pub mod condvar;
 pub mod mutex;
 
 /// #[panic_handler]
