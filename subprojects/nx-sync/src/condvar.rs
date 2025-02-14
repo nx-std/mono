@@ -7,11 +7,11 @@
 
 use nx_svc::{
     error::ToRawResultCode,
-    sync::{WaitProcessWideKeyError, signal_process_wide_key, wait_process_wide_key_atomic},
+    sync::{signal_process_wide_key, wait_process_wide_key_atomic, WaitProcessWideKeyError},
 };
 use nx_thread::raw::Handle;
 
-use crate::mutex::{__nx_sync_mutex_lock, Mutex};
+use crate::mutex::Mutex;
 
 /// Result type
 type Result = u32;
@@ -28,6 +28,18 @@ impl Condvar {
     /// Creates a new condition variable initialized to 0.
     pub const fn new() -> Self {
         Condvar(0)
+    }
+    /// Returns a raw pointer to the underlying integer.
+    ///
+    /// # Safety
+    ///
+    /// This function is intended for FFI purposes and should be used with care.
+    /// The caller must ensure that:
+    /// - The pointer is not used after the condition variable is dropped
+    /// - The pointer is only used with Nintendo Switch kernel synchronization primitives
+    /// - The pointer is properly aligned and valid for the lifetime of the condition variable
+    pub fn as_ptr(&self) -> *mut u32 {
+        &self.0 as *const _ as *mut u32
     }
 
     /// Waits on the condition variable until notified or a timeout occurs.
@@ -164,12 +176,13 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait_timeout(
     mutex: *mut Mutex,
     timeout: u64,
 ) -> Result {
+    let mutex = unsafe { &*mutex };
     let curr_thread_handle = get_curr_thread_handle();
 
     let result = unsafe {
         wait_process_wide_key_atomic(
             condvar as *mut u32,
-            mutex as *mut u32,
+            mutex.as_ptr(),
             curr_thread_handle,
             timeout,
         )
@@ -177,7 +190,7 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait_timeout(
 
     // Handle the timeout case specially since we need to re-acquire the mutex
     if let Err(WaitProcessWideKeyError::TimedOut) = result {
-        unsafe { __nx_sync_mutex_lock(mutex as *mut u32) };
+        mutex.lock();
     }
 
     // Map result to return codes
