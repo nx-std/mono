@@ -4,6 +4,8 @@
 //! It allows threads to wait for and release resources in a thread-safe manner. The semaphore's
 //! internal counter represents the number of available resources.
 
+use core::cell::UnsafeCell;
+
 use static_assertions::const_assert_eq;
 
 use crate::{condvar::Condvar, mutex::Mutex};
@@ -20,7 +22,7 @@ pub struct Semaphore {
     /// Mutex for protecting the internal counter
     mutex: Mutex,
     /// Number of available resources
-    count: u64,
+    count: UnsafeCell<u64>,
 }
 
 // Ensure that the Semaphore object has a 16 bytes size, and is properly aligned
@@ -37,20 +39,37 @@ impl Semaphore {
         Self {
             condvar: Condvar::new(),
             mutex: Mutex::new(),
-            count,
+            count: UnsafeCell::new(count),
         }
     }
 
     /// Signals the semaphore, incrementing its counter and potentially waking a waiting thread.
     pub fn signal(&self) {
-        unsafe { __nx_sync_semaphore_signal(self as *const Self as *mut Self) };
+        self.mutex.lock();
+
+        // Increment the count and wake one waiting thread
+        let count = unsafe { &mut *self.count.get() };
+        *count = count.checked_add(1).expect("semaphore count overflow");
+        self.condvar.wake_one();
+
+        self.mutex.unlock();
     }
 
     /// Waits for the semaphore, decrementing its counter when a resource becomes available.
     ///
     /// This call will block if no resources are currently available.
     pub fn wait(&self) {
-        unsafe { __nx_sync_semaphore_wait(self as *const Self as *mut Self) };
+        self.mutex.lock();
+
+        // If count is 0, wait until signaled
+        let count = unsafe { &mut *self.count.get() };
+        #[allow(clippy::while_immutable_condition)]
+        while *count == 0 {
+            self.condvar.wait(&self.mutex);
+        }
+        *count = count.checked_sub(1).expect("semaphore count underflow");
+
+        self.mutex.unlock();
     }
 
     /// Attempts to wait for the semaphore without blocking.
@@ -61,7 +80,19 @@ impl Semaphore {
     /// This function is safe to call with an immutable reference because the internal
     /// synchronization is handled by the Mutex in __nx_sync_semaphore_try_wait.
     pub fn try_wait(&self) -> bool {
-        unsafe { __nx_sync_semaphore_try_wait(self as *const Self as *mut Self) }
+        self.mutex.lock();
+
+        // Check and immediately return result
+        let count = unsafe { &mut *self.count.get() };
+        let result = if *count > 0 {
+            *count = count.checked_sub(1).expect("semaphore count underflow");
+            true // Successfully decremented
+        } else {
+            false // No resources available
+        };
+
+        self.mutex.unlock();
+        result
     }
 }
 
@@ -92,14 +123,8 @@ pub unsafe extern "C" fn __nx_sync_semaphore_init(sem: *mut Semaphore, count: u6
 /// * `sem` points to a valid, initialized Semaphore object
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_signal(sem: *mut Semaphore) {
-    let sem = unsafe { &mut *sem };
-    sem.mutex.lock();
-
-    // Increment the count and wake one waiting thread
-    sem.count = sem.count.checked_add(1).expect("semaphore count overflow");
-    sem.condvar.wake_one();
-
-    sem.mutex.unlock();
+    let sem = unsafe { &*sem };
+    sem.signal();
 }
 
 /// Decrements the semaphore's counter, blocking if no resources are available.
@@ -115,17 +140,8 @@ pub unsafe extern "C" fn __nx_sync_semaphore_signal(sem: *mut Semaphore) {
 /// * `sem` points to a valid, initialized Semaphore object
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_wait(sem: *mut Semaphore) {
-    let sem = unsafe { &mut *sem };
-    sem.mutex.lock();
-
-    // If count is 0, wait until signaled
-    #[allow(clippy::while_immutable_condition)]
-    while sem.count == 0 {
-        sem.condvar.wait(&sem.mutex);
-    }
-    sem.count = sem.count.checked_sub(1).expect("semaphore count underflow");
-
-    sem.mutex.unlock();
+    let sem = unsafe { &*sem };
+    sem.wait();
 }
 
 /// Attempts to decrement the semaphore's counter without blocking.
@@ -142,17 +158,6 @@ pub unsafe extern "C" fn __nx_sync_semaphore_wait(sem: *mut Semaphore) {
 /// * `sem` points to a valid, initialized Semaphore object
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_try_wait(sem: *mut Semaphore) -> bool {
-    let sem = unsafe { &mut *sem };
-    sem.mutex.lock();
-
-    // Check and immediately return result
-    let result = if sem.count > 0 {
-        sem.count = sem.count.checked_sub(1).expect("semaphore count underflow");
-        true // Successfully decremented
-    } else {
-        false // No resources available
-    };
-
-    sem.mutex.unlock();
-    result
+    let sem = unsafe { &*sem };
+    sem.try_wait()
 }

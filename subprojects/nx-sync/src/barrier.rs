@@ -1,16 +1,17 @@
-//! Barrier
+//! # Barrier
+//!
 //! Multi-threading Barrier
+
+use core::cell::UnsafeCell;
 
 use static_assertions::const_assert_eq;
 
 use crate::{condvar::Condvar, mutex::Mutex};
 
 /// Barrier structure.
-// TODO: Review this. We could do this with a single atomic variable,
-//       but we're going to use a mutex and a condition variable for compatibility
 pub struct Barrier {
     /// Number of threads to reach the barrier
-    count: u64,
+    count: UnsafeCell<u64>,
     /// Number of threads to wait on
     total: u64,
     /// Mutex for synchronization
@@ -30,7 +31,7 @@ impl Barrier {
     /// * `thread_count` - Initial value for the number of threads the barrier must wait for.
     pub fn new(thread_count: u64) -> Self {
         Barrier {
-            count: 0,
+            count: UnsafeCell::new(0),
             total: thread_count - 1,
             mutex: Mutex::new(),
             condvar: Condvar::new(),
@@ -38,8 +39,19 @@ impl Barrier {
     }
 
     /// Forces threads to wait until all threads have called barrier_wait.
-    pub fn wait(&mut self) {
-        unsafe { __nx_sync_barrier_wait(self) };
+    pub fn wait(&self) {
+        self.mutex.lock();
+
+        let count = unsafe { &mut *self.count.get() };
+        if *count == self.total {
+            *count = 0;
+            self.condvar.wake(self.total as i32);
+        } else {
+            *count = count.checked_add(1).expect("Barrier count overflow");
+            self.condvar.wait(&self.mutex);
+        }
+
+        self.mutex.unlock();
     }
 }
 
@@ -50,16 +62,6 @@ pub unsafe extern "C" fn __nx_sync_barrier_init(bar: *mut Barrier, thread_count:
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_barrier_wait(bar: *mut Barrier) {
-    let bar = unsafe { &mut *bar };
-    bar.mutex.lock();
-
-    if bar.count == bar.total {
-        bar.count = 0;
-        bar.condvar.wake(bar.total as i32);
-    } else {
-        bar.count = bar.count.checked_add(1).expect("Barrier count overflow");
-        bar.condvar.wait(&bar.mutex);
-    }
-
-    bar.mutex.unlock();
+    let bar = unsafe { &*bar };
+    bar.wait();
 }

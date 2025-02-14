@@ -70,7 +70,66 @@ impl Mutex {
     /// Panics if the kernel's lock arbitration fails. This should never happen under
     /// normal circumstances.
     pub fn lock(&self) {
-        unsafe { __nx_sync_mutex_lock(&self.0 as *const _ as *mut Self) }
+        let curr_thread_handle = get_curr_thread_handle();
+        let mut curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
+
+        loop {
+            match curr_state {
+                MutexState::Unlocked => {
+                    // Attempt to acquire the lock
+                    match self.0.compare_exchange(
+                        curr_state.into_raw(),
+                        MutexState::Locked(MutexTag(curr_thread_handle)).into_raw(),
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => return, // Lock acquired successfully
+                        Err(new_value) => {
+                            // Another thread modified the mutex; retry with the new value
+                            curr_state = MutexState::from_raw(new_value);
+                            continue;
+                        }
+                    }
+                }
+                MutexState::Locked(mut tag) => {
+                    // If there are no waiters, set the waiters bitflag and proceed to arbitration
+                    if !tag.has_waiters() {
+                        tag.set_waiters_bitflag();
+
+                        if let Err(new_value) = self.0.compare_exchange(
+                            curr_state.into_raw(),
+                            MutexState::Locked(tag).into_raw(),
+                            Ordering::Acquire,
+                            Ordering::Relaxed,
+                        ) {
+                            // Another thread modified the mutex; retry with the new value
+                            curr_state = MutexState::from_raw(new_value);
+                            continue;
+                        }
+                    }
+
+                    // Ask the kernel to arbitrate the mutex locking
+                    // This will pause the current thread until the mutex is unlocked
+                    let arb_result = unsafe {
+                        arbitrate_lock(tag.get_owner_handle(), self.0.as_ptr(), curr_thread_handle)
+                    };
+                    if arb_result.is_err() {
+                        // This should never happen
+                        // TODO: Handle the arbitrate_lock errors
+                        let _ = unsafe { break_event(BreakReason::Assert, ptr::null_mut(), 0) };
+                    }
+
+                    // The arbitration has completed; check if we acquired the lock
+                    curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
+                    if matches!(curr_state, MutexState::Locked(tag) if tag.get_owner_handle() == curr_thread_handle)
+                    {
+                        return;
+                    }
+
+                    continue;
+                }
+            }
+        }
     }
 
     /// Attempts to lock the mutex without blocking.
@@ -87,7 +146,18 @@ impl Mutex {
     /// * `true` if the mutex was successfully locked
     /// * `false` if the mutex was already locked by another thread
     pub fn try_lock(&self) -> bool {
-        unsafe { __nx_sync_mutex_try_lock(&self.0 as *const _ as *mut Self) }
+        let curr_thread_handle = get_curr_thread_handle();
+
+        // Attempt to acquire the lock by setting it from Unlocked to Locked with the current thread's handle
+        // This will fail if the mutex is already locked
+        self.0
+            .compare_exchange(
+                MutexState::Unlocked.into_raw(),
+                MutexState::Locked(MutexTag(curr_thread_handle)).into_raw(),
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_ok()
     }
 
     /// Unlocks the [`Mutex`].
@@ -101,7 +171,47 @@ impl Mutex {
     /// Panics if the kernel's unlock arbitration fails. This should never happen
     /// under normal circumstances.
     pub fn unlock(&self) {
-        unsafe { __nx_sync_mutex_unlock(&self.0 as *const _ as *mut Self) }
+        let curr_thread_handle = get_curr_thread_handle();
+        let mut curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
+
+        loop {
+            match curr_state {
+                MutexState::Unlocked => return,
+                MutexState::Locked(tag) => {
+                    // If the mutex is not locked by the current thread, return
+                    if tag.get_owner_handle() != curr_thread_handle {
+                        return;
+                    }
+
+                    // If locked and there are waiters, ask the kernel to arbitrate the mutex unlocking
+                    if tag.has_waiters() {
+                        unsafe {
+                            if arbitrate_unlock(self.0.as_ptr()).is_err() {
+                                // This should never happen
+                                // TODO: Handle the arbitrate_lock errors
+                                let _ = break_event(BreakReason::Assert, ptr::null_mut(), 0);
+                            }
+                        }
+                        return;
+                    }
+
+                    // Attempt to set the mutex state to Unlocked
+                    match self.0.compare_exchange(
+                        curr_state.into_raw(),
+                        MutexState::Unlocked.into_raw(),
+                        Ordering::Release,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => return,
+                        Err(current_value) => {
+                            // If another thread modified the mutex, retry with the new value
+                            curr_state = MutexState::from_raw(current_value);
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -211,71 +321,10 @@ pub unsafe extern "C" fn __nx_sync_mutex_init(mutex: *mut Mutex) {
 /// This function is unsafe because it:
 /// - Requires that `mutex` points to a valid Mutex instance
 /// - Requires that `mutex` is properly aligned
-/// - May cause undefined behavior if the mutex is already locked by the current thread
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_mutex_lock(mutex: *mut Mutex) {
-    let mutex = unsafe { &(*mutex).0 };
-
-    let curr_thread_handle = get_curr_thread_handle();
-    let mut curr_state = MutexState::from_raw(mutex.load(Ordering::Acquire));
-
-    loop {
-        match curr_state {
-            MutexState::Unlocked => {
-                // Attempt to acquire the lock
-                match mutex.compare_exchange(
-                    curr_state.into_raw(),
-                    MutexState::Locked(MutexTag(curr_thread_handle)).into_raw(),
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => return, // Lock acquired successfully
-                    Err(new_value) => {
-                        // Another thread modified the mutex; retry with the new value
-                        curr_state = MutexState::from_raw(new_value);
-                        continue;
-                    }
-                }
-            }
-            MutexState::Locked(mut tag) => {
-                // If there are no waiters, set the waiters bitflag and proceed to arbitration
-                if !tag.has_waiters() {
-                    tag.set_waiters_bitflag();
-
-                    if let Err(new_value) = mutex.compare_exchange(
-                        curr_state.into_raw(),
-                        MutexState::Locked(tag).into_raw(),
-                        Ordering::Acquire,
-                        Ordering::Relaxed,
-                    ) {
-                        // Another thread modified the mutex; retry with the new value
-                        curr_state = MutexState::from_raw(new_value);
-                        continue;
-                    }
-                }
-
-                // Ask the kernel to arbitrate the mutex locking
-                // This will pause the current thread until the mutex is unlocked
-                let arb_result = unsafe {
-                    arbitrate_lock(tag.get_owner_handle(), mutex.as_ptr(), curr_thread_handle)
-                };
-                if arb_result.is_err() {
-                    // This should never happen
-                    // TODO: Handle the arbitrate_lock errors
-                    let _ = unsafe { break_event(BreakReason::Assert, ptr::null_mut(), 0) };
-                }
-
-                // The arbitration has completed; check if we acquired the lock
-                curr_state = MutexState::from_raw(mutex.load(Ordering::Acquire));
-                if matches!(curr_state, MutexState::Locked(tag) if tag.get_owner_handle() == curr_thread_handle)
-                {
-                    return;
-                }
-
-                continue;
-            }
-        }
-    }
+    let mutex = unsafe { &*mutex };
+    mutex.lock();
 }
 
 /// Attempts to lock the mutex without waiting.
@@ -291,20 +340,8 @@ pub unsafe extern "C" fn __nx_sync_mutex_lock(mutex: *mut Mutex) {
 /// Returns `true` if the mutex was successfully locked, `false` if it was already locked.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_mutex_try_lock(mutex: *mut Mutex) -> bool {
-    let mutex = unsafe { &(*mutex).0 };
-
-    let curr_thread_handle = get_curr_thread_handle();
-
-    // Attempt to acquire the lock by setting it from Unlocked to Locked with the current thread's handle
-    // This will fail if the mutex is already locked
-    let result = mutex.compare_exchange(
-        MutexState::Unlocked.into_raw(),
-        MutexState::Locked(MutexTag(curr_thread_handle)).into_raw(),
-        Ordering::Acquire,
-        Ordering::Relaxed,
-    );
-
-    result.is_ok()
+    let mutex = unsafe { &*mutex };
+    mutex.try_lock()
 }
 
 /// Unlocks the mutex.
@@ -316,47 +353,8 @@ pub unsafe extern "C" fn __nx_sync_mutex_try_lock(mutex: *mut Mutex) -> bool {
 /// - Requires that `mutex` is properly aligned
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_mutex_unlock(mutex: *mut Mutex) {
-    let mutex = unsafe { &(*mutex).0 };
-
-    let curr_thread_handle = get_curr_thread_handle();
-    let mut curr_state = MutexState::from_raw(mutex.load(Ordering::Acquire));
-
-    loop {
-        match curr_state {
-            MutexState::Unlocked => return,
-            MutexState::Locked(tag) => {
-                // If the mutex is not locked by the current thread, return
-                if tag.get_owner_handle() != curr_thread_handle {
-                    return;
-                }
-
-                // If locked and there are waiters, ask the kernel to arbitrate the mutex unlocking
-                if tag.has_waiters() {
-                    unsafe {
-                        if arbitrate_unlock(mutex.as_ptr()).is_err() {
-                            let _ = break_event(BreakReason::Assert, ptr::null_mut(), 0);
-                        }
-                    }
-                    return;
-                }
-
-                // Attempt to set the mutex state to Unlocked
-                match mutex.compare_exchange(
-                    curr_state.into_raw(),
-                    MutexState::Unlocked.into_raw(),
-                    Ordering::Release,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => return,
-                    Err(current_value) => {
-                        // If another thread modified the mutex, retry with the new value
-                        curr_state = MutexState::from_raw(current_value);
-                        continue;
-                    }
-                }
-            }
-        }
-    }
+    let mutex = unsafe { &*mutex };
+    mutex.unlock();
 }
 
 /// Get the current thread's kernel handle.

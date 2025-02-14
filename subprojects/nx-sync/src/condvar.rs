@@ -7,7 +7,7 @@
 
 use nx_svc::{
     error::ToRawResultCode,
-    sync::{signal_process_wide_key, wait_process_wide_key_atomic, WaitProcessWideKeyError},
+    sync::{WaitProcessWideKeyError, signal_process_wide_key, wait_process_wide_key_atomic},
 };
 use nx_thread::raw::Handle;
 
@@ -58,13 +58,19 @@ impl Condvar {
     /// * `0` on successful wait and wake
     /// * Error code if the wait timed out or another error occurred
     pub fn wait_timeout(&self, mutex: &Mutex, timeout: u64) -> Result {
-        unsafe {
-            __nx_sync_condvar_wait_timeout(
-                self as *const Self as *mut Self,
-                mutex as *const Mutex as *mut Mutex,
-                timeout,
-            )
+        let curr_thread_handle = get_curr_thread_handle();
+
+        let result = unsafe {
+            wait_process_wide_key_atomic(self.as_ptr(), mutex.as_ptr(), curr_thread_handle, timeout)
+        };
+
+        // Handle the timeout case specially since we need to re-acquire the mutex
+        if let Err(WaitProcessWideKeyError::TimedOut) = result {
+            mutex.lock();
         }
+
+        // Map result to return codes
+        result.map_or_else(ToRawResultCode::to_rc, |_| 0)
     }
 
     /// Waits on the condition variable indefinitely until notified.
@@ -90,35 +96,22 @@ impl Condvar {
     /// * `num` - Number of threads to wake:
     ///   - If positive, wakes up to that many threads
     ///   - If zero or negative, wakes all waiting threads
-    ///
-    /// # Returns
-    /// * `0` on success
-    /// * Error code if an error occurred
-    pub fn wake(&self, num: i32) -> Result {
-        unsafe { __nx_sync_condvar_wake(self as *const Self as *mut Self, num) };
-        0
+    pub fn wake(&self, num: i32) {
+        unsafe { signal_process_wide_key(self.as_ptr(), num) };
     }
 
     /// Wakes up a single thread waiting on the condition variable.
     ///
     /// If multiple threads are waiting, the highest priority thread will be woken.
-    ///
-    /// # Returns
-    /// * `0` on success
-    /// * Error code if an error occurred
     #[inline]
-    pub fn wake_one(&self) -> Result {
-        self.wake(1)
+    pub fn wake_one(&self) {
+        self.wake(1);
     }
 
     /// Wakes up all threads waiting on the condition variable.
-    ///
-    /// # Returns
-    /// * `0` on success
-    /// * Error code if an error occurred
     #[inline]
-    pub fn wake_all(&self) -> Result {
-        self.wake(-1)
+    pub fn wake_all(&self) {
+        self.wake(-1);
     }
 }
 
@@ -176,25 +169,9 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait_timeout(
     mutex: *mut Mutex,
     timeout: u64,
 ) -> Result {
+    let condvar = unsafe { &*condvar };
     let mutex = unsafe { &*mutex };
-    let curr_thread_handle = get_curr_thread_handle();
-
-    let result = unsafe {
-        wait_process_wide_key_atomic(
-            condvar as *mut u32,
-            mutex.as_ptr(),
-            curr_thread_handle,
-            timeout,
-        )
-    };
-
-    // Handle the timeout case specially since we need to re-acquire the mutex
-    if let Err(WaitProcessWideKeyError::TimedOut) = result {
-        mutex.lock();
-    }
-
-    // Map result to return codes
-    result.map_or_else(ToRawResultCode::to_rc, |_| 0)
+    condvar.wait_timeout(mutex, timeout)
 }
 
 /// Waits on a condition variable indefinitely
@@ -228,7 +205,9 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait(
     condvar: *mut Condvar,
     mutex: *mut Mutex,
 ) -> Result {
-    unsafe { __nx_sync_condvar_wait_timeout(condvar, mutex, u64::MAX) }
+    let condvar = unsafe { &*condvar };
+    let mutex = unsafe { &*mutex };
+    condvar.wait_timeout(mutex, u64::MAX)
 }
 
 /// Wakes up a specified number of threads waiting on a condition variable.
@@ -252,7 +231,8 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait(
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_condvar_wake(condvar: *mut Condvar, num: i32) -> Result {
-    unsafe { signal_process_wide_key(condvar as *mut u32, num) };
+    let condvar = unsafe { &*condvar };
+    condvar.wake(num);
     0
 }
 
@@ -263,10 +243,6 @@ pub unsafe extern "C" fn __nx_sync_condvar_wake(condvar: *mut Condvar, num: i32)
 /// The caller must ensure that:
 /// * `condvar` points to a valid initialized condition variable
 ///
-/// # Parameters
-///
-/// * `condvar`: Pointer to the condition variable
-///
 /// # Returns
 ///
 /// * `0` on success
@@ -274,7 +250,9 @@ pub unsafe extern "C" fn __nx_sync_condvar_wake(condvar: *mut Condvar, num: i32)
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_condvar_wake_one(condvar: *mut Condvar) -> Result {
-    unsafe { __nx_sync_condvar_wake(condvar, 1) }
+    let condvar = unsafe { &*condvar };
+    condvar.wake_one();
+    0
 }
 
 /// Wakes up all threads waiting on a condition variable.
@@ -284,10 +262,6 @@ pub unsafe extern "C" fn __nx_sync_condvar_wake_one(condvar: *mut Condvar) -> Re
 /// The caller must ensure that:
 /// * `condvar` points to a valid initialized condition variable
 ///
-/// # Parameters
-///
-/// * `condvar`: Pointer to the condition variable
-///
 /// # Returns
 ///
 /// * `0` on success
@@ -295,7 +269,9 @@ pub unsafe extern "C" fn __nx_sync_condvar_wake_one(condvar: *mut Condvar) -> Re
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_condvar_wake_all(condvar: *mut Condvar) -> Result {
-    unsafe { __nx_sync_condvar_wake(condvar, -1) }
+    let condvar = unsafe { &*condvar };
+    condvar.wake_all();
+    0
 }
 
 /// Get the current thread's kernel handle
