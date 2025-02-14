@@ -5,6 +5,7 @@
 pub mod barrier;
 pub mod condvar;
 pub mod mutex;
+pub mod rwlock;
 pub mod semaphore;
 
 /// #[panic_handler]
