@@ -23,9 +23,9 @@ pub struct Semaphore {
     count: u64,
 }
 
-// Ensures that the Semaphore object has a 16 bytes size and is properly aligned.
+// Ensure that the Semaphore object has a 16 bytes size, and is properly aligned
 const_assert_eq!(size_of::<Semaphore>(), 16);
-const_assert_eq!(align_of::<Semaphore>(), 8);
+const_assert_eq!(align_of::<Semaphore>(), align_of::<u64>());
 
 impl Semaphore {
     /// Creates a new Semaphore with the specified initial count.
@@ -76,7 +76,7 @@ impl Semaphore {
 /// * `sem` points to valid memory that is properly aligned for a Semaphore object
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_init(sem: *mut Semaphore, count: u64) {
-    unsafe { *sem = Semaphore::new(count) };
+    unsafe { sem.write(Semaphore::new(count)) };
 }
 
 /// Increments the semaphore's counter and wakes one waiting thread.
@@ -93,15 +93,13 @@ pub unsafe extern "C" fn __nx_sync_semaphore_init(sem: *mut Semaphore, count: u6
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_signal(sem: *mut Semaphore) {
     let sem = unsafe { &mut *sem };
-    unsafe { sem.mutex.lock() };
+    sem.mutex.lock();
 
     // Increment the count and wake one waiting thread
     sem.count = sem.count.checked_add(1).expect("semaphore count overflow");
-    unsafe { sem.condvar.wake_one() };
+    sem.condvar.wake_one();
 
-    unsafe {
-        sem.mutex.unlock();
-    };
+    sem.mutex.unlock();
 }
 
 /// Decrements the semaphore's counter, blocking if no resources are available.
@@ -118,16 +116,16 @@ pub unsafe extern "C" fn __nx_sync_semaphore_signal(sem: *mut Semaphore) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_wait(sem: *mut Semaphore) {
     let sem = unsafe { &mut *sem };
-    unsafe { sem.mutex.lock() };
+    sem.mutex.lock();
 
     // If count is 0, wait until signaled
     #[allow(clippy::while_immutable_condition)]
     while sem.count == 0 {
-        unsafe { sem.condvar.wait(&sem.mutex) };
+        sem.condvar.wait(&sem.mutex);
     }
     sem.count = sem.count.checked_sub(1).expect("semaphore count underflow");
 
-    unsafe { sem.mutex.unlock() };
+    sem.mutex.unlock();
 }
 
 /// Attempts to decrement the semaphore's counter without blocking.
@@ -145,7 +143,7 @@ pub unsafe extern "C" fn __nx_sync_semaphore_wait(sem: *mut Semaphore) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_semaphore_try_wait(sem: *mut Semaphore) -> bool {
     let sem = unsafe { &mut *sem };
-    unsafe { sem.mutex.lock() };
+    sem.mutex.lock();
 
     // Check and immediately return result
     let result = if sem.count > 0 {
@@ -155,6 +153,6 @@ pub unsafe extern "C" fn __nx_sync_semaphore_try_wait(sem: *mut Semaphore) -> bo
         false // No resources available
     };
 
-    unsafe { sem.mutex.unlock() };
+    sem.mutex.unlock();
     result
 }

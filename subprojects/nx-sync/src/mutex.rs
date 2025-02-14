@@ -19,7 +19,7 @@ use static_assertions::const_assert_eq;
 #[repr(C)]
 pub struct Mutex(u32);
 
-// Ensure the in-memory sisze of the Mutex is the same as u32
+// Ensure the in-memory size of the Mutex is the same as u32
 const_assert_eq!(size_of::<Mutex>(), size_of::<u32>());
 
 impl Mutex {
@@ -30,13 +30,20 @@ impl Mutex {
         Self(INVALID_HANDLE)
     }
 
+    /// Returns a raw pointer to the underlying integer.
+    ///
+    /// This is useful when you need to pass the mutex to FFI functions that expect a raw pointer.
+    pub fn as_ptr(&self) -> *mut u32 {
+        &self.0 as *const _ as *mut u32
+    }
+
     /// Locks the mutex, blocking the current thread until the lock can be acquired.
     ///
     /// This function will block the current thread until it is able to acquire the mutex.
     /// When the function returns, the current thread will be the only thread with the
     /// mutex locked.
     pub fn lock(&self) {
-        unsafe { __nx_sync_mutex_lock(self.0 as *mut u32) }
+        unsafe { __nx_sync_mutex_lock(self.as_ptr()) }
     }
 
     /// Attempts to lock the mutex without blocking.
@@ -50,14 +57,14 @@ impl Mutex {
     /// * `true` if the mutex was successfully locked
     /// * `false` if the mutex was already locked by another thread
     pub fn try_lock(&self) -> bool {
-        unsafe { __nx_sync_mutex_try_lock(self.0 as *mut u32) }
+        unsafe { __nx_sync_mutex_try_lock(self.as_ptr()) }
     }
 
     /// Unlocks the mutex.
     ///
     /// This function will unlock the mutex, allowing other threads to lock it.
     pub fn unlock(&self) {
-        unsafe { __nx_sync_mutex_unlock(self.0 as *mut u32) }
+        unsafe { __nx_sync_mutex_unlock(self.as_ptr()) }
     }
 }
 
@@ -155,9 +162,7 @@ impl MutexTag {
 /// Initializes the mutex.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_mutex_init(mutex: *mut u32) {
-    unsafe {
-        *mutex = mem::transmute::<Mutex, u32>(Mutex::new());
-    }
+    unsafe { mutex.write(mem::transmute::<Mutex, u32>(Mutex::new())) };
 }
 
 /// Locks the mutex.
@@ -314,10 +319,10 @@ fn load_exclusive(ptr: *const u32) -> u32 {
     let value: u32;
     unsafe {
         asm!(
-            "ldaxr {val:w}, [{ptr:x}]", // Loads the 32-bit value from the memory location pointed to by ptr
-            ptr = in(reg) ptr,          // Input: ptr to load from
-            val = out(reg) value,       // Output: Capture thr result in value (via a register)
-            options(nostack, preserves_flags)
+        "ldaxr {val:w}, [{ptr:x}]", // Loads the 32-bit value from the memory location pointed to by ptr
+        ptr = in(reg) ptr,          // Input: ptr to load from
+        val = out(reg) value,       // Output: Capture thr result in value (via a register)
+        options(nostack, preserves_flags)
         );
     }
     value
@@ -332,11 +337,11 @@ fn store_exclusive(ptr: *mut u32, val: impl IntoRawTag) -> Result<(), ()> {
     let mut res: u32;
     unsafe {
         asm!(
-            "stlxr {res:w}, {val:w}, [{ptr:x}]", // Stores the 32-bit value to the memory location pointed to by ptr
-            val = in(reg) val.into_raw(),        // Input: Value to store
-            ptr = in(reg) ptr,                   // Input: ptr to store to
-            res = out(reg) res,                  // Output: Capture the result in res (via a register)
-            options(nostack, preserves_flags)
+        "stlxr {res:w}, {val:w}, [{ptr:x}]", // Stores the 32-bit value to the memory location pointed to by ptr
+        val = in(reg) val.into_raw(),        // Input: Value to store
+        ptr = in(reg) ptr,                   // Input: ptr to store to
+        res = out(reg) res,                  // Output: Capture the result in res (via a register)
+        options(nostack, preserves_flags)
         );
     }
 

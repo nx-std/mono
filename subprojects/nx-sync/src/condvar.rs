@@ -126,9 +126,7 @@ impl Default for Condvar {
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sync_condvar_init(condvar: *mut Condvar) {
-    unsafe {
-        *condvar = Condvar::new();
-    }
+    unsafe { condvar.write(Condvar::new()) };
 }
 
 /// Waits on a condition variable with a timeout

@@ -2,6 +2,7 @@
 
 #![no_std]
 
+pub mod barrier;
 pub mod condvar;
 pub mod mutex;
 pub mod semaphore;
