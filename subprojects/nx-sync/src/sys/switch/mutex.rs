@@ -213,6 +213,14 @@ impl Mutex {
             }
         }
     }
+
+    /// Checks if the mutex is locked by the current thread.
+    pub fn is_locked_by_current_thread(&self) -> bool {
+        let curr_thread_handle = get_curr_thread_handle();
+        let curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
+
+        matches!(curr_state, MutexState::Locked(tag) if tag.get_owner_handle() == curr_thread_handle)
+    }
 }
 
 impl Default for Mutex {
@@ -301,86 +309,8 @@ impl MutexTag {
     }
 }
 
-/// Initializes the mutex.
-///
-/// # Safety
-///
-/// This function is unsafe because it:
-/// - Writes to the memory pointed to by `mutex`
-/// - Requires that `mutex` is valid and properly aligned
-/// - Requires that `mutex` points to memory that can be safely written to
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_mutex_init(mutex: *mut Mutex) {
-    unsafe { mutex.write(Mutex::new()) }
-}
-
-/// Locks the mutex.
-///
-/// # Safety
-///
-/// This function is unsafe because it:
-/// - Requires that `mutex` points to a valid Mutex instance
-/// - Requires that `mutex` is properly aligned
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_mutex_lock(mutex: *mut Mutex) {
-    let mutex = unsafe { &*mutex };
-    mutex.lock()
-}
-
-/// Attempts to lock the mutex without waiting.
-///
-/// # Safety
-///
-/// This function is unsafe because it:
-/// - Requires that `mutex` points to a valid Mutex instance
-/// - Requires that `mutex` is properly aligned
-///
-/// # Returns
-///
-/// Returns `true` if the mutex was successfully locked, `false` if it was already locked.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_mutex_try_lock(mutex: *mut Mutex) -> bool {
-    let mutex = unsafe { &*mutex };
-    mutex.try_lock()
-}
-
-/// Unlocks the mutex.
-///
-/// # Safety
-///
-/// This function is unsafe because it:
-/// - Requires that `mutex` points to a valid Mutex instance
-/// - Requires that `mutex` is properly aligned
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_mutex_unlock(mutex: *mut Mutex) {
-    let mutex = unsafe { &*mutex };
-    mutex.unlock()
-}
-
 /// Get the current thread's kernel handle.
 #[inline(always)]
 fn get_curr_thread_handle() -> Handle {
     unsafe { nx_thread::raw::__nx_thread_get_current_thread_handle() }
-}
-
-/// Checks if the mutex is locked by the current thread.
-///
-/// # Safety
-///
-/// This function is unsafe because it:
-/// - Requires that `mutex` points to a valid Mutex instance
-/// - Requires that `mutex` is properly aligned
-///
-/// # Returns
-///
-/// Returns `true` if the mutex is currently locked by the calling thread,
-/// `false` otherwise.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_mutex_is_locked_by_current_thread(mutex: *mut Mutex) -> bool {
-    let mutex = unsafe { &(*mutex).0 };
-
-    let curr_thread_handle = get_curr_thread_handle();
-    let curr_state = MutexState::from_raw(mutex.load(Ordering::Acquire));
-
-    matches!(curr_state, MutexState::Locked(tag) if tag.get_owner_handle() == curr_thread_handle)
 }

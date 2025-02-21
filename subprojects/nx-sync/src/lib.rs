@@ -3,6 +3,7 @@
 #![no_std]
 pub mod barrier;
 pub mod condvar;
+mod ffi;
 pub mod mutex;
 mod result;
 pub mod rwlock;

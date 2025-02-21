@@ -1,10 +1,3 @@
-mod barrier;
-mod condvar;
-mod mutex;
-mod rwlock;
-mod semaphore;
+//! Platform-specific code.
 
-#[doc(inline)]
-pub use self::{
-    barrier::Barrier, condvar::Condvar, mutex::Mutex, rwlock::RwLock, semaphore::Semaphore,
-};
+pub mod switch;

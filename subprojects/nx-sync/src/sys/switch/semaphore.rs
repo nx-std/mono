@@ -8,7 +8,7 @@ use core::cell::UnsafeCell;
 
 use static_assertions::const_assert_eq;
 
-use crate::sys::{Condvar, Mutex};
+use super::{Condvar, Mutex};
 
 /// A counting semaphore synchronization primitive.
 ///
@@ -94,70 +94,4 @@ impl Semaphore {
         self.mutex.unlock();
         result
     }
-}
-
-/// Initializes a semaphore with an initial counter value.
-///
-/// # Arguments
-/// * `sem` - Pointer to the semaphore object to initialize
-/// * `count` - Initial value for the semaphore's counter. It must be >= 1.
-///
-/// # Safety
-/// The caller must ensure that:
-/// * `sem` points to valid memory that is properly aligned for a Semaphore object
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_semaphore_init(sem: *mut Semaphore, count: u64) {
-    unsafe { sem.write(Semaphore::new(count)) };
-}
-
-/// Increments the semaphore's counter and wakes one waiting thread.
-///
-/// This function is used when a thread is done with a resource, making it
-/// available for other threads.
-///
-/// # Arguments
-/// * `sem` - Pointer to the semaphore object
-///
-/// # Safety
-/// The caller must ensure that:
-/// * `sem` points to a valid, initialized Semaphore object
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_semaphore_signal(sem: *mut Semaphore) {
-    let sem = unsafe { &*sem };
-    sem.signal();
-}
-
-/// Decrements the semaphore's counter, blocking if no resources are available.
-///
-/// If the counter is 0, the calling thread will block until another thread
-/// signals the semaphore.
-///
-/// # Arguments
-/// * `sem` - Pointer to the semaphore object
-///
-/// # Safety
-/// The caller must ensure that:
-/// * `sem` points to a valid, initialized Semaphore object
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_semaphore_wait(sem: *mut Semaphore) {
-    let sem = unsafe { &*sem };
-    sem.wait();
-}
-
-/// Attempts to decrement the semaphore's counter without blocking.
-///
-/// # Arguments
-/// * `sem` - Pointer to the semaphore object
-///
-/// # Returns
-/// * `true` if the counter was successfully decremented
-/// * `false` if the counter was 0 (no resources available)
-///
-/// # Safety
-/// The caller must ensure that:
-/// * `sem` points to a valid, initialized Semaphore object
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_semaphore_try_wait(sem: *mut Semaphore) -> bool {
-    let sem = unsafe { &*sem };
-    sem.try_wait()
 }

@@ -10,10 +10,8 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::{
-    result::{TryLockError, TryLockResult},
-    sys,
-};
+pub use crate::result::{TryLockError, TryLockResult};
+use crate::sys::switch as sys;
 
 /// A reader-writer lock
 ///
