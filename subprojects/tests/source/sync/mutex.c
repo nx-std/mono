@@ -11,7 +11,7 @@
 * @brief Sleeps the current thread for the given number of milliseconds.
 * @param ms The number of milliseconds to sleep.
 */
-void threadSleepMs(int64_t ms) {
+static inline void threadSleepMs(int64_t ms) {
     svcSleepThread(ms * 1000000);
 }
 

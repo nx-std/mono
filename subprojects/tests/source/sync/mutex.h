@@ -35,12 +35,12 @@ test_rc_t test_0004_mutex_multiple_threads_same_priority(void);
 *
 * Different priorities are used to test the priority inheritance mechanism.
 */
-uint32_t test_0005_mutex_multiple_threads_different_priority(void);
+test_rc_t test_0005_mutex_multiple_threads_different_priority(void);
 
 /**
  * Test suite for sync/mutex.
  */
-static inline void sync_mutex_suite(void) {
+static void sync_mutex_suite(void) {
     TEST_SUITE("sync/mutex");
 
     TEST_CASE(

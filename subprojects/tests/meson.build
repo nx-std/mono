@@ -32,8 +32,11 @@ nx_default_icon = nx_proj.get_variable('nx_default_icon')
 # Source files
 c_src = files(
     'source/main.c',
+    'source/sync/suite.h',
     'source/sync/mutex.h',
     'source/sync/mutex.c',
+    'source/sync/condvar.h',
+    'source/sync/condvar.c',
 )
 
 # Compiler (and linker) options
