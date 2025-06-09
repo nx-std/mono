@@ -12,3 +12,38 @@ option(
     description : 'Use pre-built devkitPro libnx',
     yield : true
 )
+
+option(
+    'use_nx_cpu',
+    type : 'feature', value : 'disabled',
+    description : 'Use nx-cpu instead of libnx implementation',
+    yield : true
+)
+
+option(
+    'use_nx_svc',
+    type : 'feature', value : 'disabled',
+    description : 'Use nx-svc instead of libnx implementation',
+    yield : true
+)
+
+option(
+    'use_nx_sync',
+    type : 'feature', value : 'disabled',
+    description : 'Use nx-sync instead of libnx implementation',
+    yield : true
+)
+
+option(
+    'use_nx_thread',
+    type : 'feature', value : 'disabled',
+    description : 'Use nx-thread instead of libnx implementation',
+    yield : true
+)
+
+option(
+    'use_nx_time',
+    type : 'feature', value : 'disabled',
+    description : 'Use nx-time instead of libnx implementation',
+    yield : true
+)
