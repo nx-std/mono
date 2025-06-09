@@ -1,4 +1,4 @@
-project('nx-dkp', 'c')
+project('nx-dkp', 'c', meson_version : '>= 1.3.0')
 
 # Get `devkitpro` path option, otherwise use default
 devkitpro = get_option('devkitpro')

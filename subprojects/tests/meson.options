@@ -1,0 +1,6 @@
+option(
+    'use_libnx_dkp',
+    type : 'feature', value : 'disabled',
+    description : 'Use devkitPro libnx',
+    yield : true
+)

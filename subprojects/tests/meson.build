@@ -1,10 +1,10 @@
 project('nx-tests', 'c',
         version : '1.0.0',
+        meson_version : '>= 1.3.0',
         default_options : [
             'buildtype=debugoptimized', # -g -O2
             'warning_level=1', # -Wall
-        ],
-)
+        ])
 
 # Project metadata
 name = 'nx-tests'
@@ -21,7 +21,12 @@ endif
 # Dependencies
 #---------------------------------------------------------------------------------
 # libnx
-nx_proj = subproject('libnx')
+if get_option('use_libnx_dkp').enabled()
+    nx_proj = subproject('libnx-dkp')
+else
+    nx_proj = subproject('libnx')
+endif
+
 nx_dep = nx_proj.get_variable('nx_dep')
 nx_switch_specs = nx_proj.get_variable('nx_switch_specs')
 nx_default_icon = nx_proj.get_variable('nx_default_icon')
