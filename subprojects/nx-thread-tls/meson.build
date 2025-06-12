@@ -31,7 +31,7 @@ nx_thread_tls_tgt = custom_target(
         '--target-dir', '@PRIVATE_DIR@',
         '--artifact-dir', '@OUTDIR@',
     ],
-    output : 'libnx_thread.a',
+    output : 'libnx_thread_tls.a',
     console: true,
     build_by_default : true,
     build_always_stale: true,
