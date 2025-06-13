@@ -1,7 +1,7 @@
 //! Synchronization primitives
 
 use crate::{
-    error::{KernelError, ResultCode, ToRawResultCode},
+    error::{KernelError as KError, ResultCode, ToRawResultCode},
     raw::{
         __nx_svc_arbitrate_lock, __nx_svc_arbitrate_unlock, __nx_svc_signal_process_wide_key,
         __nx_svc_wait_process_wide_key_atomic, Handle,
@@ -57,19 +57,11 @@ pub unsafe fn arbitrate_lock(
     curr_thread_handle: Handle,
 ) -> Result<(), ArbitrateLockError> {
     let rc = unsafe { __nx_svc_arbitrate_lock(owner_thread_handle, mutex, curr_thread_handle) };
-    raw::Result::from_raw(rc).map((), |rc| {
-        let desc = rc.description();
-
-        // Map kernel error codes to the appropriate error enum variant
-        if KernelError::InvalidHandle == desc {
-            ArbitrateLockError::InvalidHandle
-        } else if KernelError::InvalidAddress == desc {
-            ArbitrateLockError::InvalidMemState
-        } else if KernelError::TerminationRequested == desc {
-            ArbitrateLockError::ThreadTerminating
-        } else {
-            ArbitrateLockError::Unknown(Error::from(rc))
-        }
+    raw::Result::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidHandle == desc => ArbitrateLockError::InvalidHandle,
+        desc if KError::InvalidAddress == desc => ArbitrateLockError::InvalidMemState,
+        desc if KError::TerminationRequested == desc => ArbitrateLockError::ThreadTerminating,
+        _ => ArbitrateLockError::Unknown(Error::from(rc)),
     })
 }
 
@@ -121,15 +113,9 @@ pub enum ArbitrateLockError {
 /// - Interacts directly with thread scheduling and kernel synchronization primitives
 pub unsafe fn arbitrate_unlock(mutex: *mut u32) -> Result<(), ArbitrateUnlockError> {
     let rc = unsafe { __nx_svc_arbitrate_unlock(mutex) };
-    raw::Result::from_raw(rc).map((), |rc| {
-        let desc = rc.description();
-
-        // Map kernel error codes to the appropriate error enum variant
-        if KernelError::InvalidAddress == desc {
-            ArbitrateUnlockError::InvalidMemState
-        } else {
-            ArbitrateUnlockError::Unknown(Error::from(rc))
-        }
+    raw::Result::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidAddress == desc => ArbitrateUnlockError::InvalidMemState,
+        _ => ArbitrateUnlockError::Unknown(Error::from(rc)),
     })
 }
 
@@ -191,19 +177,11 @@ pub unsafe fn wait_process_wide_key_atomic(
     timeout_ns: u64,
 ) -> Result<(), WaitProcessWideKeyError> {
     let res = unsafe { __nx_svc_wait_process_wide_key_atomic(mutex, condvar, tag, timeout_ns) };
-    raw::Result::from_raw(res).map((), |rc| {
-        let desc = rc.description();
-
-        // Map kernel error codes to the appropriate error enum variant
-        if KernelError::InvalidAddress == desc {
-            WaitProcessWideKeyError::InvalidMemState
-        } else if KernelError::TerminationRequested == desc {
-            WaitProcessWideKeyError::ThreadTerminating
-        } else if KernelError::TimedOut == desc {
-            WaitProcessWideKeyError::TimedOut
-        } else {
-            WaitProcessWideKeyError::Unknown(Error::from(rc))
-        }
+    raw::Result::from_raw(res).map((), |rc| match rc.description() {
+        desc if KError::InvalidAddress == desc => WaitProcessWideKeyError::InvalidMemState,
+        desc if KError::TerminationRequested == desc => WaitProcessWideKeyError::ThreadTerminating,
+        desc if KError::TimedOut == desc => WaitProcessWideKeyError::TimedOut,
+        _ => WaitProcessWideKeyError::Unknown(Error::from(rc)),
     })
 }
 
@@ -229,9 +207,9 @@ pub enum WaitProcessWideKeyError {
 impl ToRawResultCode for WaitProcessWideKeyError {
     fn to_rc(self) -> ResultCode {
         match self {
-            WaitProcessWideKeyError::InvalidMemState => KernelError::InvalidAddress.to_rc(),
-            WaitProcessWideKeyError::ThreadTerminating => KernelError::TerminationRequested.to_rc(),
-            WaitProcessWideKeyError::TimedOut => KernelError::TimedOut.to_rc(),
+            WaitProcessWideKeyError::InvalidMemState => KError::InvalidAddress.to_rc(),
+            WaitProcessWideKeyError::ThreadTerminating => KError::TerminationRequested.to_rc(),
+            WaitProcessWideKeyError::TimedOut => KError::TimedOut.to_rc(),
             WaitProcessWideKeyError::Unknown(err) => err.to_raw(),
         }
     }

@@ -1,6 +1,5 @@
 #![no_std]
 
-mod ffi;
 pub mod sys;
 
 /// #[panic_handler]

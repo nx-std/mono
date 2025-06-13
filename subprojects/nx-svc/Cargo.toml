@@ -11,6 +11,7 @@ doctest = false
 bench = false
 
 [dependencies]
+bitflags = "2.9"
 panic-abort = "0.3.2"
 panic-halt = "1.0.0"
 thiserror = { version = "2.0", default-features = false }

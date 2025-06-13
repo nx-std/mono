@@ -265,6 +265,13 @@ impl PartialEq<u32> for KernelError {
     }
 }
 
+impl PartialEq<KernelError> for u32 {
+    /// Compares the error code with a raw description value.
+    fn eq(&self, other: &KernelError) -> bool {
+        *self == *other as u32
+    }
+}
+
 impl IntoDescription for KernelError {
     fn into_value(self) -> u32 {
         self as u32

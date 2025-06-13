@@ -39,6 +39,95 @@ pub fn get_random_entropy(source: u64) -> Result<u64, GetInfoError> {
     Ok(out)
 }
 
+/// Retrieves memory region information for the current process.
+///
+/// This is a convenience wrapper around [`get_info`] for retrieving memory region information.
+/// It's commonly used by the virtual memory manager to get information about various memory regions.
+///
+/// # Arguments
+///
+/// * `region_type` - The type of memory region to query (e.g. Alias, Heap, ASLR, Stack)
+///
+/// # Returns
+///
+/// Returns the base address and size of the requested memory region on success,
+/// or a [`GetInfoError`] on failure.
+pub fn get_memory_region_info(region_type: InfoType) -> Result<(u64, u64), GetInfoError> {
+    let mut base = 0u64;
+    let mut size = 0u64;
+
+    // Get the base address
+    unsafe {
+        get_info(&mut base as *mut u64, region_type, INVALID_HANDLE)?;
+    }
+
+    // Get the size using the corresponding size info type
+    let size_type = match region_type {
+        InfoType::AliasRegionAddress => InfoType::AliasRegionSize,
+        InfoType::HeapRegionAddress => InfoType::HeapRegionSize,
+        InfoType::AslrRegionAddress => InfoType::AslrRegionSize,
+        InfoType::StackRegionAddress => InfoType::StackRegionSize,
+        _ => return Err(GetInfoError::InvalidInfoType),
+    };
+
+    unsafe {
+        get_info(&mut size as *mut u64, size_type, INVALID_HANDLE)?;
+    }
+
+    Ok((base, size))
+}
+
+/// Retrieves information about the system or a kernel object.
+///
+/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
+/// retrieval of various system properties and kernel object information.
+///
+/// # Arguments
+///
+/// * `out` - Pointer to where the retrieved information will be stored
+/// * `id0` - Type of information to retrieve, specified using the [`InfoType`] enum
+/// * `handle` - Handle of the object to retrieve information from, or [`INVALID_HANDLE`] to retrieve system information
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the information was successfully retrieved, or an error if the
+/// operation failed.
+///
+/// # Safety
+///
+/// This function is unsafe because:
+/// * It dereferences the raw pointer `out`
+/// * The caller must ensure the pointer is valid and points to writable memory
+/// * The caller must ensure the handle is valid if one is provided
+pub unsafe fn get_info(out: *mut u64, id0: InfoType, handle: Handle) -> Result<(), GetInfoError> {
+    let (id0, id1) = id0.to_ids();
+
+    let rc = unsafe { raw::__nx_svc_get_info(out, id0, handle, id1) };
+    RawResult::from_raw(rc).map((), |rc| {
+        let desc = rc.description();
+
+        // Map kernel error codes to the appropriate error enum variant
+        if desc == KernelError::InvalidHandle {
+            GetInfoError::InvalidHandle
+        } else if desc == KernelError::InvalidAddress {
+            GetInfoError::InvalidAddress
+        } else if desc == KernelError::InvalidEnumValue {
+            // Check if it's an info type or ID error based on the error code
+            if rc.module() == Module::Kernel {
+                if desc == KernelError::InvalidEnumValue {
+                    GetInfoError::InvalidInfoType
+                } else {
+                    GetInfoError::InvalidInfoId
+                }
+            } else {
+                GetInfoError::Unknown(Error::from(rc))
+            }
+        } else {
+            GetInfoError::Unknown(Error::from(rc))
+        }
+    })
+}
+
 /// InfoType for svcGetInfo. Only some variants require a sub-ID (id1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InfoType {
@@ -185,54 +274,4 @@ impl ToRawResultCode for GetInfoError {
             GetInfoError::Unknown(err) => err.to_raw(),
         }
     }
-}
-
-/// Retrieves information about the system or a kernel object.
-///
-/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
-/// retrieval of various system properties and kernel object information.
-///
-/// # Arguments
-///
-/// * `out` - Pointer to where the retrieved information will be stored
-/// * `id0` - Type of information to retrieve, specified using the [`InfoType`] enum
-/// * `handle` - Handle of the object to retrieve information from, or [`INVALID_HANDLE`] to retrieve system information
-///
-/// # Returns
-///
-/// Returns `Ok(())` if the information was successfully retrieved, or an error if the
-/// operation failed.
-///
-/// # Safety
-///
-/// This function is unsafe because:
-/// * It dereferences the raw pointer `out`
-/// * The caller must ensure the pointer is valid and points to writable memory
-/// * The caller must ensure the handle is valid if one is provided
-pub unsafe fn get_info(out: *mut u64, id0: InfoType, handle: Handle) -> Result<(), GetInfoError> {
-    let (id0, id1) = id0.to_ids();
-    let rc = unsafe { raw::__nx_svc_get_info(out, id0, handle, id1) };
-    RawResult::from_raw(rc).map((), |rc| {
-        let desc = rc.description();
-
-        // Map kernel error codes to the appropriate error enum variant
-        if desc == KernelError::InvalidHandle as u32 {
-            GetInfoError::InvalidHandle
-        } else if desc == KernelError::InvalidAddress as u32 {
-            GetInfoError::InvalidAddress
-        } else if desc == KernelError::InvalidEnumValue as u32 {
-            // Check if it's an info type or ID error based on the error code
-            if rc.module() == Module::Kernel {
-                if desc == KernelError::InvalidEnumValue as u32 {
-                    GetInfoError::InvalidInfoType
-                } else {
-                    GetInfoError::InvalidInfoId
-                }
-            } else {
-                GetInfoError::Unknown(Error::from(rc))
-            }
-        } else {
-            GetInfoError::Unknown(Error::from(rc))
-        }
-    })
 }

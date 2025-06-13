@@ -5,6 +5,8 @@ use core::{
     ffi::{c_char, c_int, c_void},
 };
 
+use bitflags::bitflags;
+
 use crate::result::ResultCode;
 
 //<editor-fold desc="Types and Constants">
@@ -171,27 +173,168 @@ pub enum LimitableResource {
 }
 
 /// Memory information structure
+#[derive(Debug, Clone, Default)]
 #[repr(C)]
 pub struct MemoryInfo {
     /// Base address
-    pub addr: u64,
+    pub addr: usize,
     /// Size
-    pub size: u64,
-    /// Memory type (see lower 8 bits of [MemoryState])
-    // TODO: MemoryState bitfield
-    pub type_: u32,
-    /// Memory attributes (see [MemoryAttribute])
-    // TODO: MemoryAttribute bitfield
+    pub size: usize,
+    /// Memory state and type.
+    ///
+    /// The upper 24 bits hold the [`MemoryState`] flags.
+    /// The lower 8 bits indicate the [`MemoryType`].
+    pub typ: u32,
+    /// Memory attributes (see [`MemoryAttribute`])
     pub attr: u32,
-    /// Memory permissions (see [MemoryPermission])
-    // TODO: MemoryPermission bitfield
+    /// Memory permissions (see [`MemoryPermission`])
     pub perm: u32,
     /// IPC reference count
     pub ipc_refcount: u32,
     /// Device reference count
     pub device_refcount: u32,
-    /// Padding
-    pub padding: u32,
+    /// Padding (for alignment)
+    _pad: u32,
+}
+
+/// Bitmask for the `typ` field in [`MemoryInfo`]
+pub const MEMORY_TYPE_MASK: u32 = 0xFF;
+
+bitflags! {
+    /// Memory state flags (upper bits of type field)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(transparent)]
+    pub struct MemoryState: u32 {
+        /// Permission change allowed
+        const PERM_CHANGE_ALLOWED = 1 << 8;
+        /// Force read/writable by debug syscalls
+        const FORCE_RW_BY_DEBUG_SYSCALLS = 1 << 9;
+        /// IPC type 0 send allowed
+        const IPC_SEND_ALLOWED_TYPE0 = 1 << 10;
+        /// IPC type 3 send allowed
+        const IPC_SEND_ALLOWED_TYPE3 = 1 << 11;
+        /// IPC type 1 send allowed
+        const IPC_SEND_ALLOWED_TYPE1 = 1 << 12;
+        /// Process permission change allowed
+        const PROCESS_PERM_CHANGE_ALLOWED = 1 << 14;
+        /// Map allowed
+        const MAP_ALLOWED = 1 << 15;
+        /// Unmap process code memory allowed
+        const UNMAP_PROCESS_CODE_MEM_ALLOWED = 1 << 16;
+        /// Transfer memory allowed
+        const TRANSFER_MEM_ALLOWED = 1 << 17;
+        /// Query physical address allowed
+        const QUERY_PADDR_ALLOWED = 1 << 18;
+        /// Map device allowed ([`__nx_svc_map_device_address_space`] and [`__nx_svc_map_device_address_space_by_force`])
+        const MAP_DEVICE_ALLOWED = 1 << 19;
+        /// Map device aligned allowed
+        const MAP_DEVICE_ALIGNED_ALLOWED = 1 << 20;
+        /// IPC buffer allowed
+        const IPC_BUFFER_ALLOWED = 1 << 21;
+        /// Is pool allocated
+        const IS_POOL_ALLOCATED = 1 << 22;
+        /// Alias for [`IS_POOL_ALLOCATED`]
+        const IS_REF_COUNTED = 1 << 22;
+        /// Map process allowed
+        const MAP_PROCESS_ALLOWED = 1 << 23;
+        /// Attribute change allowed
+        const ATTR_CHANGE_ALLOWED = 1 << 24;
+        /// Code memory allowed
+        const CODE_MEM_ALLOWED = 1 << 25;
+    }
+}
+
+/// Memory type enum (lower 8 bits of [`MemoryState])
+#[repr(u8)]
+pub enum MemoryType {
+    /// Unmapped memory
+    Unmapped = 0x00,
+    /// Mapped by kernel capability parsing in [`__nx_svc_create_process`]
+    Io = 0x01,
+    /// Mapped by kernel capability parsing in [`__nx_svc_create_process`]
+    Normal = 0x02,
+    /// Mapped during [`__nx_svc_create_process`]
+    CodeStatic = 0x03,
+    /// Transition from CodeStatic performed by [`__nx_svc_set_process_memory_permission`]
+    CodeMutable = 0x04,
+    /// Mapped using [`__nx_svc_set_heap_size`]
+    Heap = 0x05,
+    /// Mapped using [`__nx_svc_map_shared_memory`]
+    SharedMem = 0x06,
+    /// Mapped using [`__nx_svc_map_memory`]
+    WeirdMappedMem = 0x07,
+    /// Mapped using [`__nx_svc_map_process_code_memory`]
+    ModuleCodeStatic = 0x08,
+    /// Transition from ModuleCodeStatic performed by [`__nx_svc_set_process_memory_permission`]
+    ModuleCodeMutable = 0x09,
+    /// IPC buffers with descriptor `flags=0`
+    IpcBuffer0 = 0x0A,
+    /// Mapped using [`__nx_svc_map_memory`]
+    MappedMemory = 0x0B,
+    /// Mapped during [`__nx_svc_create_thread`]
+    ThreadLocal = 0x0C,
+    /// Mapped using [`__nx_svc_map_transfer_memory`] when the owning process has `perm=0`
+    TransferMemIsolated = 0x0D,
+    /// Mapped using [`__nx_svc_map_transfer_memory`] when the owning process has `perm!=0`
+    TransferMem = 0x0E,
+    /// Mapped using [`__nx_svc_map_process_memory`]
+    ProcessMem = 0x0F,
+    /// Reserved
+    Reserved = 0x10,
+    /// IPC buffers with descriptor `flags=1`
+    IpcBuffer1 = 0x11,
+    /// IPC buffers with descriptor `flags=3`
+    IpcBuffer3 = 0x12,
+    /// Mapped in kernel during [`__nx_svc_create_thread`]
+    KernelStack = 0x13,
+    /// Mapped in kernel during [`__nx_svc_control_code_memory`]
+    CodeReadOnly = 0x14,
+    /// Mapped in kernel during [`__nx_svc_control_code_memory`]
+    CodeWritable = 0x15,
+    /// Not available
+    Coverage = 0x16,
+    /// Mapped in kernel during [`__nx_svc_map_insecure_physical_memory`]
+    Insecure = 0x17,
+}
+
+bitflags! {
+    /// Memory attributes
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    #[repr(transparent)]
+    pub struct MemoryAttribute: u32 {
+        /// Is borrowed memory
+        const IS_BORROWED = 1 << 0;
+        /// Is IPC mapped (when IpcRefCount > 0)
+        const IS_IPC_MAPPED = 1 << 1;
+        /// Is device mapped (when DeviceRefCount > 0)
+        const IS_DEVICE_MAPPED = 1 << 2;
+        /// Is uncached
+        const IS_UNCACHED = 1 << 3;
+        /// Is permission locked
+        const IS_PERMISSION_LOCKED = 1 << 4;
+    }
+}
+
+bitflags! {
+    /// Memory permissions
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    #[repr(transparent)]
+    pub struct MemoryPermission: u32 {
+        /// No permissions
+        const NONE = 0;
+        /// Read permission
+        const R = 1 << 0;
+        /// Write permission
+        const W = 1 << 1;
+        /// Execute permission
+        const X = 1 << 2;
+        /// Read/write permissions
+        const RW = Self::R.bits() | Self::W.bits();
+        /// Read/execute permissions
+        const RX = Self::R.bits() | Self::X.bits();
+        /// Don't care
+        const DONT_CARE = 1 << 28;
+    }
 }
 
 /// Physical memory information structure
@@ -474,7 +617,7 @@ pub unsafe extern "C" fn __nx_svc_unmap_memory(
 pub unsafe extern "C" fn __nx_svc_query_memory(
     meminfo: *mut MemoryInfo,
     pageinfo: *mut u32,
-    addr: u64,
+    addr: usize,
 ) -> ResultCode {
     let result: ResultCode;
     unsafe {
@@ -1475,8 +1618,8 @@ pub unsafe extern "C" fn __nx_svc_get_thread_id(thread_id: *mut u64, handle: Han
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_svc_break(
     reason: BreakReason,
-    address: *mut c_void, // TODO: Review uintptr_t
-    size: usize,          // TODO: Review uintptr_t
+    address: usize,
+    size: usize,
 ) -> ResultCode {
     let result: ResultCode;
     unsafe {

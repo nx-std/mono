@@ -14,14 +14,11 @@
 //! attempt to lock an already locked mutex, they will be suspended by the kernel until
 //! the mutex becomes available.
 
-use core::{
-    ptr,
-    sync::atomic::{AtomicU32, Ordering},
-};
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use nx_svc::{
-    debug::break_event,
-    raw::{BreakReason, Handle, INVALID_HANDLE},
+    debug::{BreakReason, break_event},
+    raw::{Handle, INVALID_HANDLE},
     sync::{HANDLE_WAIT_MASK, arbitrate_lock, arbitrate_unlock},
 };
 use nx_thread_tls::sys::thread_vars;
@@ -116,7 +113,7 @@ impl Mutex {
                     if arb_result.is_err() {
                         // This should never happen
                         // TODO: Handle the arbitrate_lock errors
-                        let _ = unsafe { break_event(BreakReason::Assert, ptr::null_mut(), 0) };
+                        break_event(BreakReason::Assert, 0, 0);
                     }
 
                     // The arbitration has completed; check if we acquired the lock
@@ -189,7 +186,7 @@ impl Mutex {
                             if arbitrate_unlock(self.0.as_ptr()).is_err() {
                                 // This should never happen
                                 // TODO: Handle the arbitrate_lock errors
-                                let _ = break_event(BreakReason::Assert, ptr::null_mut(), 0);
+                                break_event(BreakReason::Assert, 0, 0);
                             }
                         }
                         return;
