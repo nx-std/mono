@@ -2,12 +2,12 @@
 #![no_std]
 
 mod ffi;
+mod global;
 pub mod llalloc;
 mod sync;
 
 #[cfg(feature = "global-allocator")]
-pub mod global;
-
+pub use global::GlobalLinkedListAllocator;
 /// #[panic_handler]
 ///
 /// Use different panic handlers for debug and release builds.

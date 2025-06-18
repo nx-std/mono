@@ -1,9 +1,16 @@
 //! # nx-std-sync
 #![no_std]
 
+extern crate alloc;
+
+/// Use the linked list allocator as the global allocator.
+#[global_allocator]
+static ALLOC: nx_alloc::GlobalLinkedListAllocator = nx_alloc::GlobalLinkedListAllocator;
+
 pub mod barrier;
 pub mod condvar;
 pub mod mutex;
+pub mod oneshot;
 mod result;
 pub mod rwlock;
 pub mod semaphore;

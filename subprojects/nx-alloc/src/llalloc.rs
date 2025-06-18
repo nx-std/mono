@@ -10,13 +10,13 @@ use nx_svc::{
 use crate::sync::Mutex;
 
 /// The allocator instance.
-pub static ALLOC: Mutex<LlAllocator> = Mutex::new(LlAllocator::new_uninit());
+pub static ALLOC: Mutex<LinkedListAllocator> = Mutex::new(LinkedListAllocator::new_uninit());
 
 /// A wrapper around the linked list allocator that provides
 /// a lazy initialization mechanism for the heap.
-pub struct LlAllocator(Option<Heap>);
+pub struct LinkedListAllocator(Option<Heap>);
 
-impl LlAllocator {
+impl LinkedListAllocator {
     /// Create a new allocator with an uninitialized heap.
     const fn new_uninit() -> Self {
         Self(None)

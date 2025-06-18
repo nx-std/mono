@@ -11,6 +11,8 @@ doctest = false
 bench = false
 
 [dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-sync = { version = "0.1.0", path = "../nx-sync" }
 panic-abort = "0.3.2"
 panic-halt = "1.0.0"
+thiserror = { version = "2.0.12", default-features = false }

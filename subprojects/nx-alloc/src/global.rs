@@ -2,20 +2,14 @@
 //!
 //! This module provides a global allocator that uses the linked list allocator.
 //! It is used to allocate memory for the entire program.
-
-#![cfg(feature = "global-allocator")]
-
 use core::alloc::{GlobalAlloc, Layout};
 
 use crate::llalloc::ALLOC;
 
-#[global_allocator]
-static GLOBAL_ALLOC: GlobalLlAllocator = GlobalLlAllocator;
-
 /// A global allocator that uses the linked list allocator.
-pub struct GlobalLlAllocator;
+pub struct GlobalLinkedListAllocator;
 
-unsafe impl GlobalAlloc for GlobalLlAllocator {
+unsafe impl GlobalAlloc for GlobalLinkedListAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut alloc = ALLOC.lock();
         unsafe { alloc.malloc(layout.size(), layout.align()) }

@@ -50,9 +50,11 @@ dependencies = [
 name = "nx-std-sync"
 version = "0.1.0"
 dependencies = [
+ "nx-alloc",
  "nx-sync",
  "panic-abort",
  "panic-halt",
+ "thiserror",
 ]
 
 [[package]]

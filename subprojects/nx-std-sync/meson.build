@@ -10,9 +10,14 @@ cargo = find_program('cargo', required : true)
 nx_sync_proj = subproject('nx-sync')
 nx_sync_dep = nx_sync_proj.get_variable('nx_sync_dep')
 
+# nx-alloc
+nx_alloc_proj = subproject('nx-alloc')
+nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
+
 # Dependencies list
 deps = [
     nx_sync_dep,
+    nx_alloc_dep,
 ]
 
 #------------------------------------------------
