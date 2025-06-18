@@ -115,46 +115,46 @@ test_rc_t test_0010_rwlock_ownership_checks(void);
  * Test suite for sync/rwlock.
  */
 static void sync_rwlock_suite(void) {
-    TEST_SUITE("sync/rwlock")
+    TEST_SUITE("sync/rwlock");
 
     TEST_CASE(
         "Test 0001: rwlock_read_lock_single_thread",
         test_0001_rwlock_read_lock_single_thread
-    )
+    );
     TEST_CASE(
         "Test 0002: rwlock_write_lock_single_thread",
         test_0002_rwlock_write_lock_single_thread
-    )
+    );
     TEST_CASE(
         "Test 0003: rwlock_multiple_readers_concurrent",
         test_0003_rwlock_multiple_readers_concurrent
-    )
+    );
     TEST_CASE(
         "Test 0004: rwlock_write_lock_exclusive",
         test_0004_rwlock_write_lock_exclusive
-    )
+    );
     TEST_CASE(
         "Test 0005: rwlock_reader_writer_priority",
         test_0005_rwlock_reader_writer_priority
-    )
+    );
     TEST_CASE(
         "Test 0006: rwlock_try_operations",
         test_0006_rwlock_try_operations
-    )
+    );
     TEST_CASE(
         "Test 0007: rwlock_write_first_unlock",
         test_0007_rwlock_write_first_unlock
-    )
+    );
     TEST_CASE(
         "Test 0008: rwlock_reads_first_unlock",
         test_0008_rwlock_reads_first_unlock
-    )
+    );
     TEST_CASE(
         "Test 0009: rwlock_mixed_unlock_order",
         test_0009_rwlock_mixed_unlock_order
-    )
+    );
     TEST_CASE(
         "Test 0010: rwlock_ownership_checks",
         test_0010_rwlock_ownership_checks
-    )
+    );
 } 

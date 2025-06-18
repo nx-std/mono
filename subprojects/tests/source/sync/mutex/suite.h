@@ -46,21 +46,21 @@ static void sync_mutex_suite(void) {
     TEST_CASE(
         "Test 0001: mutex_lock_unlock_single_thread",
         test_0001_mutex_lock_unlock_single_thread
-    )
+    );
     TEST_CASE(
         "Test 0002: mutex_two_threads_no_lock_overlap",
         test_0002_mutex_two_threads_no_lock_overlap
-    )
+    );
     TEST_CASE(
         "Test 0003: mutex_two_threads_with_lock_overlap",
         test_0003_mutex_two_threads_with_lock_overlap
-    )
+    );
     TEST_CASE(
         "Test 0004: mutex_multiple_threads_same_priority",
         test_0004_mutex_multiple_threads_same_priority
-    )
+    );
     TEST_CASE(
         "Test 0005: mutex_multiple_threads_different_priority",
         test_0005_mutex_multiple_threads_different_priority
-    )
+    );
 }
