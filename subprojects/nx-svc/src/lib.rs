@@ -35,6 +35,7 @@ pub mod misc;
 pub mod raw;
 pub mod result;
 pub mod sync;
+pub mod thread;
 
 /// #[panic_handler]
 ///
