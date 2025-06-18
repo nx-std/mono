@@ -1,6 +1,6 @@
 //! # nx-sync
-
 #![no_std]
+
 pub mod barrier;
 pub mod condvar;
 mod ffi;
