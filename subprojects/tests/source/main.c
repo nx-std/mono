@@ -14,6 +14,7 @@ static TestSuiteFn test_suites[] = {
     rand_suite,
     // sync
     sync_mutex_suite,
+    sync_remutex_suite,
     sync_condvar_suite,
     sync_barrier_suite,
     sync_rwlock_suite,

@@ -13,10 +13,12 @@
 mod barrier;
 mod condvar;
 mod mutex;
+mod remutex;
 mod rwlock;
 mod semaphore;
 
 #[doc(inline)]
 pub use self::{
-    barrier::Barrier, condvar::Condvar, mutex::Mutex, rwlock::RwLock, semaphore::Semaphore,
+    barrier::Barrier, condvar::Condvar, mutex::Mutex, remutex::ReentrantMutex, rwlock::RwLock,
+    semaphore::Semaphore,
 };

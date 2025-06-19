@@ -36,6 +36,17 @@ mutexTryLock = __nx_sync_mutex_try_lock;
 mutexUnlock = __nx_sync_mutex_unlock;
 mutexIsLockedByCurrentThread = __nx_sync_mutex_is_locked_by_current_thread;
 
+/* RMutex */
+EXTERN(__nx_sync_remutex_init);
+EXTERN(__nx_sync_remutex_lock);
+EXTERN(__nx_sync_remutex_try_lock);
+EXTERN(__nx_sync_remutex_unlock);
+
+rmutexInit = __nx_sync_remutex_init;
+rmutexLock = __nx_sync_remutex_lock;
+rmutexTryLock = __nx_sync_remutex_try_lock;
+rmutexUnlock = __nx_sync_remutex_unlock;
+
 /* RwLock */
 EXTERN(__nx_sync_rwlock_init);
 EXTERN(__nx_sync_rwlock_read_lock);

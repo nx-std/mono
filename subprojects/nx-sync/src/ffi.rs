@@ -11,5 +11,6 @@
 mod barrier;
 mod condvar;
 mod mutex;
+mod remutex;
 mod rwlock;
 mod semaphore;
