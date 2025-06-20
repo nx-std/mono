@@ -13,9 +13,7 @@ bench = false
 [features]
 # Enable the __nx_alloc FFI
 ffi = []
-# Expose the global linked-list allocator, `GlobalLinkedListAllocator`.
-# This is useful when this crate is used as a dependency for other libraries that need to access
-# the allocator.
+# Enable the `#[global_allocator]` for the dependent crates
 global-allocator = []
 
 [dependencies]

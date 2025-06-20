@@ -1,25 +1,30 @@
+//! # Linked list First Fit Allocator
+//!
+//! This module provides a linked list first fit allocator.
+//! It is used to allocate memory for the entire program.
+//!
+//! It is based on the [linked_list_allocator](https://github.com/rust-osdev/linked_list_allocator) crate.
 use core::{alloc::Layout, ffi::c_char, ptr};
 
-use linked_list_allocator::Heap;
 use nx_svc::{
     debug::{BreakReason, break_event},
     mem::set_heap_size,
     misc::{get_total_memory_size, get_used_memory_size},
 };
 
-use crate::sync::Mutex;
-
-/// The allocator instance.
-pub static ALLOC: Mutex<LinkedListAllocator> = Mutex::new(LinkedListAllocator::new_uninit());
-
 /// A wrapper around the linked list allocator that provides
 /// a lazy initialization mechanism for the heap.
-pub struct LinkedListAllocator(Option<Heap>);
+pub struct Heap(Option<linked_list_allocator::Heap>);
 
-impl LinkedListAllocator {
+impl Heap {
     /// Create a new allocator with an uninitialized heap.
-    const fn new_uninit() -> Self {
+    pub const fn new_uninit() -> Self {
         Self(None)
+    }
+
+    /// Initialize the heap.
+    pub fn init(&mut self) {
+        self.0 = Some(init_inner_heap());
     }
 
     /// Allocate memory from the heap.
@@ -29,7 +34,7 @@ impl LinkedListAllocator {
             return ptr::null_mut();
         };
 
-        let heap = self.0.get_or_insert_with(init_alloc_heap);
+        let heap = self.0.get_or_insert_with(init_inner_heap);
         match heap.allocate_first_fit(layout) {
             Ok(nn) => nn.as_ptr(),
             Err(_) => ptr::null_mut(),
@@ -42,13 +47,17 @@ impl LinkedListAllocator {
             return;
         };
 
-        let heap = self.0.get_or_insert_with(init_alloc_heap);
+        let heap = self.0.get_or_insert_with(init_inner_heap);
         let layout = unsafe { Layout::from_size_align_unchecked(size, align) };
         unsafe { heap.deallocate(ptr, layout) };
     }
 }
 
-fn init_alloc_heap() -> Heap {
+/// Initialize the linked-list allocator heap
+///
+/// This function is used to initialize the linked-list allocator heap.
+/// It is either called by the `init` function or when the heap is first used.
+fn init_inner_heap() -> linked_list_allocator::Heap {
     // Default heap size if not specified (0x2000000 * 16)
     const DEFAULT_HEAP_SIZE: usize = 0x2_000_000 * 16;
     const HEAP_SIZE_ALIGN: usize = 0x200_000;
@@ -67,7 +76,7 @@ fn init_alloc_heap() -> Heap {
     }
 
     // Actually allocate the heap
-    let heap_addr = match set_heap_size(heap_size) {
+    let heap_bottom = match set_heap_size(heap_size) {
         Ok(heap_addr) => heap_addr as *mut c_char,
         Err(_) => {
             break_event(BreakReason::Panic, 0, 0);
@@ -75,5 +84,5 @@ fn init_alloc_heap() -> Heap {
     };
 
     // Safety: The kernel guarantees this region is valid and owned by us
-    unsafe { Heap::new(heap_addr as *mut u8, heap_size) }
+    unsafe { linked_list_allocator::Heap::new(heap_bottom as *mut u8, heap_size) }
 }

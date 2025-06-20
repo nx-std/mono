@@ -1,12 +1,12 @@
 use core::{ffi::c_void, ptr};
 
 use self::meta::{Allocation, Layout};
-use crate::llalloc::ALLOC;
+use crate::global as global_allocator;
 
 /// Override fn for libnx's __libnx_initheap
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc_init_heap() {
-    // Intentionally a no-op
+    global_allocator::init();
 }
 
 #[unsafe(no_mangle)]
@@ -15,11 +15,16 @@ pub unsafe extern "C" fn __nx_alloc_malloc(size: usize) -> *mut c_void {
         return ptr::null_mut();
     };
 
-    let mut alloc = ALLOC.lock();
-    let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+    // Critical section
+    let alloc_ptr = {
+        let mut alloc = global_allocator::lock();
 
-    let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
-        return ptr::null_mut();
+        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
+            return ptr::null_mut();
+        };
+
+        alloc_ptr
     };
 
     let allocation = unsafe { Allocation::new_with_metadata(alloc_ptr, layout) };
@@ -32,12 +37,16 @@ pub unsafe extern "C" fn __nx_alloc_aligned_alloc(align: usize, size: usize) -> 
         return ptr::null_mut();
     };
 
-    // Allocate memory with metadata
-    let mut alloc = ALLOC.lock();
-    let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+    // Critical section
+    let alloc_ptr = {
+        let mut alloc = global_allocator::lock();
 
-    let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
-        return ptr::null_mut();
+        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
+            return ptr::null_mut();
+        };
+
+        alloc_ptr
     };
 
     let allocation = unsafe { Allocation::new_with_metadata(alloc_ptr, layout) };
@@ -50,9 +59,9 @@ pub unsafe extern "C" fn __nx_alloc_free(ptr: *mut c_void) {
         return; // If the pointer is null, no-op
     };
 
-    let mut alloc = ALLOC.lock();
-
     let allocation = unsafe { Allocation::from_data_ptr(alloc_ptr) };
+
+    let mut alloc = global_allocator::lock();
     unsafe { alloc.free(allocation.as_ptr(), allocation.size(), allocation.align()) }
 }
 
@@ -66,13 +75,23 @@ pub unsafe extern "C" fn __nx_alloc_calloc(nmemb: usize, size: usize) -> *mut c_
     let Ok(layout) = Layout::from_size(total) else {
         return ptr::null_mut();
     };
-    let mut alloc = ALLOC.lock();
-    let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
-    let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
-        return ptr::null_mut();
+
+    // Critical section
+    let alloc_ptr = {
+        let mut alloc = global_allocator::lock();
+
+        // Allocate new block
+        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
+            return ptr::null_mut();
+        };
+
+        alloc_ptr
     };
+
     // Zero the allocation
     unsafe { ptr::write_bytes(alloc_ptr.as_ptr(), 0, layout.size()) };
+
     let allocation = unsafe { Allocation::new_with_metadata(alloc_ptr, layout) };
     allocation.data_ptr() as *mut c_void
 }
@@ -83,6 +102,7 @@ pub unsafe extern "C" fn __nx_alloc_realloc(ptr: *mut c_void, new_size: usize) -
     if ptr.is_null() {
         return unsafe { __nx_alloc_malloc(new_size) };
     }
+
     // If new_size is zero, free and return null
     if new_size == 0 {
         unsafe { __nx_alloc_free(ptr) };
@@ -97,25 +117,31 @@ pub unsafe extern "C" fn __nx_alloc_realloc(ptr: *mut c_void, new_size: usize) -
     let old_size = allocation.size();
     let align = allocation.align();
 
-    // Allocate new block
     let Ok(layout) = Layout::from_size_align(new_size, align) else {
         return ptr::null_mut();
     };
 
-    let mut alloc = ALLOC.lock();
-    let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
-    let Some(new_alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
-        return ptr::null_mut();
+    // Critical section
+    let new_alloc_ptr = {
+        let mut alloc = global_allocator::lock();
+
+        // Allocate new block
+        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let Some(new_alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
+            return ptr::null_mut();
+        };
+
+        // Copy old data to new allocation (up to the minimum of old and new size)
+        let copy_size = old_size.min(layout.size());
+
+        // Safety: The pointers are valid and the size is non-zero
+        unsafe { ptr::copy_nonoverlapping(allocation.as_ptr(), new_alloc_ptr.as_ptr(), copy_size) };
+
+        // Free old allocation
+        unsafe { alloc.free(allocation.as_ptr(), old_size, align) };
+
+        new_alloc_ptr
     };
-
-    // Copy old data to new allocation (up to the minimum of old and new size)
-    let copy_size = core::cmp::min(old_size, layout.size());
-
-    // Safety: The pointers are valid and the size is non-zero
-    unsafe { ptr::copy_nonoverlapping(allocation.as_ptr(), new_alloc_ptr.as_ptr(), copy_size) };
-
-    // Free old allocation
-    unsafe { alloc.free(allocation.as_ptr(), old_size, align) };
 
     // Write new metadata and return pointer to data
     let new_allocation = unsafe { Allocation::new_with_metadata(new_alloc_ptr, layout) };
