@@ -11,7 +11,7 @@ use nx_svc::{
     result::ResultCode,
     sync::{WaitProcessWideKeyError, signal_process_wide_key, wait_process_wide_key_atomic},
 };
-use nx_thread_tls::sys::thread_vars;
+use nx_sys_thread::sys::thread_vars;
 
 use super::Mutex;
 

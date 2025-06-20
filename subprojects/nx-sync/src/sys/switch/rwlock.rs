@@ -5,7 +5,7 @@
 use core::cell::UnsafeCell;
 
 use nx_svc::raw::{Handle, INVALID_HANDLE};
-use nx_thread_tls::sys::thread_vars;
+use nx_sys_thread::sys::thread_vars;
 use static_assertions::const_assert_eq;
 
 use super::{Condvar, Mutex};

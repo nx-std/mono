@@ -75,12 +75,12 @@ if get_option('use_nx_thread').enabled()
     deps_cargo_features += ['thread']
 endif
 
-# nx-thread-tls
-if get_option('use_nx_thread_tls').enabled()
-    nx_thread_tls_proj = subproject('nx-thread-tls')
+# nx-sys-thread
+if get_option('use_nx_sys_thread').enabled()
+    nx_sys_thread_proj = subproject('nx-sys-thread')
 
-    deps += nx_thread_tls_proj.get_variable('nx_thread_tls_dep')
-    deps_override_link_args += ['-T', nx_thread_tls_proj.get_variable('nx_thread_tls_ld_override')]
+    deps += nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
+    deps_override_link_args += ['-T', nx_sys_thread_proj.get_variable('nx_sys_thread_ld_override')]
 
     debug('sys-thread feature: enabled')
     deps_cargo_features += ['sys-thread']

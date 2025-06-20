@@ -1,1 +1,1 @@
-pub use nx_thread_tls::sys::*;
+pub use nx_sys_thread::sys::*;

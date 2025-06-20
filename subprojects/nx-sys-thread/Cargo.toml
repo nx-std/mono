@@ -1,17 +1,17 @@
 [package]
-name = "nx-thread-tls"
+name = "nx-sys-thread"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_thread_tls"
+name = "nx_sys_thread"
 crate-type = ["rlib", "staticlib"]
 test = false
 doctest = false
 bench = false
 
 [features]
-# Enable the __nx_thread_tls FFI
+# Enable the __nx_sys_thread FFI
 ffi = []
 
 [dependencies]

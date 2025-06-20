@@ -21,7 +21,7 @@ use nx_svc::{
     raw::{Handle, INVALID_HANDLE},
     sync::{HANDLE_WAIT_MASK, arbitrate_lock, arbitrate_unlock},
 };
-use nx_thread_tls::sys::thread_vars;
+use nx_sys_thread::sys::thread_vars;
 use static_assertions::const_assert_eq;
 
 /// A mutual exclusion primitive useful for protecting shared data

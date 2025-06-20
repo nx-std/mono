@@ -55,8 +55,8 @@ dependencies = [
  "nx-std-sync",
  "nx-svc",
  "nx-sync",
+ "nx-sys-thread",
  "nx-thread",
- "nx-thread-tls",
  "nx-time",
  "panic-abort",
  "panic-halt",
@@ -88,7 +88,17 @@ name = "nx-sync"
 version = "0.1.0"
 dependencies = [
  "nx-svc",
- "nx-thread-tls",
+ "nx-sys-thread",
+ "panic-abort",
+ "panic-halt",
+ "static_assertions",
+]
+
+[[package]]
+name = "nx-sys-thread"
+version = "0.1.0"
+dependencies = [
+ "nx-cpu",
  "panic-abort",
  "panic-halt",
  "static_assertions",
@@ -99,17 +109,7 @@ name = "nx-thread"
 version = "0.1.0"
 dependencies = [
  "nx-svc",
- "nx-thread-tls",
- "panic-abort",
- "panic-halt",
- "static_assertions",
-]
-
-[[package]]
-name = "nx-thread-tls"
-version = "0.1.0"
-dependencies = [
- "nx-cpu",
+ "nx-sys-thread",
  "panic-abort",
  "panic-halt",
  "static_assertions",

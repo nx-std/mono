@@ -28,16 +28,16 @@ typedef struct {
  * @brief Gets the thread local storage buffer.
  * @return The thread local storage buffer.
  */
-void* __nx_thread_tls_get_ptr(void);
+void* __nx_sys_thread_get_ptr(void);
 
 /**
  * @brief Gets the thread variables structure.
  * @return Pointer to the thread variables structure.
  */
-ThreadVars* __nx_thread_tls_get_thread_vars(void);
+ThreadVars* __nx_sys_thread_get_thread_vars(void);
 
 /**
  * @brief Gets the current thread handle.
  * @return The current thread handle.
  */
-uint32_t __nx_thread_tls_get_current_thread_handle(void);
+uint32_t __nx_sys_thread_get_current_thread_handle(void);

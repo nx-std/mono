@@ -6,6 +6,13 @@ option(
 ) 
 
 option(
+    'use_nx',
+    type : 'feature', value : 'disabled',
+    description : 'Override all libnx functions with nx- functions',
+    yield : true
+)
+
+option(
     'use_nx_alloc',
     type : 'feature', value : 'disabled',
     description : 'Use nx-alloc instead of libnx implementation',
@@ -34,16 +41,16 @@ option(
 )
 
 option(
-    'use_nx_thread',
-    type : 'feature', value : 'disabled',    
-    description : 'Use nx-thread instead of libnx implementation',
+    'use_nx_sys_thread',
+    type : 'feature', value : 'disabled',
+    description : 'Use nx-sys-thread instead of libnx implementation',
     yield : true
 )
 
 option(
-    'use_nx_thread_tls',
-    type : 'feature', value : 'disabled',
-    description : 'Use nx-thread-tls instead of libnx implementation',
+    'use_nx_thread',
+    type : 'feature', value : 'disabled',    
+    description : 'Use nx-thread instead of libnx implementation',
     yield : true
 )
 

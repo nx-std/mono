@@ -41,7 +41,7 @@ pub mod sys {
     #[cfg(any(feature = "sys", feature = "sys-sync"))]
     pub use nx_sync as sync;
     #[cfg(any(feature = "sys", feature = "sys-thread"))]
-    pub use nx_thread_tls as thread;
+    pub use nx_sys_thread as thread;
 }
 
 /// #[panic_handler]

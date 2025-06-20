@@ -34,16 +34,16 @@ option(
 )
 
 option(
-    'use_nx_thread',
-    type : 'feature', value : 'auto',    
-    description : 'Enable the `thread` feature',
+    'use_nx_sys_thread',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `sys-thread` feature',
     yield : true
 )
 
 option(
-    'use_nx_thread_tls',
-    type : 'feature', value : 'auto',
-    description : 'Enable the `sys-thread` feature',
+    'use_nx_thread',
+    type : 'feature', value : 'auto',    
+    description : 'Enable the `thread` feature',
     yield : true
 )
 

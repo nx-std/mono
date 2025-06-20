@@ -1,4 +1,4 @@
-//! FFI bindings for the `nx-thread-tls` crate
+//! FFI bindings for the `nx-sys-thread` crate
 //!
 //! # References
 //! - [switchbrew/libnx: switch/arm/tls.h](https://github.com/switchbrew/libnx/blob/master/nx/include/switch/arm/tls.h)
@@ -20,7 +20,7 @@ use crate::sys::{
 /// Returns a pointer to the thread-local storage buffer.
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_thread_tls_get_ptr() -> *mut c_void {
+pub unsafe extern "C" fn __nx_sys_thread_get_ptr() -> *mut c_void {
     tls::get_tlr_ptr()
 }
 
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn __nx_thread_tls_get_ptr() -> *mut c_void {
 /// Returns a mutable reference to the `ThreadVars` structure for the current thread.
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_thread_tls_get_thread_vars() -> *mut ThreadVars {
+pub unsafe extern "C" fn __nx_sys_thread_get_thread_vars() -> *mut ThreadVars {
     thread_vars::get_thread_vars()
 }
 
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn __nx_thread_tls_get_thread_vars() -> *mut ThreadVars {
 /// The thread handle is used for mutexes.
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_thread_tls_get_current_thread_handle() -> Handle {
+pub unsafe extern "C" fn __nx_sys_thread_get_current_thread_handle() -> Handle {
     thread_vars::get_current_thread_handle()
 }
 
