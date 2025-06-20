@@ -53,10 +53,10 @@ dependencies = [
  "nx-alloc",
  "nx-rand",
  "nx-std-sync",
+ "nx-std-thread",
  "nx-svc",
  "nx-sys-sync",
  "nx-sys-thread",
- "nx-thread",
  "nx-time",
  "panic-abort",
  "panic-halt",
@@ -71,6 +71,17 @@ dependencies = [
  "panic-abort",
  "panic-halt",
  "thiserror",
+]
+
+[[package]]
+name = "nx-std-thread"
+version = "0.1.0"
+dependencies = [
+ "nx-svc",
+ "nx-sys-thread",
+ "panic-abort",
+ "panic-halt",
+ "static_assertions",
 ]
 
 [[package]]
@@ -99,17 +110,6 @@ name = "nx-sys-thread"
 version = "0.1.0"
 dependencies = [
  "nx-cpu",
- "panic-abort",
- "panic-halt",
- "static_assertions",
-]
-
-[[package]]
-name = "nx-thread"
-version = "0.1.0"
-dependencies = [
- "nx-svc",
- "nx-sys-thread",
  "panic-abort",
  "panic-halt",
  "static_assertions",

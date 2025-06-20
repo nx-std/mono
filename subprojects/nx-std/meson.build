@@ -64,12 +64,12 @@ if get_option('use_nx_sys_sync').enabled()
     deps_cargo_features += ['sys-sync']
 endif
 
-# nx-thread
-if get_option('use_nx_thread').enabled()
-    nx_thread_proj = subproject('nx-thread')
+# nx-std-thread
+if get_option('use_nx_std_thread').enabled()
+    nx_std_thread_proj = subproject('nx-std-thread')
 
-    deps += nx_thread_proj.get_variable('nx_thread_dep')
-    deps_override_link_args += ['-T', nx_thread_proj.get_variable('nx_thread_ld_override')]
+    deps += nx_std_thread_proj.get_variable('nx_std_thread_dep')
+    deps_override_link_args += ['-T', nx_std_thread_proj.get_variable('nx_std_thread_ld_override')]
 
     debug('thread feature: enabled')
     deps_cargo_features += ['thread']

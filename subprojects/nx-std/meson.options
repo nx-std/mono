@@ -41,7 +41,7 @@ option(
 )
 
 option(
-    'use_nx_thread',
+    'use_nx_std_thread',
     type : 'feature', value : 'auto',    
     description : 'Enable the `thread` feature',
     yield : true

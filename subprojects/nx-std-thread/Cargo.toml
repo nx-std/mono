@@ -1,17 +1,17 @@
 [package]
-name = "nx-thread"
+name = "nx-std-thread"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_thread"
+name = "nx_std_thread"
 crate-type = ["rlib", "staticlib"]
 test = false
 doctest = false
 bench = false
 
 [features]
-# Enable the __nx_thread FFI
+# Enable the __nx_std_thread FFI
 ffi = []
 
 [dependencies]

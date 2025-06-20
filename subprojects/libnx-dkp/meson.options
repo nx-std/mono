@@ -48,9 +48,9 @@ option(
 )
 
 option(
-    'use_nx_thread',
+    'use_nx_std_thread',
     type : 'feature', value : 'disabled',    
-    description : 'Use nx-thread instead of libnx implementation',
+    description : 'Use nx-std-thread instead of libnx implementation',
     yield : true
 )
 

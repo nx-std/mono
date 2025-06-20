@@ -22,7 +22,7 @@ pub mod sync {
 }
 #[cfg(feature = "thread")]
 pub mod thread {
-    pub use nx_thread::*;
+    pub use nx_std_thread::*;
 }
 #[cfg(feature = "time")]
 pub mod time {

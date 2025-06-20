@@ -37,7 +37,7 @@ nx_sys_sync_tgt = custom_target(
         '--artifact-dir', '@OUTDIR@',
         '--features', 'ffi',
     ],
-    output : ['libnx_sync.a', 'libnx_sync.rlib'],
+    output : ['libnx_sys_sync.a', 'libnx_sys_sync.rlib'],
     console: true,
     build_by_default : true,
     build_always_stale: true,
@@ -47,7 +47,7 @@ nx_sys_sync_tgt = custom_target(
 # Dependency declaration
 #------------------------------------------------
 # Linker script for overriding libnx sync functions
-nx_sys_sync_ld_override = meson.current_source_dir() / '.ld'
+nx_sys_sync_ld_override = meson.current_source_dir() / 'sys_sync_override.ld'
 
 nx_sys_sync_dep = declare_dependency(
     include_directories : inc,

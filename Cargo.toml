@@ -9,7 +9,7 @@ members = [
     "subprojects/nx-svc",
     "subprojects/nx-sys-sync",
     "subprojects/nx-sys-thread",
-    "subprojects/nx-thread",
+    "subprojects/nx-std-thread",
     "subprojects/nx-time",
 ]
 

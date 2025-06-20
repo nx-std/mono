@@ -25,7 +25,7 @@ ffi = [
     "nx-svc?/ffi",
     "nx-sys-sync?/ffi",
     "nx-sys-thread?/ffi",
-    "nx-thread?/ffi",
+    "nx-std-thread?/ffi",
     "nx-time?/ffi",
 ]
 
@@ -36,7 +36,7 @@ sync = ["dep:nx-std-sync", "alloc"]
 svc = ["dep:nx-svc"]
 sys-sync = ["dep:nx-sys-sync"]
 sys-thread = ["dep:nx-sys-thread"]
-thread = ["dep:nx-thread"]
+thread = ["dep:nx-std-thread"]
 time = ["dep:nx-time"]
 
 [dependencies]
@@ -46,7 +46,7 @@ nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
-nx-thread = { version = "0.1.0", path = "../nx-thread", optional = true }
+nx-std-thread = { version = "0.1.0", path = "../nx-std-thread", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
 panic-abort = "0.3.2"
 panic-halt = "1.0.0"

@@ -1,4 +1,4 @@
-project('nx-thread', version : '0.1.0')
+project('nx-std-thread', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
@@ -27,8 +27,8 @@ deps = [
 inc = include_directories('include')
 
 # Target
-nx_thread_tgt = custom_target(
-    'nx-thread',
+nx_std_thread_tgt = custom_target(
+    'nx-std-thread',
     command : [
         cargo, 'build',
         '--package', meson.project_name(),
@@ -37,7 +37,7 @@ nx_thread_tgt = custom_target(
         '--artifact-dir', '@OUTDIR@',
         '--features', 'ffi',
     ],
-    output : ['libnx_thread.a', 'libnx_thread.rlib'],
+    output : ['libnx_std_thread.a', 'libnx_std_thread.rlib'],
     console: true,
     build_by_default : true,
     build_always_stale: true,
@@ -47,10 +47,10 @@ nx_thread_tgt = custom_target(
 # Dependency declaration
 #------------------------------------------------
 # Linker script for overriding libnx thread functions
-nx_thread_ld_override = meson.current_source_dir() / 'thread_redirect.ld'
+nx_std_thread_ld_override = meson.current_source_dir() / 'std_thread_override.ld'
 
-nx_thread_dep = declare_dependency(
+nx_std_thread_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_thread_tgt[0],
+    link_with : nx_std_thread_tgt[0],
     dependencies : deps,
 )
