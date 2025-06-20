@@ -15,6 +15,10 @@ bench = false
 ffi = []
 
 [dependencies]
+intrusive-collections = "0.9.7"
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-rand = { version = "0.1.0", path = "../nx-rand" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread" }
 panic-abort = "0.3.2"

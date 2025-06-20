@@ -25,37 +25,10 @@ use super::{
 /// Returns the random entropy value on success, or a [`GetInfoError`] on failure.
 // TODO: Review the actual error codes this fn returns
 pub fn get_random_entropy(source: u64) -> Result<u64, GetInfoError> {
-    Ok(unsafe { get_info(InfoType::RandomEntropy { source }, INVALID_HANDLE)? })
-}
-
-/// Retrieves memory region information for the current process.
-///
-/// This is a convenience wrapper around [`get_info`] for retrieving memory region information.
-/// It's commonly used by the virtual memory manager to get information about various memory regions.
-///
-/// # Arguments
-///
-/// * `region_type` - The type of memory region to query (e.g. Alias, Heap, ASLR, Stack)
-///
-/// Returns the base address and size of the requested memory region on success,
-/// or a [`GetInfoError`] on failure.
-// TODO: Review the actual error codes this fn returns
-pub fn get_memory_region_info(region_type: InfoType) -> Result<(u64, u64), GetInfoError> {
-    // Get the base address
-    let base = unsafe { get_info(region_type, raw::INVALID_HANDLE) }?;
-
-    // Get the size using the corresponding size info type
-    let size_type = match region_type {
-        InfoType::AliasRegionAddress => InfoType::AliasRegionSize,
-        InfoType::HeapRegionAddress => InfoType::HeapRegionSize,
-        InfoType::AslrRegionAddress => InfoType::AslrRegionSize,
-        InfoType::StackRegionAddress => InfoType::StackRegionSize,
-        _ => return Err(GetInfoError::InvalidInfoType),
-    };
-
-    let size = unsafe { get_info(size_type, raw::INVALID_HANDLE) }?;
-
-    Ok((base, size))
+    Ok(get_info(
+        InfoType::RandomEntropy { source },
+        INVALID_HANDLE,
+    )?)
 }
 
 /// Retrieves the total amount of memory available for the current process.
@@ -67,8 +40,7 @@ pub fn get_memory_region_info(region_type: InfoType) -> Result<(u64, u64), GetIn
 /// or a [`GetInfoError`] on failure.
 // TODO: Review the actual error codes this fn returns
 pub fn get_total_memory_size() -> Result<usize, GetInfoError> {
-    unsafe { get_info(InfoType::TotalMemorySize, raw::CUR_PROCESS_HANDLE) }
-        .map(|size| size as usize)
+    get_info(InfoType::TotalMemorySize, raw::CUR_PROCESS_HANDLE).map(|size| size as usize)
 }
 
 /// Retrieves the amount of memory currently used by the current process.
@@ -80,7 +52,66 @@ pub fn get_total_memory_size() -> Result<usize, GetInfoError> {
 /// or a [`GetInfoError`] on failure.
 // TODO: Review the actual error codes this fn returns
 pub fn get_used_memory_size() -> Result<usize, GetInfoError> {
-    unsafe { get_info(InfoType::UsedMemorySize, raw::CUR_PROCESS_HANDLE) }.map(|size| size as usize)
+    get_info(InfoType::UsedMemorySize, raw::CUR_PROCESS_HANDLE).map(|size| size as usize)
+}
+
+/// Retrieves the base address and size of the alias region for the current process.
+///
+/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
+/// retrieval of the base address and size of the alias region for the current process.
+///
+/// Returns the base address and size of the alias region on success, or a [`GetInfoError`] on failure.
+pub fn get_alias_region_info() -> Result<(usize, usize), GetInfoError> {
+    let base = get_info(InfoType::AliasRegionAddress, raw::CUR_PROCESS_HANDLE)?;
+    let size = get_info(InfoType::AliasRegionSize, raw::CUR_PROCESS_HANDLE)?;
+    Ok((base as usize, size as usize))
+}
+
+/// Retrieves the extra size added to the reserved alias region.
+///
+/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
+/// retrieval of the extra size added to the reserved alias region.
+///
+/// Returns the extra size added to the reserved alias region on success,
+/// or a [`GetInfoError`] on failure.
+pub fn get_alias_region_extra_size() -> Result<usize, GetInfoError> {
+    get_info(InfoType::AliasRegionExtraSize, raw::CUR_PROCESS_HANDLE).map(|size| size as usize)
+}
+
+/// Retrieves the base address and size of the heap region for the current process.
+///
+/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
+/// retrieval of the base address and size of the heap region for the current process.
+///
+/// Returns the base address and size of the heap region on success, or a [`GetInfoError`] on failure.
+pub fn get_heap_region_info() -> Result<(usize, usize), GetInfoError> {
+    let base = get_info(InfoType::HeapRegionAddress, raw::CUR_PROCESS_HANDLE)?;
+    let size = get_info(InfoType::HeapRegionSize, raw::CUR_PROCESS_HANDLE)?;
+    Ok((base as usize, size as usize))
+}
+
+/// Retrieves the base address and size of the ASLR region for the current process.
+///
+/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
+/// retrieval of the base address and size of the ASLR region for the current process.
+///
+/// Returns the base address and size of the ASLR region on success, or a [`GetInfoError`] on failure.
+pub fn get_aslr_region_info() -> Result<(usize, usize), GetInfoError> {
+    let base = get_info(InfoType::AslrRegionAddress, raw::CUR_PROCESS_HANDLE)?;
+    let size = get_info(InfoType::AslrRegionSize, raw::CUR_PROCESS_HANDLE)?;
+    Ok((base as usize, size as usize))
+}
+
+/// Retrieves the base address and size of the stack region for the current process.
+
+/// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
+/// retrieval of the base address and size of the stack region for the current process.
+///
+/// Returns the base address and size of the stack region on success, or a [`GetInfoError`] on failure.
+pub fn get_stack_region_info() -> Result<(usize, usize), GetInfoError> {
+    let base = get_info(InfoType::StackRegionAddress, raw::CUR_PROCESS_HANDLE)?;
+    let size = get_info(InfoType::StackRegionSize, raw::CUR_PROCESS_HANDLE)?;
+    Ok((base as usize, size as usize))
 }
 
 /// Retrieves information about the system or a kernel object.
@@ -102,10 +133,8 @@ pub fn get_used_memory_size() -> Result<usize, GetInfoError> {
 /// # Safety
 ///
 /// This function is unsafe because:
-/// * It dereferences the raw pointer `out`
-/// * The caller must ensure the pointer is valid and points to writable memory
 /// * The caller must ensure the handle is valid if one is provided
-pub unsafe fn get_info(info_type: InfoType, handle: Handle) -> Result<u64, GetInfoError> {
+pub fn get_info(info_type: InfoType, handle: Handle) -> Result<u64, GetInfoError> {
     let (id0, id1) = info_type.to_ids();
     let mut out = 0u64;
 

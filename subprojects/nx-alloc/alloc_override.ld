@@ -6,7 +6,7 @@ EXTERN(__nx_alloc_init_heap)
 
 __libnx_initheap = __nx_alloc_init_heap;
 
-/* newlib (libc) */
+/* libc (newlib) */
 EXTERN(__nx_alloc_newlib_malloc_r)
 EXTERN(__nx_alloc_newlib_calloc_r)
 EXTERN(__nx_alloc_newlib_realloc_r)
