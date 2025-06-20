@@ -42,7 +42,7 @@ nx_time_tgt = custom_target(
 # Dependency declaration
 #------------------------------------------------
 # Linker script for overriding libnx time functions
-nx_time_ld_override = meson.current_source_dir() / 'time_redirect.ld'
+nx_time_ld_override = meson.current_source_dir() / 'time_override.ld'
 
 nx_time_dep = declare_dependency(
     include_directories : inc,

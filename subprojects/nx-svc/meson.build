@@ -27,7 +27,7 @@ nx_svc_tgt = custom_target(
 # Dependency declaration
 #------------------------------------------------
 # Linker script for overriding libnx svc functions
-nx_svc_ld_override = meson.current_source_dir() / 'svc_redirect.ld'
+nx_svc_ld_override = meson.current_source_dir() / 'svc_override.ld'
 
 nx_svc_dep = declare_dependency(
     include_directories : inc,
