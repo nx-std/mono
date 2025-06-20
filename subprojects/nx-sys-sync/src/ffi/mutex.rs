@@ -4,7 +4,7 @@
 //!
 //! - [switchbrew/libnx: switch/kernel/mutex.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/mutex.h)
 
-use crate::sys::switch::Mutex;
+use crate::mutex::Mutex;
 
 /// Initializes the mutex.
 ///

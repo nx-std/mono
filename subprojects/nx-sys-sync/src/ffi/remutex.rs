@@ -1,6 +1,6 @@
 //! FFI bindings for the `nx-sys-sync` crate - Reentrant Mutex
 
-use crate::sys::switch::ReentrantMutex;
+use crate::remutex::ReentrantMutex;
 
 /// Initializes the reentrant mutex.
 ///

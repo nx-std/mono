@@ -5,7 +5,7 @@
 
 use core::cell::UnsafeCell;
 
-use nx_sys_sync::sys::switch as sys;
+use nx_sys_sync as sys;
 
 /// A mutual exclusion primitive useful for protecting shared data.
 pub struct Mutex<T: ?Sized> {

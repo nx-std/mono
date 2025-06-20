@@ -6,7 +6,7 @@
 
 use nx_svc::result::ResultCode;
 
-use crate::sys::switch::{Condvar, Mutex};
+use crate::{condvar::Condvar, mutex::Mutex};
 
 /// Initializes a condition variable.
 ///

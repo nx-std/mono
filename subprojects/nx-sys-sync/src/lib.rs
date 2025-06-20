@@ -1,10 +1,28 @@
 //! # nx-sys-sync
+//!
+//! Switchbrew libnx synchronization primitives
+//!
+//! This module contains synchronization primitives ported from Switchbrew's libnx.
+//!
+//! # References
+//!
+//! - [switchbrew/libnx: switch/kernel/mutex.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/mutex.h)
+//! - [switchbrew/libnx: switch/kernel/condvar.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/condvar.h)
+//! - [switchbrew/libnx: switch/kernel/rwlock.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/rwlock.h)
+//! - [switchbrew/libnx: switch/kernel/barrier.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/barrier.h)
+//! - [switchbrew/libnx: switch/kernel/semaphore.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/semaphore.h)
+
 #![no_std]
 
 #[cfg(feature = "ffi")]
 mod ffi;
 
-pub mod sys;
+mod barrier;
+mod condvar;
+mod mutex;
+mod remutex;
+mod rwlock;
+mod semaphore;
 
 /// #[panic_handler]
 ///
@@ -21,3 +39,9 @@ use panic_abort as _;
 #[cfg(debug_assertions)]
 #[allow(unused_imports)]
 use panic_halt as _;
+
+#[doc(inline)]
+pub use self::{
+    barrier::Barrier, condvar::Condvar, mutex::Mutex, remutex::ReentrantMutex, rwlock::RwLock,
+    semaphore::Semaphore,
+};

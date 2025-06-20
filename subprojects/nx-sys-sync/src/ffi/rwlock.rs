@@ -4,7 +4,7 @@
 //!
 //! - [switchbrew/libnx: switch/kernel/rwlock.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/rwlock.h)
 
-use crate::sys::switch::RwLock;
+use crate::rwlock::RwLock;
 
 /// Initializes a read/write lock at the given memory location.
 ///

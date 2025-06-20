@@ -4,7 +4,7 @@
 //!
 //! - [switchbrew/libnx: switch/kernel/semaphore.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/semaphore.h)
 
-use crate::sys::switch::Semaphore;
+use crate::semaphore::Semaphore;
 
 /// Initializes a semaphore with an initial counter value.
 ///

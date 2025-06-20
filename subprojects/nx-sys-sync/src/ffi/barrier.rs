@@ -4,7 +4,7 @@
 //!
 //! - [switchbrew/libnx: switch/kernel/barrier.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/kernel/barrier.h)
 
-use crate::sys::switch::Barrier;
+use crate::barrier::Barrier;
 
 /// Initializes a new barrier with the specified thread count.
 ///
