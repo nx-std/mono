@@ -53,12 +53,12 @@ if get_option('use_nx_svc').enabled()
     deps_cargo_features += ['svc']
 endif
 
-# nx-sync
-if get_option('use_nx_sync').enabled()
-    nx_sync_proj = subproject('nx-sync')
+# nx-sys-sync
+if get_option('use_nx_sys_sync').enabled()
+    nx_sys_sync_proj = subproject('nx-sys-sync')
 
-    deps += nx_sync_proj.get_variable('nx_sync_dep')
-    deps_override_link_args += ['-T', nx_sync_proj.get_variable('nx_sync_ld_override')]
+    deps += nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
+    deps_override_link_args += ['-T', nx_sys_sync_proj.get_variable('nx_sys_sync_ld_override')]
 
     debug('sys-sync feature: enabled')
     deps_cargo_features += ['sys-sync']

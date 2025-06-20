@@ -1,4 +1,4 @@
-project('nx-sync', version : '0.1.0')
+project('nx-sys-sync', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
@@ -27,8 +27,8 @@ deps = [
 inc = include_directories('include')
 
 # Target
-nx_sync_tgt = custom_target(
-    'nx-sync',
+nx_sys_sync_tgt = custom_target(
+    'nx-sys-sync',
     command : [
         cargo, 'build',
         '--package', meson.project_name(),
@@ -47,10 +47,10 @@ nx_sync_tgt = custom_target(
 # Dependency declaration
 #------------------------------------------------
 # Linker script for overriding libnx sync functions
-nx_sync_ld_override = meson.current_source_dir() / 'sync_redirect.ld'
+nx_sys_sync_ld_override = meson.current_source_dir() / '.ld'
 
-nx_sync_dep = declare_dependency(
+nx_sys_sync_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_sync_tgt[0],
+    link_with : nx_sys_sync_tgt[0],
     dependencies : deps,
 )

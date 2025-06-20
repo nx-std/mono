@@ -6,9 +6,9 @@ cargo = find_program('cargo', required : true)
 # Dependencies
 #------------------------------------------------
 # Rust dependencies here ar just informative so Meson can build the dependencies in the correct order
-# nx-sync
-nx_sync_proj = subproject('nx-sync')
-nx_sync_dep = nx_sync_proj.get_variable('nx_sync_dep')
+# nx-sys-sync
+nx_sys_sync_proj = subproject('nx-sys-sync')
+nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 
 # nx-alloc
 nx_alloc_proj = subproject('nx-alloc')
@@ -16,7 +16,7 @@ nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
 
 # Dependencies list
 deps = [
-    nx_sync_dep,
+    nx_sys_sync_dep,
     nx_alloc_dep,
 ]
 

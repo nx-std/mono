@@ -8,8 +8,8 @@
 
 #include <stdint.h>
 
-#include "nx_sync_mutex.h"
-#include "nx_sync_condvar.h"
+#include "nx_sys_sync_mutex.h"
+#include "nx_sys_sync_condvar.h"
 
 /// Semaphore structure.
 typedef struct Semaphore
@@ -20,27 +20,27 @@ typedef struct Semaphore
 } Semaphore;
 
 /**
- * @brief Initializes a __nx_sync_semaphore and its internal counter.
+ * @brief Initializes a __nx_sys_sync_semaphore and its internal counter.
  * @param s Semaphore object.
  * @param initial_count initial value for internal counter (typically the # of free resources).
  */
-void __nx_sync_semaphore_init(Semaphore *s, uint64_t initial_count);
+void __nx_sys_sync_semaphore_init(Semaphore *s, uint64_t initial_count);
 
 /**
  * @brief Increments the Semaphore to allow other threads to continue
  * @param s Semaphore object.
  */
-void __nx_sync_semaphore_signal(Semaphore *s);
+void __nx_sys_sync_semaphore_signal(Semaphore *s);
 
 /**
  * @brief Decrements Semaphore and waits if 0.
  * @param s Semaphore object.
  */
-void __nx_sync_semaphore_wait(Semaphore *s);
+void __nx_sys_sync_semaphore_wait(Semaphore *s);
 
 /**
  * @brief Attempts to get lock without waiting.
  * @param s Semaphore object.
  * @return true if no wait and successful lock, false otherwise.
  */
-bool __nx_sync_semaphore_try_wait(Semaphore *s);
+bool __nx_sys_sync_semaphore_try_wait(Semaphore *s);

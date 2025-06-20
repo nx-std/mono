@@ -34,9 +34,9 @@ option(
 )
 
 option(
-    'use_nx_sync',
+    'use_nx_sys_sync',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-sync instead of libnx implementation',
+    description : 'Use nx-sys-sync instead of libnx implementation',
     yield : true
 )
 

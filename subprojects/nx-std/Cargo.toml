@@ -23,7 +23,7 @@ ffi = [
     "nx-rand?/ffi",
     "nx-std-sync?/ffi",
     "nx-svc?/ffi",
-    "nx-sync?/ffi",
+    "nx-sys-sync?/ffi",
     "nx-sys-thread?/ffi",
     "nx-thread?/ffi",
     "nx-time?/ffi",
@@ -34,7 +34,7 @@ alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 rand = ["dep:nx-rand"]
 sync = ["dep:nx-std-sync", "alloc"]
 svc = ["dep:nx-svc"]
-sys-sync = ["dep:nx-sync"]
+sys-sync = ["dep:nx-sys-sync"]
 sys-thread = ["dep:nx-sys-thread"]
 thread = ["dep:nx-thread"]
 time = ["dep:nx-time"]
@@ -44,7 +44,7 @@ nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
-nx-sync = { version = "0.1.0", path = "../nx-sync", optional = true }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
 nx-thread = { version = "0.1.0", path = "../nx-thread", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }

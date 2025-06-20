@@ -1,4 +1,4 @@
-//! FFI bindings for the `nx-sync` crate - Condvar
+//! FFI bindings for the `nx-sys-sync` crate - Condvar
 //!
 //! # References
 //!
@@ -17,7 +17,7 @@ use crate::sys::switch::{Condvar, Mutex};
 /// * The memory pointed to by `condvar` remains valid for the entire lifetime of the condition variable
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_condvar_init(condvar: *mut Condvar) {
+pub unsafe extern "C" fn __nx_sys_sync_condvar_init(condvar: *mut Condvar) {
     unsafe { condvar.write(Condvar::new()) };
 }
 
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn __nx_sync_condvar_init(condvar: *mut Condvar) {
 /// On function return, the underlying mutex is guaranteed to be acquired, even in case
 /// of timeout or error.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_condvar_wait_timeout(
+pub unsafe extern "C" fn __nx_sys_sync_condvar_wait_timeout(
     condvar: *mut Condvar,
     mutex: *mut Mutex,
     timeout: u64,
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait_timeout(
 /// On function return, the underlying mutex is guaranteed to be acquired.
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_condvar_wait(
+pub unsafe extern "C" fn __nx_sys_sync_condvar_wait(
     condvar: *mut Condvar,
     mutex: *mut Mutex,
 ) -> ResultCode {
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn __nx_sync_condvar_wait(
 /// * Non-zero value indicates an error
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_condvar_wake(condvar: *mut Condvar, num: i32) -> ResultCode {
+pub unsafe extern "C" fn __nx_sys_sync_condvar_wake(condvar: *mut Condvar, num: i32) -> ResultCode {
     unsafe { &*condvar }.wake(num);
     0
 }
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn __nx_sync_condvar_wake(condvar: *mut Condvar, num: i32)
 /// * Non-zero value indicates an error
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_condvar_wake_one(condvar: *mut Condvar) -> ResultCode {
+pub unsafe extern "C" fn __nx_sys_sync_condvar_wake_one(condvar: *mut Condvar) -> ResultCode {
     unsafe { &*condvar }.wake_one();
     0
 }
@@ -151,7 +151,7 @@ pub unsafe extern "C" fn __nx_sync_condvar_wake_one(condvar: *mut Condvar) -> Re
 /// * Non-zero value indicates an error
 #[inline]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sync_condvar_wake_all(condvar: *mut Condvar) -> ResultCode {
+pub unsafe extern "C" fn __nx_sys_sync_condvar_wake_all(condvar: *mut Condvar) -> ResultCode {
     unsafe { &*condvar }.wake_all();
     0
 }

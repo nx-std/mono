@@ -7,8 +7,8 @@
 #pragma once
 #include <stdint.h>
 
-#include "nx_sync_mutex.h"
-#include "nx_sync_condvar.h"
+#include "nx_sys_sync_mutex.h"
+#include "nx_sys_sync_condvar.h"
 
 /// Barrier structure.
 typedef struct Barrier {
@@ -23,10 +23,10 @@ typedef struct Barrier {
  * @param b Barrier object.
  * @param thread_count Initial value for the number of threads the barrier must wait for.
  */
-void __nx_sync_barrier_init(Barrier *b, uint64_t thread_count);
+void __nx_sys_sync_barrier_init(Barrier *b, uint64_t thread_count);
 
 /**
  * @brief Forces threads to wait until all threads have called barrierWait.
  * @param b Barrier object.
  */
-void __nx_sync_barrier_wait(Barrier *b);
+void __nx_sys_sync_barrier_wait(Barrier *b);

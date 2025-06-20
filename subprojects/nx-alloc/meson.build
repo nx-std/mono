@@ -18,16 +18,16 @@ nx_sys_thread_dep = nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
 nx_rand_proj = subproject('nx-rand')
 nx_rand_dep = nx_rand_proj.get_variable('nx_rand_dep')
 
-# nx-sync
-nx_sync_proj = subproject('nx-sync')
-nx_sync_dep = nx_sync_proj.get_variable('nx_sync_dep')
+# nx-sys-sync
+nx_sys_sync_proj = subproject('nx-sys-sync')
+nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 
 # Dependencies list
 deps = [
     nx_svc_dep,
     nx_sys_thread_dep,
     nx_rand_dep,
-    nx_sync_dep,
+    nx_sys_sync_dep,
 ]
 
 #------------------------------------------------

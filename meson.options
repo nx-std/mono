@@ -56,9 +56,9 @@ option(
 )
 
 option(
-    'use_nx_sync',
+    'use_nx_sys_sync',
     type : 'feature', value : 'auto',
-    description : 'Override all libnx functions with nx-sync functions',
+    description : 'Override all libnx functions with nx-sys-sync functions',
     yield : true
 )
 

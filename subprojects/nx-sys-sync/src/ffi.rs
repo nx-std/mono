@@ -1,4 +1,4 @@
-//! FFI bindings for the `nx-sync` crate
+//! FFI bindings for the `nx-sys-sync` crate
 //!
 //! # References
 //!

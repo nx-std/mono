@@ -1,17 +1,17 @@
 [package]
-name = "nx-sync"
+name = "nx-sys-sync"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_sync"
+name = "nx_sys_sync"
 crate-type = ["rlib", "staticlib"]
 test = false
 doctest = false
 bench = false
 
 [features]
-# Enable the __nx_sync FFI
+# Enable the __nx_sys_sync FFI
 ffi = []
 
 [dependencies]

@@ -20,7 +20,7 @@ version = "0.1.0"
 dependencies = [
  "linked_list_allocator",
  "nx-svc",
- "nx-sync",
+ "nx-sys-sync",
  "panic-abort",
  "panic-halt",
  "thiserror",
@@ -54,7 +54,7 @@ dependencies = [
  "nx-rand",
  "nx-std-sync",
  "nx-svc",
- "nx-sync",
+ "nx-sys-sync",
  "nx-sys-thread",
  "nx-thread",
  "nx-time",
@@ -67,7 +67,7 @@ name = "nx-std-sync"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
- "nx-sync",
+ "nx-sys-sync",
  "panic-abort",
  "panic-halt",
  "thiserror",
@@ -84,7 +84,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nx-sync"
+name = "nx-sys-sync"
 version = "0.1.0"
 dependencies = [
  "nx-svc",

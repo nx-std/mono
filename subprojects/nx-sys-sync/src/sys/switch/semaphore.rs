@@ -78,7 +78,7 @@ impl Semaphore {
     ///
     /// # Safety
     /// This function is safe to call with an immutable reference because the internal
-    /// synchronization is handled by the Mutex in __nx_sync_semaphore_try_wait.
+    /// synchronization is handled by the Mutex in __nx_sys_sync_semaphore_try_wait.
     pub fn try_wait(&self) -> bool {
         self.mutex.lock();
 

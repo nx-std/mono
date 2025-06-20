@@ -1,4 +1,4 @@
-//! # nx-sync
+//! # nx-sys-sync
 #![no_std]
 
 #[cfg(feature = "ffi")]
