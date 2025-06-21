@@ -34,6 +34,31 @@ impl<T> Mutex<T> {
             data: UnsafeCell::new(data),
         }
     }
+
+    /// Creates a new `Mutex` from an existing raw [`nx_sys_sync::Mutex`].
+    ///
+    /// This is primarily intended for interoperability with foreign code that
+    /// exposes a raw libnx mutex.  The returned high-level `Mutex` takes
+    /// ownership of the provided raw mutex; after calling this function you
+    /// must not manipulate `inner` directly.
+    ///
+    /// # Safety
+    ///
+    /// * `inner` must be a valid, properly initialised `nx_sys_sync::Mutex`.
+    /// * No other code may continue to access `inner` for the lifetime of the
+    ///   created `Mutex`.
+    /// * The calling thread must ensure that there are no outstanding locks on
+    ///   `inner` that could violate Rust's aliasing rules.
+    #[inline]
+    pub const unsafe fn from_raw(inner: sys::Mutex, data: T) -> Mutex<T>
+    where
+        T: Sized,
+    {
+        Mutex {
+            inner,
+            data: UnsafeCell::new(data),
+        }
+    }
 }
 
 impl<T: ?Sized> Mutex<T> {
@@ -93,6 +118,56 @@ impl<T: ?Sized> Mutex<T> {
     pub fn get_mut(&mut self) -> &mut T {
         self.data.get_mut()
     }
+
+    /// Creates a new `MutexGuard` **without** verifying that the lock is currently held.
+    ///
+    /// This is useful when the lock has already been acquired through some other
+    /// mechanism (for example, after calling [`try_lock`] and keeping the lock
+    /// across an FFI boundary) and you need to reconstruct a guard so that the
+    /// mutex is unlocked automatically on drop.
+    ///
+    /// # Safety
+    ///
+    /// * The current thread must logically own the lock.
+    /// * There must be no other active `MutexGuard` instances for this mutex
+    ///   (unless they were previously leaked with `core::mem::forget`).
+    /// * Violating these requirements results in **undefined behaviour**.
+    #[inline]
+    pub unsafe fn make_guard_unchecked(&self) -> MutexGuard<'_, T> {
+        // SAFETY: Caller guarantees that the mutex is already locked and that
+        // no other guard exists.
+        unsafe { MutexGuard::new(self) }
+    }
+
+    /// Forcibly unlocks the mutex, regardless of whether a `MutexGuard` is
+    /// currently in scope.
+    ///
+    /// This can be combined with `core::mem::forget` to keep the lock for an
+    /// arbitrary duration without holding a guard value, which is sometimes
+    /// required when interfacing with foreign code.
+    ///
+    /// # Safety
+    ///
+    /// * The current thread must currently own the lock.
+    /// * No `MutexGuard` instances for this mutex may exist (unless they have
+    ///   been intentionally leaked with `core::mem::forget`).
+    /// * Unlocking a mutex that is not locked or is locked by another thread
+    ///   is **undefined behaviour**.
+    #[inline]
+    pub unsafe fn force_unlock(&self) {
+        self.inner.unlock();
+    }
+
+    /// Returns a raw pointer to the underlying data protected by the mutex.
+    ///
+    /// This can be handy when the guard has been purposely leaked and you still
+    /// want to access the data (e.g. from FFI code).  Dereferencing the pointer
+    /// is inherently unsafe because the compiler cannot guarantee the absence
+    /// of data races.
+    #[inline]
+    pub fn data_ptr(&self) -> *mut T {
+        self.data.get()
+    }
 }
 
 impl<T> From<T> for Mutex<T> {
@@ -140,6 +215,27 @@ impl<'mutex, T: ?Sized> MutexGuard<'mutex, T> {
             lock,
             _marker: Default::default(),
         }
+    }
+
+    /// Leaks the mutex guard and returns a mutable reference to the data it
+    /// protects **without** unlocking the mutex.
+    ///
+    /// After calling this function the caller is responsible for eventually
+    /// unlocking the mutex manually (for example with
+    /// [`Mutex::force_unlock`](super::mutex::Mutex::force_unlock)) once the
+    /// mutable reference is no longer used. Failing to do so will leave the
+    /// mutex permanently locked and likely dead-lock future lock attempts.
+    ///
+    /// The behaviour mimics [`lock_api::MutexGuard::leak`] from the *lock_api*
+    /// crate.
+    #[inline]
+    pub fn leak(self) -> &'mutex mut T {
+        // SAFETY: `this` provides exclusive access to the data and we
+        // intentionally skip the guard's `Drop` implementation, leaving the
+        // mutex locked.
+        let ptr = self.lock.data.get();
+        core::mem::forget(self);
+        unsafe { &mut *ptr }
     }
 }
 
