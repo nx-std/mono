@@ -82,6 +82,38 @@ where
     }
 }
 
+impl<S> StackMemory<S>
+where
+    S: StackState + core::fmt::Debug,
+{
+    /// Returns the size of the stack backing buffer.
+    pub fn size(&self) -> usize {
+        self.0.size()
+    }
+
+    /// Returns `true` if the stack backing buffer is owned by the [`StackMemory`]
+    /// instance, `false` otherwise.
+    pub fn is_owned(&self) -> bool {
+        self.0.is_owned()
+    }
+
+    /// Returns the physical backing pointer of the stack pages.
+    ///
+    /// This is the pointer originally allocated (or provided by the caller)
+    /// before being mapped into the process address space.
+    pub fn backing_ptr(&self) -> NonNull<c_void> {
+        self.0.backing_ptr()
+    }
+}
+
+impl StackMemory<Mapped> {
+    /// Returns the virtual address where this stack is mapped, if any.
+    pub fn addr(&self) -> NonNull<c_void> {
+        let StackMemory(Mapped { addr, .. }) = self;
+        *addr
+    }
+}
+
 impl<S> Drop for StackMemory<S>
 where
     S: StackState + core::fmt::Debug,
@@ -234,7 +266,7 @@ pub trait StackState: _priv::Sealed {
     fn size(&self) -> usize;
     fn is_owned(&self) -> bool;
     fn is_mapped(&self) -> bool;
-    fn get_addr(&self) -> Option<*mut c_void>;
+    fn get_addr(&self) -> Option<NonNull<c_void>>;
 }
 
 #[derive(Debug)]
@@ -261,7 +293,7 @@ impl StackState for Unmapped {
         false
     }
 
-    fn get_addr(&self) -> Option<*mut c_void> {
+    fn get_addr(&self) -> Option<NonNull<c_void>> {
         None
     }
 }
@@ -293,8 +325,8 @@ impl StackState for Mapped {
         true
     }
 
-    fn get_addr(&self) -> Option<*mut c_void> {
-        Some(self.addr.as_ptr())
+    fn get_addr(&self) -> Option<NonNull<c_void>> {
+        Some(self.addr)
     }
 }
 
