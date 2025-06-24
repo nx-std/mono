@@ -153,6 +153,7 @@ dependencies = [
  "panic-abort",
  "panic-halt",
  "static_assertions",
+ "thiserror",
 ]
 
 [[package]]

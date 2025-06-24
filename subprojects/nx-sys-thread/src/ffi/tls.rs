@@ -5,9 +5,11 @@
 
 use core::ffi::c_void;
 
+use nx_svc::thread::Handle;
+
 use crate::{
-    thread_vars::{self, Handle, ThreadVars},
     tls,
+    tls_thread_vars::{self, ThreadVars},
 };
 
 //<editor-fold desc="switch/arm/tls.h">
@@ -21,7 +23,7 @@ use crate::{
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_get_ptr() -> *mut c_void {
-    tls::get_tlr_ptr()
+    tls::get_tls_ptr()
 }
 
 //</editor-fold>
@@ -32,7 +34,7 @@ pub unsafe extern "C" fn __nx_sys_thread_get_ptr() -> *mut c_void {
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_get_thread_vars() -> *mut ThreadVars {
-    thread_vars::get_thread_vars()
+    tls_thread_vars::thread_vars_ptr()
 }
 
 /// Returns the current thread's handle.
@@ -43,7 +45,7 @@ pub unsafe extern "C" fn __nx_sys_thread_get_thread_vars() -> *mut ThreadVars {
 #[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_get_current_thread_handle() -> Handle {
-    thread_vars::get_current_thread_handle()
+    tls_thread_vars::get_current_thread_handle()
 }
 
 //</editor-fold>

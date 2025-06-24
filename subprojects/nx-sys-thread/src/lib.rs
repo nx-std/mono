@@ -3,9 +3,9 @@
 #[cfg(feature = "ffi")]
 mod ffi;
 
-pub mod sleep;
-pub mod thread_vars;
+mod thread_impl;
 pub mod tls;
+pub mod tls_thread_vars;
 
 /// #[panic_handler]
 ///
@@ -22,3 +22,4 @@ use panic_abort as _;
 #[cfg(debug_assertions)]
 #[allow(unused_imports)]
 use panic_halt as _;
+pub use thread_impl::*;
