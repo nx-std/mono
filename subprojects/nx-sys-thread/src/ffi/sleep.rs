@@ -1,3 +1,8 @@
+//! FFI bindings for the `nx-sys-thread` crate
+//!
+//! # References
+//! - [switchbrew/libnx: switch/runtime/newlib.c](https://github.com/switchbrew/libnx/blob/master/nx/source/runtime/newlib.c)
+
 mod newlib {
     use core::{
         ffi::{c_int, c_long, c_uint},

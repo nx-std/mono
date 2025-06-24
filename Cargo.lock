@@ -149,6 +149,7 @@ name = "nx-sys-thread"
 version = "0.1.0"
 dependencies = [
  "nx-cpu",
+ "nx-svc",
  "panic-abort",
  "panic-halt",
  "static_assertions",

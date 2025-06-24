@@ -3,7 +3,9 @@
 #[cfg(feature = "ffi")]
 mod ffi;
 
-pub mod sys;
+pub mod sleep;
+pub mod thread_vars;
+pub mod tls;
 
 /// #[panic_handler]
 ///

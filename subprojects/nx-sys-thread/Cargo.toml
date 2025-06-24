@@ -16,6 +16,7 @@ ffi = []
 
 [dependencies]
 nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
 panic-abort = "0.3.2"
 panic-halt = "1.0.0"
 static_assertions = "1.1.0"

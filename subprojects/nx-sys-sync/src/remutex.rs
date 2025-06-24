@@ -34,7 +34,7 @@ use nx_svc::{
     debug::BreakReason,
     raw::{Handle, INVALID_HANDLE},
 };
-use nx_sys_thread::sys::thread_vars;
+use nx_sys_thread::thread_vars;
 
 use super::mutex::Mutex;
 
