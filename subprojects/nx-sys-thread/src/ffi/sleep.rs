@@ -26,7 +26,7 @@ mod newlib {
     ///
     /// This function is declared in `<unistd.h>`.
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn __nx_std_thread_newlib_sleep(seconds: c_uint) -> c_uint {
+    unsafe extern "C" fn __nx_sys_thread_newlib_sleep(seconds: c_uint) -> c_uint {
         let nanos = (seconds as u64) * 1_000_000_000;
         let _ = svc::sleep(nanos);
         0
@@ -36,7 +36,7 @@ mod newlib {
     ///
     /// This function is declared in `<unistd.h>`.
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn __nx_std_thread_newlib_usleep(useconds: c_uint) -> c_int {
+    unsafe extern "C" fn __nx_sys_thread_newlib_usleep(useconds: c_uint) -> c_int {
         let nanos = (useconds as u64) * 1_000;
         let _ = svc::sleep(nanos);
         0
@@ -46,7 +46,7 @@ mod newlib {
     ///
     /// This function is declared in `<time.h>`.
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn __nx_std_thread_newlib_nanosleep(
+    unsafe extern "C" fn __nx_sys_thread_newlib_nanosleep(
         req: *const TimeSpec,
         rem: *mut TimeSpec,
     ) -> c_int {
@@ -75,7 +75,7 @@ mod newlib {
     ///
     /// This function is declared in `<sched.h>`.
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn __nx_std_thread_newlib_sched_yield() -> c_int {
+    unsafe extern "C" fn __nx_sys_thread_newlib_sched_yield() -> c_int {
         svc::yield_with_migration();
         0
     }
