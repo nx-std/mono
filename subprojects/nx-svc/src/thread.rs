@@ -13,7 +13,7 @@ use crate::{
     result::{Error, ResultCode, raw::Result as RawResult},
 };
 
-define_handle_type! {
+define_waitable_handle_type! {
     /// A handle to a thread kernel object.
     pub struct Handle
 }

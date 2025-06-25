@@ -2,6 +2,7 @@
 
 use crate::{
     error::{KernelError as KError, ResultCode, ToRawResultCode},
+    handle::Waitable,
     raw::{self, Handle},
     result::{Error, Result, raw::Result as RawResult},
 };
@@ -40,14 +41,24 @@ pub const HANDLE_WAIT_MASK: u32 = 0x40000000;
 /// - An error occurs (invalid handle, invalid memory state)
 ///
 /// # Notes
-/// - This is a blocking operation that will pause the current thread if the mutex is held
-/// - The mutex must be properly initialized before calling this function
-/// - Thread handles must belong to the same process
+/// - This is a blocking operation that will pause the current thread if the mutex is held.
+/// - The mutex must be properly initialized before calling this function.
+/// - Thread handles must belong to the same process.
 ///
 /// # Safety
-/// This function is unsafe because it:
-/// - Dereferences a raw pointer (`mutex`)
-/// - Interacts directly with thread scheduling and kernel synchronization primitives
+/// The caller **must uphold** *all* of the following invariants:
+/// 1. `mutex` must point to a 4-byte aligned, readable **and writable** `u32` that is mapped in
+///    the caller's address space for the whole duration of the call **and** until the mutex is
+///    subsequently unlocked.  The pointed-to memory **must not** be unmapped, have its
+///    permissions changed or otherwise invalidated while the kernel may access it.
+/// 2. `owner_thread_handle` and `curr_thread_handle` are valid kernel handles referring to
+///    threads that belong to the **same** process.
+/// 3. Immediately before the call, the value stored at `mutex` follows the Horizon mutex format:
+///    `owner_thread_handle | HANDLE_WAIT_MASK`.
+/// 4. No safe-Rust mutable aliasing of the memory behind `mutex` may happen while the kernel is
+///    arbitrating the lock.
+///
+/// Violating any of these requirements results in **undefined behaviour**.
 pub unsafe fn arbitrate_lock(
     owner_thread_handle: Handle,
     mutex: *mut u32,
@@ -105,9 +116,15 @@ pub enum ArbitrateLockError {
 /// - The current thread must be the owner of the mutex. Otherwise, this is a no-op
 ///
 /// # Safety
-/// This function is unsafe because it:
-/// - Dereferences a raw pointer (`mutex`)
-/// - Interacts directly with thread scheduling and kernel synchronization primitives
+/// In addition to the invariants listed for [`arbitrate_lock`], the caller must ensure:
+/// 1. The **current thread actually owns** the mutex referenced by `mutex`. Calling this function
+///    when the mutex is owned by another thread will lead to kernel-level assertion failures and
+///    is therefore *undefined behaviour* from Rust's perspective.
+/// 2. The mutex value is in the expected format: `owner_thread_handle | HANDLE_WAIT_MASK`.
+/// 3. No safe-Rust mutable aliasing of the memory behind `mutex` may happen while the kernel is
+///    arbitrating the unlock.
+///
+/// Violating any of these requirements results in **undefined behaviour**.
 pub unsafe fn arbitrate_unlock(mutex: *mut u32) -> Result<(), ArbitrateUnlockError> {
     let rc = unsafe { raw::arbitrate_unlock(mutex) };
     RawResult::from_raw(rc).map((), |rc| match rc.description() {
@@ -164,9 +181,16 @@ pub enum ArbitrateUnlockError {
 /// - If timeout is -1, waits indefinitely
 ///
 /// # Safety
-/// This function is unsafe because it:
-/// - Dereferences raw pointers (`mutex` and `condvar`)
-/// - Interacts directly with thread scheduling and kernel synchronization primitives
+/// The caller must guarantee:
+/// 1. `mutex` and `condvar` each point to a 4-byte aligned, readable **and writable** `u32`
+///    residing in the current process' address space. Both pointers must remain valid for the
+///    entire wait – which may extend **beyond** the function call if the thread blocks – and until
+///    the mutex is re-acquired.
+/// 2. The calling thread **owns** the mutex when this function is invoked.
+/// 3. After this function returns, the mutex is held again by the calling thread; normal mutex
+///    invariants therefore apply.
+///
+/// Violating any of these requirements results in **undefined behaviour**.
 pub unsafe fn wait_process_wide_key_atomic(
     condvar: *mut u32,
     mutex: *mut u32,
@@ -243,9 +267,138 @@ impl ToRawResultCode for WaitProcessWideKeyError {
 /// - Thread selection is priority-aware, favoring threads with higher dynamic priority
 ///
 /// # Safety
-/// This function is unsafe because it:
-/// - Dereferences a raw pointer (`condvar`)
-/// - Interacts directly with thread scheduling and kernel synchronization primitives
+/// The caller must ensure that `condvar` is a valid, 4-byte aligned, writable pointer to a `u32`
+/// located in process memory. The pointed-to memory must stay valid until all woken threads have
+/// attempted to re-acquire their mutex. Passing an invalid pointer or allowing the memory to be
+/// unmapped while the kernel still references it constitutes undefined behaviour.
 pub unsafe fn signal_process_wide_key(condvar: *mut u32, count: i32) {
     unsafe { raw::signal_process_wide_key(condvar, count) };
+}
+
+/// Upper bound on how many synchronization objects the high-level [`wait_synchronization`] wrapper
+/// will forward to the kernel.
+///
+/// If the caller supplies a longer slice, only the first `MAX_WAIT_HANDLES` elements are forwarded
+/// and the remainder is **silently ignored**.  This mirrors the Horizon kernel limit (64) while
+/// avoiding a panic or allocation inside the wrapper.
+pub const MAX_WAIT_HANDLES: usize = 64;
+
+/// Waits on one or more synchronization objects
+///
+/// Suspends the current thread until one of the given synchronization handles is signalled,
+/// a timeout occurs or the wait gets cancelled.
+///
+/// # Arguments
+/// | Arg | Name | Description |
+/// | --- | --- | --- |
+/// | IN | _handles_ | Slice of objects implementing [`Waitable`] to wait on. Each element yields its underlying kernel handle via [`Waitable::raw_handle`]. If the slice is longer than [`MAX_HANDLES`], only the first [`MAX_HANDLES`] elements are considered. |
+/// | IN | _timeout_ns_ | Timeout in nanoseconds. Use `u64::MAX` for an infinite wait, `0` for an immediate check. |
+///
+/// # Returns
+/// On success returns the index (within `handles`) of the object that was signalled.
+///
+/// # Behavior
+/// This function calls the [`__nx_svc_wait_synchronization`] syscall under the hood.
+/// The kernel will:
+/// 1. Validate all provided handles and memory access.
+/// 2. If any of the objects are already signalled, return immediately with its index.
+/// 3. Otherwise, block the current thread until either:
+///    - One of the objects becomes signalled → success, returning its index.
+///    - The timeout expires              → [`WaitSynchronizationError::TimedOut`].
+///    - The wait gets cancelled via [`__nx_svc_cancel_synchronization`] → [`WaitSynchronizationError::Cancelled`].
+///
+/// # Notes
+/// - Passing an empty slice results in a sleep until `timeout_ns` elapses (or indefinitely when
+///   `timeout_ns == u64::MAX`). In that case the returned index value is implementation-defined and
+///   should not be relied upon.
+/// - The special pseudo-handles [`raw::CUR_THREAD_HANDLE`] and [`raw::CUR_PROCESS_HANDLE`] **must not**
+///   appear among the first [`MAX_WAIT_HANDLES`] entries – doing so triggers
+///   [`WaitSynchronizationError::InvalidHandle`].
+/// - The error variant [`WaitSynchronizationError::OutOfRange`] is unlikely to be returned by this
+///   wrapper because the argument list is clamped to [`MAX_WAIT_HANDLES`] before the syscall is issued;
+///   it is kept for forward-compatibility.
+///
+/// # Safety
+/// The caller must uphold the following invariants:
+/// 1. Only the first [`MAX_WAIT_HANDLES`] entries of `handles` are forwarded to the kernel.  Each of
+///    those entries **must** yield a valid kernel handle owned by the current process and **must
+///    not** be one of the pseudo-handles [`raw::CUR_THREAD_HANDLE`] or
+///    [`raw::CUR_PROCESS_HANDLE`].
+/// 2. The memory backing the `handles` slice must remain valid and immutable for the entire
+///    duration of the syscall (it is read by the kernel while the thread is in user-space).
+///
+/// Violating any of these requirements results in **undefined behaviour**.
+pub unsafe fn wait_synchronization<H>(
+    handles: &[H],
+    timeout_ns: u64,
+) -> Result<usize, WaitSynchronizationError>
+where
+    H: Waitable,
+{
+    // Stack-allocate a fixed buffer and copy only the used handles. We then create a slice that
+    // covers just the initial `handles.len()` elements so that only the relevant part of the
+    // buffer is visible to the kernel.
+    let handles_len = handles.len().min(MAX_WAIT_HANDLES);
+    let mut raw_handles: [Handle; MAX_WAIT_HANDLES] = [raw::INVALID_HANDLE; MAX_WAIT_HANDLES];
+    for (dst, src) in raw_handles[..handles_len]
+        .iter_mut()
+        .zip(handles[..handles_len].iter())
+    {
+        *dst = src.raw_handle();
+    }
+
+    let mut idx: i32 = -1;
+    let raw_handles = &raw_handles[..handles_len];
+
+    // SAFETY: `raw_slice.as_ptr()` is valid for reads of `handles.len()` * size_of::<Handle>()
+    // bytes because the buffer lives on the stack for the duration of the call and is properly
+    // initialised for the first `handles.len()` entries.
+    let rc = unsafe {
+        raw::wait_synchronization(
+            &mut idx,
+            raw_handles.as_ptr(),
+            raw_handles.len() as i32,
+            timeout_ns,
+        )
+    };
+
+    RawResult::from_raw(rc).map(idx as usize, |rc| match rc.description() {
+        desc if KError::InvalidHandle == desc => WaitSynchronizationError::InvalidHandle,
+        desc if KError::TimedOut == desc => WaitSynchronizationError::TimedOut,
+        desc if KError::Cancelled == desc => WaitSynchronizationError::Cancelled,
+        desc if KError::OutOfRange == desc => WaitSynchronizationError::OutOfRange,
+        _ => WaitSynchronizationError::Unknown(Error::from(rc)),
+    })
+}
+
+/// Error type for [`wait_synchronization`]
+#[derive(Debug, thiserror::Error)]
+pub enum WaitSynchronizationError {
+    /// One (or more) of the supplied handles is invalid.
+    #[error("Invalid handle")]
+    InvalidHandle,
+    /// The wait operation timed out.
+    #[error("Operation timed out")]
+    TimedOut,
+    /// The wait was cancelled via [`__nx_svc_cancel_synchronization`].
+    #[error("Wait cancelled")]
+    Cancelled,
+    /// The number of handles supplied is out of range (must be ≤ 0x40).
+    #[error("Out of range")]
+    OutOfRange,
+    /// An unknown error occurred.
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToRawResultCode for WaitSynchronizationError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            WaitSynchronizationError::InvalidHandle => KError::InvalidHandle.to_rc(),
+            WaitSynchronizationError::TimedOut => KError::TimedOut.to_rc(),
+            WaitSynchronizationError::Cancelled => KError::Cancelled.to_rc(),
+            WaitSynchronizationError::OutOfRange => KError::OutOfRange.to_rc(),
+            WaitSynchronizationError::Unknown(err) => err.to_raw(),
+        }
+    }
 }
