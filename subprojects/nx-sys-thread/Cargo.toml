@@ -20,6 +20,7 @@ nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-alloca
 nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-time = { version = "0.1.0", path = "../nx-time" }
 panic-abort = "0.3.2"
 panic-halt = "1.0.0"
 static_assertions = "1.1.0"

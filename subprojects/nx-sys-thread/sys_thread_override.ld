@@ -16,6 +16,7 @@ EXTERN(__nx_sys_thread_pause)
 EXTERN(__nx_sys_thread_resume)
 EXTERN(__nx_sys_thread_dump_context)
 EXTERN(__nx_sys_thread_get_cur_handle);
+EXTERN(__nx_sys_thread_wait_for_exit)
 EXTERN(__nx_sys_thread_get_self);
 EXTERN(__nx_sys_thread_tls_get);
 EXTERN(__nx_sys_thread_tls_set);
@@ -25,6 +26,7 @@ threadPause        = __nx_sys_thread_pause;
 threadResume       = __nx_sys_thread_resume;
 threadDumpContext  = __nx_sys_thread_dump_context;
 threadGetCurHandle = __nx_sys_thread_get_cur_handle;
+threadWaitForExit  = __nx_sys_thread_wait_for_exit;
 threadGetSelf      = __nx_sys_thread_get_self;
 threadTlsGet       = __nx_sys_thread_tls_get;
 threadTlsSet       = __nx_sys_thread_tls_set;

@@ -5,4 +5,5 @@ mod thread_activity;
 mod thread_context;
 mod thread_info;
 mod thread_slots;
+mod thread_wait;
 mod tls;
