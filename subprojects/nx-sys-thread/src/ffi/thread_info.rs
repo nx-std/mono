@@ -8,7 +8,7 @@ use core::ffi::c_void;
 
 use nx_svc::raw::Handle;
 
-use crate::thread_impl::{self as sys};
+use crate::thread_impl as sys;
 
 /// C-compatible representation of a Horizon thread information block.
 ///
