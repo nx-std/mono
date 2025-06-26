@@ -1,61 +1,86 @@
-use core::{ffi::c_void, ptr};
+use core::{
+    ffi::c_void,
+    ptr::{self, NonNull},
+};
 
 use nx_svc::thread::Handle;
 
 use crate::tls;
 
 /// Thread information structure
-#[repr(C)]
 pub struct Thread {
     /// The kernel thread handle
     pub handle: Handle,
-
-    /// Whether the stack memory is owned by the thread.
-    pub stack_mem_owned: bool,
-
-    /// Alignment padding
-    _align: [u8; 3],
 
     /// Stack memory information.
     pub stack_mem: ThreadStackMem,
 
     /// Pointer to the TLS slot array.
-    pub tls_slot_array: *mut *mut c_void,
-
-    /// Pointer to the next thread.
-    pub next: *mut Thread,
-
-    /// Pointer to the previous thread.
-    pub prev_next: *mut *mut Thread,
+    pub tls_slot_ptr: *mut *mut c_void,
 }
 
 /// Thread stack memory information
-#[repr(C)]
-pub struct ThreadStackMem {
-    /// Pointer to stack memory
-    pub mem: *mut c_void,
+pub enum ThreadStackMem {
+    /// The stack memory is owned by the thread.
+    Owned {
+        /// Pointer to stack memory
+        mem: NonNull<c_void>,
 
-    /// Pointer to stack memory mirror
-    pub mirror: *mut c_void,
+        /// Pointer to stack memory mirror
+        mirror: NonNull<c_void>,
 
-    /// Stack memory size
-    pub size: usize,
+        /// Stack memory size
+        size: usize,
+    },
+
+    /// The stack memory is not owned by the thread.
+    Provided {
+        /// Pointer to stack memory
+        mirror: NonNull<c_void>,
+
+        /// Stack memory size
+        size: usize,
+    },
 }
 
 impl ThreadStackMem {
+    /// Creates a new owned thread stack memory.
+    pub fn new_owned(mem: NonNull<c_void>, mirror: NonNull<c_void>, size: usize) -> Self {
+        Self::Owned { mem, mirror, size }
+    }
+
+    /// Creates a new thread stack memory from a provided stack memory.
+    pub fn new_provided(mirror: NonNull<c_void>, size: usize) -> Self {
+        Self::Provided { mirror, size }
+    }
+
+    /// Returns true if the stack memory is owned by the thread.
+    pub fn is_owned(&self) -> bool {
+        matches!(self, ThreadStackMem::Owned { .. })
+    }
+
     /// Returns a pointer to the thread stack memory.
-    pub fn memory_ptr(&self) -> *mut c_void {
-        self.mem
+    pub fn memory_ptr(&self) -> Option<NonNull<c_void>> {
+        match self {
+            ThreadStackMem::Owned { mem, .. } => Some(*mem),
+            ThreadStackMem::Provided { .. } => None,
+        }
     }
 
     /// Returns a pointer to the thread stack memory mirror.
-    pub fn mirror_ptr(&self) -> *mut c_void {
-        self.mirror
+    pub fn mirror_ptr(&self) -> NonNull<c_void> {
+        match self {
+            ThreadStackMem::Owned { mirror, .. } => *mirror,
+            ThreadStackMem::Provided { mirror, .. } => *mirror,
+        }
     }
 
     /// Returns the size of the thread stack memory.
     pub fn size(&self) -> usize {
-        self.size
+        match self {
+            ThreadStackMem::Owned { size, .. } => *size,
+            ThreadStackMem::Provided { size, .. } => *size,
+        }
     }
 }
 
@@ -107,19 +132,4 @@ pub fn get_current_thread_handle() -> Handle {
     // SAFETY: The current thread's handle is stored in the TLS.
     // Use `read_volatile` to avoid the compiler re-ordering or eliminating the read.
     unsafe { ptr::read_volatile(&raw const (*tls_ptr).handle) }
-}
-
-#[cfg(test)]
-mod tests {
-    use static_assertions::const_assert;
-
-    use super::{Thread, ThreadStackMem};
-
-    // Assert that the size and alignment of the `Thread` struct is correct
-    const_assert!(size_of::<Thread>() == 0x38);
-    const_assert!(align_of::<Thread>() == 0x8);
-
-    // Assert that the size and alignment of the `ThreadStackMem` struct is correct
-    const_assert!(size_of::<ThreadStackMem>() == 0x18);
-    const_assert!(align_of::<ThreadStackMem>() == 0x8);
 }

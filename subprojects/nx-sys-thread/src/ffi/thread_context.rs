@@ -11,7 +11,8 @@
 
 use nx_svc::error::ToRawResultCode;
 
-use crate::thread_impl::{self as sys, Thread};
+use super::thread_info::Thread;
+use crate::thread_impl as sys;
 
 /// Dumps the CPU/FPU context of a *paused* thread into `ctx`.
 ///
@@ -22,9 +23,9 @@ use crate::thread_impl::{self as sys, Thread};
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_dump_context(ctx: *mut Context, t: *const Thread) -> u32 {
     // SAFETY: The caller guarantees that the pointers are valid.
-    let thread = unsafe { &*t };
+    let thread = unsafe { &*t }.into();
 
-    match sys::dump_context(thread) {
+    match sys::dump_context(&thread) {
         Ok(sys_ctx) => {
             // Write the converted context back to the caller-provided buffer.
             unsafe { ctx.write(sys_ctx.into()) };

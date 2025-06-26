@@ -2,7 +2,8 @@
 
 use nx_svc::error::ToRawResultCode;
 
-use crate::thread_impl::{self as sys, Thread};
+use super::thread_info::Thread;
+use crate::thread_impl as sys;
 
 /// Starts the execution of a thread.
 ///
@@ -12,9 +13,9 @@ use crate::thread_impl::{self as sys, Thread};
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_start(t: *const Thread) -> u32 {
     // SAFETY: The caller must ensure that `t` is non-null.
-    let thread = unsafe { &*t };
+    let thread = unsafe { &*t }.into();
 
-    sys::start(thread).map_or_else(|err| err.to_rc(), |_| 0)
+    sys::start(&thread).map_or_else(|err| err.to_rc(), |_| 0)
 }
 
 /// Pauses the execution of a thread.
@@ -25,9 +26,9 @@ pub unsafe extern "C" fn __nx_sys_thread_start(t: *const Thread) -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_pause(t: *const Thread) -> u32 {
     // SAFETY: The caller must ensure that `t` is non-null.
-    let thread = unsafe { &*t };
+    let thread = unsafe { &*t }.into();
 
-    sys::pause(thread).map_or_else(|err| err.to_rc(), |_| 0)
+    sys::pause(&thread).map_or_else(|err| err.to_rc(), |_| 0)
 }
 
 /// Resumes the execution of a previously paused thread.
@@ -38,7 +39,7 @@ pub unsafe extern "C" fn __nx_sys_thread_pause(t: *const Thread) -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_thread_resume(t: *const Thread) -> u32 {
     // SAFETY: The caller must ensure that `t` is non-null.
-    let thread = unsafe { &*t };
+    let thread = unsafe { &*t }.into();
 
-    sys::resume(thread).map_or_else(|err| err.to_rc(), |_| 0)
+    sys::resume(&thread).map_or_else(|err| err.to_rc(), |_| 0)
 }
