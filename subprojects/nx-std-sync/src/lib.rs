@@ -12,6 +12,7 @@ mod ffi;
 pub mod barrier;
 pub mod condvar;
 pub mod mutex;
+pub mod once_lock;
 pub mod oneshot;
 mod result;
 pub mod rwlock;
