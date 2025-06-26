@@ -1,8 +1,5 @@
 //! Thread Implementation
 
-#[allow(dead_code)] // TODO: Remove this once the module is used
-mod list;
-
 mod activity;
 mod context;
 mod info;

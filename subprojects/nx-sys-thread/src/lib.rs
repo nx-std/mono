@@ -20,10 +20,13 @@ use panic_abort as _;
 #[cfg(debug_assertions)]
 #[allow(unused_imports)]
 use panic_halt as _;
-pub use thread_impl::*;
+
+#[allow(dead_code)] // TODO: Remove once it is used
+mod registry;
 
 mod thread_impl;
 pub mod tls;
+pub use thread_impl::*;
 
 #[cfg(feature = "ffi")]
 mod ffi;
