@@ -14,7 +14,6 @@ use crate::sys::clock;
 /// CPU counter-timer.
 ///
 /// Returns the current system tick as a `u64`.
-#[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time_get_system_tick() -> u64 {
     clock::aarch64::get_system_tick()
@@ -26,7 +25,6 @@ pub unsafe extern "C" fn __nx_time_get_system_tick() -> u64 {
 /// frequency of the system counter-timer.
 ///
 /// Returns the system counter-timer frequency, in Hz.
-#[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time_get_system_tick_freq() -> u64 {
     clock::aarch64::get_system_tick_freq()
@@ -36,7 +34,6 @@ pub unsafe extern "C" fn __nx_time_get_system_tick_freq() -> u64 {
 ///
 /// Returns the equivalent CPU ticks for a given time in nanoseconds, based on the
 /// system counter frequency.
-#[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time_ns_to_ticks(ns: u64) -> u64 {
     clock::aarch64::ns_to_cpu_ticks(ns)
@@ -45,7 +42,6 @@ pub unsafe extern "C" fn __nx_time_ns_to_ticks(ns: u64) -> u64 {
 /// Converts from CPU ticks to nanoseconds.
 ///
 /// Returns the equivalent time in nanoseconds for a given number of CPU ticks.
-#[inline]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time_ticks_to_ns(tick: u64) -> u64 {
     clock::aarch64::cpu_ticks_to_ns(tick)

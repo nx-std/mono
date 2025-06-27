@@ -28,7 +28,6 @@ unsafe extern "C" fn __nx_sys_thread_get_thread_vars() -> *mut ThreadVars {
 /// Returns the start offset (in bytes) of the initialised TLS data (`.tdata`/`.tbss`) within a
 /// thread's TLS block. Mirrors the behaviour of `getTlsStartOffset()` from the original C
 /// implementation.
-#[inline]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_sys_thread_get_tls_start_offset() -> usize {
     tls::static_tls_data_start_offset()
