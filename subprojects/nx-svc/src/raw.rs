@@ -1,13 +1,10 @@
 //! Raw _Supervisor Call (SVC)_ API.
 
-use core::{
-    arch::asm,
-    ffi::{c_char, c_int, c_void},
-};
+use core::ffi::{c_char, c_int, c_void};
 
 use bitflags::bitflags;
 
-use crate::result::ResultCode;
+use crate::{code::*, result::ResultCode};
 
 //<editor-fold desc="Types and Constants">
 
@@ -446,21 +443,16 @@ pub struct SecmonArgs {
 /// | IN | _size_ | Size of the heap, must be a multiple of 0x200000 and [2.0.0+] less than 0x18000000. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetHeapSize>
-pub unsafe fn set_heap_size(out_addr: *mut *mut c_void, size: usize) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 (out_addr) on the stack
-            "svc 0x1",             // Issue the SVC call with immediate value 0x1
-            "ldr x2, [sp], #16",   // Load x2 (out_addr pointer) from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") out_addr,     // Input: out_addr in register x0
-            in("x1") size,         // Input: size in register x1
-            lateout("w0") result,  // Output: Capture result from x0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_heap_size(out_addr: *mut *mut c_void, size: usize) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out_addr) on the stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x1
+        "ldr x2, [sp], #16",   // Load x2 (out_addr pointer) from the stack
+        "str x1, [x2]",        // Store x1 in the memory pointed to by x2
+        "ret",
+        code = const SET_HEAP_SIZE,
+    );
 }
 
 /// Set the memory permissions of a (page-aligned) range of memory.
@@ -476,23 +468,17 @@ pub unsafe fn set_heap_size(out_addr: *mut *mut c_void, size: usize) -> ResultCo
 /// | IN | _perm_ | Permissions (see [MemoryPermission]). |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetMemoryPermission>
-pub unsafe fn set_memory_permission(
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_memory_permission(
     addr: *mut c_void,
     size: usize,
     perm: u32, // TODO: MemoryPermission bitfield
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x2",            // Issue the SVC call with immediate value 0x2
-            in("x0") addr,        // Input: addr in register x0
-            in("x1") size,        // Input: size in register x1
-            in("x2") perm,        // Input: perm in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}",          // Issue the SVC call with immediate value 0x2
+        "ret",
+        code = const SET_MEMORY_PERMISSION,
+    );
 }
 
 /// Set the memory attributes of a (page-aligned) range of memory.
@@ -509,25 +495,18 @@ pub unsafe fn set_memory_permission(
 /// | IN | _attr_ | New attributes. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetMemoryAttribute>
-pub unsafe fn set_memory_attribute(
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_memory_attribute(
     addr: *mut c_void,
     size: usize,
     mask: u32,
     attr: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x3",            // Issue the SVC call with immediate value 0x3
-            in("x0") addr,        // Input: addr in register x0
-            in("x1") size,        // Input: size in register x1
-            in("x2") mask,        // Input: mask in register x2
-            in("x3") attr,        // Input: attr in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x3
+        "ret",
+        code = const SET_MEMORY_ATTRIBUTE,
+    );
 }
 
 /// Maps a memory range into a different range. Mainly used for adding guard pages around stack.
@@ -546,19 +525,17 @@ pub unsafe fn set_memory_attribute(
 /// | IN | _size_ | Size of the range. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapMemory>
-pub unsafe fn map_memory(dst_addr: *mut c_void, src_addr: *mut c_void, size: usize) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x4",            // Issue the SVC call with immediate value 0x4
-            in("x0") dst_addr,    // Input: addr in register x0
-            in("x1") src_addr,    // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_memory(
+    dst_addr: *mut c_void,
+    src_addr: *mut c_void,
+    size: usize,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}",  // Issue the SVC call with immediate value 0x4
+        "ret",
+        code = const MAP_MEMORY,
+    );
 }
 
 /// Unmaps a region that was previously mapped with [`map_memory`].
@@ -574,23 +551,17 @@ pub unsafe fn map_memory(dst_addr: *mut c_void, src_addr: *mut c_void, size: usi
 /// | IN | _size_ | Size of the range. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapMemory>
-pub unsafe fn unmap_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_memory(
     dst_addr: *mut c_void,
     src_addr: *mut c_void,
     size: usize,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x5",            // Issue the SVC call with immediate value 0x5
-            in("x0") dst_addr,    // Input: addr in register x0
-            in("x1") src_addr,    // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}",  // Issue the SVC call with immediate value 0x5
+        "ret",
+        code = const UNMAP_MEMORY,
+    );
 }
 
 /// Query information about an address. Will always fetch the lowest page-aligned mapping that
@@ -607,26 +578,20 @@ pub unsafe fn unmap_memory(
 /// | IN  | _addr_ | Address to query.
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryMemory>
-pub unsafe fn query_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn query_memory(
     meminfo: *mut MemoryInfo,
     pageinfo: *mut u32,
     addr: usize,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x1, [sp, #-16]!", // Store x1 on the stack
-            "svc 0x6",             // Issue the SVC call with immediate value 0x6
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") meminfo,      // Input: meminfo in register x0
-            in("x1") pageinfo,     // Input: pageinfo in register x1
-            in("x2") addr,         // Input: addr in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x1, [sp, #-16]!", // Store x1 (pageinfo pointer) on stack with pre-decrement
+        "svc {code}",          // Issue the SVC call with immediate value 0x6
+        "ldr x2, [sp], #16",   // Load x2 from stack with post-increment
+        "str w1, [x2]",        // Store w1 (page info) to address in x2
+        "ret",
+        code = const QUERY_MEMORY,
+    );
 }
 
 //</editor-fold>
@@ -640,13 +605,13 @@ pub unsafe fn query_memory(
 /// Syscall code: [EXIT_PROCESS](crate::code::EXIT_PROCESS) (`0x7`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ExitProcess>
-pub unsafe fn exit_process() -> ! {
-    unsafe {
-        asm!(
-            "svc 0x7",         // Issue the SVC call with immediate value 0x7
-            options(noreturn)  // Never returns, and its return type is defined as ! (never).
-        )
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn exit_process() -> ! {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x7 (ExitProcess) - never returns
+        "ret",
+        code = const EXIT_PROCESS,
+    );
 }
 
 /// Creates a thread.
@@ -665,7 +630,8 @@ pub unsafe fn exit_process() -> ! {
 /// | IN | _cpuid_ | CPU core ID. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateThread>
-pub unsafe fn create_thread(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_thread(
     handle: *mut Handle,
     entry: *mut c_void,
     arg: *mut c_void,
@@ -673,24 +639,14 @@ pub unsafe fn create_thread(
     prio: c_int,
     cpuid: c_int,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 (handle pointer) on the stack
-            "svc 0x8",             // Issue the SVC call with immediate value 0x8
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 (thread handle) in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") entry,        // Input: entry in register x1
-            in("x2") arg,          // Input: arg in register x2
-            in("x3") stack_top,    // Input: stack_top in register x3
-            in("w4") prio,         // Input: prio in register w4
-            in("w5") cpuid,        // Input: cpuid in register w5
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack with pre-decrement
+        "svc {code}",          // Issue the SVC call with immediate value 0x8
+        "ldr x2, [sp], #16",   // Load x2 from stack with post-increment
+        "str w1, [x2]",        // Store w1 (thread handle) to address in x2
+        "ret",
+        code = const CREATE_THREAD,
+    );
 }
 
 /// Starts a freshly created thread.
@@ -704,17 +660,13 @@ pub unsafe fn create_thread(
 /// | IN | _handle_ | Handle of the thread to start. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#StartThread>
-pub unsafe fn start_thread(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x9",            // Issue the SVC call with immediate value 0x9
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn start_thread(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x9
+        "ret",
+        code = const START_THREAD,
+    );
 }
 
 /// Exits the current thread.
@@ -724,13 +676,13 @@ pub unsafe fn start_thread(handle: Handle) -> ResultCode {
 /// Syscall code: [EXIT_THREAD](crate::code::EXIT_THREAD) (`0xA`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ExitThread>
-pub unsafe fn exit_thread() -> ! {
-    unsafe {
-        asm!(
-            "svc 0xA",         // Issue the SVC call with immediate value 0xA
-            options(noreturn)  // Never returns, and its return type is defined as ! (never).
-        )
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn exit_thread() -> ! {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0xA - never returns
+        "ret",
+        code = const EXIT_THREAD,
+    );
 }
 
 /// Sleeps the current thread for the specified amount of time.
@@ -746,14 +698,13 @@ pub unsafe fn exit_thread() -> ! {
 /// | IN | _nano_ | Number of nanoseconds to sleep, or [YieldType] for yield. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SleepThread>
-pub unsafe fn sleep_thread(nano: i64) {
-    unsafe {
-        asm!(
-            "svc 0xB",     // Issue the SVC call with immediate value 0xB
-            in("x0") nano, // Input: nano in register x0
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn sleep_thread(nano: i64) {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0xB
+        "ret",
+        code = const SLEEP_THREAD,
+    );
 }
 
 /// Gets a thread's priority.
@@ -768,21 +719,16 @@ pub unsafe fn sleep_thread(nano: i64) {
 /// | IN | _handle_ | Handle of the thread to query. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadPriority>
-pub unsafe fn get_thread_priority(priority: *mut i32, handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0xC",             // Issue the SVC call with immediate value 0xC
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") priority,     // Input: priority in register x0
-            in("x1") handle,       // Input: handle in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_thread_priority(priority: *mut i32, handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (priority pointer) on stack with pre-decrement
+        "svc {code}",          // Issue the SVC call with immediate value 0xC
+        "ldr x2, [sp], #16",   // Load x2 from stack with post-increment
+        "str w1, [x2]",        // Store w1 (priority) to address in x2
+        "ret",
+        code = const GET_THREAD_PRIORITY,
+    );
 }
 
 /// Sets the priority of provided thread handle.
@@ -799,18 +745,13 @@ pub unsafe fn get_thread_priority(priority: *mut i32, handle: Handle) -> ResultC
 /// | IN | _priority_ | New priority. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetThreadPriority>
-pub unsafe fn set_thread_priority(handle: Handle, priority: u32) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0xD",            // Issue the SVC call with immediate value 0xD
-            in("x0") handle,      // Input: handle in register x0
-            in("x1") priority,    // Input: priority in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_thread_priority(handle: Handle, priority: u32) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0xD
+        "ret",
+        code = const SET_THREAD_PRIORITY,
+    );
 }
 
 /// Gets the affinity mask of provided thread handle.
@@ -826,27 +767,21 @@ pub unsafe fn set_thread_priority(handle: Handle, priority: u32) -> ResultCode {
 /// | IN | _handle_ | Handle of the thread to query. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadCoreMask>
-pub unsafe fn get_thread_core_mask(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_thread_core_mask(
     core_id: *mut i32,
     affinity_mask: *mut u64,
     handle: Handle,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0xE",                 // Issue the SVC call with immediate value 0xE
-            "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
-            "str w1, [x3]",            // Store w1 in the memory pointed to by x3
-            "str x2, [x4]",            // Store x2 in the memory pointed to by x4
-            in("x0") core_id,          // Input: core_id in register x0
-            in("x1") affinity_mask,    // Input: affinity_mask in register x1
-            in("x2") handle,           // Input: handle in register x2
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store x0 (core_id ptr) and x1 (affinity_mask ptr) on stack
+        "svc {code}",              // Issue the SVC call with immediate value 0xE
+        "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
+        "str w1, [x3]",            // Store w1 (core_id value) to address in x3
+        "str x2, [x4]",            // Store x2 (affinity_mask value) to address in x4
+        "ret",
+        code = const GET_THREAD_CORE_MASK,
+    );
 }
 
 /// Sets the affinity mask of provided thread handle.
@@ -862,19 +797,17 @@ pub unsafe fn get_thread_core_mask(
 /// | IN | _affinity_mask_ | New affinity mask. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetThreadCoreMask>
-pub unsafe fn set_thread_core_mask(handle: Handle, core_id: i32, affinity_mask: u32) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0xF",              // Issue the SVC call with immediate value 0xF
-            in("x0") handle,        // Input: handle in register x0
-            in("x1") core_id,       // Input: core_id in register x1
-            in("x2") affinity_mask, // Input: affinity_mask in register x2
-            lateout("w0") result,   // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_thread_core_mask(
+    handle: Handle,
+    core_id: i32,
+    affinity_mask: u32,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0xF
+        "ret",
+        code = const SET_THREAD_CORE_MASK,
+    );
 }
 
 /// Gets which CPU is executing the current thread.
@@ -886,16 +819,13 @@ pub unsafe fn set_thread_core_mask(handle: Handle, core_id: i32, affinity_mask: 
 /// Syscall code: [GET_CURRENT_PROCESSOR_NUMBER](crate::code::GET_CURRENT_PROCESSOR_NUMBER) (`0x10`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetCurrentProcessorNumber>
-pub unsafe fn get_current_processor_number() -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x10",           // Issue the SVC call with immediate value 0x10
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_current_processor_number() -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x10
+        "ret",
+        code = const GET_CURRENT_PROCESSOR_NUMBER,
+    );
 }
 
 //</editor-fold>
@@ -918,17 +848,13 @@ pub unsafe fn get_current_processor_number() -> ResultCode {
 /// | IN | _handle_ | Handle of the event to signal. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SignalEvent>
-pub unsafe fn signal_event(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x11",           // Issue the SVC call with immediate value 0x11
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn signal_event(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x11
+        "ret",
+        code = const SIGNAL_EVENT,
+    );
 }
 
 /// Takes the given event out of the signaled state, if it is signaled.
@@ -942,17 +868,13 @@ pub unsafe fn signal_event(handle: Handle) -> ResultCode {
 /// | IN | _handle_ | Handle of the event to clear. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ClearEvent>
-pub unsafe fn clear_event(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x12",           // Issue the SVC call with immediate value 0x12
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn clear_event(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x12
+        "ret",
+        code = const CLEAR_EVENT,
+    );
 }
 
 //</editor-fold>
@@ -973,25 +895,18 @@ pub unsafe fn clear_event(handle: Handle) -> ResultCode {
 /// | IN | _perm_ | Permissions (see [MemoryPermission]). |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapSharedMemory>
-pub unsafe fn map_shared_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_shared_memory(
     handle: Handle,
     addr: *mut c_void,
     size: usize,
     perm: u32, // TODO: MemoryPermission bitfield
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x13",           // Issue the SVC call with immediate value 0x13
-            in("x0") handle,      // Input: handle in register x0
-            in("x1") addr,        // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            in("x3") perm,        // Input: perm in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x13
+        "ret",
+        code = const MAP_SHARED_MEMORY,
+    );
 }
 
 /// Unmaps a block of shared memory.
@@ -1007,19 +922,17 @@ pub unsafe fn map_shared_memory(
 /// | IN | _size_ | Size of the block. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapSharedMemory>
-pub unsafe fn unmap_shared_memory(handle: Handle, addr: *mut c_void, size: usize) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x14",           // Issue the SVC call with immediate value 0x14
-            in("x0") handle,      // Input: handle in register x0
-            in("x1") addr,        // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_shared_memory(
+    handle: Handle,
+    addr: *mut c_void,
+    size: usize,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x14
+        "ret",
+        code = const UNMAP_SHARED_MEMORY,
+    );
 }
 
 /// Creates a block of transfer memory.
@@ -1036,28 +949,21 @@ pub unsafe fn unmap_shared_memory(handle: Handle, addr: *mut c_void, size: usize
 /// | IN | _perm_ | Permissions (see [MemoryPermission]). |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateTransferMemory>
-pub unsafe fn create_transfer_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_transfer_memory(
     handle: *mut Handle,
     addr: *mut c_void,
     size: usize,
     perm: u32, // TODO: MemoryPermission bitfield
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x15",            // Issue the SVC call with immediate value 0x15
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") addr,         // Input: addr in register x1
-            in("x2") size,         // Input: size in register x2
-            in("x3") perm,         // Input: perm in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack with pre-decrement
+        "svc {code}",          // Issue the SVC call with immediate value 0x15
+        "ldr x2, [sp], #16",   // Load x2 from stack with post-increment
+        "str w1, [x2]",        // Store w1 (handle value) to address in x2
+        "ret",
+        code = const CREATE_TRANSFER_MEMORY,
+    );
 }
 
 //</editor-fold>
@@ -1075,17 +981,13 @@ pub unsafe fn create_transfer_memory(
 /// | IN | _handle_ | Handle to close. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CloseHandle>
-pub unsafe fn close_handle(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x16",           // Issue the SVC call with immediate value 0x16
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn close_handle(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x16
+        "ret",
+        code = const CLOSE_HANDLE,
+    );
 }
 
 //</editor-fold>
@@ -1103,17 +1005,13 @@ pub unsafe fn close_handle(handle: Handle) -> ResultCode {
 /// | IN | _handle_ | Handle of the signal to reset. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ResetSignal>
-pub unsafe fn reset_signal(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x17",           // Issue the SVC call with immediate value 0x17
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn reset_signal(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x17
+        "ret",
+        code = const RESET_SIGNAL,
+    );
 }
 
 /// Waits on one or more synchronization objects, optionally with a timeout.
@@ -1138,28 +1036,21 @@ pub unsafe fn reset_signal(handle: Handle) -> ResultCode {
 /// | IN | _timeout_ | Timeout in nanoseconds. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WaitSynchronization>
-pub unsafe fn wait_synchronization(
+#[unsafe(naked)]
+pub unsafe extern "C" fn wait_synchronization(
     index: *mut i32,
     handles: *const u32,
     handle_count: i32,
     timeout: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x18",            // Issue the SVC call with immediate value 0x18
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") index,        // Input: index in register x0
-            in("x1") handles,      // Input: handles in register x1
-            in("x2") handle_count, // Input: handle_count in register x2
-            in("x3") timeout,      // Input: timeout in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (index pointer) on stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x18
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (index result) to address in x2
+        "ret",
+        code = const WAIT_SYNCHRONIZATION,
+    );
 }
 
 /// Waits a [wait_synchronization] operation being done on a synchronization object in
@@ -1179,17 +1070,13 @@ pub unsafe fn wait_synchronization(
 /// | IN | _handle_ | Handle to the thread to wait for. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CancelSynchronization>
-pub unsafe fn cancel_synchronization(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x19",           // Issue the SVC call with immediate value 0x19
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn cancel_synchronization(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x19
+        "ret",
+        code = const CANCEL_SYNCHRONIZATION,
+    );
 }
 
 /// Arbitrates a mutex lock operation in userspace.
@@ -1205,23 +1092,17 @@ pub unsafe fn cancel_synchronization(handle: Handle) -> ResultCode {
 /// | IN | _curr_thread_handle_ | The current thread's kernel handle. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ArbitrateLock>
-pub unsafe fn arbitrate_lock(
+#[unsafe(naked)]
+pub unsafe extern "C" fn arbitrate_lock(
     owner_thread_handle: Handle,
     mutex: *mut u32,
     curr_thread_handle: Handle,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x1A",                   // Issue the SVC call with immediate value 0x1A
-            in("x0") owner_thread_handle, // Input: owner_thread_handle in register x0
-            in("x1") mutex,               // Input: mutex in register x1
-            in("x2") curr_thread_handle,  // Input: curr_thread_handle in register x2
-            lateout("w0") result,         // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x1A
+        "ret",
+        code = const ARBITRATE_LOCK,
+    );
 }
 
 /// Arbitrates a mutex unlock operation in userspace.
@@ -1235,17 +1116,13 @@ pub unsafe fn arbitrate_lock(
 /// | IN | _mutex_ | The mutex raw tag value. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ArbitrateUnlock>
-pub unsafe fn arbitrate_unlock(mutex: *mut u32) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x1B",            // Issue the SVC call with immediate value 0x1B
-            in("x0") mutex,        // Input: mutex in register x0
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn arbitrate_unlock(mutex: *mut u32) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x1B
+        "ret",
+        code = const ARBITRATE_UNLOCK,
+    );
 }
 
 /// Performs a condition variable wait operation in userspace.
@@ -1262,25 +1139,18 @@ pub unsafe fn arbitrate_unlock(mutex: *mut u32) -> ResultCode {
 /// | IN | _timeout_ns_ | Timeout in nanoseconds. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WaitProcessWideKeyAtomic>
-pub unsafe fn wait_process_wide_key_atomic(
+#[unsafe(naked)]
+pub unsafe extern "C" fn wait_process_wide_key_atomic(
     address: *mut u32,
     cv_key: *mut u32,
     tag: u32,
     timeout_ns: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x1C",           // Issue the SVC call with immediate value 0x1C
-            in("x0") address,     // Input: address in register x0
-            in("x1") cv_key,      // Input: cv_key in register x1
-            in("x2") tag,         // Input: tag in register x2
-            in("x3") timeout_ns,  // Input: timeout_ns in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x1C
+        "ret",
+        code = const WAIT_PROCESS_WIDE_KEY_ATOMIC,
+    );
 }
 
 /// Performs a condition variable wake-up operation in userspace.
@@ -1295,15 +1165,13 @@ pub unsafe fn wait_process_wide_key_atomic(
 /// | IN | _count_ | Number of threads to wake up. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SignalProcessWideKey>
-pub unsafe fn signal_process_wide_key(cv_key: *mut u32, count: i32) {
-    unsafe {
-        asm!(
-            "svc 0x1D",      // Issue the SVC call with immediate value 0x1D
-            in("x0") cv_key, // Input: cv_key in register x0
-            in("x1") count,  // Input: count in register x1
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn signal_process_wide_key(cv_key: *mut u32, count: i32) {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x1D
+        "ret",
+        code = const SIGNAL_PROCESS_WIDE_KEY,
+    );
 }
 
 //</editor-fold>
@@ -1317,16 +1185,13 @@ pub unsafe fn signal_process_wide_key(cv_key: *mut u32, count: i32) {
 /// Syscall code: [GET_SYSTEM_TICK](crate::code::GET_SYSTEM_TICK) (`0x1E`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetSystemTick>
-pub unsafe fn get_system_tick() -> u64 {
-    let result: u64;
-    unsafe {
-        asm!(
-            "svc 0x1E",       // Issue the SVC call with immediate value 0x1E
-            out("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_system_tick() -> u64 {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x1E
+        "ret",
+        code = const GET_SYSTEM_TICK,
+    );
 }
 
 //</editor-fold>
@@ -1345,21 +1210,19 @@ pub unsafe fn get_system_tick() -> u64 {
 /// | IN | _name_ | Pointer to the name of the port. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ConnectToNamedPort>
-pub unsafe fn connect_to_named_port(session: *mut Handle, name: *const c_char) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x1F",            // Issue the SVC call with immediate value 0x1F
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") session,      // Input: session in register x0
-            in("x1") name,         // Input: name in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn connect_to_named_port(
+    session: *mut Handle,
+    name: *const c_char,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (session pointer) on stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x1F
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (session handle) to address in x2
+        "ret",
+        code = const CONNECT_TO_NAMED_PORT,
+    );
 }
 
 /// Sends a light IPC synchronization request to a session.
@@ -1373,17 +1236,13 @@ pub unsafe fn connect_to_named_port(session: *mut Handle, name: *const c_char) -
 /// | IN | _session_ | Session handle. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendSyncRequestLight>
-pub unsafe fn send_sync_request_light(session: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x20",           // Issue the SVC call with immediate value 0x20
-            in("x0") session,     // Input: session in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn send_sync_request_light(session: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x20
+        "ret",
+        code = const SEND_SYNC_REQUEST_LIGHT,
+    );
 }
 
 /// Sends an IPC synchronization request to a session.
@@ -1397,17 +1256,13 @@ pub unsafe fn send_sync_request_light(session: Handle) -> ResultCode {
 /// | IN | _session_ | Session handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendSyncRequest>
-pub unsafe fn send_sync_request(session: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x21",           // Issue the SVC call with immediate value 0x21
-            in("x0") session,     // Input: session in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn send_sync_request(session: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x21
+        "ret",
+        code = const SEND_SYNC_REQUEST,
+    );
 }
 
 /// Sends an IPC synchronization request to a session from a user allocated buffer.
@@ -1423,23 +1278,17 @@ pub unsafe fn send_sync_request(session: Handle) -> ResultCode {
 /// | IN | _session_ | Session handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendSyncRequestWithUserBuffer>
-pub unsafe fn send_sync_request_with_user_buffer(
+#[unsafe(naked)]
+pub unsafe extern "C" fn send_sync_request_with_user_buffer(
     usr_buffer: *mut c_void,
     size: u64,
     session: Handle,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x22",           // Issue the SVC call with immediate value 0x22
-            in("x0") usr_buffer,  // Input: usr_buffer in register x0
-            in("x1") size,        // Input: size in register x1
-            in("x2") session,     // Input: session in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x22
+        "ret",
+        code = const SEND_SYNC_REQUEST_WITH_USER_BUFFER,
+    );
 }
 
 /// Sends an IPC synchronization request to a session from a user allocated buffer (asynchronous
@@ -1457,28 +1306,21 @@ pub unsafe fn send_sync_request_with_user_buffer(
 /// | IN | _session_ | Session handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendAsyncRequestWithUserBuffer>
-pub unsafe fn send_async_request_with_user_buffer(
+#[unsafe(naked)]
+pub unsafe extern "C" fn send_async_request_with_user_buffer(
     handle: *mut Handle,
     usr_buffer: *mut c_void,
     size: u64,
     session: Handle,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x23",            // Issue the SVC call with immediate value 0x23
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") usr_buffer,   // Input: usr_buffer in register x1
-            in("x2") size,         // Input: size in register x2
-            in("x3") session,      // Input: session in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x23
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret",
+        code = const SEND_ASYNC_REQUEST_WITH_USER_BUFFER,
+    );
 }
 
 //</editor-fold>
@@ -1497,21 +1339,16 @@ pub unsafe fn send_async_request_with_user_buffer(
 /// | IN | _handle_ | Handle of the process to get the PID from |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetProcessId>
-pub unsafe fn get_process_id(process_id: *mut u64, handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x24",            // Issue the SVC call with immediate value 0x24
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") process_id,   // Input: process_id in register x0
-            in("x1") handle,       // Input: handle in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_process_id(process_id: *mut u64, handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (process_id pointer) on stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x24
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (process ID result) to address in x2
+        "ret",
+        code = const GET_PROCESS_ID,
+    );
 }
 
 /// Gets the TID associated with a process.
@@ -1526,21 +1363,16 @@ pub unsafe fn get_process_id(process_id: *mut u64, handle: Handle) -> ResultCode
 /// | IN | _handle_ | Handle of the thread to get the TID from |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadId>
-pub unsafe fn get_thread_id(thread_id: *mut u64, handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x25",            // Issue the SVC call with immediate value 0x25
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") thread_id,    // Input: thread_id in register x0
-            in("x1") handle,       // Input: handle in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_thread_id(thread_id: *mut u64, handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (thread_id pointer) on stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x25
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (thread ID result) to address in x2
+        "ret",
+        code = const GET_THREAD_ID,
+    );
 }
 
 //</editor-fold>
@@ -1560,19 +1392,13 @@ pub unsafe fn get_thread_id(thread_id: *mut u64, handle: Handle) -> ResultCode {
 /// | IN | _size_ | Size of the buffer to pass to the debugger |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#Break>
-pub unsafe fn r#break(reason: BreakReason, address: usize, size: usize) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x26",             // Issue the SVC call with immediate value 0x26
-            in("x0") reason as u32, // Input: break_reason in register x0
-            in("x1") address,       // Input: address in register x1
-            in("x2") size,          // Input: size in register x2
-            lateout("w0") result,   // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn r#break(reason: BreakReason, address: usize, size: usize) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x26
+        "ret",
+        code = const BREAK,
+    );
 }
 
 //</editor-fold>
@@ -1591,18 +1417,13 @@ pub unsafe fn r#break(reason: BreakReason, address: usize, size: usize) -> Resul
 /// | IN | _size_ | Size of the text in bytes |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#OutputDebugString>
-pub unsafe fn output_debug_string(dbg_str: *const c_char, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x27",           // Issue the SVC call with immediate value 0x27
-            in("x0") dbg_str,     // Input: dbg_str in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn output_debug_string(dbg_str: *const c_char, size: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x27
+        "ret",
+        code = const OUTPUT_DEBUG_STRING,
+    );
 }
 
 //</editor-fold>
@@ -1620,14 +1441,13 @@ pub unsafe fn output_debug_string(dbg_str: *const c_char, size: u64) -> ResultCo
 /// | IN | _res_ | Result code |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReturnFromException>
-pub unsafe fn return_from_exception(res: ResultCode) -> ! {
-    unsafe {
-        asm!(
-            "svc 0x28",       // Issue the SVC call with immediate value 0x28
-            in("x0") res,     // Input: res in register x0
-            options(noreturn) // Never returns, and its return type is defined as ! (never).
-        )
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn return_from_exception(res: ResultCode) -> ! {
+    core::arch::naked_asm!(
+        "svc {code}", // Issue the SVC call with immediate value 0x28 - never returns
+        "ret",
+        code = const RETURN_FROM_EXCEPTION,
+    );
 }
 
 /// Information types for [`get_info`]
@@ -1679,23 +1499,16 @@ pub enum InfoTypeId0 {
 /// | IN | _id1_ | Second ID of the property to retrieve |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetInfo>
-pub unsafe fn get_info(out: *mut u64, id0: u32, handle: Handle, id1: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x29",            // Issue the SVC call with immediate value 0x29
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            in("x1") id0,          // Input: id0 in register x1
-            in("x2") handle,       // Input: handle in register x2
-            in("x3") id1,          // Input: id1 in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_info(out: *mut u64, id0: u32, handle: Handle, id1: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc {code}",          // Issue the SVC call with immediate value 0x29
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (info result) to address in x2
+        "ret",
+        code = const GET_INFO,
+    );
 }
 
 //</editor-fold>
@@ -1712,13 +1525,12 @@ pub unsafe fn get_info(out: *mut u64, id0: u32, handle: Handle, id1: u64) -> Res
 /// Syscall code: [FLUSH_ENTIRE_DATA_CACHE](crate::code::FLUSH_ENTIRE_DATA_CACHE) (`0x2A`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#FlushEntireDataCache>
-pub unsafe fn flush_entire_data_cache() {
-    unsafe {
-        asm!(
-            "svc 0x2A", // Issue the SVC call with immediate value 0x2A
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn flush_entire_data_cache() {
+    core::arch::naked_asm!(
+        "svc 0x2A", // Issue the SVC call with immediate value 0x2A
+        "ret"
+    );
 }
 
 /// Flushes data cache for a virtual address range.
@@ -1733,18 +1545,12 @@ pub unsafe fn flush_entire_data_cache() {
 /// | IN | _size_ | Size of region to flush |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#FlushDataCache>
-pub unsafe fn flush_data_cache(address: *mut c_void, size: usize) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x2B",           // Issue the SVC call with immediate value 0x2B
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn flush_data_cache(address: *mut c_void, size: usize) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x2B", // Issue the SVC call with immediate value 0x2B
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -1763,18 +1569,12 @@ pub unsafe fn flush_data_cache(address: *mut c_void, size: usize) -> ResultCode 
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapPhysicalMemory>
-pub unsafe fn map_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x2C",           // Issue the SVC call with immediate value 0x2C
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x2C", // Issue the SVC call with immediate value 0x2C
+        "ret"
+    );
 }
 
 /// Undoes the effects of [map_physical_memory]. [3.0.0+]
@@ -1789,18 +1589,12 @@ pub unsafe fn map_physical_memory(address: *mut c_void, size: u64) -> ResultCode
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapPhysicalMemory>
-pub unsafe fn unmap_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x2D",           // Issue the SVC call with immediate value 0x2D
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x2D", // Issue the SVC call with immediate value 0x2D
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -1825,30 +1619,22 @@ pub unsafe fn unmap_physical_memory(address: *mut c_void, size: u64) -> ResultCo
 /// | IN | _ns_ | Nanoseconds in the future to get scheduled thread at.
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugFutureThreadInfo>
-pub unsafe fn get_debug_future_thread_info(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_debug_future_thread_info(
     context: *mut LastThreadContext,
     thread_id: *mut u64,
     debug: Handle,
     ns: i64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0x2E",                // Issue the SVC call with immediate value 0x2E
-            "ldp x6, x7, [sp], #16",   // Load x6 and x7 from the stack
-            "stp x1, x2, [x6]",        // Store x1 and x2 in the memory pointed to by x6
-            "stp x3, x4, [x6, #16]",   // Store x3 and x4 in the memory pointed to by x6, offset by 16 bytes
-            "str x5, [x7]",            // Store x5 in the memory pointed to by x7
-            in("x0") context,          // Input: context in register x0
-            in("x1") thread_id,        // Input: thread_id in register x1
-            in("x2") debug,            // Input: debug in register x2
-            in("x3") ns,               // Input: ns in register x3
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
+        "svc 0x2E",                // Issue the SVC call with immediate value 0x2E
+        "ldp x6, x7, [sp], #16",   // Load x6 and x7 from the stack
+        "stp x1, x2, [x6]",        // Store x1 and x2 in the memory pointed to by x6
+        "stp x3, x4, [x6, #16]", // Store x3 and x4 in the memory pointed to by x6, offset by 16 bytes
+        "str x5, [x7]",          // Store x5 in the memory pointed to by x7
+        "ret"
+    );
 }
 
 /// Gets information about the previously-scheduled thread.
@@ -1864,31 +1650,24 @@ pub unsafe fn get_debug_future_thread_info(
 /// | OUT | _flags_ | Output flags for the previously scheduled thread |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetLastThreadInfo>
-pub unsafe fn get_last_thread_info(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_last_thread_info(
     context: *mut LastThreadContext,
     tls_address: *mut u64,
     flags: *mut u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x1, x2, [sp, #-16]!", // Store x1 and x2 on the stack
-            "str x0, [sp, #-16]!",     // Store x0 on the stack
-            "svc 0x2F",                // Issue the SVC call with immediate value 0x2F
-            "ldr x7, [sp], #16",       // Load x7 from the stack
-            "stp x1, x2, [x7]",        // Store x1 and x2 in the memory pointed to by x7
-            "stp x3, x4, [x7, #16]",   // Store x3 and x4 in the memory pointed to by x7, offset by 16 bytes
-            "ldp x1, x2, [sp], #16",   // Load x1 and x2 from the stack
-            "str x5, [x1]",            // Store x5 in the memory pointed to by x1
-            "str w6, [x2]",            // Store w6 in the memory pointed to by x2
-            in("x0") context,          // Input: context in register x0
-            in("x1") tls_address,      // Input: tls_address in register x1
-            in("x2") flags,            // Input: flags in register x2
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x1, x2, [sp, #-16]!", // Store x1 and x2 on the stack
+        "str x0, [sp, #-16]!",     // Store x0 on the stack
+        "svc 0x2F",                // Issue the SVC call with immediate value 0x2F
+        "ldr x7, [sp], #16",       // Load x7 from the stack
+        "stp x1, x2, [x7]",        // Store x1 and x2 in the memory pointed to by x7
+        "stp x3, x4, [x7, #16]", // Store x3 and x4 in the memory pointed to by x7, offset by 16 bytes
+        "ldp x1, x2, [sp], #16", // Load x1 and x2 from the stack
+        "str x5, [x1]",          // Store x5 in the memory pointed to by x1
+        "str w6, [x2]",          // Store w6 in the memory pointed to by x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -1908,26 +1687,19 @@ pub unsafe fn get_last_thread_info(
 /// | IN | _which_ | Resource to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetResourceLimitLimitValue>
-pub unsafe fn get_resource_limit_limit_value(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_resource_limit_limit_value(
     value: *mut i64,
     handle: Handle,
     which: LimitableResource,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x30",            // Issue the SVC call with immediate value 0x30
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") value,        // Input: value in register x0
-            in("x1") handle,       // Input: handle in register x1
-            in("x2") which as u32, // Input: which in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (value pointer) on stack
+        "svc 0x30",            // Issue the SVC call with immediate value 0x30
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (limit value result) to address in x2
+        "ret"
+    );
 }
 
 /// Gets the current value a [LimitableResource] has, for a Resource Limit handle.
@@ -1943,26 +1715,19 @@ pub unsafe fn get_resource_limit_limit_value(
 /// | IN | _which_ | Resource to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetResourceLimitCurrentValue>
-pub unsafe fn get_resource_limit_current_value(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_resource_limit_current_value(
     out: *mut i64,
     reslimit: Handle,
     which: LimitableResource,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x31",            // Issue the SVC call with immediate value 0x31
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            in("x1") reslimit,     // Input: reslimit in register x1
-            in("x2") which as u32, // Input: which in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x31",            // Issue the SVC call with immediate value 0x31
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (current value result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -1981,18 +1746,12 @@ pub unsafe fn get_resource_limit_current_value(
 /// | IN | _paused_ | Whether to pause or unpause the thread |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetThreadActivity>
-pub unsafe fn set_thread_activity(thread: Handle, paused: ThreadActivity) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x32",             // Issue the SVC call with immediate value 0x32
-            in("x0") thread,        // Input: thread in register x0
-            in("x1") paused as u32, // Input: paused in register x1
-            lateout("w0") result,   // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_thread_activity(thread: Handle, paused: ThreadActivity) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x32", // Issue the SVC call with immediate value 0x32
+        "ret"
+    );
 }
 
 /// Dumps the registers of a thread paused by [set_thread_activity] (register groups: all).
@@ -2007,18 +1766,15 @@ pub unsafe fn set_thread_activity(thread: Handle, paused: ThreadActivity) -> Res
 /// | IN | _thread_ | Thread handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadContext3>
-pub unsafe fn get_thread_context3(ctx: *mut ThreadContext, thread: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x33",           // Issue the SVC call with immediate value 0x33
-            in("x0") ctx,         // Input: ctx in register x0
-            in("x1") thread,      // Input: thread in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_thread_context3(
+    ctx: *mut ThreadContext,
+    thread: Handle,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x33", // Issue the SVC call with immediate value 0x33
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2039,25 +1795,17 @@ pub unsafe fn get_thread_context3(ctx: *mut ThreadContext, thread: Handle) -> Re
 /// | IN | _timeout_ | Maximum time in nanoseconds to wait |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WaitForAddress>
-pub unsafe fn wait_for_address(
+#[unsafe(naked)]
+pub unsafe extern "C" fn wait_for_address(
     address: *mut c_void,
     arb_type: ArbitrationType,
     value: i64,
     timeout: i64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x34",               // Issue the SVC call with immediate value 0x34
-            in("x0") address,         // Input: address in register x0
-            in("x1") arb_type as u32, // Input: arb_type in register x1
-            in("x2") value,           // Input: value in register x2
-            in("x3") timeout,         // Input: timeout in register x3
-            lateout("w0") result,     // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x34", // Issue the SVC call with immediate value 0x34
+        "ret"
+    );
 }
 
 /// Signals (and updates) an address depending on type and value. [4.0.0+]
@@ -2074,25 +1822,17 @@ pub unsafe fn wait_for_address(
 /// | IN | _count_ | Number of waiting threads to signal |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SignalToAddress>
-pub unsafe fn signal_to_address(
+#[unsafe(naked)]
+pub unsafe extern "C" fn signal_to_address(
     address: *mut c_void,
     signal_type: SignalType,
     value: i32,
     count: i32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x35",                  // Issue the SVC call with immediate value 0x35
-            in("x0") address,            // Input: address in register x0
-            in("x1") signal_type as u32, // Input: signal_type in register x1
-            in("x2") value,              // Input: value in register x2
-            in("x3") count,              // Input: count in register x3
-            lateout("w0") result,        // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x35", // Issue the SVC call with immediate value 0x35
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2106,13 +1846,12 @@ pub unsafe fn signal_to_address(
 /// Syscall code: [SYNCHRONIZE_PREEMPTION_STATE](crate::code::SYNCHRONIZE_PREEMPTION_STATE) (`0x36`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SynchronizePreemptionState>
-pub unsafe fn synchronize_preemption_state() {
-    unsafe {
-        asm!(
-            "svc 0x36", // Issue the SVC call with immediate value 0x36
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn synchronize_preemption_state() {
+    core::arch::naked_asm!(
+        "svc 0x36", // Issue the SVC call with immediate value 0x36
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2132,26 +1871,19 @@ pub unsafe fn synchronize_preemption_state() {
 /// | IN | _which_ | Resource to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetResourceLimitPeakValue>
-pub unsafe fn get_resource_limit_peak_value(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_resource_limit_peak_value(
     out: *mut i64,
     reslimit: Handle,
     which: LimitableResource,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x37",            // Issue the SVC call with immediate value 0x37
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            in("x1") reslimit,     // Input: reslimit in register x1
-            in("x2") which as u32, // Input: which in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x37",            // Issue the SVC call with immediate value 0x37
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (peak value result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2174,21 +1906,15 @@ pub unsafe fn get_resource_limit_peak_value(
 /// | IN | _which_ | [IoPoolType] to create |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x39,CreateIoPool>
-pub unsafe fn create_io_pool(handle: *mut Handle, which: IoPoolType) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x39",            // Issue the SVC call with immediate value 0x37
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") which as u32, // Input: which in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_io_pool(handle: *mut Handle, which: IoPoolType) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack
+        "svc 0x39",            // Issue the SVC call with immediate value 0x39
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Creates an IO Region. [13.0.0+]
@@ -2211,7 +1937,8 @@ pub unsafe fn create_io_pool(handle: *mut Handle, which: IoPoolType) -> ResultCo
 /// | IN | _perm_ | [MemoryPermission] configuration |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x3A,CreateIoRegion>
-pub unsafe fn create_io_region(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_io_region(
     handle: *mut Handle,
     io_pool_h: Handle,
     physical_address: u64,
@@ -2219,24 +1946,13 @@ pub unsafe fn create_io_region(
     mapping: MemoryMapping,
     perm: u32, // TODO: MemoryPermission bitfield
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!",     // Store x0 on the stack
-            "svc 0x3A",                // Issue the SVC call with immediate value 0x38
-            "ldr x2, [sp], #16",       // Load x2 from the stack
-            "str w1, [x2]",            // Store w1 in the memory pointed to by x2
-            in("x0") handle,           // Input: handle in register x0
-            in("x1") io_pool_h,        // Input: io_pool_h in register x1
-            in("x2") physical_address, // Input: physical_address in register x2
-            in("x3") size,             // Input: size in register x3
-            in("x4") mapping as u32,   // Input: mapping in register x4
-            in("x5") perm,             // Input: perm in register x5
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack
+        "svc 0x3A",            // Issue the SVC call with immediate value 0x3A
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2255,15 +1971,12 @@ pub unsafe fn create_io_region(
 /// | IN | _arg0_ | Additional argument |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#DumpInfo>
-pub unsafe fn dump_info(dump_info_type: u32, arg0: u64) {
-    unsafe {
-        asm!(
-            "svc 0x3C",              // Issue the SVC call with immediate value 0x3C
-            in("x0") dump_info_type, // Input: dump_info_type in register x0
-            in("x1") arg0,           // Input: arg0 in register x1
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn dump_info(dump_info_type: u32, arg0: u64) {
+    core::arch::naked_asm!(
+        "svc 0x3C", // Issue the SVC call with immediate value 0x3C
+        "ret"
+    );
 }
 
 /// Performs a debugging operation on the kernel. [4.0.0+]
@@ -2280,17 +1993,12 @@ pub unsafe fn dump_info(dump_info_type: u32, arg0: u64) {
 /// | IN | _arg2_ | Third additional argument |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#KernelDebug>
-pub unsafe fn kernel_debug(kern_debug_type: u32, arg0: u64, arg1: u64, arg2: u64) {
-    unsafe {
-        asm!(
-            "svc 0x3C",               // Issue the SVC call with immediate value 0x3C
-            in("x0") kern_debug_type, // Input: kern_debug_type in register x0
-            in("x1") arg0,            // Input: arg0 in register x1
-            in("x2") arg1,            // Input: arg1 in register x2
-            in("x3") arg2,            // Input: arg2 in register x3
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn kernel_debug(kern_debug_type: u32, arg0: u64, arg1: u64, arg2: u64) {
+    core::arch::naked_asm!(
+        "svc 0x3C", // Issue the SVC call with immediate value 0x3C
+        "ret"
+    );
 }
 
 /// Changes the kernel's trace state. [4.0.0+]
@@ -2304,14 +2012,12 @@ pub unsafe fn kernel_debug(kern_debug_type: u32, arg0: u64, arg1: u64, arg2: u64
 /// | IN | _kern_trace_state_ | New kernel trace state |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ChangeKernelTraceState>
-pub unsafe fn change_kernel_trace_state(kern_trace_state: u32) {
-    unsafe {
-        asm!(
-            "svc 0x3D",                  // Issue the SVC call with immediate value 0x3D
-            in("x0") kern_trace_state,   // Input: kern_trace_state in register x0
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn change_kernel_trace_state(kern_trace_state: u32) {
+    core::arch::naked_asm!(
+        "svc 0x3D", // Issue the SVC call with immediate value 0x3D
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2332,29 +2038,21 @@ pub unsafe fn change_kernel_trace_state(kern_trace_state: u32) {
 /// | IN | _unk1_ | Unknown parameter |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateSession>
-pub unsafe fn create_session(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_session(
     server_handle: *mut Handle,
     client_handle: *mut Handle,
     is_light: bool,
     unk1: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0x40",                // Issue the SVC call with immediate value 0x40
-            "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
-            "str w1, [x3]",            // Store w1 in the memory pointed to by x3
-            "str w2, [x4]",            // Store w2 in the memory pointed to by x4
-            in("x0") server_handle,    // Input: server_handle in register x0
-            in("x1") client_handle,    // Input: client_handle in register x1
-            in("x2") is_light as u32,  // Input: is_light in register x2
-            in("x3") unk1,             // Input: unk1 in register x3
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store x0 and x1 (handle pointers) on stack
+        "svc 0x40",                // Issue the SVC call with immediate value 0x40
+        "ldp x3, x4, [sp], #16",   // Load x3 and x4 from stack
+        "str w1, [x3]",            // Store w1 (server handle result) to address in x3
+        "str w2, [x4]",            // Store w2 (client handle result) to address in x4
+        "ret"
+    );
 }
 
 /// Accepts an IPC session.
@@ -2369,21 +2067,15 @@ pub unsafe fn create_session(
 /// | IN | _port_handle_ | Handle to the port to accept from |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#AcceptSession>
-pub unsafe fn accept_session(session: *mut Handle, port_handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!",   // Store x0 on the stack
-            "svc 0x41",              // Issue the SVC call with immediate value 0x41
-            "ldr x2, [sp], #16",     // Load x2 from the stack
-            "str w1, [x2]",          // Store w1 in the memory pointed to by x2
-            in("x0") session,        // Input: session in register x0
-            in("x1") port_handle,    // Input: port_handle in register x1
-            lateout("w0") result,    // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn accept_session(session: *mut Handle, port_handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (session pointer) on stack
+        "svc 0x41",            // Issue the SVC call with immediate value 0x41
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (session handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Performs light IPC input/output.
@@ -2397,17 +2089,12 @@ pub unsafe fn accept_session(session: *mut Handle, port_handle: Handle) -> Resul
 /// | IN | _handle_ | Handle to perform IPC on |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReplyAndReceiveLight>
-pub unsafe fn reply_and_receive_light(handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x42",           // Issue the SVC call with immediate value 0x42
-            in("x0") handle,      // Input: handle in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn reply_and_receive_light(handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x42", // Issue the SVC call with immediate value 0x42
+        "ret"
+    );
 }
 
 /// Performs IPC input/output.
@@ -2439,30 +2126,21 @@ pub unsafe fn reply_and_receive_light(handle: Handle) -> ResultCode {
 /// | IN | _timeout_ | Timeout in nanoseconds |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReplyAndReceive>
-pub unsafe fn reply_and_receive(
+#[unsafe(naked)]
+pub unsafe extern "C" fn reply_and_receive(
     index: *mut i32,
     handles: *const u32,
     handle_count: i32,
     reply_target: u32,
     timeout: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x43",            // Issue the SVC call with immediate value 0x43
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") index,        // Input: index in register x0
-            in("x1") handles,      // Input: handles in register x1
-            in("x2") handle_count, // Input: handle_count in register x2
-            in("x3") reply_target, // Input: reply_target in register x3
-            in("x4") timeout,      // Input: timeout in register x4
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (index pointer) on stack
+        "svc 0x43",            // Issue the SVC call with immediate value 0x43
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (index result) to address in x2
+        "ret"
+    );
 }
 
 /// Performs IPC input/output from a user allocated buffer.
@@ -2482,7 +2160,8 @@ pub unsafe fn reply_and_receive(
 /// | IN | _timeout_ | Timeout in nanoseconds |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReplyAndReceiveWithUserBuffer>
-pub unsafe fn reply_and_receive_with_user_buffer(
+#[unsafe(naked)]
+pub unsafe extern "C" fn reply_and_receive_with_user_buffer(
     index: *mut i32,
     usr_buffer: *mut c_void,
     size: u64,
@@ -2491,25 +2170,13 @@ pub unsafe fn reply_and_receive_with_user_buffer(
     reply_target: Handle,
     timeout: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x44",            // Issue the SVC call with immediate value 0x44
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") index,        // Input: index in register x0
-            in("x1") usr_buffer,   // Input: usr_buffer in register x1
-            in("x2") size,         // Input: size in register x2
-            in("x3") handles,      // Input: handles in register x3
-            in("x4") handle_count, // Input: handle_count in register x4
-            in("x5") reply_target, // Input: reply_target in register x5
-            in("x6") timeout,      // Input: timeout in register x6
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (index pointer) on stack
+        "svc 0x44",            // Issue the SVC call with immediate value 0x44
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (index result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2528,22 +2195,19 @@ pub unsafe fn reply_and_receive_with_user_buffer(
 /// | OUT | _client_handle_ | Output handle for client |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateEvent>
-pub unsafe fn create_event(server_handle: *mut Handle, client_handle: *mut Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0x45",                // Issue the SVC call with immediate value 0x45
-            "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
-            "str w1, [x3]",            // Store w1 in the memory pointed to by x3
-            "str w2, [x4]",            // Store w2 in the memory pointed to by x4
-            in("x0") server_handle,    // Input: server_handle in register x0
-            in("x1") client_handle,    // Input: client_handle in register x1
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_event(
+    server_handle: *mut Handle,
+    client_handle: *mut Handle,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store x0 and x1 (handle pointers) on stack
+        "svc 0x45",                // Issue the SVC call with immediate value 0x45
+        "ldp x3, x4, [sp], #16",   // Load x3 and x4 from stack
+        "str w1, [x3]",            // Store w1 (server handle result) to address in x3
+        "str w2, [x4]",            // Store w2 (client handle result) to address in x4
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2564,25 +2228,17 @@ pub unsafe fn create_event(server_handle: *mut Handle, client_handle: *mut Handl
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x46,MapIoRegion>
-pub unsafe fn map_io_region(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_io_region(
     io_region_h: Handle,
     address: *mut c_void,
     size: u64,
     perm: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x46",           // Issue the SVC call with immediate value 0x46
-            in("x0") io_region_h, // Input: io_region_h in register x0
-            in("x1") address,     // Input: address in register x1
-            in("x2") size,        // Input: size in register x2
-            in("x3") perm,        // Input: perm in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x46", // Issue the SVC call with immediate value 0x46
+        "ret"
+    );
 }
 
 /// Undoes the effects of [map_io_region]. [13.0.0+]
@@ -2598,19 +2254,16 @@ pub unsafe fn map_io_region(
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x47,UnmapIoRegion>
-pub unsafe fn unmap_io_region(io_region_h: Handle, address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x47",           // Issue the SVC call with immediate value 0x47
-            in("x0") io_region_h, // Input: io_region_h in register x0
-            in("x1") address,     // Input: address in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_io_region(
+    io_region_h: Handle,
+    address: *mut c_void,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x47", // Issue the SVC call with immediate value 0x47
+        "ret"
+    );
 }
 
 /// Maps unsafe memory (usable for GPU DMA) for a system module at the desired address. [5.0.0+]
@@ -2625,18 +2278,12 @@ pub unsafe fn unmap_io_region(io_region_h: Handle, address: *mut c_void, size: u
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapPhysicalMemoryUnsafe>
-pub unsafe fn map_physical_memory_unsafe(address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x48",           // Issue the SVC call with immediate value 0x48
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_physical_memory_unsafe(address: *mut c_void, size: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x48", // Issue the SVC call with immediate value 0x48
+        "ret"
+    );
 }
 
 /// Undoes the effects of [map_physical_memory_unsafe]. [5.0.0+]
@@ -2651,18 +2298,15 @@ pub unsafe fn map_physical_memory_unsafe(address: *mut c_void, size: u64) -> Res
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapPhysicalMemoryUnsafe>
-pub unsafe fn unmap_physical_memory_unsafe(address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x49",           // Issue the SVC call with immediate value 0x49
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_physical_memory_unsafe(
+    address: *mut c_void,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x49", // Issue the SVC call with immediate value 0x49
+        "ret"
+    );
 }
 
 /// Sets the system-wide limit for unsafe memory mappable using [map_physical_memory_unsafe]. [5.0.0+]
@@ -2676,17 +2320,12 @@ pub unsafe fn unmap_physical_memory_unsafe(address: *mut c_void, size: u64) -> R
 /// | IN | _size_ | Size limit |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetUnsafeLimit>
-pub unsafe fn set_unsafe_limit(size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x4A",           // Issue the SVC call with immediate value 0x4A
-            in("x0") size,        // Input: size in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_unsafe_limit(size: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x4A", // Issue the SVC call with immediate value 0x4A
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2710,26 +2349,19 @@ pub unsafe fn set_unsafe_limit(size: u64) -> ResultCode {
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateCodeMemory>
-pub unsafe fn create_code_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_code_memory(
     handle: *mut Handle,
     src_addr: *mut c_void,
     size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x4B",            // Issue the SVC call with immediate value 0x4B
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") src_addr,     // Input: src_addr in register x1
-            in("x2") size,         // Input: size in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 on the stack
+        "svc 0x4B",            // Issue the SVC call with immediate value 0x4B
+        "ldr x2, [sp], #16",   // Load x2 from the stack
+        "str w1, [x2]",        // Store w1 in the memory pointed to by x2
+        "ret"
+    );
 }
 
 /// Maps code memory in the caller's address space [4.0.0+].
@@ -2751,27 +2383,18 @@ pub unsafe fn create_code_memory(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ControlCodeMemory>
-pub unsafe fn control_code_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn control_code_memory(
     code_handle: Handle,
     op: CodeMapOperation,
     dst_addr: *mut c_void,
     size: u64,
     perm: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x4C",           // Issue the SVC call with immediate value 0x4C
-            in("x0") code_handle, // Input: code_handle in register x0
-            in("x1") op as u32,   // Input: op in register x1
-            in("x2") dst_addr,    // Input: dst_addr in register x2
-            in("x3") size,        // Input: size in register x3
-            in("x4") perm,        // Input: perm in register x4
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x4C", // Issue the SVC call with immediate value 0x4C
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2789,13 +2412,12 @@ pub unsafe fn control_code_memory(
 /// Syscall code: [SLEEP_SYSTEM](crate::code::SLEEP_SYSTEM) (`0x4D`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SleepSystem>
-pub unsafe fn sleep_system() {
-    unsafe {
-        asm!(
-            "svc 0x4D", // Issue the SVC call with immediate value 0x4D
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn sleep_system() {
+    core::arch::naked_asm!(
+        "svc 0x4D", // Issue the SVC call with immediate value 0x4D
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2820,28 +2442,20 @@ pub unsafe fn sleep_system() {
 /// | IN | _value_ | Input value to write |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReadWriteRegister>
-pub unsafe fn read_write_register(
+#[unsafe(naked)]
+pub unsafe extern "C" fn read_write_register(
     out_val: *mut u32,
     reg_addr: u64,
     mask: u32,
     value: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x4E",            // Issue the SVC call with immediate value 0x4E
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") out_val,      // Input: out_val in register x0
-            in("x1") reg_addr,     // Input: reg_addr in register x1
-            in("x2") mask,         // Input: mask in register x2
-            in("x3") value,        // Input: value in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out_val pointer) on stack
+        "svc 0x4E",            // Issue the SVC call with immediate value 0x4E
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (register value result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2860,18 +2474,15 @@ pub unsafe fn read_write_register(
 /// | IN | _paused_ | Whether to pause (1) or unpause (0) the process |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetProcessActivity>
-pub unsafe fn set_process_activity(process: Handle, paused: ProcessActivity) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x4F",             // Issue the SVC call with immediate value 0x4F
-            in("x0") process,       // Input: process in register x0
-            in("x1") paused as u32, // Input: paused in register x1
-            lateout("w0") result,   // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_process_activity(
+    process: Handle,
+    paused: ProcessActivity,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x4F", // Issue the SVC call with immediate value 0x4F
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -2892,28 +2503,20 @@ pub unsafe fn set_process_activity(process: Handle, paused: ProcessActivity) -> 
 /// | IN | _other_perm_ | [MemoryPermission] for other processes |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateSharedMemory>
-pub unsafe fn create_shared_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_shared_memory(
     handle: *mut Handle,
     size: usize,
     local_perm: u32, // TODO: MemoryPermission bitfield
     other_perm: u32, // TODO: MemoryPermission bitfield
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x50",            // Issue the SVC call with immediate value 0x4F
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") size,         // Input: size in register x1
-            in("x2") local_perm,   // Input: local_perm in register x2
-            in("x3") other_perm,   // Input: other_perm in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack
+        "svc 0x50",            // Issue the SVC call with immediate value 0x50
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Maps a block of transfer memory.
@@ -2930,25 +2533,17 @@ pub unsafe fn create_shared_memory(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapTransferMemory>
-pub unsafe fn map_transfer_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_transfer_memory(
     tmem_handle: Handle,
     addr: *mut c_void,
     size: usize,
     perm: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x51",           // Issue the SVC call with immediate value 0x50
-            in("x0") tmem_handle, // Input: tmem_handle in register x0
-            in("x1") addr,        // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            in("x3") perm,        // Input: perm in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x51", // Issue the SVC call with immediate value 0x51
+        "ret"
+    );
 }
 
 /// Unmaps a block of transfer memory.
@@ -2964,23 +2559,16 @@ pub unsafe fn map_transfer_memory(
 /// | IN | _size_ | Size of the transfer memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapTransferMemory>
-pub unsafe fn unmap_transfer_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_transfer_memory(
     tmem_handle: Handle,
     addr: *mut c_void,
     size: usize,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x52",           // Issue the SVC call with immediate value 0x51
-            in("x0") tmem_handle, // Input: tmem_handle in register x0
-            in("x1") addr,        // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x52", // Issue the SVC call with immediate value 0x52
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3000,22 +2588,19 @@ pub unsafe fn unmap_transfer_memory(
 /// | IN | _flag_ | Flags for the event |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateInterruptEvent>
-pub unsafe fn create_interrupt_event(handle: *mut Handle, irq_num: u64, flag: u32) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x53",            // Issue the SVC call with immediate value 0x52
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") irq_num,      // Input: irq_num in register x1
-            in("x2") flag,         // Input: flag in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_interrupt_event(
+    handle: *mut Handle,
+    irq_num: u64,
+    flag: u32,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack
+        "svc 0x53",            // Issue the SVC call with immediate value 0x53
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Queries information about a certain virtual address, including its physical address.
@@ -3030,22 +2615,19 @@ pub unsafe fn create_interrupt_event(handle: *mut Handle, irq_num: u64, flag: u3
 /// | IN | _virtaddr_ | Virtual address to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryPhysicalAddress>
-pub unsafe fn query_physical_address(out: *mut PhysicalMemoryInfo, virtaddr: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x54",            // Issue the SVC call with immediate value 0x54
-            "ldr x4, [sp], #16",   // Load x4 from the stack
-            "stp x1, x2, [x4]",    // Store x1 and x2 in the memory pointed to by x4
-            "str x3, [x4, #16]",   // Store x3 in the memory pointed to by x4, offset by 16 bytes
-            in("x0") out,          // Input: out in register x0
-            in("x1") virtaddr,     // Input: virtaddr in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn query_physical_address(
+    out: *mut PhysicalMemoryInfo,
+    virtaddr: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x54",            // Issue the SVC call with immediate value 0x54
+        "ldr x4, [sp], #16",   // Load x4 from stack
+        "stp x1, x2, [x4]",    // Store x1 and x2 to PhysicalMemoryInfo struct
+        "str x3, [x4, #16]",   // Store x3 at offset 16 bytes in struct
+        "ret"
+    );
 }
 
 /// Returns a virtual address mapped to a given IO range. [10.0.0+]
@@ -3062,29 +2644,21 @@ pub unsafe fn query_physical_address(out: *mut PhysicalMemoryInfo, virtaddr: u64
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=%5B10.0.0%2B%5D-,0x55,QueryMemoryMapping,-uintptr_t%20*out_address%2C%20size_t>
-pub unsafe fn query_memory_mapping(
+#[unsafe(naked)]
+pub unsafe extern "C" fn query_memory_mapping(
     virtaddr: *mut u64,
     out_size: *mut u64,
     physaddr: u64,
     size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0x55",                // Issue the SVC call with immediate value 0x54
-            "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
-            "str x1, [x3]",            // Store x1 in the memory pointed to by x3
-            "str x2, [x4]",            // Store x2 in the memory pointed to by x4
-            in("x0") virtaddr,         // Input: virtaddr in register x0
-            in("x1") out_size,         // Input: out_size in register x1
-            in("x2") physaddr,         // Input: physaddr in register x2
-            in("x3") size,             // Input: size in register x3
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store x0 and x1 (pointers) on stack
+        "svc 0x55",                // Issue the SVC call with immediate value 0x55
+        "ldp x3, x4, [sp], #16",   // Load x3 and x4 from stack
+        "str x1, [x3]",            // Store x1 (virtaddr result) to address in x3
+        "str x2, [x4]",            // Store x2 (size result) to address in x4
+        "ret"
+    );
 }
 
 /// Returns a virtual address mapped to a given IO range. [1.0.0-9.2.0]
@@ -3100,22 +2674,19 @@ pub unsafe fn query_memory_mapping(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryIoMapping>
-pub unsafe fn legacy_query_io_mapping(virtaddr: *mut u64, physaddr: u64, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x55",            // Issue the SVC call with immediate value 0x55
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") virtaddr,     // Input: virtaddr in register x0
-            in("x1") physaddr,     // Input: physaddr in register x1
-            in("x2") size,         // Input: size in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn legacy_query_io_mapping(
+    virtaddr: *mut u64,
+    physaddr: u64,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (virtaddr pointer) on stack
+        "svc 0x55",            // Issue the SVC call with immediate value 0x55
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (virtual address result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3135,26 +2706,19 @@ pub unsafe fn legacy_query_io_mapping(virtaddr: *mut u64, physaddr: u64, size: u
 /// | IN | _dev_size_ | Size of the device address space |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateDeviceAddressSpace>
-pub unsafe fn create_device_address_space(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_device_address_space(
     handle: *mut Handle,
     dev_addr: u64,
     dev_size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x56",            // Issue the SVC call with immediate value 0x56
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") handle,       // Input: handle in register x0
-            in("x1") dev_addr,     // Input: dev_addr in register x1
-            in("x2") dev_size,     // Input: dev_size in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (handle pointer) on stack
+        "svc 0x56",            // Issue the SVC call with immediate value 0x56
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Attaches a device address space to a device.
@@ -3169,18 +2733,12 @@ pub unsafe fn create_device_address_space(
 /// | IN | _handle_ | Handle to the device address space |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#AttachDeviceAddressSpace>
-pub unsafe fn attach_device_address_space(device: u64, handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x57",           // Issue the SVC call with immediate value 0x57
-            in("x0") device,      // Input: device in register x0
-            in("x1") handle,      // Input: handle in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn attach_device_address_space(device: u64, handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x57", // Issue the SVC call with immediate value 0x57
+        "ret"
+    );
 }
 
 /// Detaches a device address space from a device.
@@ -3195,18 +2753,12 @@ pub unsafe fn attach_device_address_space(device: u64, handle: Handle) -> Result
 /// | IN | _handle_ | Handle to the device address space |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#DetachDeviceAddressSpace>
-pub unsafe fn detach_device_address_space(device: u64, handle: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x58",           // Issue the SVC call with immediate value 0x58
-            in("x0") device,      // Input: device in register x0
-            in("x1") handle,      // Input: handle in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn detach_device_address_space(device: u64, handle: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x58", // Issue the SVC call with immediate value 0x58
+        "ret"
+    );
 }
 
 /// Maps an attached device address space to an userspace address.
@@ -3225,7 +2777,8 @@ pub unsafe fn detach_device_address_space(device: u64, handle: Handle) -> Result
 /// | IN | _option_ | Mapping options |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapDeviceAddressSpaceByForce>
-pub unsafe fn map_device_address_space_by_force(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_device_address_space_by_force(
     handle: Handle,
     proc_handle: Handle,
     map_addr: u64,
@@ -3233,21 +2786,10 @@ pub unsafe fn map_device_address_space_by_force(
     dev_addr: u64,
     option: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x59",           // Issue the SVC call with immediate value 0x59
-            in("x0") handle,      // Input: handle in register x0
-            in("x1") proc_handle, // Input: proc_handle in register x1
-            in("x2") map_addr,    // Input: map_addr in register x2
-            in("x3") dev_size,    // Input: dev_size in register x3
-            in("x4") dev_addr,    // Input: dev_addr in register x4
-            in("x5") option,      // Input: option in register x5
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x59", // Issue the SVC call with immediate value 0x59
+        "ret"
+    );
 }
 
 /// Maps an attached device address space to an userspace address.
@@ -3266,7 +2808,8 @@ pub unsafe fn map_device_address_space_by_force(
 /// | IN | _option_ | Mapping options |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapDeviceAddressSpaceAligned>
-pub unsafe fn map_device_address_space_aligned(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_device_address_space_aligned(
     handle: Handle,
     proc_handle: Handle,
     map_addr: u64,
@@ -3274,21 +2817,10 @@ pub unsafe fn map_device_address_space_aligned(
     dev_addr: u64,
     option: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x5A",           // Issue the SVC call with immediate value 0x5A
-            in("x0") handle,      // Input: handle in register x0
-            in("x1") proc_handle, // Input: proc_handle in register x1
-            in("x2") map_addr,    // Input: map_addr in register x2
-            in("x3") dev_size,    // Input: dev_size in register x3
-            in("x4") dev_addr,    // Input: dev_addr in register x4
-            in("x5") option,      // Input: option in register x5
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x5A", // Issue the SVC call with immediate value 0x5A
+        "ret"
+    );
 }
 
 /// Maps an attached device address space to an userspace address. [1.0.0-12.1.0]
@@ -3308,7 +2840,8 @@ pub unsafe fn map_device_address_space_aligned(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapDeviceAddressSpace>
-pub unsafe fn map_device_address_space(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_device_address_space(
     out_mapped_size: *mut u64,
     handle: Handle,
     proc_handle: Handle,
@@ -3317,25 +2850,13 @@ pub unsafe fn map_device_address_space(
     dev_addr: u64,
     perm: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!",    // Store x0 on the stack
-            "svc 0x5B",               // Issue the SVC call with immediate value 0x5B
-            "ldr x2, [sp], #16",      // Load x2 from the stack
-            "str w1, [x2]",           // Store w1 in the memory pointed to by x2
-            in("x0") out_mapped_size, // Input: out_mapped_size in register x0
-            in("x1") handle,          // Input: handle in register x1
-            in("x2") proc_handle,     // Input: proc_handle in register x2
-            in("x3") map_addr,        // Input: map_addr in register x3
-            in("x4") dev_size,        // Input: dev_size in register x4
-            in("x5") dev_addr,        // Input: dev_addr in register x5
-            in("x6") perm,            // Input: perm in register x6
-            lateout("w0") result,     // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 on the stack
+        "svc 0x5B",            // Issue the SVC call with immediate value 0x5B
+        "ldr x2, [sp], #16",   // Load x2 from the stack
+        "str x1, [x2]",        // Store x1 in the memory pointed to by x2
+        "ret"
+    );
 }
 
 /// Unmaps an attached device address space from an userspace address.
@@ -3353,27 +2874,18 @@ pub unsafe fn map_device_address_space(
 /// | IN | _dev_addr_ | Device address |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapDeviceAddressSpace>
-pub unsafe fn unmap_device_address_space(
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_device_address_space(
     handle: Handle,
     proc_handle: Handle,
     map_addr: u64,
     map_size: u64,
     dev_addr: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x5C",           // Issue the SVC call with immediate value 0x5C
-            in("x0") handle,      // Input: handle in register x0
-            in("x1") proc_handle, // Input: proc_handle in register x1
-            in("x2") map_addr,    // Input: map_addr in register x2
-            in("x3") map_size,    // Input: map_size in register x3
-            in("x4") dev_addr,    // Input: dev_addr in register x4
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x5C", // Issue the SVC call with immediate value 0x5C
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3393,23 +2905,16 @@ pub unsafe fn unmap_device_address_space(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#InvalidateProcessDataCache>
-pub unsafe fn invalidate_process_data_cache(
+#[unsafe(naked)]
+pub unsafe extern "C" fn invalidate_process_data_cache(
     process: Handle,
     address: *mut c_void,
     size: usize,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x5D",           // Issue the SVC call with immediate value 0x5D
-            in("x0") process,     // Input: process in register x0
-            in("x1") address,     // Input: address in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x5D", // Issue the SVC call with immediate value 0x5D
+        "ret"
+    );
 }
 
 /// Stores data cache for a virtual address range within a process.
@@ -3425,23 +2930,16 @@ pub unsafe fn invalidate_process_data_cache(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#StoreProcessDataCache>
-pub unsafe fn store_process_data_cache(
+#[unsafe(naked)]
+pub unsafe extern "C" fn store_process_data_cache(
     process: Handle,
     address: *mut c_void,
     size: usize,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x5E",           // Issue the SVC call with immediate value 0x5E
-            in("x0") process,     // Input: process in register x0
-            in("x1") address,     // Input: address in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x5E", // Issue the SVC call with immediate value 0x5E
+        "ret"
+    );
 }
 
 /// Flushes data cache for a virtual address range within a process.
@@ -3457,23 +2955,16 @@ pub unsafe fn store_process_data_cache(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#FlushProcessDataCache>
-pub unsafe fn flush_process_data_cache(
+#[unsafe(naked)]
+pub unsafe extern "C" fn flush_process_data_cache(
     process: Handle,
     address: *mut c_void,
     size: usize,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x5F",           // Issue the SVC call with immediate value 0x5F
-            in("x0") process,     // Input: process in register x0
-            in("x1") address,     // Input: address in register x1
-            in("x2") size,        // Input: size in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x5F", // Issue the SVC call with immediate value 0x5F
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3492,21 +2983,15 @@ pub unsafe fn flush_process_data_cache(
 /// | IN | _process_id_ | Process ID to debug |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#DebugActiveProcess>
-pub unsafe fn debug_active_process(debug: *mut Handle, process_id: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x60",            // Issue the SVC call with immediate value 0x60
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") debug,        // Input: debug in register x0
-            in("x1") process_id,   // Input: process_id in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn debug_active_process(debug: *mut Handle, process_id: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (debug pointer) on stack
+        "svc 0x60",            // Issue the SVC call with immediate value 0x60
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Breaks an active debugging session.
@@ -3520,17 +3005,12 @@ pub unsafe fn debug_active_process(debug: *mut Handle, process_id: u64) -> Resul
 /// | IN | _debug_ | Debug handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#BreakDebugProcess>
-pub unsafe fn break_debug_process(debug: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x61",           // Issue the SVC call with immediate value 0x61
-            in("x0") debug,       // Input: debug in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn break_debug_process(debug: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x61", // Issue the SVC call with immediate value 0x61
+        "ret"
+    );
 }
 
 /// Terminates the process of an active debugging session.
@@ -3544,17 +3024,12 @@ pub unsafe fn break_debug_process(debug: Handle) -> ResultCode {
 /// | IN | _debug_ | Debug handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#TerminateDebugProcess>
-pub unsafe fn terminate_debug_process(debug: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x62",           // Issue the SVC call with immediate value 0x62
-            in("x0") debug,       // Input: debug in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn terminate_debug_process(debug: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x62", // Issue the SVC call with immediate value 0x62
+        "ret"
+    );
 }
 
 /// Gets an incoming debug event from a debugging session.
@@ -3569,18 +3044,15 @@ pub unsafe fn terminate_debug_process(debug: Handle) -> ResultCode {
 /// | IN | _debug_ | Debug handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugEvent>
-pub unsafe fn get_debug_event(event: *mut c_void, debug: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x63",           // Issue the SVC call with immediate value 0x63
-            in("x0") event,       // Input: event in register x0
-            in("x1") debug,       // Input: debug in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_debug_event(event: *mut c_void, debug: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (event pointer) on stack
+        "svc 0x63",            // Issue the SVC call with immediate value 0x63
+        "ldr x2, [sp], #16",   // Load x2 (saved event pointer) from stack
+        "str w1, [x2]",        // Store w1 (event value) to *event
+        "ret"
+    );
 }
 
 /// Continues a debugging session. [3.0.0+]
@@ -3597,25 +3069,17 @@ pub unsafe fn get_debug_event(event: *mut c_void, debug: Handle) -> ResultCode {
 /// | IN | _num_tids_ | Number of thread IDs |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ContinueDebugEvent>
-pub unsafe fn continue_debug_event(
+#[unsafe(naked)]
+pub unsafe extern "C" fn continue_debug_event(
     debug: Handle,
     flags: u32,
     tid_list: *mut u64,
     num_tids: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x64",           // Issue the SVC call with immediate value 0x64
-            in("x0") debug,       // Input: debug in register x0
-            in("x1") flags,       // Input: flags in register x1
-            in("x2") tid_list,    // Input: tid_list in register x2
-            in("x3") num_tids,    // Input: num_tids in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x64", // Issue the SVC call with immediate value 0x64
+        "ret"
+    );
 }
 
 /// Continues a debugging session. [1.0.0-2.3.0]
@@ -3631,19 +3095,16 @@ pub unsafe fn continue_debug_event(
 /// | IN | _thread_id_ | Thread ID |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ContinueDebugEvent>
-pub unsafe fn legacy_continue_debug_event(debug: Handle, flags: u32, thread_id: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x64",           // Issue the SVC call with immediate value 0x64
-            in("x0") debug,       // Input: debug in register x0
-            in("x1") flags,       // Input: flags in register x1
-            in("x2") thread_id,   // Input: thread_id in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn legacy_continue_debug_event(
+    debug: Handle,
+    flags: u32,
+    thread_id: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x64", // Issue the SVC call with immediate value 0x64
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3669,26 +3130,19 @@ pub unsafe fn legacy_continue_debug_event(debug: Handle, flags: u32, thread_id: 
 /// | IN | _max_pids_count_ | Maximum number of process IDs to write |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetProcessList>
-pub unsafe fn get_process_list(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_process_list(
     pids_count: *mut i32,
     pids_list: *mut u64,
     max_pids_count: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!",   // Store x0 on the stack
-            "svc 0x65",              // Issue the SVC call with immediate value 0x65
-            "ldr x2, [sp], #16",     // Load x2 from the stack
-            "str w1, [x2]",          // Store w1 in the memory pointed to by x2
-            in("x0") pids_count,     // Input: pids_count in register x0
-            in("x1") pids_list,      // Input: pids_list in register x1
-            in("x2") max_pids_count, // Input: max_pids_count in register x2
-            lateout("w0") result,    // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (pids_count pointer) on stack
+        "svc 0x65",            // Issue the SVC call with immediate value 0x65
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (count result) to address in x2
+        "ret"
+    );
 }
 
 /// Retrieves a list of all threads for a debug handle (or zero).
@@ -3705,28 +3159,20 @@ pub unsafe fn get_process_list(
 /// | IN | _debug_ | Debug handle, or 0 to use the current process |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadList>
-pub unsafe fn get_thread_list(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_thread_list(
     num_out: *mut i32,
     tids_out: *mut u64,
     max_tids: u32,
     debug: Handle,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x66",            // Issue the SVC call with immediate value 0x66
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") num_out,      // Input: num_out in register x0
-            in("x1") tids_out,     // Input: tids_out in register x1
-            in("x2") max_tids,     // Input: max_tids in register x2
-            in("x3") debug,        // Input: debug in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (num_out pointer) on stack
+        "svc 0x66",            // Issue the SVC call with immediate value 0x66
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (count result) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3747,25 +3193,17 @@ pub unsafe fn get_thread_list(
 /// | IN | _flags_ | Context flags |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugThreadContext>
-pub unsafe fn get_debug_thread_context(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_debug_thread_context(
     ctx: *mut ThreadContext,
     debug: Handle,
     thread_id: u64,
     flags: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x67",           // Issue the SVC call with immediate value 0x67
-            in("x0") ctx,         // Input: ctx in register x0
-            in("x1") debug,       // Input: debug in register x1
-            in("x2") thread_id,   // Input: thread_id in register x2
-            in("x3") flags,       // Input: flags in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x67", // Issue the SVC call with immediate value 0x67
+        "ret"
+    );
 }
 
 /// Gets the context (dump the registers) of a thread in a debugging session.
@@ -3782,25 +3220,17 @@ pub unsafe fn get_debug_thread_context(
 /// | IN | _flags_ | Context flags |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetDebugThreadContext>
-pub unsafe fn set_debug_thread_context(
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_debug_thread_context(
     debug: Handle,
     thread_id: u64,
     ctx: *mut ThreadContext,
     flags: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x68",           // Issue the SVC call with immediate value 0x68
-            in("x0") debug,       // Input: debug in register x0
-            in("x1") thread_id,   // Input: thread_id in register x1
-            in("x2") ctx,         // Input: ctx in register x2
-            in("x3") flags,       // Input: flags in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x68", // Issue the SVC call with immediate value 0x68
+        "ret"
+    );
 }
 
 /// Queries memory information from a process that is being debugged.
@@ -3817,28 +3247,20 @@ pub unsafe fn set_debug_thread_context(
 /// | IN | _addr_ | Address to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryDebugProcessMemory>
-pub unsafe fn query_debug_process_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn query_debug_process_memory(
     meminfo_ptr: *mut MemoryInfo,
     pageinfo: *mut u32,
     debug: Handle,
     addr: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x1, [sp, #-16]!", // Store x1 on the stack
-            "svc 0x69",            // Issue the SVC call with immediate value 0x69
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") meminfo_ptr,  // Input: meminfo_ptr in register x0
-            in("x1") pageinfo,     // Input: pageinfo in register x1
-            in("x2") debug,        // Input: debug in register x2
-            in("x3") addr,         // Input: addr in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x1, [sp, #-16]!", // Store x1 (pageinfo pointer) on stack
+        "svc 0x69",            // Issue the SVC call with immediate value 0x69
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (page info result) to address in x2
+        "ret"
+    );
 }
 
 ///  Reads memory from a process that is being debugged.
@@ -3855,25 +3277,17 @@ pub unsafe fn query_debug_process_memory(
 /// | IN | _size_ | Size to read |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReadDebugProcessMemory>
-pub unsafe fn read_debug_process_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn read_debug_process_memory(
     buffer: *mut c_void,
     debug: Handle,
     addr: u64,
     size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x6A",           // Issue the SVC call with immediate value 0x6A
-            in("x0") buffer,      // Input: buffer in register x0
-            in("x1") debug,       // Input: debug in register x1
-            in("x2") addr,        // Input: addr in register x2
-            in("x3") size,        // Input: size in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x6A", // Issue the SVC call with immediate value 0x6A
+        "ret"
+    );
 }
 
 /// Writes to memory in a process that is being debugged.
@@ -3890,25 +3304,17 @@ pub unsafe fn read_debug_process_memory(
 /// | IN | _size_ | Size to write |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WriteDebugProcessMemory>
-pub unsafe fn write_debug_process_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn write_debug_process_memory(
     debug: Handle,
     buffer: *const c_void,
     addr: u64,
     size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x6B",           // Issue the SVC call with immediate value 0x6B
-            in("x0") debug,       // Input: debug in register x0
-            in("x1") buffer,      // Input: buffer in register x1
-            in("x2") addr,        // Input: addr in register x2
-            in("x3") size,        // Input: size in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x6B", // Issue the SVC call with immediate value 0x6B
+        "ret"
+    );
 }
 
 /// Sets one of the hardware breakpoints.
@@ -3924,19 +3330,12 @@ pub unsafe fn write_debug_process_memory(
 /// | IN | _value_ | Breakpoint value |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetHardwareBreakPoint>
-pub unsafe fn set_hardware_breakpoint(which: u32, flags: u64, value: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x6C",           // Issue the SVC call with immediate value 0x6C
-            in("x0") which,       // Input: which in register x0
-            in("x1") flags,       // Input: flags in register x1
-            in("x2") value,       // Input: value in register x2
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_hardware_breakpoint(which: u32, flags: u64, value: u64) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x6C", // Issue the SVC call with immediate value 0x6C
+        "ret"
+    );
 }
 
 ///  Gets parameters from a thread in a debugging session.
@@ -3954,31 +3353,22 @@ pub unsafe fn set_hardware_breakpoint(which: u32, flags: u64, value: u64) -> Res
 /// | IN | _param_ | Parameter to get |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugThreadParam>
-pub unsafe fn get_debug_thread_param(
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_debug_thread_param(
     out_64: *mut u64,
     out_32: *mut u32,
     debug: Handle,
     thread_id: u64,
     param: DebugThreadParam,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0x6D",                // Issue the SVC call with immediate value 0x6D
-            "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
-            "str x1, [x3]",            // Store x1 in the memory pointed to by x3
-            "str w2, [x4]",            // Store w2 in the memory pointed to by x4
-            in("x0") out_64,           // Input: out_64 in register x0
-            in("x1") out_32,           // Input: out_32 in register x1
-            in("x2") debug,            // Input: debug in register x2
-            in("x3") thread_id,        // Input: thread_id in register x3
-            in("x4") param as u32,     // Input: param in register x4
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store out_64 and out_32 on stack
+        "svc 0x6D",                // Issue the SVC call with immediate value 0x6D
+        "ldp x3, x4, [sp], #16",   // Load out_64 and out_32 from stack
+        "str x1, [x3]",            // Store x1 (out_64) to address in x3
+        "str w2, [x4]",            // Store w2 (out_32) to address in x4
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -3999,23 +3389,20 @@ pub unsafe fn get_debug_thread_param(
 /// | IN | _id1_ | Second ID |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetSystemInfo>
-pub unsafe fn get_system_info(out: *mut u64, id0: u64, handle: Handle, id1: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x6F",            // Issue the SVC call with immediate value 0x6F
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str x1, [x2]",        // Store x1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            in("x1") id0,          // Input: id0 in register x1
-            in("x2") handle,       // Input: handle in register x2
-            in("x3") id1,          // Input: id1 in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_system_info(
+    out: *mut u64,
+    id0: u64,
+    handle: Handle,
+    id1: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x6F",            // Issue the SVC call with immediate value 0x6F
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (result value) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -4037,31 +3424,22 @@ pub unsafe fn get_system_info(out: *mut u64, id0: u64, handle: Handle, id1: u64)
 /// | IN | _name_ | Name of the port |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreatePort>
-pub unsafe fn create_port(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_port(
     port_server: *mut Handle,
     port_client: *mut Handle,
     max_sessions: i32,
     is_light: bool,
     name: *const c_char,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "stp x0, x1, [sp, #-16]!", // Store x0 and x1 on the stack
-            "svc 0x70",                // Issue the SVC call with immediate value 0x70
-            "ldp x3, x4, [sp], #16",   // Load x3 and x4 from the stack
-            "str w1, [x3]",            // Store w1 in the memory pointed to by x3
-            "str w2, [x4]",            // Store w2 in the memory pointed to by x4
-            in("x0") port_server,      // Input: port_server in register x0
-            in("x1") port_client,      // Input: port_client in register x1
-            in("x2") max_sessions,     // Input: max_sessions in register x2
-            in("x3") is_light as u32,  // Input: is_light in register x3
-            in("x4") name,             // Input: name in register x4
-            lateout("w0") result,      // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "stp x0, x1, [sp, #-16]!", // Store port_server and port_client on stack
+        "svc 0x70",                // Issue the SVC call with immediate value 0x70
+        "ldp x3, x4, [sp], #16",   // Load port_server and port_client from stack
+        "str w1, [x3]",            // Store w1 (port_server) to address in x3
+        "str w2, [x4]",            // Store w2 (port_client) to address in x4
+        "ret"
+    );
 }
 
 /// Manages a named port.
@@ -4077,26 +3455,19 @@ pub unsafe fn create_port(
 /// | IN | _max_sessions_ | Maximum number of sessions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ManageNamedPort>
-pub unsafe fn manage_named_port(
+#[unsafe(naked)]
+pub unsafe extern "C" fn manage_named_port(
     port_server: *mut Handle,
     name: *const c_char,
     max_sessions: i32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x71",            // Issue the SVC call with immediate value 0x71
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") port_server,  // Input: port_server in register x0
-            in("x1") name,         // Input: name in register x1
-            in("x2") max_sessions, // Input: max_sessions in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store port_server on stack
+        "svc 0x71",            // Issue the SVC call with immediate value 0x71
+        "ldr x2, [sp], #16",   // Load port_server from stack
+        "str w1, [x2]",        // Store w1 (port_server) to address in x2
+        "ret"
+    );
 }
 
 /// Connects to a port.
@@ -4111,21 +3482,15 @@ pub unsafe fn manage_named_port(
 /// | IN | _port_ | Port handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ConnectToPort>
-pub unsafe fn connect_to_port(session: *mut Handle, port: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x72",            // Issue the SVC call with immediate value 0x72
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") session,      // Input: session in register x0
-            in("x1") port,         // Input: port in register x1
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn connect_to_port(session: *mut Handle, port: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (session pointer) on stack
+        "svc 0x72",            // Issue the SVC call with immediate value 0x72
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (session handle) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -4146,25 +3511,17 @@ pub unsafe fn connect_to_port(session: *mut Handle, port: Handle) -> ResultCode 
 /// | IN | _perm_ | New memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetProcessMemoryPermission>
-pub unsafe fn set_process_memory_permission(
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_process_memory_permission(
     proc: Handle,
     addr: u64,
     size: u64,
     perm: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x73",           // Issue the SVC call with immediate value 0x73
-            in("x0") proc,        // Input: proc in register x0
-            in("x1") addr,        // Input: addr in register x1
-            in("x2") size,        // Input: size in register x2
-            in("x3") perm,        // Input: perm in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x73", // Issue the SVC call with immediate value 0x73
+        "ret"
+    );
 }
 
 /// Maps the src address from the supplied process handle into the current process.
@@ -4181,25 +3538,17 @@ pub unsafe fn set_process_memory_permission(
 /// | IN | _size_ | Size of the memory to map |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapProcessMemory>
-pub unsafe fn map_process_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_process_memory(
     dst: *mut c_void,
     proc: Handle,
     src: u64,
     size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x74",           // Issue the SVC call with immediate value 0x74
-            in("x0") dst,         // Input: dst in register x0
-            in("x1") proc,        // Input: proc in register x1
-            in("x2") src,         // Input: src in register x2
-            in("x3") size,        // Input: size in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x74", // Issue the SVC call with immediate value 0x74
+        "ret"
+    );
 }
 
 /// Undoes the effects of [map_process_memory].
@@ -4216,25 +3565,17 @@ pub unsafe fn map_process_memory(
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapProcessMemory>
-pub unsafe fn unmap_process_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_process_memory(
     dst: *mut c_void,
     proc: Handle,
     src: u64,
     size: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x75",           // Issue the SVC call with immediate value 0x75
-            in("x0") dst,         // Input: dst in register x0
-            in("x1") proc,        // Input: proc in register x1
-            in("x2") src,         // Input: src in register x2
-            in("x3") size,        // Input: size in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x75", // Issue the SVC call with immediate value 0x75
+        "ret"
+    );
 }
 
 /// Equivalent to [query_memory], for another process.
@@ -4255,28 +3596,20 @@ pub unsafe fn unmap_process_memory(
 /// | IN | _addr_ | Address to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryProcessMemory>
-pub unsafe fn query_process_memory(
+#[unsafe(naked)]
+pub unsafe extern "C" fn query_process_memory(
     meminfo_ptr: *mut MemoryInfo,
     pageinfo: *mut u32,
     proc: Handle,
     addr: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x1, [sp, #-16]!", // Store x1 on the stack
-            "svc 0x76",            // Issue the SVC call with immediate value 0x76
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") meminfo_ptr,  // Input: meminfo_ptr in register x0
-            in("x1") pageinfo,     // Input: pageinfo in register x1
-            in("x2") proc,         // Input: proc in register x2
-            in("x3") addr,         // Input: addr in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x1, [sp, #-16]!", // Store pageinfo on stack
+        "svc 0x76",            // Issue the SVC call with immediate value 0x76
+        "ldr x2, [sp], #16",   // Load pageinfo from stack
+        "str w1, [x2]",        // Store w1 (pageinfo) to address in x2
+        "ret"
+    );
 }
 
 /// Maps normal heap in a certain process as executable code (used when loading NROs).
@@ -4297,20 +3630,17 @@ pub unsafe fn query_process_memory(
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapProcessCodeMemory>
-pub unsafe fn map_process_code_memory(proc: Handle, dst: u64, src: u64, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x77",            // Issue the SVC call with immediate value 0x77
-            in("x0") proc,         // Input: proc in register x0
-            in("x1") dst,          // Input: dst in register x1
-            in("x2") src,          // Input: src in register x2
-            in("x3") size,         // Input: size in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_process_code_memory(
+    proc: Handle,
+    dst: u64,
+    src: u64,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x77", // Issue the SVC call with immediate value 0x77
+        "ret"
+    );
 }
 
 /// Undoes the effects of [map_process_code_memory].
@@ -4331,20 +3661,17 @@ pub unsafe fn map_process_code_memory(proc: Handle, dst: u64, src: u64, size: u6
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapProcessCodeMemory>
-pub unsafe fn unmap_process_code_memory(proc: Handle, dst: u64, src: u64, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x78",           // Issue the SVC call with immediate value 0x78
-            in("x0") proc,        // Input: proc in register x0
-            in("x1") dst,         // Input: dst in register x1
-            in("x2") src,         // Input: src in register x2
-            in("x3") size,        // Input: size in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_process_code_memory(
+    proc: Handle,
+    dst: u64,
+    src: u64,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x78", // Issue the SVC call with immediate value 0x78
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -4369,28 +3696,20 @@ pub unsafe fn unmap_process_code_memory(proc: Handle, dst: u64, src: u64, size: 
 /// | IN | _cap_num_ | Number of kernel capabilities |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateProcess>
-pub unsafe fn create_process(
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_process(
     out: *mut Handle,
     proc_info: *const u8,
     caps: *const u32,
     cap_num: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x79",            // Issue the SVC call with immediate value 0x79
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            in("x1") proc_info,    // Input: proc_info in register x1
-            in("x2") caps,         // Input: caps in register x2
-            in("x3") cap_num,      // Input: cap_num in register x3
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x79",            // Issue the SVC call with immediate value 0x79
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Starts executing a freshly created process.
@@ -4409,25 +3728,17 @@ pub unsafe fn create_process(
 /// | IN | _stack_size_ | Stack size for the main thread |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#StartProcess>
-pub unsafe fn start_process(
+#[unsafe(naked)]
+pub unsafe extern "C" fn start_process(
     proc: Handle,
     main_prio: i32,
     default_cpu: i32,
     stack_size: u32,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x7A",           // Issue the SVC call with immediate value 0x7A
-            in("x0") proc,        // Input: proc in register x0
-            in("x1") main_prio,   // Input: main_prio in register x1
-            in("x2") default_cpu, // Input: default_cpu in register x2
-            in("x3") stack_size,  // Input: stack_size in register x3
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x7A", // Issue the SVC call with immediate value 0x7A
+        "ret"
+    );
 }
 
 /// Terminates a running process.
@@ -4445,17 +3756,12 @@ pub unsafe fn start_process(
 /// | IN | _proc_ | Handle of the process to terminate |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#TerminateProcess>
-pub unsafe fn terminate_process(proc: Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x7B",           // Issue the SVC call with immediate value 0x7B
-            in("x0") proc,        // Input: proc in register x0
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn terminate_process(proc: Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x7B", // Issue the SVC call with immediate value 0x7B
+        "ret"
+    );
 }
 
 /// Gets a [ProcessInfoType] for a process.
@@ -4475,22 +3781,19 @@ pub unsafe fn terminate_process(proc: Handle) -> ResultCode {
 /// | IN | _which_ | Type of information to retrieve |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetProcessInfo>
-pub unsafe fn get_process_info(out: *mut i64, proc: Handle, which: ProcessInfoType) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x7C",            // Issue the SVC call with immediate value 0x7C
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            in("x1") proc,         // Input: proc in register x1
-            in("x2") which as u32, // Input: which in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn get_process_info(
+    out: *mut i64,
+    proc: Handle,
+    which: ProcessInfoType,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x7C",            // Issue the SVC call with immediate value 0x7C
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str x1, [x2]",        // Store x1 (result value) to address in x2
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -4508,20 +3811,15 @@ pub unsafe fn get_process_info(out: *mut i64, proc: Handle, which: ProcessInfoTy
 /// | OUT | _out_ | Output resource limit handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateResourceLimit>
-pub unsafe fn create_resource_limit(out: *mut Handle) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!", // Store x0 on the stack
-            "svc 0x7D",            // Issue the SVC call with immediate value 0x7D
-            "ldr x2, [sp], #16",   // Load x2 from the stack
-            "str w1, [x2]",        // Store w1 in the memory pointed to by x2
-            in("x0") out,          // Input: out in register x0
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn create_resource_limit(out: *mut Handle) -> ResultCode {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Store x0 (out pointer) on stack
+        "svc 0x7D",            // Issue the SVC call with immediate value 0x7D
+        "ldr x2, [sp], #16",   // Load x2 from stack
+        "str w1, [x2]",        // Store w1 (handle result) to address in x2
+        "ret"
+    );
 }
 
 /// Sets the value for a [LimitableResource] for a Resource Limit handle.
@@ -4537,23 +3835,16 @@ pub unsafe fn create_resource_limit(out: *mut Handle) -> ResultCode {
 /// | IN | _value_ | Value to set |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetResourceLimitLimitValue>
-pub unsafe fn set_resource_limit_limit_value(
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_resource_limit_limit_value(
     reslimit: Handle,
     which: LimitableResource,
     value: u64,
 ) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x7E",            // Issue the SVC call with immediate value 0x7E
-            in("x0") reslimit,     // Input: reslimit in register x0
-            in("x1") which as u32, // Input: which in register x1
-            in("x2") value,        // Input: value in register x2
-            lateout("w0") result,  // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+    core::arch::naked_asm!(
+        "svc 0x7E", // Issue the SVC call with immediate value 0x7E
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -4575,25 +3866,26 @@ pub unsafe fn set_resource_limit_limit_value(
 /// | IN | _regs_ | Arguments to pass to the secure monitor |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CallSecureMonitor>
-pub unsafe fn call_secure_monitor(regs: *mut SecmonArgs) {
-    unsafe {
-        asm!(
-            "str x0, [sp, #-16]!",     // Store x0 on the stack
-            "mov x8, x0",              // Move regs pointer to x8
-            "ldp x0, x1, [x8]",        // Load first pair of args
-            "ldp x2, x3, [x8, #0x10]", // Load second pair
-            "ldp x4, x5, [x8, #0x20]", // Load third pair
-            "ldp x6, x7, [x8, #0x30]", // Load fourth pair
-            "svc 0x7F",                // Issue the SVC call
-            "ldr x8, [sp], #16",       // Restore regs pointer
-            "stp x0, x1, [x8]",        // Store first pair of results
-            "stp x2, x3, [x8, #0x10]", // Store second pair
-            "stp x4, x5, [x8, #0x20]", // Store third pair
-            "stp x6, x7, [x8, #0x30]", // Store fourth pair
-            in("x0") regs,             // Input: regs pointer in x0
-            options(nostack)
-        );
-    }
+#[unsafe(naked)]
+pub unsafe extern "C" fn call_secure_monitor(regs: *mut SecmonArgs) {
+    core::arch::naked_asm!(
+        "str x0, [sp, #-16]!", // Push regs pointer on stack
+        "mov x8, x0",          // Copy regs pointer to x8 for load phase
+        // Load arguments into x0..x7
+        "ldp x0, x1, [x8]",        // x0,x1 = regs->x[0], x[1]
+        "ldp x2, x3, [x8, #0x10]", // x2,x3 = regs->x[2], x[3]
+        "ldp x4, x5, [x8, #0x20]", // x4,x5 = regs->x[4], x[5]
+        "ldp x6, x7, [x8, #0x30]", // x6,x7 = regs->x[6], x[7]
+        "svc 0x7F",                // Secure monitor call
+        // Restore original regs pointer from stack
+        "ldr x8, [sp], #16", // Pop regs pointer into x8
+        // Store results back to struct
+        "stp x0, x1, [x8]",        // regs->x[0] = x0, x1
+        "stp x2, x3, [x8, #0x10]", // regs->x[2] = x2, x3
+        "stp x4, x5, [x8, #0x20]", // regs->x[4] = x4, x5
+        "stp x6, x7, [x8, #0x30]", // regs->x[6] = x6, x7
+        "ret"
+    );
 }
 
 //</editor-fold>
@@ -4612,18 +3904,15 @@ pub unsafe fn call_secure_monitor(regs: *mut SecmonArgs) {
 /// | IN | _size_ | Size of memory to map |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x90,MapInsecurePhysicalMemory>
-pub unsafe fn map_insecure_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x90",           // Issue the SVC call with immediate value 0x90
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn map_insecure_physical_memory(
+    address: *mut c_void,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x90", // Issue the SVC call with immediate value 0x90
+        "ret"
+    );
 }
 
 /// Undoes the effects of [map_insecure_physical_memory]. [15.0.0+]
@@ -4638,18 +3927,15 @@ pub unsafe fn map_insecure_physical_memory(address: *mut c_void, size: u64) -> R
 /// | IN | _size_ | Size of memory to unmap |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x91,UnmapInsecurePhysicalMemory>
-pub unsafe fn unmap_insecure_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
-    let result: ResultCode;
-    unsafe {
-        asm!(
-            "svc 0x91",           // Issue the SVC call with immediate value 0x91
-            in("x0") address,     // Input: address in register x0
-            in("x1") size,        // Input: size in register x1
-            lateout("w0") result, // Output: Capture result from w0
-            options(nostack)
-        );
-    }
-    result
+#[unsafe(naked)]
+pub unsafe extern "C" fn unmap_insecure_physical_memory(
+    address: *mut c_void,
+    size: u64,
+) -> ResultCode {
+    core::arch::naked_asm!(
+        "svc 0x91", // Issue the SVC call with immediate value 0x91
+        "ret"
+    );
 }
 
 //</editor-fold>
