@@ -2,7 +2,7 @@
 //!
 //! This module provides functions for interacting with the CPU control registers.
 
-use core::arch::asm;
+use core::arch::naked_asm;
 
 /// Read the `cntpct_el0` system register.
 ///
@@ -19,18 +19,20 @@ use core::arch::asm;
 ///
 /// - [ARM CNTPCT-EL0 Register](https://developer.arm.com/documentation/ddi0601/2024-12/AArch64-Registers/CNTPCT-EL0--Counter-timer-Physical-Count-Register)
 /// - [rust-embedded/aarch64-cpu: cntpct_el0](https://github.com/rust-embedded/aarch64-cpu/blob/f8bf731f0d0bda084302f04adb5b3a0a2c448d9e/src/registers/cntpct_el0.rs)
-#[inline]
-pub unsafe fn cntpct_el0() -> u64 {
-    let value: u64;
-    // SAFETY: Assembly only loads the system counter-timer value
-    unsafe {
-        asm!(
-            "mrs {:x}, cntpct_el0", // Move from system register to general-purpose register
-            out(reg) value,         // Output: Capture the value of the `cntpct_el0` register
-            options(nostack, nomem, preserves_flags)
-        );
-    }
-    value
+///
+/// # SAFETY
+///
+/// This function is `naked`, and its body is written in assembly.
+/// The assembly code reads the `cntpct_el0` system register and returns
+/// its value in `x0`, according to the AArch64 procedure call standard.
+/// The `noreturn` option is used to prevent the compiler from generating
+/// a function prologue and epilogue.
+#[unsafe(naked)]
+pub unsafe extern "C" fn cntpct_el0() -> u64 {
+    naked_asm!(
+        "mrs x0, cntpct_el0", // Move the value of `cntpct_el0` into the return register `x0`
+        "ret",
+    );
 }
 
 /// Read the `cntfrq_el0` system register.
@@ -50,18 +52,20 @@ pub unsafe fn cntpct_el0() -> u64 {
 ///
 /// - [ARM CNTFRQ-EL0 Register](https://developer.arm.com/documentation/ddi0601/2020-12/AArch64-Registers/CNTFRQ-EL0--Counter-timer-Frequency-register)
 /// - [rust-embedded/aarch64-cpu: cntfrq_el0.rs](https://github.com/rust-embedded/aarch64-cpu/blob/f8bf731f0d0bda084302f04adb5b3a0a2c448d9e/src/registers/cntfrq_el0.rs)
-#[inline]
-pub unsafe fn cntfrq_el0() -> u64 {
-    let value: u64;
-    // SAFETY: Assembly only loads the system counter-timer frequency value
-    unsafe {
-        asm!(
-            "mrs {:x}, cntfrq_el0", // Move from system register to general-purpose register
-            out(reg) value,         // Output: Capture the value of the `cntfrq_el0` register
-            options(nostack, nomem, preserves_flags)
-        );
-    }
-    value
+///
+/// # SAFETY
+///
+/// This function is `naked`, and its body is written in assembly.
+/// The assembly code reads the `cntfrq_el0` system register and returns
+/// its value in `x0`, according to the AArch64 procedure call standard.
+/// The `noreturn` option is used to prevent the compiler from generating
+/// a function prologue and epilogue.
+#[unsafe(naked)]
+pub unsafe extern "C" fn cntfrq_el0() -> u64 {
+    naked_asm!(
+        "mrs x0, cntfrq_el0", // Move the value of `cntfrq_el0` into the return register `x0`
+        "ret",
+    );
 }
 
 /// Read the `tpidrro_el0` system register.
@@ -75,16 +79,18 @@ pub unsafe fn cntfrq_el0() -> u64 {
 ///
 /// - [ARM TPIDRRO_ELO Register](https://developer.arm.com/documentation/ddi0601/2024-12/AArch64-Registers/TPIDRRO-EL0--EL0-Read-Only-Software-Thread-ID-Register)
 /// - [rust-embedded/aarch64-cpu: tpidrro_el0.rs](https://github.com/rust-embedded/aarch64-cpu/blob/main/src/registers/tpidrro_el0.rs)
-#[inline]
-pub unsafe fn tpidrro_el0() -> usize {
-    let tls_ptr: usize;
-    // SAFETY: Assembly only loads the system register value
-    unsafe {
-        asm!(
-        "mrs {:x}, tpidrro_el0", // Move the value of tpidrro_el0 into tls_ptr
-        out(reg) tls_ptr,        // Output: tls_ptr will hold the value of tpidrro_el0
-        options(nostack, nomem, preserves_flags)
-        );
-    }
-    tls_ptr
+///
+/// # SAFETY
+///
+/// This function is `naked`, and its body is written in assembly.
+/// The assembly code reads the `tpidrro_el0` system register and returns
+/// its value in `x0`, according to the AArch64 procedure call standard.
+/// The `noreturn` option is used to prevent the compiler from generating
+/// a function prologue and epilogue.
+#[unsafe(naked)]
+pub unsafe extern "C" fn tpidrro_el0() -> usize {
+    naked_asm!(
+        "mrs x0, tpidrro_el0", // Move the value of `tpidrro_el0` into the return register `x0`
+        "ret",
+    );
 }
