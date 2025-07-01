@@ -153,6 +153,7 @@ dependencies = [
  "nx-cpu",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-mem",
  "nx-time",
  "panic-abort",
  "panic-halt",

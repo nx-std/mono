@@ -111,7 +111,7 @@ pub unsafe fn slot_alloc(destructor: Option<fn(*mut c_void)>) -> Option<usize> {
     let _ = unsafe { curr_thread_slot_set(mod_id, ptr::null_mut()) };
 
     // Set the slot to null in all threads.
-    // SAFETY: `for_each` guarantees that `th` points to a valid `Thread`.
+    // SAFETY: index validated above; `for_each` guarantees that `th` points to a valid `Thread`.
     unsafe {
         registry::for_each(|th| {
             let _ = th.slot_set(mod_id, ptr::null_mut());
@@ -267,7 +267,6 @@ impl Slots {
     ///
     /// # Safety
     /// * The caller must ensure the returned slice is not aliased mutably elsewhere.
-    #[cfg(feature = "ffi")]
     pub unsafe fn from_ptr(addr: NonNull<*mut c_void>) -> Self {
         // SAFETY: The caller ensures the pointer is valid.
         unsafe { Self::from_raw_parts(addr, NUM_SLOTS) }

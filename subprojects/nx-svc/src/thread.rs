@@ -48,15 +48,24 @@ impl Handle {
 /// execute.
 ///
 /// On failure, the function yields a [`CreateThreadError`] detailing the cause.
-pub fn create(
-    entry: *mut c_void,
-    arg: *mut c_void,
+pub fn create<A>(
+    entry: fn(A),
+    arg: A,
     stack_top: *mut c_void,
     prio: i32,
     cpuid: i32,
 ) -> Result<Handle, CreateThreadError> {
     let mut handle: raw::Handle = raw::INVALID_HANDLE;
-    let rc = unsafe { raw::create_thread(&mut handle, entry, arg, stack_top, prio, cpuid) };
+    let rc = unsafe {
+        raw::create_thread(
+            &mut handle,
+            entry as *mut c_void,
+            &arg as *const _ as *mut c_void,
+            stack_top,
+            prio,
+            cpuid,
+        )
+    };
 
     RawResult::from_raw(rc).map(Handle(handle), |rc| match rc.description() {
         desc if KError::OutOfMemory == desc => CreateThreadError::OutOfMemory,
