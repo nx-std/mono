@@ -18,10 +18,7 @@ const PAGE_SIZE: usize = 0x1000;
 #[derive(Debug)]
 pub struct StackMemory<S: StackState + core::fmt::Debug>(S);
 
-impl<S> StackMemory<S>
-where
-    S: StackState + core::fmt::Debug,
-{
+impl StackMemory<Unmapped> {
     /// Allocate a new, page-aligned stack buffer of `size` bytes and wrap it
     /// in an `Unmapped` `StackMemory` that **owns** the allocation.
     ///
@@ -59,7 +56,7 @@ where
     /// - `size` is a multiple of the 4 KiB page size expected by the kernel.
     /// - The caller is responsible for ensuring the memory outlives the returned
     ///   `StackMemory`.
-    pub unsafe fn from_raw(
+    pub unsafe fn from_raw_parts(
         backing: *mut c_void,
         size: usize,
     ) -> Result<StackMemory<Unmapped>, AllocError> {
@@ -76,6 +73,28 @@ where
             size,
             owned: false,
         }))
+    }
+}
+
+impl StackMemory<Mapped> {
+    /// Reconstruct a `StackMemory<Mapped>` from its raw parts.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that all provided arguments correctly represent a
+    /// previously mapped stack memory region.
+    pub unsafe fn from_raw_parts(
+        backing: NonNull<c_void>,
+        size: usize,
+        owned: bool,
+        addr: NonNull<c_void>,
+    ) -> StackMemory<Mapped> {
+        StackMemory(Mapped {
+            backing,
+            size,
+            owned,
+            addr,
+        })
     }
 }
 
@@ -151,11 +170,6 @@ where
     /// The method uses `unsafe` code internally because it performs a raw
     /// `dealloc`; the safety invariants are upheld by the surrounding checks.
     fn drop(&mut self) {
-        // If we don't own the backing buffer, do nothing.
-        if !self.0.is_owned() {
-            return;
-        }
-
         // If the buffer is still mapped, automatically unmap it first.
         // This is safer and more idiomatic than panicking or leaking.
         if self.0.is_mapped() {
@@ -165,6 +179,11 @@ where
                 let _ =
                     svc::unmap_memory(addr.as_ptr(), self.0.backing_ptr().as_ptr(), self.0.size());
             }
+        }
+
+        // If we don't own the backing buffer, do nothing.
+        if !self.0.is_owned() {
+            return;
         }
 
         // Free the backing buffer if we own it.
