@@ -23,7 +23,6 @@ use panic_halt as _;
 
 mod init;
 mod registry;
-pub mod slots;
 mod thread_impl;
 pub mod tls_block;
 pub mod tls_region;

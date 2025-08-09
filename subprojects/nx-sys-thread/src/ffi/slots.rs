@@ -1,68 +1,55 @@
 use core::{ffi::c_void, ptr};
 
-use crate::slots;
-
 /// Reads the raw pointer stored in the dynamic TLS slot `slot_id`.
 ///
 /// Mirrors `threadTlsGet` in libnx's C API.
+///
+/// TODO: Add support for dynamic TLS slots
+/// Currently returns NULL for all slot IDs as dynamic slots are not implemented.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sys_thread_tls_get(slot_id: i32) -> *mut c_void {
-    if slot_id < 0 {
-        return ptr::null_mut();
-    }
-
-    match unsafe { slots::curr_thread_slot_get(slot_id as usize) } {
-        Ok(value) => value,
-        Err(_) => ptr::null_mut(),
-    }
+unsafe extern "C" fn __nx_sys_thread_tls_get(_slot_id: i32) -> *mut c_void {
+    // Dynamic TLS slots not supported - always return NULL
+    ptr::null_mut()
 }
 
 /// Writes `value` into dynamic TLS slot `slot_id`.
 ///
 /// Mirrors `threadTlsSet` in libnx's C API.
+///
+/// TODO: Add support for dynamic TLS slots
+/// Currently does nothing as dynamic slots are not implemented.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sys_thread_tls_set(slot_id: i32, value: *mut c_void) {
-    if slot_id < 0 {
-        return; // Silently ignore invalid negative indices to match common C semantics.
-    }
-
-    let _ = unsafe { slots::curr_thread_slot_set(slot_id as usize, value) };
+unsafe extern "C" fn __nx_sys_thread_tls_set(_slot_id: i32, _value: *mut c_void) {
+    // Dynamic TLS slots not supported - silently ignore
 }
 
 mod newlib {
     use core::{ffi::c_void, ptr};
 
-    use crate::slots;
-
-    /// POSIX constant for `EINVAL` (invalid argument).
-    /// Mirrors the value used by newlib on Horizon (22).
-    const EINVAL: i32 = 22;
+    /// POSIX constant for `ENOSYS` (function not implemented).
+    /// Standard POSIX error code (38).
+    const ENOSYS: i32 = 38;
 
     /// Rust implementation of `pthread_setspecific` that libgloss/newlib expects.
     ///
-    /// # Safety
-    /// The caller must ensure that `key` was previously obtained via a successful call to
-    /// `pthread_key_create` (or equivalent) and therefore lies within the dynamic TLS slot
-    /// range `[0, NUM_TLS_SLOTS)`.
+    /// TODO: Add support for pthread TLS functions
+    /// Currently returns ENOSYS as dynamic slots are not implemented.
     #[unsafe(no_mangle)]
     unsafe extern "C" fn __nx_sys_thread_newlib_pthread_setspecific(
-        key: u32,
-        value: *const c_void,
+        _key: u32,
+        _value: *const c_void,
     ) -> i32 {
-        match unsafe { slots::curr_thread_slot_set(key as usize, value as *mut c_void) } {
-            Ok(_) => 0,
-            Err(_) => EINVAL,
-        }
+        // Dynamic TLS slots not supported - return ENOSYS (function not implemented)
+        ENOSYS
     }
 
     /// Rust implementation of `pthread_getspecific` that libgloss/newlib expects.
     ///
-    /// Returns the stored pointer or NULL if `key` is out of range.
+    /// TODO: Add support for pthread TLS functions
+    /// Currently returns NULL as dynamic slots are not implemented.
     #[unsafe(no_mangle)]
-    unsafe extern "C" fn __nx_sys_thread_newlib_pthread_getspecific(key: u32) -> *mut c_void {
-        match unsafe { slots::curr_thread_slot_get(key as usize) } {
-            Ok(value) => value,
-            Err(_) => ptr::null_mut(),
-        }
+    unsafe extern "C" fn __nx_sys_thread_newlib_pthread_getspecific(_key: u32) -> *mut c_void {
+        // Dynamic TLS slots not supported - always return NULL
+        ptr::null_mut()
     }
 }

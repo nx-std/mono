@@ -15,7 +15,6 @@ use nx_svc::{
 
 use crate::{
     registry,
-    slots::Slots,
     thread_impl::{Thread, ThreadStackMem},
     tls_region,
 };
@@ -126,14 +125,14 @@ pub unsafe fn init_main_thread() {
             ThreadStackMem::new_provided(stack_mem_ptr, stack_mem_size)
         };
 
-        // SAFETY: The TLS slots are always available for the main thread, and not
-        // aliased mutably elsewhere.
-        let tls_slots = unsafe { Slots::from_ptr(tls_region::slots_ptr()) };
+        // TODO: Add support for dynamic TLS slots initialization
+        // Initialize TLS slots here:
+        // let tls_slots = unsafe { Slots::from_ptr(tls_region::slots_ptr()) };
 
         Thread {
             handle,
             stack_mem,
-            tls_slots: Some(tls_slots),
+            // TODO: Add tls_slots field initialization
         }
     };
 
