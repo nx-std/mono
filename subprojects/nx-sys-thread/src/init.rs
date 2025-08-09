@@ -143,11 +143,12 @@ pub unsafe fn init_main_thread() {
     // SAFETY: The main thread was just successfully stored in the registry above.
     let main_thread_ptr = unsafe { registry::main_thread() };
 
+    // TODO: Thread registry list functionality temporarily disabled for dyn slots initialization
     // Register the main thread with the global thread list to enable cleanup
     // operations (TLS destructor walks, thread enumeration, etc.).
     // SAFETY: The main thread is fully initialized and will remain valid for
     // the lifetime of the process.
-    unsafe { registry::insert(&*main_thread_ptr) };
+    // unsafe { registry::insert(&*main_thread_ptr) };
 
     // Update ThreadVars to maintain compatibility with libnx C functions.
     // This ensures threadGetSelf() and related APIs work correctly.
