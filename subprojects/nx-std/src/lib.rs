@@ -20,10 +20,6 @@ pub mod rand {
 pub mod sync {
     pub use nx_std_sync::*;
 }
-#[cfg(feature = "thread")]
-pub mod thread {
-    pub use nx_std_thread::*;
-}
 #[cfg(feature = "time")]
 pub mod time {
     pub use nx_time::*;

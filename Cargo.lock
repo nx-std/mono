@@ -72,7 +72,6 @@ dependencies = [
  "nx-alloc",
  "nx-rand",
  "nx-std-sync",
- "nx-std-thread",
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-sync",
@@ -87,14 +86,6 @@ dependencies = [
  "nx-alloc",
  "nx-sys-sync",
  "thiserror",
-]
-
-[[package]]
-name = "nx-std-thread"
-version = "0.1.0"
-dependencies = [
- "nx-svc",
- "nx-sys-thread",
 ]
 
 [[package]]

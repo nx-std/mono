@@ -12,7 +12,7 @@ bench = false
 
 [features]
 # All non-sys features are enabled by default
-default = ["alloc", "rand", "sync", "thread", "time"]
+default = ["alloc", "rand", "sync", "time"]
 
 # Low-level features
 sys = ["svc", "sys-mem", "sys-sync", "sys-thread"]
@@ -26,7 +26,6 @@ ffi = [
     "nx-sys-mem?/ffi",
     "nx-sys-sync?/ffi",
     "nx-sys-thread?/ffi",
-    "nx-std-thread?/ffi",
     "nx-time?/ffi",
 ]
 
@@ -38,7 +37,6 @@ svc = ["dep:nx-svc"]
 sys-mem = ["dep:nx-sys-mem", "alloc"]
 sys-sync = ["dep:nx-sys-sync"]
 sys-thread = ["dep:nx-sys-thread"]
-thread = ["dep:nx-std-thread"]
 time = ["dep:nx-time"]
 
 [dependencies]
@@ -49,5 +47,4 @@ nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
-nx-std-thread = { version = "0.1.0", path = "../nx-std-thread", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }

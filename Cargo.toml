@@ -6,7 +6,6 @@ members = [
     "subprojects/nx-rand",
     "subprojects/nx-std",
     "subprojects/nx-std-sync",
-    "subprojects/nx-std-thread",
     "subprojects/nx-svc",
     "subprojects/nx-sys-mem",
     "subprojects/nx-sys-sync",

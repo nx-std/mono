@@ -55,13 +55,6 @@ option(
 )
 
 option(
-    'use_nx_std_thread',
-    type : 'feature', value : 'disabled',    
-    description : 'Use nx-std-thread instead of libnx implementation',
-    yield : true
-)
-
-option(
     'use_nx_time',
     type : 'feature', value : 'disabled',
     description : 'Use nx-time instead of libnx implementation',
