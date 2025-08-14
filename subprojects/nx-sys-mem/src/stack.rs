@@ -133,7 +133,20 @@ pub struct MappedStackMemory<B> {
     mapped_mem_ptr: NonNull<c_void>,
 }
 
-impl<B> MappedStackMemory<B> {
+impl<B> MappedStackMemory<B>
+where
+    B: Buf,
+{
+    /// Returns the underlying memory buffer pointer.
+    pub fn buffer_ptr(&self) -> NonNull<c_void> {
+        self.buffer.ptr()
+    }
+
+    /// Returns the size of the maemory buffer.
+    pub fn size(&self) -> usize {
+        self.buffer.size()
+    }
+
     /// Returns the pointer to the mapped memory.
     pub fn mapped_mem_ptr(&self) -> NonNull<c_void> {
         self.mapped_mem_ptr
