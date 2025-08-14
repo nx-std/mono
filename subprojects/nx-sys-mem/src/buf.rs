@@ -9,18 +9,13 @@
 //! The module defines:
 //! - [`Buf`] trait: A common interface for memory buffer implementations
 //! - [`Buffer`]: An owned buffer with custom layout support
-//! - [`PageAlignedBuffer`]: An owned buffer with page-aligned memory allocation
 //! - [`BufferRef`]: A non-owning reference to externally managed memory
-//! - [`BufAllocError`]: Error types for buffer allocation failures
+//! - [`PageAlignedBuffer`]: An owned buffer with page-aligned memory allocation
 
 use alloc::alloc::{Layout, alloc_zeroed, dealloc};
 use core::{ffi::c_void, marker::PhantomData, mem::align_of, ptr::NonNull};
 
-/// Standard page size for memory alignment (4 KiB).
-///
-/// This constant defines the alignment boundary for all page-aligned
-/// allocations in the system.
-const PAGE_SIZE: usize = 0x1000;
+use crate::alignment::{PAGE_SIZE, is_page_aligned};
 
 /// Trait for memory buffer implementations.
 ///
@@ -108,10 +103,10 @@ impl Buffer {
     ///
     /// Creates a new buffer with the specified size and alignment from the layout.
     /// The memory is zero-initialized to ensure no uninitialized data is exposed.
-    pub fn try_with_layout(layout: Layout) -> Result<Self, BufAllocError> {
+    pub fn try_with_layout(layout: Layout) -> Result<Self, AllocationError> {
         let ptr = unsafe { alloc_zeroed(layout) } as *mut c_void;
         let Some(ptr) = NonNull::new(ptr) else {
-            return Err(BufAllocError::AllocationFailed);
+            return Err(AllocationError);
         };
 
         Ok(Self { ptr, layout })
@@ -143,21 +138,17 @@ impl Buffer {
     /// The actual size may be larger to satisfy alignment requirements.
     /// The buffer will have a default alignment matching `c_void`.
     ///
-    /// # Arguments
-    ///
-    /// * `capacity` - The minimum capacity in bytes. Must be non-zero.
-    ///
-    /// Returns `Ok(Buffer)` on success, or a [`BufAllocError`] if:
-    /// - The capacity is zero ([`BufAllocError::InvalidSize`])
-    /// - Memory allocation fails ([`BufAllocError::AllocationFailed`])
-    pub fn try_with_capacity(capacity: usize) -> Result<Self, BufAllocError> {
-        if capacity == 0 {
-            return Err(BufAllocError::InvalidSize);
-        }
+    /// Returns `Ok(Buffer)` on success, or a [`BufWithCapacityError`] if:
+    /// - Layout creation fails ([`BufWithCapacityError::InvalidLayout`])
+    /// - Memory allocation fails ([`BufWithCapacityError::AllocationFailed`])
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, BufWithCapacityError> {
+        // Capacity must be non-zero
+        debug_assert!(capacity != 0, "capacity must be non-zero");
 
         let layout = Layout::from_size_align(capacity, align_of::<c_void>())
-            .map_err(|_| BufAllocError::InvalidSize)?;
-        Self::try_with_layout(layout)
+            .map_err(|_| BufWithCapacityError::InvalidLayout)?;
+
+        Self::try_with_layout(layout).map_err(|_| BufWithCapacityError::AllocationFailed)
     }
 }
 
@@ -194,28 +185,27 @@ impl<'a> Buf for &'a Buffer {
     }
 }
 
-/// Errors that can occur during memory buffer allocation.
+/// Error that occurs when memory buffer allocation fails.
+///
+/// The system allocator was unable to allocate the requested memory.
+/// This typically occurs when the system is out of memory or the
+/// requested size is too large.
 #[derive(Debug, thiserror::Error)]
-pub enum BufAllocError {
-    /// Size must be non-zero.
-    ///
-    /// Attempted to allocate a buffer with size 0. All buffers must have
-    /// a positive size.
-    #[error("Size must be non-zero")]
-    InvalidSize,
+#[error("Memory allocation failed")]
+pub struct AllocationError;
 
-    /// Size must be a multiple of the page size (4 KiB).
+/// Errors that can occur when creating a buffer with a capacity.
+#[derive(Debug, thiserror::Error)]
+pub enum BufWithCapacityError {
+    /// Invalid layout parameters.
     ///
-    /// The requested size is not aligned to page boundaries. All sizes must
-    /// be multiples of 0x1000 (4096 bytes).
-    #[error("Size must be page-aligned (0x1000)")]
-    InvalidAlignment,
+    /// The capacity and alignment combination resulted in an invalid layout.
+    #[error("Invalid layout parameters")]
+    InvalidLayout,
 
     /// Memory allocation failed.
     ///
     /// The system allocator was unable to allocate the requested memory.
-    /// This typically occurs when the system is out of memory or the
-    /// requested size is too large.
     #[error("Memory allocation failed")]
     AllocationFailed,
 }
@@ -310,24 +300,25 @@ impl PageAlignedBuffer {
     ///   - Non-zero
     ///   - A multiple of the page size (0x1000 / 4 KiB)
     ///
-    /// Returns `Ok(PageAlignedBuffer)` on success, or a [`BufAllocError`] if:
-    /// - The size is zero ([`BufAllocError::InvalidSize`])
-    /// - The size is not page-aligned ([`BufAllocError::InvalidAlignment`])
-    /// - Memory allocation fails ([`BufAllocError::AllocationFailed`])
-    pub fn alloc(size: usize) -> Result<Self, BufAllocError> {
+    /// Returns `Ok(PageAlignedBuffer)` on success, or a [`PageAlignedBufError`] if:
+    /// - The size is zero ([`PageAlignedBufError::InvalidSize`])
+    /// - The size is not page-aligned ([`PageAlignedBufError::InvalidAlignment`])
+    /// - Memory allocation fails ([`PageAlignedBufError::AllocationFailed`])
+    pub fn alloc(size: usize) -> Result<Self, PageAlignedBufError> {
         // Size must be non-zero
         if size == 0 {
-            return Err(BufAllocError::InvalidSize);
+            return Err(PageAlignedBufError::InvalidSize);
         }
 
         // Ensure size must be page-aligned (multiple of PAGE_SIZE)
-        if size & (PAGE_SIZE - 1) != 0 {
-            return Err(BufAllocError::InvalidAlignment);
+        if !is_page_aligned(size) {
+            return Err(PageAlignedBufError::InvalidAlignment);
         }
 
-        // SAFETY: Size and alignment are guaranteed to be valid.
-        let layout = unsafe { Layout::from_size_align_unchecked(size, PAGE_SIZE) };
-        let inner = Buffer::try_with_layout(layout)?;
+        let layout = Layout::from_size_align(size, PAGE_SIZE)
+            .map_err(|_| PageAlignedBufError::InvalidSize)?;
+        let inner =
+            Buffer::try_with_layout(layout).map_err(|_| PageAlignedBufError::AllocationFailed)?;
 
         Ok(Self(inner))
     }
@@ -365,4 +356,30 @@ impl<'a> Buf for &'a PageAlignedBuffer {
     fn layout(&self) -> Layout {
         self.0.layout()
     }
+}
+
+/// Errors that can occur during allocation of a page-aligned buffer.
+#[derive(Debug, thiserror::Error)]
+pub enum PageAlignedBufError {
+    /// Size must be non-zero.
+    ///
+    /// Attempted to allocate a buffer with size 0. All buffers must have
+    /// a positive size.
+    #[error("Size must be non-zero")]
+    InvalidSize,
+
+    /// Size must be a multiple of the page size (4 KiB).
+    ///
+    /// The requested size is not aligned to page boundaries. All sizes must
+    /// be multiples of 0x1000 (4096 bytes).
+    #[error("Size must be page-aligned (0x1000)")]
+    InvalidAlignment,
+
+    /// Memory allocation failed.
+    ///
+    /// The system allocator was unable to allocate the requested memory.
+    /// This typically occurs when the system is out of memory or the
+    /// requested size is too large.
+    #[error("Memory allocation failed")]
+    AllocationFailed,
 }
