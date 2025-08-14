@@ -17,7 +17,7 @@ use nx_svc::{
 };
 use nx_time::Instant;
 
-use super::info::Thread;
+use super::handle::Thread;
 
 /// Blocks until the supplied thread [`Handle`] becomes *signalled*, i.e. the
 /// referenced thread has fully exited and entered the _dead_ state.

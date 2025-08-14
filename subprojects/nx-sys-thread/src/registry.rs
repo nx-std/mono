@@ -34,6 +34,7 @@
 use core::ptr::NonNull;
 
 use nx_std_sync::once_lock::OnceLock;
+use nx_sys_mem::buf::BufferRef;
 
 use crate::thread_impl::Thread;
 
@@ -60,8 +61,8 @@ static MAIN_THREAD: OnceLock<MainThread> = OnceLock::new();
 ///     initialised.
 ///   * The provided [`Thread`] value lives for the entire lifetime of the
 ///     process (it is stored globally and later returned by [`main_thread`]).
-pub unsafe fn set_main_thread(thread: Thread) {
-    if MAIN_THREAD.set(MainThread::new(thread)).is_err() {
+pub unsafe fn set_main_thread(thread: Thread<BufferRef<'static>>) {
+    if MAIN_THREAD.set(MainThread(thread)).is_err() {
         panic!("Main thread already set: MAIN_THREAD_ALREADY_SET");
     }
 }
@@ -79,12 +80,10 @@ pub unsafe fn set_main_thread(thread: Thread) {
 ///
 /// * Do **not** concurrently obtain mutable access to the same `Thread` while
 ///   holding the returned shared reference; doing so is **undefined behaviour**.
-pub unsafe fn main_thread() -> &'static Thread {
-    let Some(thread) = MAIN_THREAD.get() else {
-        panic!("Main thread not set: MAIN_THREAD_NOT_SET");
-    };
-
-    thread
+pub unsafe fn main_thread() -> &'static MainThread {
+    MAIN_THREAD
+        .get()
+        .expect("Main thread not set: MAIN_THREAD_NOT_SET")
 }
 
 /// Returns a raw pointer to the process' main [`Thread`].
@@ -101,12 +100,12 @@ pub unsafe fn main_thread() -> &'static Thread {
 /// * The caller must ensure that no other references (shared or mutable) to the
 ///   `Thread` exist when dereferencing the returned pointer to create a mutable
 ///   reference. Creating aliasing references is **undefined behaviour**.
-pub unsafe fn main_thread_ptr() -> NonNull<Thread> {
-    let Some(thread) = MAIN_THREAD.get() else {
-        panic!("Main thread not set: MAIN_THREAD_NOT_SET");
-    };
+pub unsafe fn main_thread_ptr() -> NonNull<MainThread> {
+    let thread = MAIN_THREAD
+        .get()
+        .expect("Main thread not set: MAIN_THREAD_NOT_SET");
 
-    NonNull::from(&thread.0)
+    NonNull::from(thread)
 }
 
 // TODO: Thread registry list functionality temporarily disabled for dyn slots initialization
@@ -115,17 +114,10 @@ pub unsafe fn main_thread_ptr() -> NonNull<Thread> {
 // A wrapper around `Thread` to safely mark it as Send + Sync.
 // This is safe specifically for the main thread because it's initialized
 // once and then treated as read-only for the lifetime of the process.
-struct MainThread(Thread);
-
-impl MainThread {
-    /// Creates a new `MainThread` wrapper from a `Thread`.
-    fn new(thread: Thread) -> Self {
-        Self(thread)
-    }
-}
+pub struct MainThread(Thread<BufferRef<'static>>);
 
 impl core::ops::Deref for MainThread {
-    type Target = Thread;
+    type Target = Thread<BufferRef<'static>>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {

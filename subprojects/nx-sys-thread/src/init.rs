@@ -100,27 +100,18 @@ pub unsafe fn init_main_thread() {
             // thread's stack boundaries.
             let stack_marker: u8 = 0;
 
-            let (stack_mem_base_addr, stack_mem_size) = match mem::query_memory(
+            let (stack_mem_base_addr, stack_mem_size) = mem::query_memory(
                 &stack_marker as *const _ as usize,
-            ) {
-                Ok((mem_info, ..)) => (mem_info.addr, mem_info.size),
-                Err(_) => {
-                    // Kernel memory query failed during initialization - this is fatal.
-                    panic!(
-                        "Kernel memory query failed during initialization: INIT_MEMORY_QUERY_FAILED"
-                    );
-                }
-            };
+            )
+            .map(|(mem_info, ..)| (mem_info.addr, mem_info.size))
+            .expect("Kernel memory query failed during initialization: INIT_MEMORY_QUERY_FAILED");
 
-            let Some(stack_mem_ptr) = NonNull::new(stack_mem_base_addr as *mut _) else {
-                // Stack memory base address is null - this should never happen.
-                panic!("Stack memory base address is null: NULL_STACK_BASE_ADDRESS");
-            };
+            let stack_mem_ptr = NonNull::new(stack_mem_base_addr as *mut _)
+                .expect("Stack memory base address is null: NULL_STACK_BASE_ADDRESS");
 
             // For the main thread, the stack memory is provided by the kernel and
-            // not owned by the application. This matches the C implementation where
-            // owns_stack_mem=false and stack_mem=NULL.
-            ThreadStackMem::new_provided(stack_mem_ptr, stack_mem_size)
+            // not owned by the application
+            unsafe { ThreadStackMem::from_provided(stack_mem_ptr, stack_mem_size) }
         };
 
         // TODO: Add support for dynamic TLS slots initialization

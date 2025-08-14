@@ -26,7 +26,7 @@
 
 use nx_svc::{result::Error, thread as svc};
 
-use super::info::Thread;
+use super::handle::Thread;
 
 /// Starts execution of the given [`Thread`].
 ///

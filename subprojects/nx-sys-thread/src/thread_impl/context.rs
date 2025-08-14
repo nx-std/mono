@@ -15,7 +15,7 @@
 
 use nx_svc::{raw, thread as svc};
 
-use super::info::Thread;
+use super::handle::Thread;
 
 /// Dumps the CPU/FPU context of a *paused* thread.
 ///

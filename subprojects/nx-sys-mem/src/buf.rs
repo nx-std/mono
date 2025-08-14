@@ -10,12 +10,9 @@
 //! - [`Buf`] trait: A common interface for memory buffer implementations
 //! - [`Buffer`]: An owned buffer with custom layout support
 //! - [`BufferRef`]: A non-owning reference to externally managed memory
-//! - [`PageAlignedBuffer`]: An owned buffer with page-aligned memory allocation
 
 use alloc::alloc::{Layout, alloc_zeroed, dealloc};
 use core::{ffi::c_void, marker::PhantomData, mem::align_of, ptr::NonNull};
-
-use crate::alignment::{PAGE_SIZE, is_page_aligned};
 
 /// Trait for memory buffer implementations.
 ///
@@ -248,7 +245,7 @@ impl<'a> BufferRef<'a> {
     /// - The pointer is valid and points to a memory region matching the layout's size and alignment.
     /// - The memory layout accurately describes the buffer's characteristics.
     /// - The memory remains valid for the lifetime `'a`.
-    pub unsafe fn from_parts(ptr: NonNull<c_void>, layout: Layout) -> Self {
+    pub unsafe fn from_raw_parts(ptr: NonNull<c_void>, layout: Layout) -> Self {
         Self {
             ptr,
             layout,
@@ -265,121 +262,4 @@ impl<'a> Buf for BufferRef<'a> {
     fn layout(&self) -> Layout {
         self.layout
     }
-}
-
-/// Buffer for page-aligned memory that is owned and will be deallocated on drop.
-///
-/// `PageAlignedBuffer` provides an RAII wrapper around page-aligned memory allocations.
-/// The buffer is automatically deallocated when it goes out of scope, preventing memory leaks.
-///
-/// # Memory Characteristics
-///
-/// - **Alignment**: All buffers are aligned to page boundaries (4 KiB)
-/// - **Initialization**: Memory is zero-initialized upon allocation
-/// - **Ownership**: The buffer owns the memory and deallocates it on drop
-///
-/// # Use Cases
-///
-/// This buffer type is particularly useful for:
-/// - Stack memory for thread creation
-/// - Memory-mapped I/O buffers
-/// - DMA transfer buffers
-/// - Any scenario requiring page-aligned memory
-#[derive(Debug)]
-pub struct PageAlignedBuffer(Buffer);
-
-impl PageAlignedBuffer {
-    /// Allocate a new owned memory buffer of the specified size.
-    ///
-    /// Creates a new page-aligned buffer with the specified size. The memory
-    /// is zero-initialized to ensure no uninitialized data is exposed.
-    ///
-    /// # Arguments
-    ///
-    /// * `size` - The size of the buffer in bytes. Must be:
-    ///   - Non-zero
-    ///   - A multiple of the page size (0x1000 / 4 KiB)
-    ///
-    /// Returns `Ok(PageAlignedBuffer)` on success, or a [`PageAlignedBufError`] if:
-    /// - The size is zero ([`PageAlignedBufError::InvalidSize`])
-    /// - The size is not page-aligned ([`PageAlignedBufError::InvalidAlignment`])
-    /// - Memory allocation fails ([`PageAlignedBufError::AllocationFailed`])
-    pub fn alloc(size: usize) -> Result<Self, PageAlignedBufError> {
-        // Size must be non-zero
-        if size == 0 {
-            return Err(PageAlignedBufError::InvalidSize);
-        }
-
-        // Ensure size must be page-aligned (multiple of PAGE_SIZE)
-        if !is_page_aligned(size) {
-            return Err(PageAlignedBufError::InvalidAlignment);
-        }
-
-        let layout = Layout::from_size_align(size, PAGE_SIZE)
-            .map_err(|_| PageAlignedBufError::InvalidSize)?;
-        let inner =
-            Buffer::try_with_layout(layout).map_err(|_| PageAlignedBufError::AllocationFailed)?;
-
-        Ok(Self(inner))
-    }
-}
-
-impl<'a> From<&'a PageAlignedBuffer> for BufferRef<'a> {
-    fn from(buffer: &'a PageAlignedBuffer) -> Self {
-        Self {
-            ptr: buffer.0.ptr(),
-            layout: buffer.0.layout(),
-            _lifetime: PhantomData,
-        }
-    }
-}
-
-impl Buf for PageAlignedBuffer {
-    fn ptr(&self) -> NonNull<c_void> {
-        self.0.ptr()
-    }
-
-    fn layout(&self) -> Layout {
-        self.0.layout()
-    }
-}
-
-/// Implementation of [`Buf`] for references to [`PageAlignedBuffer`].
-///
-/// This allows borrowed references to be used wherever the [`Buf`] trait
-/// is required.
-impl<'a> Buf for &'a PageAlignedBuffer {
-    fn ptr(&self) -> NonNull<c_void> {
-        self.0.ptr()
-    }
-
-    fn layout(&self) -> Layout {
-        self.0.layout()
-    }
-}
-
-/// Errors that can occur during allocation of a page-aligned buffer.
-#[derive(Debug, thiserror::Error)]
-pub enum PageAlignedBufError {
-    /// Size must be non-zero.
-    ///
-    /// Attempted to allocate a buffer with size 0. All buffers must have
-    /// a positive size.
-    #[error("Size must be non-zero")]
-    InvalidSize,
-
-    /// Size must be a multiple of the page size (4 KiB).
-    ///
-    /// The requested size is not aligned to page boundaries. All sizes must
-    /// be multiples of 0x1000 (4096 bytes).
-    #[error("Size must be page-aligned (0x1000)")]
-    InvalidAlignment,
-
-    /// Memory allocation failed.
-    ///
-    /// The system allocator was unable to allocate the requested memory.
-    /// This typically occurs when the system is out of memory or the
-    /// requested size is too large.
-    #[error("Memory allocation failed")]
-    AllocationFailed,
 }

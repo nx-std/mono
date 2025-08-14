@@ -7,8 +7,7 @@
 //! # Overview
 //!
 //! Stack memory management on Horizon OS involves several steps:
-//! 1. **Allocation**: Create or provide a memory buffer implementing the [`Buf`] trait (e.g.,
-//! [`PageAlignedBuffer`](crate::buf::PageAlignedBuffer))
+//! 1. **Allocation**: Create or provide a memory buffer implementing the [`Buf`] trait
 //! 2. **Mapping**: Map the memory into the process address space with [`map`]
 //! 3. **Usage**: Use the mapped memory as thread stack
 //! 4. **Unmapping**: Unmap the memory when done with [`unmap`]
@@ -131,6 +130,22 @@ pub enum UnmapError {
 pub struct MappedStackMemory<B> {
     buffer: B,
     mapped_mem_ptr: NonNull<c_void>,
+}
+
+impl<B> MappedStackMemory<B> {
+    /// Creates a new `MappedStackMemory` instance from the provided buffer and
+    /// mapped memory pointer.
+    ///
+    /// # Safety
+    /// This function is unsafe because it assumes that the `buffer` is valid and
+    /// the `mapped_mem_ptr` points to a valid memory region that has been
+    /// mapped into the process address space.
+    pub unsafe fn from_raw_parts(buffer: B, mapped_mem_ptr: NonNull<c_void>) -> Self {
+        MappedStackMemory {
+            buffer,
+            mapped_mem_ptr,
+        }
+    }
 }
 
 impl<B> MappedStackMemory<B>

@@ -4,7 +4,7 @@
 
 use nx_svc::thread as svc;
 
-use super::info::Thread;
+use super::handle::Thread;
 
 /// Exits the current thread.
 ///

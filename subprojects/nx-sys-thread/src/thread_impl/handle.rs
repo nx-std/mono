@@ -2,16 +2,16 @@ use core::ptr;
 
 use nx_svc::thread::Handle;
 
-use super::stackmem::ThreadStackMem;
+use super::stackmem::{PageAlignedBuffer, ThreadStackMem};
 use crate::tls_region;
 
 /// Thread information structure
-pub struct Thread {
+pub struct Thread<S = PageAlignedBuffer> {
     /// The kernel thread handle
     pub handle: Handle,
 
     /// Stack memory information.
-    pub stack_mem: ThreadStackMem,
+    pub stack_mem: ThreadStackMem<S>,
     // TODO: Add support for dynamic TLS slots
     // Add field: pub tls_slots: Option<Slots>
 }
@@ -46,7 +46,7 @@ pub fn get_current_thread_info_ptr() -> *mut Thread {
 
     // SAFETY: The current thread's information is stored in the TLS.
     // Use `read_volatile` to avoid the compiler re-ordering or eliminating the read.
-    unsafe { ptr::read_volatile(&raw const (*tv_ptr).thread_info_ptr) as *mut Thread }
+    unsafe { ptr::read_volatile(&raw const (*tv_ptr).thread_info_ptr) }.cast()
 }
 
 /// Returns the [`Handle`] of the calling thread.
