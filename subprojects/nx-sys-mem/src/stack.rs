@@ -7,42 +7,61 @@
 //! # Overview
 //!
 //! Stack memory management on Horizon OS involves several steps:
-//! 1. **Allocation**: Create or provide a memory buffer (via [`AlignedBuffer`] or [`ProvidedMemBuffer`])
+//! 1. **Allocation**: Create or provide a memory buffer implementing the [`Buf`](crate::buf::Buf) trait (e.g., [`PageAlignedBuffer`](crate::buf::PageAlignedBuffer))
 //! 2. **Mapping**: Map the memory into the process address space with [`map`]
 //! 3. **Usage**: Use the mapped memory as thread stack
 //! 4. **Unmapping**: Unmap the memory when done with [`unmap`]
 //!
 //! # Memory Layout
 //!
-//! The stack memory includes a guard region (4 KiB) to protect against stack overflow.
+//! The stack memory includes a guard region (16 KiB) to protect against stack overflow.
 //! All memory must be page-aligned (4 KiB boundaries) as required by the Horizon OS kernel.
 
-use alloc::alloc::{Layout, alloc_zeroed, dealloc};
 use core::{ffi::c_void, ptr::NonNull};
 
 use nx_svc::mem::core as svc;
 
-use crate::vmm::sys as vmm;
+use super::{buf::Buf, vmm::sys as vmm};
 
-/// Guard size 0x4000, per libnx
+/// Size of the guard region for stack overflow protection (16 KiB).
 ///
-/// See `libnx/source/kernel/thread.c` for more details.
+/// This constant defines the size of the guard region that is placed at the
+/// bottom of each thread's stack to detect and prevent stack overflow. The guard
+/// region is a protected memory area that causes a fault when accessed, providing
+/// early detection of stack overflow conditions.
+///
+/// # Value
+///
+/// The guard size is set to 0x4000 (16,384 bytes or 16 KiB), which is:
+/// - 4 memory pages (assuming 4 KiB page size)
+/// - Standard size used by _libnx_ and the Horizon OS kernel
+/// - Sufficient to catch most stack overflow scenarios
+///
+/// # Purpose
+///
+/// The guard region serves as a safety mechanism by:
+/// - Creating an inaccessible memory region below the stack
+/// - Triggering a memory access fault if the stack grows beyond its limit
+/// - Preventing stack overflow from corrupting adjacent memory regions
+///
+/// # Compatibility
+///
+/// This value matches the implementation in libnx (`libnx/source/kernel/thread.c`)
+/// to ensure compatibility with existing Horizon OS applications and libraries.
 const GUARD_SIZE: usize = 0x4000;
-
-const PAGE_SIZE: usize = 0x1000;
 
 /// Represents stack memory that has been allocated but not yet mapped into the process address space.
 ///
 /// This is the initial state of stack memory after allocation. The memory exists but is not
 /// accessible until it is mapped using the [`map`] function.
 #[derive(Debug)]
-pub struct UnmappedStackMemory<B: MemBuf> {
+pub struct UnmappedStackMemory<B: Buf> {
     buffer: B,
 }
 
 impl<B> UnmappedStackMemory<B>
 where
-    B: MemBuf,
+    B: Buf,
 {
     /// Create a new `UnmappedStackMemory` with the given buffer.
     pub fn new(buffer: B) -> Self {
@@ -59,14 +78,14 @@ where
 /// When dropped or explicitly unmapped using [`unmap`], the memory will be unmapped
 /// from the process address space.
 #[derive(Debug)]
-pub struct MappedStackMemory<B: MemBuf> {
+pub struct MappedStackMemory<B: Buf> {
     buffer: B,
     mapped_mem_ptr: NonNull<c_void>,
 }
 
 impl<B> MappedStackMemory<B>
 where
-    B: MemBuf,
+    B: Buf,
 {
     /// Returns the pointer to the mapped memory.
     pub fn mapped_mem_ptr(&self) -> NonNull<c_void> {
@@ -74,7 +93,7 @@ where
     }
 }
 
-/// Map the [`StackMemory`] instance into the current process.
+/// Map the [`UnmappedStackMemory`] instance into the current process.
 ///
 /// # Safety
 ///
@@ -82,7 +101,7 @@ where
 /// which is inherently unsafe.
 pub unsafe fn map<B>(sm: UnmappedStackMemory<B>) -> Result<MappedStackMemory<B>, MapError>
 where
-    B: MemBuf,
+    B: Buf,
 {
     let UnmappedStackMemory { buffer } = sm;
 
@@ -123,7 +142,7 @@ pub enum MapError {
 /// which is inherently unsafe.
 pub unsafe fn unmap<B>(sm: MappedStackMemory<B>) -> Result<UnmappedStackMemory<B>, UnmapError>
 where
-    B: MemBuf,
+    B: Buf,
 {
     let MappedStackMemory {
         buffer,
@@ -142,97 +161,4 @@ pub enum UnmapError {
     /// System call to unmap memory failed.
     #[error(transparent)]
     Svc(#[from] svc::UnmapMemoryError),
-}
-
-/// Trait for memory buffer implementations.
-pub trait MemBuf {
-    /// Get the pointer to the buffer's memory.
-    fn ptr(&self) -> NonNull<c_void>;
-
-    /// Get the size of the buffer in bytes.
-    fn size(&self) -> usize;
-}
-
-/// Buffer for stack memory that is owned and will be deallocated on drop.
-#[derive(Debug)]
-pub struct AlignedBuffer {
-    /// The memory layout used for allocation and deallocation.
-    ///
-    /// This layout ensures proper size and alignment for the stack memory.
-    layout: Layout,
-
-    /// The pointer to the stack memory buffer.
-    ///
-    /// This is the pointer to the raw memory allocated via the system allocator.
-    ptr: NonNull<c_void>,
-}
-
-impl AlignedBuffer {
-    /// Allocate a new owned memory buffer of the specified size.
-    ///
-    /// The memory is zero-initialized and page-aligned.
-    pub fn alloc(size: usize) -> Result<Self, BufAllocError> {
-        // Size must be non-zero
-        if size == 0 {
-            return Err(BufAllocError::InvalidSize);
-        }
-
-        // Ensure size must be page-aligned (multiple of PAGE_SIZE)
-        if size & (PAGE_SIZE - 1) != 0 {
-            return Err(BufAllocError::InvalidAlignment);
-        }
-
-        // SAFETY: Size and alignment are guaranteed to be valid.
-        let layout = unsafe { Layout::from_size_align_unchecked(size, PAGE_SIZE) };
-        let ptr = unsafe { alloc_zeroed(layout) } as *mut c_void;
-        let Some(ptr) = NonNull::new(ptr) else {
-            return Err(BufAllocError::AllocationFailed);
-        };
-
-        Ok(Self { ptr, layout })
-    }
-}
-
-/// Errors that can occur during memory buffer allocation.
-#[derive(Debug, thiserror::Error)]
-pub enum BufAllocError {
-    /// Size must be non-zero.
-    #[error("Size must be non-zero")]
-    InvalidSize,
-
-    /// Size must be a multiple of the page size (4 KiB).
-    #[error("Size must be page-aligned (0x1000)")]
-    InvalidAlignment,
-
-    /// Memory allocation failed.
-    #[error("Memory allocation failed")]
-    AllocationFailed,
-}
-
-impl Drop for AlignedBuffer {
-    fn drop(&mut self) {
-        // SAFETY: The memory was allocated with `alloc`, so we can safely deallocate it using the
-        // same layout.
-        unsafe { dealloc(self.ptr.as_ptr().cast(), self.layout) };
-    }
-}
-
-impl MemBuf for AlignedBuffer {
-    fn ptr(&self) -> NonNull<c_void> {
-        self.ptr
-    }
-
-    fn size(&self) -> usize {
-        self.layout.size()
-    }
-}
-
-impl<'a> MemBuf for &'a AlignedBuffer {
-    fn ptr(&self) -> NonNull<c_void> {
-        self.ptr
-    }
-
-    fn size(&self) -> usize {
-        self.layout.size()
-    }
 }
