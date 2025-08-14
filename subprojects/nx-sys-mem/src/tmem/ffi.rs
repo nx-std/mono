@@ -43,18 +43,21 @@ const LIBNX_ERR_BAD_INPUT: u32 = libnx_rc(11);
 /// Corresponds to `tmemCreate()` in `tmem.h`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_tmem_create(t: *mut TransferMemory, size: usize, perm: u32) -> u32 {
-    if t.is_null() {
+    let Some(t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
+    };
 
     match unsafe { sys::create(size, sys::Permissions::from_bits_retain(perm)) } {
-        Ok(tm) => {
-            let tm_ref = unsafe { &mut *t };
-            tm_ref.handle = tm.handle().to_raw();
-            tm_ref.size = tm.size();
-            tm_ref.perm = tm.perm().bits();
-            tm_ref.map_addr = ptr::null_mut();
-            tm_ref.src_addr = tm.src_addr().unwrap_or(ptr::null_mut());
+        Ok(unmapped) => {
+            let tm = TransferMemory {
+                handle: unmapped.handle().to_raw(),
+                size: unmapped.size(),
+                perm: unmapped.perm().bits(),
+                src_addr: unmapped.src_addr().unwrap_or(ptr::null_mut()),
+                map_addr: ptr::null_mut(),
+            };
+            unsafe { t.write(tm) };
+
             0
         }
         Err(err) => match err {
@@ -75,19 +78,26 @@ unsafe extern "C" fn __nx_tmem_create_from_memory(
     size: usize,
     perm: u32,
 ) -> u32 {
-    if t.is_null() {
+    let Some(t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
+    };
+
+    let Some(buf) = NonNull::new(buf) else {
+        return KernelError::InvalidPointer.to_rc();
+    };
 
     match unsafe { sys::create_from_memory(buf, size, sys::Permissions::from_bits_retain(perm)) } {
-        Ok(tm) => {
-            let tm_ref = unsafe { &mut *t };
-            tm_ref.handle = tm.handle().to_raw();
-            tm_ref.size = tm.size();
-            tm_ref.perm = tm.perm().bits();
-            tm_ref.map_addr = ptr::null_mut();
-            // Per libnx semantics we do not take ownership of the backing buffer.
-            tm_ref.src_addr = ptr::null_mut();
+        Ok(unmapped) => {
+            let tm = TransferMemory {
+                handle: unmapped.handle().to_raw(),
+                size: unmapped.size(),
+                perm: unmapped.perm().bits(),
+                src_addr: buf.as_ptr(),
+                // Per libnx semantics we do not take ownership of the backing buffer.
+                map_addr: ptr::null_mut(),
+            };
+            unsafe { t.write(tm) };
+
             0
         }
         Err(err) => match err {
@@ -108,16 +118,20 @@ unsafe extern "C" fn __nx_tmem_load_remote(
     size: usize,
     perm: u32,
 ) {
-    if t.is_null() {
+    let Some(t) = NonNull::new(t) else {
         return;
-    }
+    };
 
-    let tm_ref = unsafe { &mut *t };
-    tm_ref.handle = handle;
-    tm_ref.size = size;
-    tm_ref.perm = perm;
-    tm_ref.map_addr = ptr::null_mut();
-    tm_ref.src_addr = ptr::null_mut();
+    let tm = TransferMemory {
+        // Use the provided handle, size, and permissions.
+        handle,
+        size,
+        perm,
+        // Initialize addresses to null pointers.
+        map_addr: ptr::null_mut(),
+        src_addr: ptr::null_mut(),
+    };
+    unsafe { t.write(tm) };
 }
 
 /// Maps a transfer memory object into the current process.
@@ -125,30 +139,33 @@ unsafe extern "C" fn __nx_tmem_load_remote(
 /// Corresponds to `tmemMap()` in `tmem.h`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_tmem_map(t: *mut TransferMemory) -> u32 {
-    if t.is_null() {
+    let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
-
-    let tm_ref = unsafe { &mut *t };
+    };
+    let tm = unsafe { t.as_ref() };
 
     // Prevent double mapping.
-    if !tm_ref.map_addr.is_null() {
+    if !tm.map_addr.is_null() {
         return LIBNX_ERR_ALREADY_MAPPED;
     }
 
-    let src_option = NonNull::new(tm_ref.src_addr);
+    let src_option = NonNull::new(tm.src_addr);
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm_ref.handle),
-            tm_ref.size,
-            sys::Permissions::from_bits_retain(tm_ref.perm),
+            Handle::from_raw(tm.handle),
+            tm.size,
+            sys::Permissions::from_bits_retain(tm.perm),
             src_option,
         )
     };
 
     match unsafe { sys::map(unmapped) } {
         Ok(mapped) => {
-            tm_ref.map_addr = mapped.map_addr().unwrap_or(ptr::null_mut());
+            let tm = unsafe { t.as_mut() };
+
+            // Update the transfer memory object with the mapped address.
+            tm.map_addr = mapped.map_addr().unwrap_or(ptr::null_mut());
+
             0
         }
         Err(err) => match err.kind {
@@ -163,22 +180,22 @@ unsafe extern "C" fn __nx_tmem_map(t: *mut TransferMemory) -> u32 {
 /// Corresponds to `tmemUnmap()` in `tmem.h`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_tmem_unmap(t: *mut TransferMemory) -> u32 {
-    if t.is_null() {
+    let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
+    };
+    let tm = unsafe { t.as_ref() };
 
-    let tm_ref = unsafe { &mut *t };
-    let Some(addr_nn) = NonNull::new(tm_ref.map_addr) else {
+    let Some(addr_nn) = NonNull::new(tm.map_addr) else {
         // Nothing mapped – treat as success.
         return 0;
     };
 
-    let src_option = NonNull::new(tm_ref.src_addr);
+    let src_option = NonNull::new(tm.src_addr);
     let mapped = unsafe {
         sys::TransferMemory::<sys::Mapped>::from_parts(
-            Handle::from_raw(tm_ref.handle),
-            tm_ref.size,
-            sys::Permissions::from_bits_retain(tm_ref.perm),
+            Handle::from_raw(tm.handle),
+            tm.size,
+            sys::Permissions::from_bits_retain(tm.perm),
             src_option,
             addr_nn,
         )
@@ -186,7 +203,11 @@ unsafe extern "C" fn __nx_tmem_unmap(t: *mut TransferMemory) -> u32 {
 
     match unsafe { sys::unmap(mapped) } {
         Ok(_unmapped) => {
-            tm_ref.map_addr = ptr::null_mut();
+            let tm = unsafe { t.as_mut() };
+
+            // Reset the mapped address
+            tm.map_addr = ptr::null_mut();
+
             0
         }
         Err(err) => err.reason.to_rc(),
@@ -198,24 +219,28 @@ unsafe extern "C" fn __nx_tmem_unmap(t: *mut TransferMemory) -> u32 {
 /// Corresponds to `tmemCloseHandle()` in `tmem.h`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_tmem_close_handle(t: *mut TransferMemory) -> u32 {
-    if t.is_null() {
+    let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
+    };
+    let tm = unsafe { t.as_ref() };
 
-    let tm_ref = unsafe { &mut *t };
-    let src_option = NonNull::new(tm_ref.src_addr);
+    let src_option = NonNull::new(tm.src_addr);
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm_ref.handle),
-            tm_ref.size,
-            sys::Permissions::from_bits_retain(tm_ref.perm),
+            Handle::from_raw(tm.handle),
+            tm.size,
+            sys::Permissions::from_bits_retain(tm.perm),
             src_option,
         )
     };
 
     match unsafe { sys::close_handle(unmapped) } {
         Ok(()) => {
-            tm_ref.handle = INVALID_HANDLE;
+            let tm = unsafe { t.as_mut() };
+
+            // Reset the handle and source address
+            tm.handle = INVALID_HANDLE;
+
             0
         }
         Err(err) => err.reason.to_rc(),
@@ -227,17 +252,17 @@ unsafe extern "C" fn __nx_tmem_close_handle(t: *mut TransferMemory) -> u32 {
 /// Corresponds to `tmemWaitForPermission()` in `tmem.h`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_tmem_wait_for_permission(t: *mut TransferMemory, perm: u32) -> u32 {
-    if t.is_null() {
+    let Some(t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
+    };
+    let tm = unsafe { t.as_ref() };
 
-    let tm_ref = unsafe { &mut *t };
-    let src_option = NonNull::new(tm_ref.src_addr);
+    let src_option = NonNull::new(tm.src_addr);
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm_ref.handle),
-            tm_ref.size,
-            sys::Permissions::from_bits_retain(tm_ref.perm),
+            Handle::from_raw(tm.handle),
+            tm.size,
+            sys::Permissions::from_bits_retain(tm.perm),
             src_option,
         )
     };
@@ -253,35 +278,36 @@ unsafe extern "C" fn __nx_tmem_wait_for_permission(t: *mut TransferMemory, perm:
 /// Corresponds to `tmemClose()` in `tmem.h`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_tmem_close(t: *mut TransferMemory) -> u32 {
-    if t.is_null() {
+    let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
-    }
-
-    // SAFETY: We already verified pointer is non-null.
-    let tm_ref = unsafe { &mut *t };
+    };
+    let tm = unsafe { t.as_ref() };
 
     // If mapped, unmap first.
-    if !tm_ref.map_addr.is_null() {
-        let rc = unsafe { __nx_tmem_unmap(t) };
+    if !tm.map_addr.is_null() {
+        let rc = unsafe { __nx_tmem_unmap(t.as_ptr()) };
         if rc != 0 {
             return rc;
         }
     }
 
-    let src_option = NonNull::new(tm_ref.src_addr);
+    let src_option = NonNull::new(tm.src_addr);
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm_ref.handle),
-            tm_ref.size,
-            sys::Permissions::from_bits_retain(tm_ref.perm),
+            Handle::from_raw(tm.handle),
+            tm.size,
+            sys::Permissions::from_bits_retain(tm.perm),
             src_option,
         )
     };
 
     match unsafe { sys::close(unmapped) } {
         Ok(()) => {
-            tm_ref.handle = INVALID_HANDLE;
-            tm_ref.src_addr = ptr::null_mut();
+            let tm = unsafe { t.as_mut() };
+
+            tm.handle = INVALID_HANDLE;
+            tm.src_addr = ptr::null_mut();
+
             0
         }
         Err(err) => err.reason.to_rc(),

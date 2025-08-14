@@ -20,8 +20,6 @@
 //! layer (`crate::tmem::ffi`) is a thin shim translating between the C structs
 //! declared in `nx_tmem.h` and the high-level Rust API below.
 
-extern crate alloc;
-
 use alloc::alloc::{Layout, alloc_zeroed, dealloc};
 use core::{ffi::c_void, ptr, ptr::NonNull};
 
@@ -64,10 +62,10 @@ pub unsafe fn create(
 ) -> Result<TransferMemory<Unmapped>, CreateError> {
     // Allocate page-aligned, zero-filled backing memory.
     let layout = Layout::from_size_align(size, 0x1000).map_err(|_| CreateError::OutOfMemory)?;
-    let addr = unsafe { alloc_zeroed(layout) } as *mut c_void;
-    if addr.is_null() {
+    let addr = unsafe { alloc_zeroed(layout) }.cast();
+    let Some(addr) = NonNull::new(addr) else {
         return Err(CreateError::OutOfMemory);
-    }
+    };
 
     // Attempt to create the kernel object around that memory.
     match svc::create_transfer_memory(addr, size, perm) {
@@ -75,11 +73,11 @@ pub unsafe fn create(
             handle,
             size,
             perm,
-            src: NonNull::new(addr),
+            src: Some(addr),
         })),
         Err(err) => {
             // Cleanup allocation on failure.
-            unsafe { dealloc(addr as *mut u8, layout) };
+            unsafe { dealloc(addr.as_ptr().cast(), layout) };
             Err(CreateError::Svc(err))
         }
     }
@@ -97,12 +95,12 @@ pub unsafe fn create(
 ///   concurrently deallocate or repurpose the memory while the transfer
 ///   memory object is alive.
 pub unsafe fn create_from_memory(
-    buf: *mut c_void,
+    buf: NonNull<c_void>,
     size: usize,
     perm: Permissions,
 ) -> Result<TransferMemory<Unmapped>, CreateError> {
     // Check that the buffer is page-aligned and has sufficient size.
-    if buf.is_null() || (buf as usize & 0xFFF) != 0 {
+    if (buf.as_ptr() as usize & 0xFFF) != 0 {
         return Err(CreateError::InvalidAddress);
     }
 
@@ -111,7 +109,7 @@ pub unsafe fn create_from_memory(
             handle,
             size,
             perm,
-            src: NonNull::new(buf),
+            src: Some(buf),
         })),
         Err(err) => Err(CreateError::Svc(err)),
     }
@@ -158,27 +156,26 @@ pub unsafe fn map(tm: TransferMemory<Unmapped>) -> Result<TransferMemory<Mapped>
         src,
     }) = tm;
 
-    let mut vmm_guard = vmm::lock();
-    let Some(addr) = vmm_guard.find_aslr(size, GUARD_SIZE) else {
+    // Lock the VMM and reserve a virtual address range in the ASLR address space.
+    let Some(addr) = vmm::lock().find_aslr(size, GUARD_SIZE) else {
         return Err(MapError {
             kind: MapErrorKind::VirtAddressAllocFailed,
             tm,
         });
     };
 
-    match svc::map_transfer_memory(handle, addr.as_ptr(), size, perm) {
-        Ok(()) => Ok(TransferMemory(Mapped {
-            handle,
-            size,
-            perm,
-            src,
-            addr,
-        })),
-        Err(err) => Err(MapError {
-            kind: MapErrorKind::Svc(err),
-            tm,
-        }),
-    }
+    svc::map_transfer_memory(handle, addr, size, perm).map_err(|err| MapError {
+        kind: MapErrorKind::Svc(err),
+        tm,
+    })?;
+
+    Ok(TransferMemory(Mapped {
+        handle,
+        size,
+        perm,
+        src,
+        addr,
+    }))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -212,7 +209,7 @@ pub unsafe fn unmap(tm: TransferMemory<Mapped>) -> Result<TransferMemory<Unmappe
         addr,
     }) = tm;
 
-    match svc::unmap_transfer_memory(handle, addr.as_ptr(), size) {
+    match svc::unmap_transfer_memory(handle, addr, size) {
         Ok(()) => Ok(TransferMemory(Unmapped {
             handle,
             size,

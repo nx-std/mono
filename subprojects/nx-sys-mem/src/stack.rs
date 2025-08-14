@@ -86,10 +86,8 @@ where
 {
     let UnmappedStackMemory { buffer } = sm;
 
-    let mut vmm = vmm::lock();
-
-    // Ask the VMM for a free slice of stack address-space.
-    let Some(ptr) = vmm.find_stack(buffer.size(), GUARD_SIZE) else {
+    // Lock the VMM and reserve a virtual address range for the stack memory.
+    let Some(ptr) = vmm::lock().find_stack(buffer.size(), GUARD_SIZE) else {
         return Err(MapError::VirtAddrAllocFailed);
     };
 

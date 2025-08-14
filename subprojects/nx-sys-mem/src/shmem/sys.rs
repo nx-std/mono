@@ -98,23 +98,20 @@ pub fn load_remote(
 pub unsafe fn map(shm: SharedMemory<Unmapped>) -> Result<SharedMemory<Mapped>, MapError> {
     let SharedMemory(Unmapped { handle, size, perm }) = shm;
 
-    let mut vmm = vmm::lock();
-
     // Ask the VMM for a free slice of ASLR address-space.
-    let Some(addr_nn) = vmm.find_aslr(size, GUARD_SIZE) else {
+    let Some(addr) = vmm::lock().find_aslr(size, GUARD_SIZE) else {
         return Err(MapError::VirtAddressAllocFailed);
     };
 
     // Attempt to map the shared memory into that slice.
-    match svc::map_shared_memory(handle, addr_nn.as_ptr(), size, perm) {
-        Ok(()) => Ok(SharedMemory(Mapped {
-            handle,
-            size,
-            perm,
-            addr: addr_nn,
-        })),
-        Err(err) => Err(MapError::Svc(err)),
-    }
+    svc::map_shared_memory(handle, addr, size, perm).map_err(MapError::Svc)?;
+
+    Ok(SharedMemory(Mapped {
+        handle,
+        size,
+        perm,
+        addr,
+    }))
 }
 
 /// Unmap the shared-memory object from the current process.
@@ -131,10 +128,9 @@ pub unsafe fn unmap(shm: SharedMemory<Mapped>) -> Result<SharedMemory<Unmapped>,
         addr,
     }) = shm;
 
-    match svc::unmap_shared_memory(handle, addr.as_ptr(), size) {
-        Ok(()) => Ok(SharedMemory(Unmapped { handle, size, perm })),
-        Err(err) => Err(UnmapError { reason: err, shm }),
-    }
+    svc::unmap_shared_memory(handle, addr, size).map_err(|reason| UnmapError { reason, shm })?;
+
+    Ok(SharedMemory(Unmapped { handle, size, perm }))
 }
 
 /// Close the shared-memory object, freeing kernel resources.

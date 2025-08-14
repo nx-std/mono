@@ -3,7 +3,7 @@
 //! Provides safe wrappers around the low-level SVCs involved in creating
 //! and managing shared memory kernel objects.
 
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr::NonNull};
 
 use bitflags::bitflags;
 
@@ -61,11 +61,11 @@ impl ToRawResultCode for CreateSharedMemoryError {
 /// Maps a shared memory object into the current process.
 pub fn map_shared_memory(
     handle: Handle,
-    addr: *mut c_void,
+    addr: NonNull<c_void>,
     size: usize,
     perm: MemoryPermission,
 ) -> Result<(), MapSharedMemoryError> {
-    let rc = unsafe { raw::map_shared_memory(handle.0, addr, size, perm.bits()) };
+    let rc = unsafe { raw::map_shared_memory(handle.0, addr.as_ptr(), size, perm.bits()) };
     RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::InvalidHandle == desc => MapSharedMemoryError::InvalidHandle,
         desc if KError::InvalidAddress == desc => MapSharedMemoryError::InvalidAddress,
@@ -122,10 +122,10 @@ impl ToRawResultCode for MapSharedMemoryError {
 /// Unmaps a previously mapped shared memory kernel object.
 pub fn unmap_shared_memory(
     handle: Handle,
-    addr: *mut c_void,
+    addr: NonNull<c_void>,
     size: usize,
 ) -> Result<(), UnmapSharedMemoryError> {
-    let rc = unsafe { raw::unmap_shared_memory(handle.0, addr, size) };
+    let rc = unsafe { raw::unmap_shared_memory(handle.0, addr.as_ptr(), size) };
     RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::InvalidCurrentMemory == desc => {
             UnmapSharedMemoryError::InvalidCurrentMemory

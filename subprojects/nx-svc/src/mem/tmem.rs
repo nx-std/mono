@@ -3,7 +3,7 @@
 //! Provides safe wrappers around the low-level SVCs involved in creating and
 //! managing transfer memory kernel objects.
 
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr::NonNull};
 
 use bitflags::bitflags;
 
@@ -24,12 +24,12 @@ define_handle_type! {
 /// allocated. On success this function returns the newly created transferWha
 /// memory [`Handle`].
 pub fn create_transfer_memory(
-    addr: *mut c_void,
+    addr: NonNull<c_void>,
     size: usize,
     perm: MemoryPermission,
 ) -> Result<Handle, CreateTransferMemoryError> {
     let mut handle = raw::INVALID_HANDLE;
-    let rc = unsafe { raw::create_transfer_memory(&mut handle, addr, size, perm.bits()) };
+    let rc = unsafe { raw::create_transfer_memory(&mut handle, addr.as_ptr(), size, perm.bits()) };
 
     RawResult::from_raw(rc).map(Handle(handle), |rc| match rc.description() {
         desc if KError::InvalidSize == desc => CreateTransferMemoryError::InvalidSize,
@@ -46,11 +46,11 @@ pub fn create_transfer_memory(
 /// Maps a transfer memory object into the current process.
 pub fn map_transfer_memory(
     handle: Handle,
-    addr: *mut c_void,
+    addr: NonNull<c_void>,
     size: usize,
     perm: MemoryPermission,
 ) -> Result<(), MapTransferMemoryError> {
-    let rc = unsafe { raw::map_transfer_memory(handle.to_raw(), addr, size, perm.bits()) };
+    let rc = unsafe { raw::map_transfer_memory(handle.to_raw(), addr.as_ptr(), size, perm.bits()) };
     RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::InvalidHandle == desc => MapTransferMemoryError::InvalidHandle,
         desc if KError::InvalidAddress == desc => MapTransferMemoryError::InvalidAddress,
@@ -69,10 +69,10 @@ pub fn map_transfer_memory(
 /// Unmaps a previously mapped transfer memory object.
 pub fn unmap_transfer_memory(
     handle: Handle,
-    addr: *mut c_void,
+    addr: NonNull<c_void>,
     size: usize,
 ) -> Result<(), UnmapTransferMemoryError> {
-    let rc = unsafe { raw::unmap_transfer_memory(handle.to_raw(), addr, size) };
+    let rc = unsafe { raw::unmap_transfer_memory(handle.to_raw(), addr.as_ptr(), size) };
     RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::InvalidHandle == desc => UnmapTransferMemoryError::InvalidHandle,
         desc if KError::InvalidAddress == desc => UnmapTransferMemoryError::InvalidAddress,
