@@ -2,9 +2,9 @@ project('nx-sys-mem', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-alloc
 nx_alloc_proj = subproject('nx-alloc')
@@ -30,9 +30,9 @@ deps = [
     nx_svc_dep,
 ]
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -53,9 +53,9 @@ nx_sys_mem_tgt = custom_target(
     build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding libnx functions
 nx_sys_mem_ld_override = meson.current_source_dir() / 'sys_mem_override.ld'
 

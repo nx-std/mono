@@ -2,9 +2,9 @@ project('nx-time', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-cpu
 nx_cpu_proj = subproject('nx-cpu')
@@ -15,9 +15,9 @@ deps = [
     nx_cpu_dep,
 ]
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -38,9 +38,9 @@ nx_time_tgt = custom_target(
     build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding libnx time functions
 nx_time_ld_override = meson.current_source_dir() / 'time_override.ld'
 

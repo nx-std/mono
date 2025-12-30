@@ -2,9 +2,9 @@ project('nx-std-sync', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-sys-sync
 nx_sys_sync_proj = subproject('nx-sys-sync')
@@ -20,9 +20,9 @@ deps = [
     nx_alloc_dep,
 ]
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -43,9 +43,9 @@ nx_std_sync_tgt = custom_target(
     build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 nx_std_sync_dep = declare_dependency(
     include_directories : inc,
     link_with : nx_std_sync_tgt[0],

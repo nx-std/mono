@@ -2,9 +2,9 @@ project('nx-sys-sync', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-svc
 nx_svc_proj = subproject('nx-svc')
@@ -20,9 +20,9 @@ deps = [
     nx_sys_thread_dep,
 ]
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -43,9 +43,9 @@ nx_sys_sync_tgt = custom_target(
     build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding libnx sync functions
 nx_sys_sync_ld_override = meson.current_source_dir() / 'sys_sync_override.ld'
 

@@ -19,9 +19,9 @@ nx_hbmenu_launch_tgt = custom_target(
     build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding hbmenu launch functions
 nx_hbmenu_launch_ld_override = meson.current_source_dir() / 'hbmenu_launch_override.ld'
 

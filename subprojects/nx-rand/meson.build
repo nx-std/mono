@@ -2,9 +2,9 @@ project('nx-rand', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-svc
 nx_svc_proj = subproject('nx-svc')
@@ -15,9 +15,9 @@ deps = [
     nx_svc_dep,
 ]
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -38,9 +38,9 @@ nx_rand_tgt = custom_target(
     build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding libnx random functions
 nx_rand_ld_override = meson.current_source_dir() / 'rand_override.ld'
 
