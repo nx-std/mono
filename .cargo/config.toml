@@ -9,6 +9,8 @@ target = ["aarch64-nintendo-switch-freestanding"]
 
 # Override the default target directory for build artifacts.
 # This places all compiled files in `buildDir/cargo-target` instead of the default `target/`.
+# NOTE: The justfile passes `--target-dir` explicitly, which overrides this setting.
+# This serves as a fallback when cargo is invoked directly (not through just tasks).
 target-dir = "buildDir/cargo-target"
 
 [unstable]
