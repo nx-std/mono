@@ -29,9 +29,9 @@ static void rand_suite(void) {
     TEST_CASE(
         "Test 0001: rand_get_fills_buffers_with_random_data",
         test_0001_rand_get_fills_buffers_with_random_data
-    );
+    )
     TEST_CASE(
         "Test 0002: rand_get64_returns_different_values",
         test_0002_rand_get64_returns_different_values
-    );
+    )
 } 

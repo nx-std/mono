@@ -44,18 +44,18 @@ test_rc_t test_0003_semaphore_producer_consumer(void);
  * Test suite for sync/semaphore.
  */
 static void sync_semaphore_suite(void) {
-    TEST_SUITE("sync/semaphore");
+    TEST_SUITE("sync/semaphore")
 
     TEST_CASE(
         "Test 0001: semaphore_wait_signal_single_thread",
         test_0001_semaphore_wait_signal_single_thread
-    );
+    )
     TEST_CASE(
         "Test 0002: semaphore_multiple_threads_initial_count",
         test_0002_semaphore_multiple_threads_initial_count
-    );
+    )
     TEST_CASE(
         "Test 0003: semaphore_producer_consumer",
         test_0003_semaphore_producer_consumer
-    );
+    )
 }
