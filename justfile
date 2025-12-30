@@ -100,15 +100,16 @@ list-dependencies: _ensure-configured
 
 ## Clean
 
-alias clean := meson-clean
-
-# Clean the meson build directory and cargo workspace
+# Clean both meson build directory and cargo workspace
 [group: 'clean']
-meson-clean: _ensure-configured
-    meson compile -C {{builddir}} --clean
-    cargo clean --target-dir {{cargo_target_dir}}
+clean: meson-clean cargo-clean
 
-# Clean cargo workspace only (cargo clean)
+# Clean the meson build directory (meson compile --clean)
+[group: 'clean']
+meson-clean:
+    meson compile -C {{builddir}} --clean
+
+# Clean cargo workspace (cargo clean)
 [group: 'clean']
 cargo-clean:
     cargo clean --target-dir {{cargo_target_dir}}
@@ -116,7 +117,7 @@ cargo-clean:
 # Remove the build directory entirely
 [group: 'clean']
 clean-all:
-    @rm -rf {{builddir}}
+    @rm -rf {{cargo_target_dir}} {{builddir}}
 
 
 ## Misc
