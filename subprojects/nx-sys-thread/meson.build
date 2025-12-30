@@ -5,7 +5,7 @@ cargo = find_program('cargo', required : true)
 #------------------------------------------------
 # Dependencies
 #------------------------------------------------
-# Rust dependencies here ar just informative so Meson can build the dependencies in the correct order
+# Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-cpu
 nx_cpu_proj = subproject('nx-cpu')
 nx_cpu_dep = nx_cpu_proj.get_variable('nx_cpu_dep')

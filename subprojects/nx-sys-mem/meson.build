@@ -5,7 +5,7 @@ cargo = find_program('cargo', required : true)
 #------------------------------------------------
 # Dependencies
 #------------------------------------------------
-# Rust dependencies here ar just informative so Meson can build the dependencies in the correct order
+# Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-alloc
 nx_alloc_proj = subproject('nx-alloc')
 nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
