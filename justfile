@@ -8,6 +8,9 @@ default:
 # Build directory (can be overridden with just builddir=<path> <task>)
 builddir := "buildDir"
 
+# Cargo target directory (can be overridden with just cargo_target_dir=<path> <task>)
+cargo_target_dir := builddir / "cargo-target"
+
 # Target platform for Rust builds
 target := "aarch64-nintendo-switch-freestanding"
 
@@ -35,22 +38,22 @@ alias check := check-rs
 # Check Rust code (cargo check)
 [group: 'check']
 check-rs *EXTRA_FLAGS:
-    cargo check --target {{target}} {{EXTRA_FLAGS}}
+    cargo check --target {{target}} --target-dir {{cargo_target_dir}} {{EXTRA_FLAGS}}
 
 # Check specific crate (cargo check -p <crate>)
 [group: 'check']
 check-crate CRATE *EXTRA_FLAGS:
-    cargo check --target {{target}} --package {{CRATE}} {{EXTRA_FLAGS}}
+    cargo check --target {{target}} --target-dir {{cargo_target_dir}} --package {{CRATE}} {{EXTRA_FLAGS}}
 
 # Lint Rust code (cargo clippy)
 [group: 'check']
 clippy *EXTRA_FLAGS:
-    cargo clippy --target {{target}} {{EXTRA_FLAGS}}
+    cargo clippy --target {{target}} --target-dir {{cargo_target_dir}} {{EXTRA_FLAGS}}
 
 # Lint specific crate (cargo clippy -p <crate> --no-deps)
 [group: 'check']
 clippy-crate CRATE *EXTRA_FLAGS:
-    cargo clippy --target {{target}} --package {{CRATE}} --no-deps {{EXTRA_FLAGS}}
+    cargo clippy --target {{target}} --target-dir {{cargo_target_dir}} --package {{CRATE}} --no-deps {{EXTRA_FLAGS}}
 
 
 ## Build (Meson)
@@ -99,15 +102,16 @@ list-dependencies: _ensure-configured
 
 alias clean := meson-clean
 
-# Clean the meson build directory (meson compile --clean)
+# Clean the meson build directory and cargo workspace
 [group: 'clean']
 meson-clean: _ensure-configured
     meson compile -C {{builddir}} --clean
+    cargo clean --target-dir {{cargo_target_dir}}
 
-# Clean cargo workspace (cargo clean)
+# Clean cargo workspace only (cargo clean)
 [group: 'clean']
 cargo-clean:
-    cargo clean
+    cargo clean --target-dir {{cargo_target_dir}}
 
 # Remove the build directory entirely
 [group: 'clean']
