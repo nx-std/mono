@@ -55,13 +55,13 @@ clippy-crate CRATE *EXTRA_FLAGS:
 
 ## Build (Meson)
 
-alias setup := meson-setup
+alias configure := meson-configure
 alias compile := meson-compile
 alias build := meson-compile
 
-# Setup meson build directory (meson setup)
+# Configure meson build directory (meson setup)
 [group: 'build']
-meson-setup *EXTRA_FLAGS:
+meson-configure *EXTRA_FLAGS:
     meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
 
 # Compile the project (meson compile)
@@ -69,15 +69,25 @@ meson-setup *EXTRA_FLAGS:
 meson-compile *TARGETS:
     meson compile -C {{builddir}} {{TARGETS}}
 
-# Setup meson build with test configuration options
+# Configure meson build with test configuration options
 [group: 'build']
-setup-tests *EXTRA_FLAGS:
+configure-tests *EXTRA_FLAGS:
     meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
 
 # Build the nx-tests NRO (Switch homebrew test executable)
 [group: 'build']
 build-tests:
     meson compile -C {{builddir}} nx-tests.nro
+
+# List all build targets (meson introspect --targets)
+[group: 'build']
+list-targets:
+    meson introspect {{builddir}} --targets
+
+# List all dependencies (meson introspect --dependencies)
+[group: 'build']
+list-dependencies:
+    meson introspect {{builddir}} --dependencies
 
 
 ## Clean
