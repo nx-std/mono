@@ -18,14 +18,14 @@ nx_svc_tgt = custom_target(
         '--features', 'ffi',
     ],
     output : ['libnx_svc.a', 'libnx_svc.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding libnx svc functions
 nx_svc_ld_override = meson.current_source_dir() / 'svc_override.ld'
 

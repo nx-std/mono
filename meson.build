@@ -1,4 +1,4 @@
-project('switchbrew', meson_version : '>=1.4.0')
+project('switchbrew', meson_version: '>= 1.7.0')
 
 ## Subprojects
 # Libraries

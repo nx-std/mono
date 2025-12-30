@@ -27,6 +27,13 @@ option(
 )
 
 option(
+    'use_nx_sys_mem',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `sys-mem` feature',
+    yield : true
+)
+
+option(
     'use_nx_sys_sync',
     type : 'feature', value : 'auto',
     description : 'Enable the `sys-sync` feature',

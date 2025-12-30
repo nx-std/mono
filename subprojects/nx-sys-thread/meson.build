@@ -2,26 +2,27 @@ project('nx-sys-thread', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
-# Rust dependencies here ar just informative so Meson can build the dependencies in the correct order
+#---------------------------------------------------------------------------------
+# Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-cpu
 nx_cpu_proj = subproject('nx-cpu')
 nx_cpu_dep = nx_cpu_proj.get_variable('nx_cpu_dep')
 
-# nx-sync
-nx_sync_proj = subproject('nx-sync')
-nx_sync_dep = nx_sync_proj.get_variable('nx_sync_dep')
+# nx-std-sync
+nx_std_sync_proj = subproject('nx-std-sync')
+nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
 
 # Dependencies list
 deps = [
     nx_cpu_dep,
+    nx_std_sync_dep,
 ]
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -37,14 +38,14 @@ nx_sys_thread_tgt = custom_target(
         '--features', 'ffi',
     ],
     output : ['libnx_sys_thread.a', 'libnx_sys_thread.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding libnx sys-thread functions
 nx_sys_thread_ld_override = meson.current_source_dir() / 'sys_thread_override.ld'
 

@@ -1,6 +1,6 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
-$schema: https://www.schemastore.org/pre-commit-config.json
+# yaml-language-server: $schema=https://json.schemastore.org/pre-commit-config.json
 repos:
 - repo: local
   hooks:
@@ -12,7 +12,6 @@ repos:
     types_or: [rust, cargo, cargo-lock]
     stages: [pre-commit, pre-merge-commit, manual]
     pass_filenames: false
-    require_serial: true
   - id: fmt-rs-check
     name: fmt-rs-check
     language: system
@@ -20,7 +19,6 @@ repos:
     types_or: [rust, cargo, cargo-lock]
     stages: [pre-push, manual]
     pass_filenames: false
-    require_serial: true
   - id: check-rs
     name: check-rs
     language: system
@@ -28,4 +26,18 @@ repos:
     types_or: [rust, cargo, cargo-lock]
     stages: [pre-push, manual]
     pass_filenames: false
-    require_serial: true
+  ## Meson hooks
+  - id: fmt-meson
+    name: fmt-meson
+    language: system
+    entry: just fmt-meson
+    types_or: [meson, meson-options]
+    stages: [pre-commit, pre-merge-commit, manual]
+    pass_filenames: false
+  - id: fmt-meson-check
+    name: fmt-meson-check
+    language: system
+    entry: just fmt-meson-check
+    types_or: [meson, meson-options]
+    stages: [pre-push, manual]
+    pass_filenames: false

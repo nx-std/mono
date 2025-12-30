@@ -2,8 +2,9 @@
 option(
     'devkitpro',
     type : 'string', value : '/opt/devkitpro',
-    description : 'Path to devkitPro directory'
-) 
+    description : 'Path to devkitPro directory',
+    yield : true
+)
 
 option(
     'use_nx',
@@ -15,48 +16,55 @@ option(
 option(
     'use_nx_alloc',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-alloc instead of libnx implementation',
+    description : 'Override all libnx functions with nx-alloc functions',
     yield : true
 )
 
 option(
     'use_nx_rand',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-rand instead of libnx implementation',
+    description : 'Override all libnx functions with nx-rand functions',
+    yield : true
+)
+
+option(
+    'use_nx_std_sync',
+    type : 'feature', value : 'disabled',
+    description : 'Override all libnx functions with nx-std-sync functions',
     yield : true
 )
 
 option(
     'use_nx_svc',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-svc instead of libnx implementation',
+    description : 'Override all libnx functions with nx-svc functions',
     yield : true
 )
 
 option(
     'use_nx_sys_mem',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-sys-mem instead of libnx implementation',
+    description : 'Override all libnx functions with nx-sys-mem functions',
     yield : true
 )
 
 option(
     'use_nx_sys_sync',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-sys-sync instead of libnx implementation',
+    description : 'Override all libnx functions with nx-sys-sync functions',
     yield : true
 )
 
 option(
     'use_nx_sys_thread',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-sys-thread instead of libnx implementation',
+    description : 'Override all libnx functions with nx-sys-thread functions',
     yield : true
 )
 
 option(
     'use_nx_time',
     type : 'feature', value : 'disabled',
-    description : 'Use nx-time instead of libnx implementation',
+    description : 'Override all libnx functions with nx-time functions',
     yield : true
 )

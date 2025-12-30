@@ -1,6 +1,6 @@
 project('nx-tests', 'c',
         version : '1.0.0',
-        meson_version : '>= 1.3.0',
+        meson_version : '>= 1.7.0',
         default_options : [
             'buildtype=debugoptimized', # -g -O2
             'warning_level=1', # -Wall

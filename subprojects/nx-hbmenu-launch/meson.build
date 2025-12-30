@@ -14,14 +14,14 @@ nx_hbmenu_launch_tgt = custom_target(
         '--artifact-dir', '@OUTDIR@',
     ],
     output : ['libnx_hbmenu_launch.a', 'libnx_hbmenu_launch.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Linker script for overriding hbmenu launch functions
 nx_hbmenu_launch_ld_override = meson.current_source_dir() / 'hbmenu_launch_override.ld'
 

@@ -1,4 +1,4 @@
-project('sysroot-dkp', 'c', meson_version : '>= 1.3.0')
+project('sysroot-dkp', 'c', meson_version : '>= 1.7.0')
 
 # Get `devkitpro` path option, otherwise use default
 devkitpro = get_option('devkitpro')

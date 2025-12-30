@@ -2,5 +2,6 @@
 option(
     'devkitpro',
     type : 'string', value : '/opt/devkitpro',
-    description : 'Path to devkitPro directory'
-) 
+    description : 'Path to devkitPro directory',
+    yield : true
+)

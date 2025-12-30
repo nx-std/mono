@@ -1,10 +1,10 @@
-project('nx-std', version : '0.1.0', meson_version : '>= 1.1.0')
+project('nx-std', version : '0.1.0', meson_version : '>= 1.7.0')
 
 cargo = find_program('cargo', required : true)
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependencies
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 deps = []
 deps_override_link_args = []
 deps_cargo_features = []
@@ -36,7 +36,6 @@ if get_option('use_nx_std_sync').enabled()
     nx_std_sync_proj = subproject('nx-std-sync')
 
     deps += nx_std_sync_proj.get_variable('nx_std_sync_dep')
-    deps_override_link_args += ['-T', nx_std_sync_proj.get_variable('nx_std_sync_ld_override')]
 
     debug('sync feature: enabled')
     deps_cargo_features += ['sync']
@@ -64,6 +63,16 @@ if get_option('use_nx_sys_sync').enabled()
     deps_cargo_features += ['sys-sync']
 endif
 
+# nx-sys-mem
+if get_option('use_nx_sys_mem').enabled()
+    nx_sys_mem_proj = subproject('nx-sys-mem')
+
+    deps += nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
+    deps_override_link_args += ['-T', nx_sys_mem_proj.get_variable('nx_sys_mem_ld_override')]
+
+    debug('sys-mem feature: enabled')
+    deps_cargo_features += ['sys-mem']
+endif
 
 # nx-sys-thread
 if get_option('use_nx_sys_thread').enabled()
@@ -87,9 +96,9 @@ if get_option('use_nx_time').enabled()
     deps_cargo_features += ['time']
 endif
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Static library
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Include directories
 inc = include_directories('include')
 
@@ -106,14 +115,14 @@ nx_std_tgt = custom_target(
         '--features', ','.join(['ffi'] + deps_cargo_features),
     ],
     output : ['libnx_std.a', 'libnx_std.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 # Dependency declaration
-#------------------------------------------------
+#---------------------------------------------------------------------------------
 nx_std_dep = declare_dependency(
     include_directories : inc,
     link_with : nx_std_tgt[0],
