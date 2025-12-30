@@ -11,7 +11,9 @@ use_nx = get_option('use_nx')
 
 use_nx_alloc = get_option('use_nx_alloc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_rand = get_option('use_nx_rand').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_std_sync = get_option('use_nx_std_sync').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_svc = get_option('use_nx_svc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_sys_mem = get_option('use_nx_sys_mem').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sys_sync = get_option('use_nx_sys_sync').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sys_thread = get_option('use_nx_sys_thread').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_time = get_option('use_nx_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
@@ -36,16 +38,18 @@ nx_dep_link_args = ['-L@0@'.format(nx_libdir), '-lnx']
 
 # nx-std
 if (use_nx.enabled()
-    or use_nx_alloc.enabled() or use_nx_rand.enabled() or use_nx_svc.enabled()
-    or use_nx_sys_sync.enabled() or use_nx_sys_thread.enabled()
-    or use_nx_time.enabled())
+    or use_nx_alloc.enabled() or use_nx_rand.enabled() or use_nx_std_sync.enabled()
+    or use_nx_svc.enabled() or use_nx_sys_mem.enabled() or use_nx_sys_sync.enabled()
+    or use_nx_sys_thread.enabled() or use_nx_time.enabled())
 
     nx_std_proj = subproject(
         'nx-std',
         default_options : {
             'use_nx_alloc' : '@0@'.format(use_nx_alloc),
             'use_nx_rand' : '@0@'.format(use_nx_rand),
+            'use_nx_std_sync' : '@0@'.format(use_nx_std_sync),
             'use_nx_svc' : '@0@'.format(use_nx_svc),
+            'use_nx_sys_mem' : '@0@'.format(use_nx_sys_mem),
             'use_nx_sys_sync' : '@0@'.format(use_nx_sys_sync),
             'use_nx_sys_thread' : '@0@'.format(use_nx_sys_thread),
             'use_nx_time' : '@0@'.format(use_nx_time),

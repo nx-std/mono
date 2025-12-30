@@ -64,6 +64,16 @@ if get_option('use_nx_sys_sync').enabled()
     deps_cargo_features += ['sys-sync']
 endif
 
+# nx-sys-mem
+if get_option('use_nx_sys_mem').enabled()
+    nx_sys_mem_proj = subproject('nx-sys-mem')
+
+    deps += nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
+    deps_override_link_args += ['-T', nx_sys_mem_proj.get_variable('nx_sys_mem_ld_override')]
+
+    debug('sys-mem feature: enabled')
+    deps_cargo_features += ['sys-mem']
+endif
 
 # nx-sys-thread
 if get_option('use_nx_sys_thread').enabled()
