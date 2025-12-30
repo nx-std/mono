@@ -126,6 +126,16 @@ list-options-configured: _ensure-configured
     @meson configure {{builddir}} | grep "use_" | sort -u
 
 
+## Deploy
+
+# Install cargo-nx from the submodule (override workspace config to build for host)
+[group: 'deploy']
+install-cargo-nx:
+    #!/usr/bin/env bash
+    host_target=$(rustc +stable -vV | sed -n 's|host: ||p')
+    cargo +stable install --path subprojects/cargo-nx --target "$host_target"
+
+
 ## Clean
 
 # Clean both meson build directory and cargo workspace
