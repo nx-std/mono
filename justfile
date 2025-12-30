@@ -30,6 +30,16 @@ fmt-rs:
 fmt-rs-check:
     cargo +nightly fmt --all -- --check
 
+# Format all meson files
+[group: 'format']
+fmt-meson:
+    meson format --inplace --recursive .
+
+# Check meson file formatting
+[group: 'format']
+fmt-meson-check:
+    meson format --check-only --recursive .
+
 
 ## Submodules
 
