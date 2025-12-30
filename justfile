@@ -97,6 +97,16 @@ list-targets: _ensure-configured
 list-dependencies: _ensure-configured
     meson introspect {{builddir}} --dependencies
 
+# List all project options (from meson.options)
+[group: 'build']
+list-options:
+    @meson introspect --buildoptions meson.build 2>/dev/null | jq -r '.[] | select(.name | startswith("use_")) | "\(.name) (\(.value)): \(.description)"'
+
+# List configured project options (requires configured build)
+[group: 'build']
+list-options-configured: _ensure-configured
+    @meson configure {{builddir}} | grep "use_" | sort -u
+
 
 ## Clean
 
