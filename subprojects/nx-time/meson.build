@@ -33,9 +33,9 @@ nx_time_tgt = custom_target(
         '--features', 'ffi',
     ],
     output : ['libnx_time.a', 'libnx_time.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
 #------------------------------------------------

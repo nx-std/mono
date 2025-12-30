@@ -106,9 +106,9 @@ nx_std_tgt = custom_target(
         '--features', ','.join(['ffi'] + deps_cargo_features),
     ],
     output : ['libnx_std.a', 'libnx_std.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
 #------------------------------------------------

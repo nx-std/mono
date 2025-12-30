@@ -14,9 +14,9 @@ nx_cpu_tgt = custom_target(
         '--artifact-dir', '@OUTDIR@',
     ],
     output : ['libnx_cpu.a', 'libnx_cpu.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
 nx_cpu_dep = declare_dependency(

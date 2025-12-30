@@ -48,9 +48,9 @@ nx_alloc_tgt = custom_target(
         '--features', 'ffi',
     ],
     output : ['libnx_alloc.a', 'libnx_alloc.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
 #------------------------------------------------

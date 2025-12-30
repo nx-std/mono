@@ -38,9 +38,9 @@ nx_sys_sync_tgt = custom_target(
         '--features', 'ffi',
     ],
     output : ['libnx_sys_sync.a', 'libnx_sys_sync.rlib'],
-    console: true,
+    console : true,
     build_by_default : true,
-    build_always_stale: true,
+    build_always_stale : true,
 )
 
 #------------------------------------------------
