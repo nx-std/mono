@@ -12,7 +12,7 @@ builddir := "buildDir"
 target := "aarch64-nintendo-switch-freestanding"
 
 
-## Code formatting
+## Format
 
 alias fmt := fmt-rs
 alias fmt-check := fmt-rs-check
@@ -64,29 +64,34 @@ alias build := meson-compile
 meson-configure *EXTRA_FLAGS:
     meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
 
+# Ensure build directory is configured (idempotent)
+[group: 'build']
+[private]
+_ensure-configured:
+    #!/usr/bin/env bash
+    if [ ! -f "{{builddir}}/meson-private/coredata.dat" ]; then
+        echo "Build directory not configured. Running configure..."
+        just configure
+    fi
+
 # Compile the project (meson compile)
 [group: 'build']
-meson-compile *TARGETS:
+meson-compile *TARGETS: _ensure-configured
     meson compile -C {{builddir}} {{TARGETS}}
-
-# Configure meson build with test configuration options
-[group: 'build']
-configure-tests *EXTRA_FLAGS:
-    meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
 
 # Build the nx-tests NRO (Switch homebrew test executable)
 [group: 'build']
-build-tests:
+build-tests: _ensure-configured
     meson compile -C {{builddir}} nx-tests.nro
 
 # List all build targets (meson introspect --targets)
 [group: 'build']
-list-targets:
+list-targets: _ensure-configured
     meson introspect {{builddir}} --targets
 
 # List all dependencies (meson introspect --dependencies)
 [group: 'build']
-list-dependencies:
+list-dependencies: _ensure-configured
     meson introspect {{builddir}} --dependencies
 
 
@@ -96,7 +101,7 @@ alias clean := meson-clean
 
 # Clean the meson build directory (meson compile --clean)
 [group: 'clean']
-meson-clean:
+meson-clean: _ensure-configured
     meson compile -C {{builddir}} --clean
 
 # Clean cargo workspace (cargo clean)
