@@ -7,3 +7,6 @@
 [submodule "subprojects/nx-hbmenu"]
 	path = subprojects/nx-hbmenu
 	url = git@github.com:nx-std/nx-hbmenu.git
+[submodule "subprojects/cargo-nx"]
+	path = subprojects/cargo-nx
+	url = git@github.com:nx-std/cargo-nx.git
