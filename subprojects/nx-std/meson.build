@@ -1,4 +1,4 @@
-project('nx-std', version : '0.1.0', meson_version : '>= 1.1.0')
+project('nx-std', version : '0.1.0', meson_version : '>= 1.4.0')
 
 cargo = find_program('cargo', required : true)
 
