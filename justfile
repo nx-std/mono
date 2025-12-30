@@ -145,6 +145,11 @@ install-cargo-nx:
     host_target=$(rustc +stable -vV | sed -n 's|host: ||p')
     cargo +stable install --path subprojects/cargo-nx --target "$host_target"
 
+# Deploy an NRO file to the Nintendo Switch via cargo nx link
+[group: 'deploy']
+deploy NRO_FILE *EXTRA_FLAGS:
+    cargo nx link {{NRO_FILE}} {{EXTRA_FLAGS}}
+
 
 ## Clean
 
