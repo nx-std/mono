@@ -31,6 +31,24 @@ fmt-rs-check:
     cargo +nightly fmt --all -- --check
 
 
+## Submodules
+
+# Initialize git submodules
+[group: 'submodules']
+submodule-init:
+    git submodule update --init --recursive
+
+# Deinitialize git submodules
+[group: 'submodules']
+submodule-deinit:
+    git submodule deinit --all
+
+# Update git submodules recursively with force
+[group: 'submodules']
+submodule-update:
+    git submodule update --init --recursive --force
+
+
 ## Check
 
 alias check := check-rs
