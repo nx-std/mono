@@ -44,6 +44,7 @@ version = "0.1.0"
 dependencies = [
  "linked_list_allocator",
  "nx-panic-handler",
+ "nx-rt-env",
  "nx-svc",
  "nx-sys-sync",
  "thiserror",
@@ -73,12 +74,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-rt-env"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-sys-sync",
+]
+
+[[package]]
 name = "nx-std"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-panic-handler",
  "nx-rand",
+ "nx-rt-env",
  "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",

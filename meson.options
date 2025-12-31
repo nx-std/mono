@@ -75,3 +75,10 @@ option(
     description : 'Override all libnx functions with nx-time functions',
     yield : true
 )
+
+option(
+    'use_nx_rt_env',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-rt-env functions',
+    yield : true
+)

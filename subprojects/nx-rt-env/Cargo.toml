@@ -1,0 +1,19 @@
+[package]
+name = "nx-rt-env"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt_env"
+crate-type = ["rlib", "staticlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_rt_env FFI
+ffi = []
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }

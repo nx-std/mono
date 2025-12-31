@@ -1,4 +1,4 @@
-project('nx-alloc', version : '0.1.0')
+project('nx-rt-env', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
@@ -10,14 +10,6 @@ cargo = find_program('cargo', required : true)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-svc
-nx_svc_proj = subproject('nx-svc')
-nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
-
-# nx-rt-env
-nx_rt_env_proj = subproject('nx-rt-env')
-nx_rt_env_dep = nx_rt_env_proj.get_variable('nx_rt_env_dep')
-
 # nx-sys-sync
 nx_sys_sync_proj = subproject('nx-sys-sync')
 nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
@@ -25,20 +17,15 @@ nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
-    nx_rt_env_dep,
-    nx_svc_dep,
     nx_sys_sync_dep,
 ]
 
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------
-# Include directories
-inc = include_directories('include')
-
 # Target
-nx_alloc_tgt = custom_target(
-    'nx-alloc',
+nx_rt_env_tgt = custom_target(
+    'nx-rt-env',
     command : [
         cargo, 'build',
         '--package', meson.project_name(),
@@ -47,7 +34,7 @@ nx_alloc_tgt = custom_target(
         '--artifact-dir', '@OUTDIR@',
         '--features', 'ffi',
     ],
-    output : ['libnx_alloc.a', 'libnx_alloc.rlib'],
+    output : ['libnx_rt_env.a', 'libnx_rt_env.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -56,11 +43,10 @@ nx_alloc_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Dependency declaration
 #---------------------------------------------------------------------------------
-# Linker script for overriding libnx alloc functions
-nx_alloc_ld_override = meson.current_source_dir() / 'alloc_override.ld'
+# Linker script for overriding libnx env functions
+nx_rt_env_ld_override = meson.current_source_dir() / 'rt_env_override.ld'
 
-nx_alloc_dep = declare_dependency(
-    include_directories : inc,
-    link_with : nx_alloc_tgt[0],
+nx_rt_env_dep = declare_dependency(
+    link_with : nx_rt_env_tgt[0],
     dependencies : deps,
 )
