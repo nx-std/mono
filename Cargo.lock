@@ -56,13 +56,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nx-hbmenu-launch"
-version = "0.1.0"
-dependencies = [
- "nx-svc",
-]
-
-[[package]]
 name = "nx-rand"
 version = "0.1.0"
 dependencies = [
