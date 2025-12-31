@@ -28,13 +28,6 @@ option(
 )
 
 option(
-    'use_nx_hbmenu_launch',
-    type : 'feature', value : 'auto',
-    description : 'Override all nx-hbmenu functions with nx-hbmenu-launch functions',
-    yield : true
-)
-
-option(
     'use_nx_rand',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-rand functions',
