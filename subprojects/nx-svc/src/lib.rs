@@ -9,15 +9,7 @@
 
 #![no_std]
 
-/// #[panic_handler]
-///
-/// Custom panic handler that calls svcBreak with Panic reason.
-/// This provides better debugging information for Nintendo Switch homebrew applications.
-///
-/// See:
-///  - <https://doc.rust-lang.org/nomicon/panic-handler.html>
-///  - <https://docs.rust-embedded.org/book/start/panicking.html>
-mod panic_handler;
+extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 #[macro_use]
 mod handle;

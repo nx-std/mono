@@ -2,7 +2,22 @@ project('nx-cpu', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-## Static library
+#---------------------------------------------------------------------------------
+# Dependencies
+#---------------------------------------------------------------------------------
+# Rust dependencies here are just informative so Meson can build the dependencies in the correct order
+# nx-panic-handler
+nx_panic_handler_proj = subproject('nx-panic-handler')
+nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
+
+# Dependencies list
+deps = [
+    nx_panic_handler_dep,
+]
+
+#---------------------------------------------------------------------------------
+# Static library
+#---------------------------------------------------------------------------------
 # Target
 nx_cpu_tgt = custom_target(
     'nx-cpu',
@@ -21,4 +36,5 @@ nx_cpu_tgt = custom_target(
 
 nx_cpu_dep = declare_dependency(
     link_with : nx_cpu_tgt[0],
+    dependencies : deps,
 )
