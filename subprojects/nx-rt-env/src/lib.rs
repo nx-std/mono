@@ -16,67 +16,44 @@ mod ffi;
 use core::{
     cell::UnsafeCell,
     ffi::{c_char, c_void},
-    ptr,
+    ptr::{self, NonNull},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
-use nx_sys_sync::Once;
-
-/// Entry list terminator
-pub const ENTRY_TYPE_END_OF_LIST: u32 = 0;
-
-/// Provides the handle to the main thread
-pub const ENTRY_TYPE_MAIN_THREAD_HANDLE: u32 = 1;
-
-/// Provides a buffer containing information about the next homebrew application to load
-pub const ENTRY_TYPE_NEXT_LOAD_PATH: u32 = 2;
-
-/// Provides heap override information (address and size)
-pub const ENTRY_TYPE_OVERRIDE_HEAP: u32 = 3;
-
-/// Provides service override information
-pub const ENTRY_TYPE_OVERRIDE_SERVICE: u32 = 4;
-
-/// Provides argv string pointer
-pub const ENTRY_TYPE_ARGV: u32 = 5;
-
-/// Provides syscall availability hints for SVCs 0x00-0x7F
-pub const ENTRY_TYPE_SYSCALL_AVAILABLE_HINT: u32 = 6;
-
-/// Provides APT applet type
-pub const ENTRY_TYPE_APPLET_TYPE: u32 = 7;
-
-/// Indicates that APT is broken and should not be used
-pub const ENTRY_TYPE_APPLET_WORKAROUND: u32 = 8;
-
-/// Unused/reserved entry type (formerly used by StdioSockets)
-pub const ENTRY_TYPE_RESERVED9: u32 = 9;
-
-/// Provides the process handle
-pub const ENTRY_TYPE_PROCESS_HANDLE: u32 = 10;
-
-/// Provides the last load result code
-pub const ENTRY_TYPE_LAST_LOAD_RESULT: u32 = 11;
-
-/// Provides random data used to seed the pseudo-random number generator
-pub const ENTRY_TYPE_RANDOM_SEED: u32 = 14;
-
-/// Provides persistent storage for the preselected user id
-pub const ENTRY_TYPE_USER_ID_STORAGE: u32 = 15;
-
-/// Provides the currently running Horizon OS version
-pub const ENTRY_TYPE_HOS_VERSION: u32 = 16;
-
-/// Provides syscall availability hints for SVCs 0x80-0xBF
-pub const ENTRY_TYPE_SYSCALL_AVAILABLE_HINT2: u32 = 17;
+use nx_sys_sync::{Mutex, Once};
 
 /// Loader return function type
 pub type LoaderReturnFn = Option<unsafe extern "C" fn(i32) -> !>;
 
-/// Global environment state
+/// Global environment state (immutable after initialization)
 static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
 
 /// Initialization guard to ensure env_setup runs exactly once
 static ENV_INIT: Once = Once::new();
+
+/// Exit function pointer (mutable at runtime)
+static EXIT_FUNC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+
+/// Chain loading state (mutable at runtime)
+struct NextLoadState {
+    path: UnsafeCell<[u8; 512]>,
+    argv: UnsafeCell<[u8; 2048]>,
+    mutex: Mutex,
+}
+
+impl NextLoadState {
+    const fn new() -> Self {
+        Self {
+            path: UnsafeCell::new([0; 512]),
+            argv: UnsafeCell::new([0; 2048]),
+            mutex: Mutex::new(),
+        }
+    }
+}
+
+unsafe impl Sync for NextLoadState {}
+
+static NEXT_LOAD: NextLoadState = NextLoadState::new();
 
 /// Parse the homebrew loader environment configuration
 ///
@@ -84,148 +61,168 @@ static ENV_INIT: Once = Once::new();
 ///
 /// This function must be called exactly once during initialization.
 /// The `ctx` pointer must either be null (NSO mode) or point to a valid
-/// ConfigEntry array terminated by ENTRY_TYPE_END_OF_LIST.
-pub unsafe fn env_setup(ctx: *const ConfigEntry, main_thread: u32, saved_lr: LoaderReturnFn) {
+/// ConfigEntry array terminated by EndOfList.
+pub unsafe fn setup(ctx: *const ConfigEntry, main_thread: u32, saved_lr: LoaderReturnFn) {
     // Use Once to ensure this only runs once
     ENV_INIT.call_once(|| {
+        // SAFETY: We're inside Once::call_once, which guarantees exclusive access
         let state = unsafe { ENV_STATE.get() };
 
-        // Check if running as NSO (ctx is null) or NRO (ctx is valid)
-        if ctx.is_null() {
-            // NSO mode
-            state.is_nso = true;
-            state.exit_func = saved_lr;
-            state.main_thread_handle = main_thread;
-
-            // In NSO mode, all syscalls are hinted as available
-            state.syscall_hints[0] = u64::MAX;
-            state.syscall_hints[1] = u64::MAX;
-            state.syscall_hints[2] = u64::MAX;
-        } else {
-            // NRO mode - parse ConfigEntry array
-            state.is_nso = false;
-            state.exit_func = saved_lr;
-
-            let mut entry_ptr = ctx;
-            loop {
-                let entry = unsafe { &*entry_ptr };
-
-                match entry.key {
-                    ENTRY_TYPE_END_OF_LIST => {
-                        // Loader info is in the final entry's Value fields
-                        state.loader_info = entry.value[0] as *const c_char;
-                        state.loader_info_size = entry.value[1];
-                        break;
-                    }
-                    ENTRY_TYPE_MAIN_THREAD_HANDLE => {
-                        state.main_thread_handle = entry.value[0] as u32;
-                    }
-                    ENTRY_TYPE_NEXT_LOAD_PATH => {
-                        state.has_next_load = true;
-                        // Value[0] and Value[1] are buffer pointers set by loader
-                    }
-                    ENTRY_TYPE_OVERRIDE_HEAP => {
-                        state.has_heap_override = true;
-                        state.override_heap_addr = entry.value[0] as *mut c_void;
-                        state.override_heap_size = entry.value[1];
-                    }
-                    ENTRY_TYPE_ARGV => {
-                        state.override_argv = entry.value[1] as *const c_char;
-                    }
-                    ENTRY_TYPE_SYSCALL_AVAILABLE_HINT => {
-                        // SVCs 0x00-0x7F
-                        state.syscall_hints[0] = entry.value[0];
-                        state.syscall_hints[1] = entry.value[1];
-                    }
-                    ENTRY_TYPE_SYSCALL_AVAILABLE_HINT2 => {
-                        // SVCs 0x80-0xBF
-                        state.syscall_hints[2] = entry.value[0];
-                    }
-                    ENTRY_TYPE_PROCESS_HANDLE => {
-                        state.process_handle = entry.value[0] as u32;
-                    }
-                    ENTRY_TYPE_LAST_LOAD_RESULT => {
-                        state.last_load_result = entry.value[0] as u32;
-                    }
-                    ENTRY_TYPE_RANDOM_SEED => {
-                        state.has_random_seed = true;
-                        state.random_seed[0] = entry.value[0];
-                        state.random_seed[1] = entry.value[1];
-                    }
-                    ENTRY_TYPE_USER_ID_STORAGE => {
-                        state.user_id_storage = entry.value[0] as *mut AccountUid;
-                    }
-                    _ => {
-                        // Ignore unknown entry types
-                    }
-                }
-
-                entry_ptr = unsafe { entry_ptr.add(1) };
-            }
+        // Select initialization based on whether ctx is null
+        match NonNull::new(ctx as *mut ConfigEntry) {
+            None => unsafe { env_init_nso(state, main_thread, saved_lr) },
+            Some(ctx_ptr) => unsafe { env_init_nro(state, ctx_ptr, saved_lr) },
         }
     });
 }
 
-/// Get loader info string pointer
-pub fn env_get_loader_info() -> *const c_char {
+/// NSO initialization
+///
+/// # Safety
+///
+/// Must only be called from within `Once::call_once`.
+unsafe fn env_init_nso(state: &mut EnvState, main_thread: u32, saved_lr: LoaderReturnFn) {
+    // Initialize exit function pointer
+    let exit_ptr = match saved_lr {
+        None => ptr::null_mut(),
+        Some(f) => f as *mut c_void,
+    };
+    EXIT_FUNC.store(exit_ptr, Ordering::Relaxed);
+
+    // NSO mode
+    state.is_nso = true;
+    state.main_thread_handle = main_thread;
+
+    // In NSO mode, all syscalls are hinted as available
+    state.syscall_hints[0] = u64::MAX;
+    state.syscall_hints[1] = u64::MAX;
+    state.syscall_hints[2] = u64::MAX;
+}
+
+/// NRO initialization
+///
+/// # Safety
+///
+/// Must only be called from within `Once::call_once`.
+/// The `ctx` pointer must point to a valid ConfigEntry array terminated by EndOfList.
+unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr: LoaderReturnFn) {
+    // Initialize exit function pointer
+    let exit_ptr = match saved_lr {
+        None => ptr::null_mut(),
+        Some(f) => f as *mut c_void,
+    };
+    EXIT_FUNC.store(exit_ptr, Ordering::Relaxed);
+
+    // NRO mode
+    state.is_nso = false;
+
+    let mut entry_ptr = ctx.as_ptr();
+    loop {
+        // SAFETY: Caller guarantees ctx points to a valid ConfigEntry array.
+        // entry_ptr starts at ctx and only advances via add(1) below.
+        let entry = unsafe { &*entry_ptr };
+
+        match EntryType::from_u32(entry.key) {
+            Some(EntryType::MainThreadHandle) => {
+                state.main_thread_handle = entry.value[0] as u32;
+            }
+            Some(EntryType::NextLoadPath) => {
+                state.has_next_load = true;
+                // Value[0] and Value[1] are buffer pointers set by loader
+            }
+            Some(EntryType::OverrideHeap) => {
+                state.heap_override = NonNull::new(entry.value[0] as *mut c_void)
+                    .map(|addr| (addr, entry.value[1] as usize));
+            }
+            Some(EntryType::Argv) => {
+                state.argv = NonNull::new(entry.value[1] as *mut c_char);
+            }
+            Some(EntryType::SyscallAvailableHint) => {
+                // SVCs 0x00-0x7F
+                state.syscall_hints[0] = entry.value[0];
+                state.syscall_hints[1] = entry.value[1];
+            }
+            Some(EntryType::SyscallAvailableHint2) => {
+                // SVCs 0x80-0xBF
+                state.syscall_hints[2] = entry.value[0];
+            }
+            Some(EntryType::ProcessHandle) => {
+                state.process_handle = entry.value[0] as u32;
+            }
+            Some(EntryType::LastLoadResult) => {
+                state.last_load_result = entry.value[0] as u32;
+            }
+            Some(EntryType::RandomSeed) => {
+                state.random_seed = Some([entry.value[0], entry.value[1]]);
+            }
+            Some(EntryType::UserIdStorage) => {
+                state.user_id_storage = NonNull::new(entry.value[0] as *mut AccountUid);
+            }
+            Some(EntryType::EndOfList) => {
+                // Loader info is in the final entry's Value fields
+                if entry.value[1] > 0 {
+                    state.loader_info = NonNull::new(entry.value[0] as *mut c_char)
+                        .map(|ptr| (ptr, entry.value[1]));
+                }
+                break;
+            }
+            _ => {
+                // Ignore unknown entry types
+            }
+        }
+
+        // SAFETY: The array is terminated by EndOfList, which breaks the loop.
+        // We only advance the pointer if we haven't reached the end marker yet.
+        entry_ptr = unsafe { entry_ptr.add(1) };
+    }
+}
+
+/// Get loader info string pointer and size
+pub fn loader_info() -> Option<(NonNull<c_char>, u64)> {
+    // SAFETY: ENV_STATE is initialized once via setup() before any other function is called.
+    // After initialization, the state is read-only.
     let state = unsafe { ENV_STATE.get_ref() };
     state.loader_info
 }
 
-/// Get loader info size
-pub fn env_get_loader_info_size() -> u64 {
-    let state = unsafe { ENV_STATE.get_ref() };
-    state.loader_info_size
-}
-
 /// Get main thread handle
-pub fn env_get_main_thread_handle() -> u32 {
+pub fn main_thread_handle() -> u32 {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.main_thread_handle
 }
 
 /// Returns true if running as NSO, false if NRO
-pub fn env_is_nso() -> bool {
+pub fn is_nso() -> bool {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.is_nso
 }
 
-/// Returns true if heap override is present
-pub fn env_has_heap_override() -> bool {
+/// Get heap override address and size if present
+///
+/// Returns `Some((addr, size))` if the homebrew loader provided a heap override,
+/// or `None` if running without a heap override.
+pub fn heap_override() -> Option<(NonNull<c_void>, usize)> {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.has_heap_override
+    state.heap_override
 }
 
-/// Get heap override address
-pub fn env_get_heap_override_addr() -> *mut c_void {
+/// Get argv string pointer if present
+pub fn argv() -> Option<*const c_char> {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.override_heap_addr
-}
-
-/// Get heap override size
-pub fn env_get_heap_override_size() -> u64 {
-    let state = unsafe { ENV_STATE.get_ref() };
-    state.override_heap_size
-}
-
-/// Returns true if argv is present
-pub fn env_has_argv() -> bool {
-    let state = unsafe { ENV_STATE.get_ref() };
-    !state.override_argv.is_null()
-}
-
-/// Get argv string pointer
-pub fn env_get_argv() -> *const c_char {
-    let state = unsafe { ENV_STATE.get_ref() };
-    state.override_argv
+    state.argv.map(|ptr| ptr.as_ptr() as *const c_char)
 }
 
 /// Returns true if the given syscall is hinted as available
-pub fn env_is_syscall_hinted(svc: u32) -> bool {
+pub fn is_syscall_hinted(svc: u32) -> bool {
     if svc >= 192 {
         return false;
     }
 
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     let hint_index = (svc / 64) as usize;
     let bit_index = svc % 64;
@@ -234,110 +231,129 @@ pub fn env_is_syscall_hinted(svc: u32) -> bool {
 }
 
 /// Get process handle
-pub fn env_get_own_process_handle() -> u32 {
+pub fn own_process_handle() -> u32 {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.process_handle
 }
 
-/// Get exit function pointer
-pub fn env_get_exit_func_ptr() -> LoaderReturnFn {
-    let state = unsafe { ENV_STATE.get_ref() };
-    state.exit_func
-}
-
 /// Set exit function pointer
-pub fn env_set_exit_func_ptr(func: LoaderReturnFn) {
-    let state = unsafe { ENV_STATE.get() };
-    state.exit_func = func;
+pub fn set_exit_func_ptr(func: LoaderReturnFn) {
+    let ptr = match func {
+        None => ptr::null_mut(),
+        Some(f) => f as *mut c_void,
+    };
+    EXIT_FUNC.store(ptr, Ordering::Release);
 }
 
-/// Returns true if chain loading is supported
-pub fn env_has_next_load() -> bool {
-    let state = unsafe { ENV_STATE.get_ref() };
-    state.has_next_load
+/// Get exit function pointer
+pub fn exit_func_ptr() -> LoaderReturnFn {
+    let ptr = EXIT_FUNC.load(Ordering::Acquire);
+    if ptr.is_null() {
+        None
+    } else {
+        // SAFETY: The pointer was stored via set_exit_func_ptr which ensures validity
+        Some(unsafe { core::mem::transmute(ptr) })
+    }
 }
 
 /// Get last load result
-pub fn env_get_last_load_result() -> u32 {
+pub fn last_load_result() -> u32 {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.last_load_result
 }
 
-/// Returns true if random seed is present
-pub fn env_has_random_seed() -> bool {
+/// Get random seed if present
+pub fn random_seed() -> Option<[u64; 2]> {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.has_random_seed
+    state.random_seed
 }
 
-/// Get random seed (copies to output buffer)
-pub fn env_get_random_seed(out: &mut [u64; 2]) {
-    let state = unsafe { ENV_STATE.get_ref() };
-    *out = state.random_seed;
-}
-
-/// Get user ID storage pointer
-pub fn env_get_user_id_storage() -> *mut AccountUid {
+/// Get user ID storage pointer if present
+pub fn user_id_storage() -> Option<NonNull<AccountUid>> {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.user_id_storage
+}
+
+/// Returns true if chain loading is supported
+pub fn has_next_load() -> bool {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
+    let state = unsafe { ENV_STATE.get_ref() };
+    state.has_next_load
 }
 
 /// Set next NRO to load (chain loading)
 ///
 /// Returns 0 on success, non-zero on error
-pub fn env_set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
-    let state = unsafe { ENV_STATE.get() };
+pub fn set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
+    let state = unsafe { ENV_STATE.get_ref() };
 
     if !state.has_next_load {
         return 1; // Chain loading not supported
     }
 
+    // Lock mutex to protect buffer access
+    NEXT_LOAD.mutex.lock();
+
+    // SAFETY: We hold the mutex, so we have exclusive access to the buffers
+    let path_buf = unsafe { &mut *NEXT_LOAD.path.get() };
+    let argv_buf = unsafe { &mut *NEXT_LOAD.argv.get() };
+
     // Copy path string
     if !path.is_null() {
         let mut i = 0;
-        while i < state.next_load_path.len() - 1 {
+        while i < path_buf.len() - 1 {
+            // SAFETY: Caller guarantees path points to a valid null-terminated C string.
+            // We stop at the first null byte or buffer limit, whichever comes first.
             let byte = unsafe { *path.add(i) } as u8;
-            state.next_load_path[i] = byte;
+            path_buf[i] = byte;
             if byte == 0 {
                 break;
             }
             i += 1;
         }
-        state.next_load_path[i] = 0; // Ensure null termination
+        path_buf[i] = 0; // Ensure null termination
     } else {
-        state.next_load_path[0] = 0;
+        path_buf[0] = 0;
     }
 
     // Copy argv string
     if !argv.is_null() {
         let mut i = 0;
-        while i < state.next_load_argv.len() - 1 {
+        while i < argv_buf.len() - 1 {
+            // SAFETY: Caller guarantees argv points to a valid null-terminated C string.
+            // We stop at the first null byte or buffer limit, whichever comes first.
             let byte = unsafe { *argv.add(i) } as u8;
-            state.next_load_argv[i] = byte;
+            argv_buf[i] = byte;
             if byte == 0 {
                 break;
             }
             i += 1;
         }
-        state.next_load_argv[i] = 0; // Ensure null termination
+        argv_buf[i] = 0; // Ensure null termination
     } else {
-        state.next_load_argv[0] = 0;
+        argv_buf[0] = 0;
     }
+
+    NEXT_LOAD.mutex.unlock();
 
     0 // Success
 }
 
-/// Static storage for parsed environment state
+/// Static storage for parsed environment state (immutable after initialization)
 struct EnvState {
     /// True if running as NSO (system module), false if NRO (homebrew)
     is_nso: bool,
 
-    /// Heap override
-    has_heap_override: bool,
-    override_heap_addr: *mut c_void,
-    override_heap_size: u64,
+    /// Heap override (address, size)
+    heap_override: Option<(NonNull<c_void>, usize)>,
 
     /// Argv string pointer
-    override_argv: *const c_char,
+    argv: Option<NonNull<c_char>>,
 
     /// Thread and process handles
     main_thread_handle: u32,
@@ -348,23 +364,18 @@ struct EnvState {
     syscall_hints: [u64; 3],
 
     /// Random seed data
-    random_seed: [u64; 2],
-    has_random_seed: bool,
+    random_seed: Option<[u64; 2]>,
 
-    /// Exit function and last load result
-    exit_func: LoaderReturnFn,
+    /// Last load result
     last_load_result: u32,
 
-    /// Loader info string (stored at end of ConfigEntry list)
-    loader_info: *const c_char,
-    loader_info_size: u64,
+    /// Loader info string (pointer, size)
+    loader_info: Option<(NonNull<c_char>, u64)>,
 
     /// User ID storage pointer
-    user_id_storage: *mut AccountUid,
+    user_id_storage: Option<NonNull<AccountUid>>,
 
-    /// Chain loading buffers
-    next_load_path: [u8; 512],
-    next_load_argv: [u8; 2048],
+    /// Chain loading capability flag (set once during init)
     has_next_load: bool,
 }
 
@@ -372,22 +383,15 @@ impl EnvState {
     const fn new() -> Self {
         Self {
             is_nso: false,
-            has_heap_override: false,
-            override_heap_addr: ptr::null_mut(),
-            override_heap_size: 0,
-            override_argv: ptr::null(),
+            heap_override: None,
+            argv: None,
             main_thread_handle: 0,
             process_handle: 0,
             syscall_hints: [0; 3],
-            random_seed: [0; 2],
-            has_random_seed: false,
-            exit_func: None,
+            random_seed: None,
             last_load_result: 0,
-            loader_info: ptr::null(),
-            loader_info_size: 0,
-            user_id_storage: ptr::null_mut(),
-            next_load_path: [0; 512],
-            next_load_argv: [0; 2048],
+            loader_info: None,
+            user_id_storage: None,
             has_next_load: false,
         }
     }
@@ -401,16 +405,95 @@ impl EnvStateWrapper {
         Self(UnsafeCell::new(EnvState::new()))
     }
 
+    /// Get mutable access to the environment state
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure exclusive access. This is safe when:
+    /// - Called from within Once::call_once during initialization, or
+    /// - Called to mutate fields that are safe to modify post-initialization
+    ///   (like exit_func and next_load buffers)
     unsafe fn get(&self) -> &mut EnvState {
+        // SAFETY: Caller guarantees exclusive access or safe mutation
         unsafe { &mut *self.0.get() }
     }
 
+    /// Get immutable access to the environment state
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the state has been initialized via setup()
+    /// before calling this method.
     unsafe fn get_ref(&self) -> &EnvState {
+        // SAFETY: Caller guarantees initialization has completed
         unsafe { &*self.0.get() }
     }
 }
 
 unsafe impl Sync for EnvStateWrapper {}
+
+/// Entry type in the homebrew environment configuration
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryType {
+    /// Entry list terminator
+    EndOfList = 0,
+    /// Provides the handle to the main thread
+    MainThreadHandle = 1,
+    /// Provides a buffer containing information about the next homebrew application to load
+    NextLoadPath = 2,
+    /// Provides heap override information (address and size)
+    OverrideHeap = 3,
+    /// Provides service override information
+    OverrideService = 4,
+    /// Provides argv string pointer
+    Argv = 5,
+    /// Provides syscall availability hints for SVCs 0x00-0x7F
+    SyscallAvailableHint = 6,
+    /// Provides APT applet type
+    AppletType = 7,
+    /// Indicates that APT is broken and should not be used
+    AppletWorkaround = 8,
+    /// Unused/reserved entry type (formerly used by StdioSockets)
+    Reserved9 = 9,
+    /// Provides the process handle
+    ProcessHandle = 10,
+    /// Provides the last load result code
+    LastLoadResult = 11,
+    /// Provides random data used to seed the pseudo-random number generator
+    RandomSeed = 14,
+    /// Provides persistent storage for the preselected user id
+    UserIdStorage = 15,
+    /// Provides the currently running Horizon OS version
+    HosVersion = 16,
+    /// Provides syscall availability hints for SVCs 0x80-0xBF
+    SyscallAvailableHint2 = 17,
+}
+
+impl EntryType {
+    /// Convert from u32 to EntryType
+    pub const fn from_u32(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::EndOfList),
+            1 => Some(Self::MainThreadHandle),
+            2 => Some(Self::NextLoadPath),
+            3 => Some(Self::OverrideHeap),
+            4 => Some(Self::OverrideService),
+            5 => Some(Self::Argv),
+            6 => Some(Self::SyscallAvailableHint),
+            7 => Some(Self::AppletType),
+            8 => Some(Self::AppletWorkaround),
+            9 => Some(Self::Reserved9),
+            10 => Some(Self::ProcessHandle),
+            11 => Some(Self::LastLoadResult),
+            14 => Some(Self::RandomSeed),
+            15 => Some(Self::UserIdStorage),
+            16 => Some(Self::HosVersion),
+            17 => Some(Self::SyscallAvailableHint2),
+            _ => None,
+        }
+    }
+}
 
 /// Account UserId structure (matches libnx AccountUid)
 #[repr(C)]

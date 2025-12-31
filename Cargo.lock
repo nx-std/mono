@@ -44,6 +44,7 @@ version = "0.1.0"
 dependencies = [
  "linked_list_allocator",
  "nx-panic-handler",
+ "nx-rt-env",
  "nx-svc",
  "nx-sys-sync",
  "thiserror",

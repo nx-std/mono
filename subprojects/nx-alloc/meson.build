@@ -14,6 +14,10 @@ nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep'
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
+# nx-rt-env
+nx_rt_env_proj = subproject('nx-rt-env')
+nx_rt_env_dep = nx_rt_env_proj.get_variable('nx_rt_env_dep')
+
 # nx-sys-sync
 nx_sys_sync_proj = subproject('nx-sys-sync')
 nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
@@ -21,6 +25,7 @@ nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
+    nx_rt_env_dep,
     nx_svc_dep,
     nx_sys_sync_dep,
 ]
