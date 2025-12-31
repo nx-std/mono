@@ -13,6 +13,13 @@ option(
 )
 
 option(
+    'use_nx_rt_env',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `rt-env` feature',
+    yield : true
+)
+
+option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
     description : 'Enable the `sync` feature',

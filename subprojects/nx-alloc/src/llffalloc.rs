@@ -21,6 +21,9 @@ use nx_svc::{
 // the loader provides a pre-allocated heap region via the environment block.
 // These functions check for and retrieve that heap override information.
 //
+// These are provided by libnx, or can be overridden by nx-rt-env when
+// use_nx_rt_env is enabled in the build configuration.
+//
 // See: `libnx/nx/source/runtime/env.c` and `libnx/nx/include/switch/runtime/env.h`
 unsafe extern "C" {
     /// Returns true if the environment provides a heap override.
