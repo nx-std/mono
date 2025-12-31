@@ -1,4 +1,4 @@
-//! # nx-svcctu
+//! # nx-svc
 //!
 //! A Rust library for interacting with Horizon OS via _Supervisor Calls_ (SVCs).
 //!

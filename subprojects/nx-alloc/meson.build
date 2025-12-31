@@ -10,14 +10,6 @@ cargo = find_program('cargo', required : true)
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
-# nx-sys-thread
-nx_sys_thread_proj = subproject('nx-sys-thread')
-nx_sys_thread_dep = nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
-
-# nx-rand
-nx_rand_proj = subproject('nx-rand')
-nx_rand_dep = nx_rand_proj.get_variable('nx_rand_dep')
-
 # nx-sys-sync
 nx_sys_sync_proj = subproject('nx-sys-sync')
 nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
@@ -25,8 +17,6 @@ nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 # Dependencies list
 deps = [
     nx_svc_dep,
-    nx_sys_thread_dep,
-    nx_rand_dep,
     nx_sys_sync_dep,
 ]
 
