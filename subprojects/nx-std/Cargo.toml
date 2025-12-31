@@ -41,6 +41,7 @@ time = ["dep:nx-time"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }

@@ -1,0 +1,11 @@
+[package]
+name = "nx-panic-handler"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_panic_handler"
+crate-type = ["rlib", "staticlib"]
+test = false
+doctest = false
+bench = false

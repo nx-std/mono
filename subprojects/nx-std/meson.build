@@ -9,6 +9,10 @@ deps = []
 deps_override_link_args = []
 deps_cargo_features = []
 
+# nx-panic-handler (always required)
+nx_panic_handler_proj = subproject('nx-panic-handler')
+deps += nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
+
 # nx-alloc
 if get_option('use_nx_alloc').enabled()
     nx_alloc_proj = subproject('nx-alloc')

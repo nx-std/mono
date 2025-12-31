@@ -1,6 +1,8 @@
 //! # nx-std
 #![no_std]
 
+extern crate nx_panic_handler as _; // provides #[panic_handler]
+
 // The `alloc` crate enables memory allocation.
 #[cfg(feature = "alloc")]
 extern crate alloc as _;

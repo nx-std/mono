@@ -43,6 +43,7 @@ name = "nx-alloc"
 version = "0.1.0"
 dependencies = [
  "linked_list_allocator",
+ "nx-panic-handler",
  "nx-svc",
  "nx-sys-sync",
  "thiserror",
@@ -52,13 +53,19 @@ dependencies = [
 name = "nx-cpu"
 version = "0.1.0"
 dependencies = [
+ "nx-panic-handler",
  "nx-svc",
 ]
+
+[[package]]
+name = "nx-panic-handler"
+version = "0.1.0"
 
 [[package]]
 name = "nx-rand"
 version = "0.1.0"
 dependencies = [
+ "nx-panic-handler",
  "nx-svc",
  "rand",
  "rand_chacha",
@@ -70,6 +77,7 @@ name = "nx-std"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
+ "nx-panic-handler",
  "nx-rand",
  "nx-std-sync",
  "nx-svc",
@@ -84,6 +92,7 @@ name = "nx-std-sync"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
+ "nx-panic-handler",
  "nx-sys-sync",
  "thiserror",
 ]
@@ -93,6 +102,7 @@ name = "nx-svc"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "nx-panic-handler",
  "thiserror",
 ]
 
@@ -102,6 +112,7 @@ version = "0.1.0"
 dependencies = [
  "intrusive-collections",
  "nx-alloc",
+ "nx-panic-handler",
  "nx-rand",
  "nx-std-sync",
  "nx-svc",
@@ -113,6 +124,7 @@ name = "nx-sys-sync"
 version = "0.1.0"
 dependencies = [
  "nx-cpu",
+ "nx-panic-handler",
  "nx-svc",
  "static_assertions",
 ]
@@ -124,6 +136,7 @@ dependencies = [
  "intrusive-collections",
  "nx-alloc",
  "nx-cpu",
+ "nx-panic-handler",
  "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",
@@ -137,6 +150,7 @@ name = "nx-time"
 version = "0.1.0"
 dependencies = [
  "nx-cpu",
+ "nx-panic-handler",
  "static_assertions",
  "thiserror",
 ]

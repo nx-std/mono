@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "subprojects/nx-alloc",
     "subprojects/nx-cpu",
+    "subprojects/nx-panic-handler",
     "subprojects/nx-rand",
     "subprojects/nx-std",
     "subprojects/nx-std-sync",

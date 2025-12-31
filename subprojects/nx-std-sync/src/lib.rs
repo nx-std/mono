@@ -1,6 +1,8 @@
 //! # nx-std-sync
 #![no_std]
 
+extern crate nx_panic_handler as _; // provides #[panic_handler]
+
 // The `alloc` crate enables memory allocation.
 extern crate alloc;
 // The `nx-alloc` crate exposes the `#[global_allocator]` for the dependent crates.

@@ -16,5 +16,6 @@ ffi = []
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
 thiserror = { version = "2.0.12", default-features = false }
