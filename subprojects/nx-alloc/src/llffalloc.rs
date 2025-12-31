@@ -4,12 +4,32 @@
 //! It is used to allocate memory for the entire program.
 //!
 //! It is based on the [linked_list_allocator](https://github.com/rust-osdev/linked_list_allocator) crate.
-use core::{alloc::Layout, ffi::c_char, ptr};
+use core::{
+    alloc::Layout,
+    ffi::{c_char, c_void},
+    ptr,
+};
 
 use nx_svc::{
     mem::set_heap_size,
     misc::{get_total_memory_size, get_used_memory_size},
 };
+
+// libnx environment functions for heap override detection.
+//
+// When running as an NRO launched by a homebrew loader (e.g., hbmenu),
+// the loader provides a pre-allocated heap region via the environment block.
+// These functions check for and retrieve that heap override information.
+//
+// See: `libnx/nx/source/runtime/env.c` and `libnx/nx/include/switch/runtime/env.h`
+unsafe extern "C" {
+    /// Returns true if the environment provides a heap override.
+    fn envHasHeapOverride() -> bool;
+    /// Returns the address of the overridden heap.
+    fn envGetHeapOverrideAddr() -> *mut c_void;
+    /// Returns the size of the overridden heap.
+    fn envGetHeapOverrideSize() -> u64;
+}
 
 /// A wrapper around the linked list allocator that provides
 /// a lazy initialization mechanism for the heap.
@@ -57,6 +77,24 @@ impl Heap {
 /// This function is used to initialize the linked-list allocator heap.
 /// It is either called by the `init` function or when the heap is first used.
 fn init_inner_heap() -> linked_list_allocator::Heap {
+    // Check if homebrew loader provided a heap override
+    //
+    // SAFETY: envHasHeapOverride is an FFI function provided by libnx runtime that is always
+    // safe to call after envSetup has been executed (which happens before any allocations).
+    if unsafe { envHasHeapOverride() } {
+        // SAFETY: envGetHeapOverrideAddr is safe to call when envHasHeapOverride returns true.
+        // The libnx runtime guarantees the returned pointer is valid for the duration of the process.
+        let heap_addr = unsafe { envGetHeapOverrideAddr() };
+
+        // SAFETY: envGetHeapOverrideSize is safe to call when envHasHeapOverride returns true.
+        // The libnx runtime guarantees the returned size matches the heap override region.
+        let heap_size = unsafe { envGetHeapOverrideSize() } as usize;
+
+        // SAFETY: The homebrew loader guarantees this region is valid and owned by us.
+        return unsafe { linked_list_allocator::Heap::new(heap_addr as *mut u8, heap_size) };
+    }
+
+    // No heap override - allocate via SVC
     // Default heap size if not specified (0x2000000 * 16)
     const DEFAULT_HEAP_SIZE: usize = 0x2_000_000 * 16;
     const HEAP_SIZE_ALIGN: usize = 0x200_000;
@@ -82,6 +120,6 @@ fn init_inner_heap() -> linked_list_allocator::Heap {
         }
     };
 
-    // Safety: The kernel guarantees this region is valid and owned by us
+    // SAFETY: The kernel guarantees this region is valid and owned by us.
     unsafe { linked_list_allocator::Heap::new(heap_bottom as *mut u8, heap_size) }
 }
