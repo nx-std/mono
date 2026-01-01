@@ -292,7 +292,7 @@ unsafe extern "C" fn __nx_sys_mem__tmem_close(t: *mut TransferMemory) -> u32 {
 
     // If mapped, unmap first.
     if !tm.map_addr.is_null() {
-        let rc = unsafe { __nx_tmem_unmap(t.as_ptr()) };
+        let rc = unsafe { __nx_sys_mem__tmem_unmap(t.as_ptr()) };
         if rc != 0 {
             return rc;
         }

@@ -182,7 +182,7 @@ unsafe extern "C" fn __nx_sys_mem__shmem_close(s: *mut SharedMemory) -> u32 {
 
     // If mapped, unmap first.
     if !sm.map_addr.is_null() {
-        let rc = unsafe { __nx_shmem_unmap(s.as_ptr()) };
+        let rc = unsafe { __nx_sys_mem__shmem_unmap(s.as_ptr()) };
         if rc != 0 {
             return rc;
         }
