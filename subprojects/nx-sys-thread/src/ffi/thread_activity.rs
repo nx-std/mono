@@ -10,7 +10,7 @@ use crate::thread_impl as sys;
 ///
 /// The caller must ensure that `t` points to a valid [`Thread`] instance.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_thread_start(t: *const sys::Thread) -> u32 {
+pub unsafe extern "C" fn __nx_sys_thread__thread_start(t: *const sys::Thread) -> u32 {
     // SAFETY: The caller must ensure that `t` is non-null.
     let thread = unsafe { &*t };
 
@@ -23,7 +23,7 @@ pub unsafe extern "C" fn __nx_sys_thread_start(t: *const sys::Thread) -> u32 {
 ///
 /// The caller must ensure that `t` points to a valid [`Thread`] instance.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_thread_pause(t: *const sys::Thread) -> u32 {
+pub unsafe extern "C" fn __nx_sys_thread__thread_pause(t: *const sys::Thread) -> u32 {
     // SAFETY: The caller must ensure that `t` is non-null.
     let thread = unsafe { &*t };
 
@@ -36,7 +36,7 @@ pub unsafe extern "C" fn __nx_sys_thread_pause(t: *const sys::Thread) -> u32 {
 ///
 /// The caller must ensure that `t` points to a valid [`Thread`] instance.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_thread_resume(t: *const sys::Thread) -> u32 {
+pub unsafe extern "C" fn __nx_sys_thread__thread_resume(t: *const sys::Thread) -> u32 {
     // SAFETY: The caller must ensure that `t` is non-null.
     let thread = unsafe { &*t };
 

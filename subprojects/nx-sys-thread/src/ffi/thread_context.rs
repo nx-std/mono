@@ -20,7 +20,7 @@ use crate::thread_impl as sys;
 /// * `ctx` must be non-null and point to writable memory large enough to hold
 ///   a [`Context`] structure.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_thread_dump_context(
+pub unsafe extern "C" fn __nx_sys_thread__thread_dump_context(
     ctx: *mut Context,
     t: *const sys::Thread,
 ) -> u32 {

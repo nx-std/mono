@@ -18,7 +18,7 @@ use crate::thread_impl as sys;
 /// * `t` must be non-null and point to a valid [`Thread`] instance.
 /// * The pointed-to thread must outlive this call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_thread_wait_for_exit(t: *const sys::Thread) -> u32 {
+pub unsafe extern "C" fn __nx_sys_thread__thread_wait_for_exit(t: *const sys::Thread) -> u32 {
     // SAFETY: The caller is responsible for ensuring `t` is non-null and valid.
     let thread = unsafe { &*t };
 

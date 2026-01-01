@@ -17,7 +17,7 @@ use crate::thread_impl as sys;
 /// 2. The caller must ensure that no mutable references coexist with shared
 ///    references derived from this pointer, upholding Rust's aliasing rules.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sys_thread_get_self() -> *mut sys::Thread {
+unsafe extern "C" fn __nx_sys_thread__thread_get_self() -> *mut sys::Thread {
     sys::get_current_thread_info_ptr()
 }
 
@@ -31,6 +31,6 @@ unsafe extern "C" fn __nx_sys_thread_get_self() -> *mut sys::Thread {
 /// after the thread has exited is undefined behaviour, but callers typically
 /// treat it as an opaque token and hand it to kernel services.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sys_thread_get_cur_handle() -> RawHandle {
+unsafe extern "C" fn __nx_sys_thread__thread_get_cur_handle() -> RawHandle {
     sys::get_current_thread_handle().to_raw()
 }
