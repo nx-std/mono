@@ -413,7 +413,7 @@ typedef struct {
  * @return Result code.
  * @note Syscall number 0x01.
  */
-Result __nx_svc_set_heap_size(void** out_addr, u64 size);
+Result __nx_svc__svc__svc_set_heap_size(void** out_addr, u64 size);
 
 /**
  * @brief Set the memory permissions of a (page-aligned) range of memory.
@@ -425,7 +425,7 @@ Result __nx_svc_set_heap_size(void** out_addr, u64 size);
  *         This can be used to move back and forth between Perm_None, Perm_R and Perm_Rw.
  * @note Syscall number 0x02.
  */
-Result __nx_svc_set_memory_permission(void* addr, u64 size, u32 perm);
+Result __nx_svc__svc__svc_set_memory_permission(void* addr, u64 size, u32 perm);
 
 /**
  * @brief Set the memory attributes of a (page-aligned) range of memory.
@@ -437,7 +437,7 @@ Result __nx_svc_set_memory_permission(void* addr, u64 size, u32 perm);
  * @remark See <a href="https://switchbrew.org/wiki/SVC#svcSetMemoryAttribute">switchbrew.org Wiki</a> for more details.
  * @note Syscall number 0x03.
  */
-Result __nx_svc_set_memory_attribute(void* addr, u64 size, u32 val0, u32 val1);
+Result __nx_svc__svc__svc_set_memory_attribute(void* addr, u64 size, u32 val0, u32 val1);
 
 /**
  * @brief Maps a memory range into a different range. Mainly used for adding guard pages around stack.
@@ -448,7 +448,7 @@ Result __nx_svc_set_memory_attribute(void* addr, u64 size, u32 val0, u32 val1);
  * @return Result code.
  * @note Syscall number 0x04.
  */
-Result __nx_svc_map_memory(void* dst_addr, void* src_addr, u64 size);
+Result __nx_svc__svc_map_memory(void* dst_addr, void* src_addr, u64 size);
 
 /**
  * @brief Unmaps a region that was previously mapped with \ref svcMapMemory.
@@ -458,7 +458,7 @@ Result __nx_svc_map_memory(void* dst_addr, void* src_addr, u64 size);
  * @return Result code.
  * @note Syscall number 0x05.
  */
-Result __nx_svc_unmap_memory(void* dst_addr, void* src_addr, u64 size);
+Result __nx_svc__svc_unmap_memory(void* dst_addr, void* src_addr, u64 size);
 
 ///**
 // * @brief Query information about an address. Will always fetch the lowest page-aligned mapping that contains the provided address.
@@ -468,7 +468,7 @@ Result __nx_svc_unmap_memory(void* dst_addr, void* src_addr, u64 size);
 // * @return Result code.
 // * @note Syscall number 0x06.
 // */
-Result __nx_svc_query_memory(MemoryInfo* meminfo_ptr, u32 *pageinfo, u64 addr);
+Result __nx_svc__svc_query_memory(MemoryInfo* meminfo_ptr, u32 *pageinfo, u64 addr);
 
 ///@}
 
@@ -480,69 +480,69 @@ Result __nx_svc_query_memory(MemoryInfo* meminfo_ptr, u32 *pageinfo, u64 addr);
  * @note Syscall number 0x07.
  */
 
-void NX_NORETURN __nx_svc_exit_process(void);
+void NX_NORETURN __nx_svc__svc_exit_process(void);
 
 /**
  * @brief Creates a thread.
  * @return Result code.
  * @note Syscall number 0x08.
  */
-Result __nx_svc_create_thread(Handle* out, void* entry, void* arg, void* stack_top, int prio, int cpuid);
+Result __nx_svc__svc_create_thread(Handle* out, void* entry, void* arg, void* stack_top, int prio, int cpuid);
 
 /**
  * @brief Starts a freshly created thread.
  * @return Result code.
  * @note Syscall number 0x09.
  */
-Result __nx_svc_start_thread(Handle handle);
+Result __nx_svc__svc_start_thread(Handle handle);
 
 /**
  * @brief Exits the current thread.
  * @note Syscall number 0x0A.
  */
-void NX_NORETURN __nx_svc_exit_thread(void);
+void NX_NORETURN __nx_svc__svc_exit_thread(void);
 
 /**
  * @brief Sleeps the current thread for the specified amount of time.
  * @param[in] nano Number of nanoseconds to sleep, or \ref YieldType for yield.
  * @note Syscall number 0x0B.
  */
-void __nx_svc_sleep_thread(s64 nano);
+void __nx_svc__svc_sleep_thread(s64 nano);
 
 /**
  * @brief Gets a thread's priority.
  * @return Result code.
  * @note Syscall number 0x0C.
  */
-Result __nx_svc_get_thread_priority(s32* priority, Handle handle);
+Result __nx_svc__svc_get_thread_priority(s32* priority, Handle handle);
 
 /**
  * @brief Sets a thread's priority.
  * @return Result code.
  * @note Syscall number 0x0D.
  */
-Result __nx_svc_set_thread_priority(Handle handle, u32 priority);
+Result __nx_svc__svc_set_thread_priority(Handle handle, u32 priority);
 
 /**
  * @brief Gets a thread's core mask.
  * @return Result code.
  * @note Syscall number 0x0E.
  */
-Result __nx_svc_get_thread_core_mask(s32* preferred_core, u64* affinity_mask, Handle handle);
+Result __nx_svc__svc_get_thread_core_mask(s32* preferred_core, u64* affinity_mask, Handle handle);
 
 /**
  * @brief Sets a thread's core mask.
  * @return Result code.
  * @note Syscall number 0x0F.
  */
-Result __nx_svc_set_thread_core_mask(Handle handle, s32 preferred_core, u32 affinity_mask);
+Result __nx_svc__svc_set_thread_core_mask(Handle handle, s32 preferred_core, u32 affinity_mask);
 
 /**
  * @brief Gets the current processor's number.
  * @return The current processor's number.
  * @note Syscall number 0x10.
  */
-u32 __nx_svc_get_current_processor_number(void);
+u32 __nx_svc__svc_get_current_processor_number(void);
 
 ///@}
 
@@ -554,14 +554,14 @@ u32 __nx_svc_get_current_processor_number(void);
  * @return Result code.
  * @note Syscall number 0x11.
  */
-Result __nx_svc_signal_event(Handle handle);
+Result __nx_svc__svc_signal_event(Handle handle);
 
 /**
  * @brief Clears an event's signalled status.
  * @return Result code.
  * @note Syscall number 0x12.
  */
-Result __nx_svc_clear_event(Handle handle);
+Result __nx_svc__svc_clear_event(Handle handle);
 
 ///@}
 
@@ -573,21 +573,21 @@ Result __nx_svc_clear_event(Handle handle);
  * @return Result code.
  * @note Syscall number 0x13.
  */
-Result __nx_svc_map_shared_memory(Handle handle, void* addr, size_t size, u32 perm);
+Result __nx_svc__svc_map_shared_memory(Handle handle, void* addr, size_t size, u32 perm);
 
 /**
  * @brief Unmaps a block of shared memory.
  * @return Result code.
  * @note Syscall number 0x14.
  */
-Result __nx_svc_unmap_shared_memory(Handle handle, void* addr, size_t size);
+Result __nx_svc__svc_unmap_shared_memory(Handle handle, void* addr, size_t size);
 
 /**
  * @brief Creates a block of transfer memory.
  * @return Result code.
  * @note Syscall number 0x15.
  */
-Result __nx_svc_create_transfer_memory(Handle* out, void* addr, size_t size, u32 perm);
+Result __nx_svc__svc_create_transfer_memory(Handle* out, void* addr, size_t size, u32 perm);
 
 ///@}
 
@@ -601,7 +601,7 @@ Result __nx_svc_create_transfer_memory(Handle* out, void* addr, size_t size, u32
  * @return Result code.
  * @note Syscall number 0x16.
  */
-Result __nx_svc_close_handle(Handle handle);
+Result __nx_svc__svc_close_handle(Handle handle);
 
 ///@}
 
@@ -613,7 +613,7 @@ Result __nx_svc_close_handle(Handle handle);
  * @return Result code.
  * @note Syscall number 0x17.
  */
-Result __nx_svc_reset_signal(Handle handle);
+Result __nx_svc__svc_reset_signal(Handle handle);
 
 ///@}
 
@@ -627,41 +627,41 @@ Result __nx_svc_reset_signal(Handle handle);
  * @note \p handleCount must not be greater than \ref MAX_WAIT_OBJECTS. This is a Horizon kernel limitation.
  * @note This is the raw syscall, which can be cancelled by \ref svcCancelSynchronization or other means. \ref waitHandles or \ref waitMultiHandle should normally be used instead.
  */
-Result __nx_svc_wait_synchronization(s32* index, const Handle* handles, s32 handleCount, u64 timeout);
+Result __nx_svc__svc_wait_synchronization(s32* index, const Handle* handles, s32 handleCount, u64 timeout);
 
 /**
  * @brief Waits a \ref svcWaitSynchronization operation being done on a synchronization object in another thread.
  * @return Result code.
  * @note Syscall number 0x19.
  */
-Result __nx_svc_cancel_synchronization(Handle thread);
+Result __nx_svc__svc_cancel_synchronization(Handle thread);
 
 /**
  * @brief Arbitrates a mutex lock operation in userspace.
  * @return Result code.
  * @note Syscall number 0x1A.
  */
-Result __nx_svc_arbitrate_lock(u32 wait_tag, u32* tag_location, u32 self_tag);
+Result __nx_svc__svc_arbitrate_lock(u32 wait_tag, u32* tag_location, u32 self_tag);
 
 /**
  * @brief Arbitrates a mutex unlock operation in userspace.
  * @return Result code.
  * @note Syscall number 0x1B.
  */
-Result __nx_svc_arbitrate_unlock(u32* tag_location);
+Result __nx_svc__svc_arbitrate_unlock(u32* tag_location);
 
 /**
  * @brief Performs a condition variable wait operation in userspace.
  * @return Result code.
  * @note Syscall number 0x1C.
  */
-Result __nx_svc_wait_process_wide_key_atomic(u32* key, u32* tag_location, u32 self_tag, u64 timeout);
+Result __nx_svc__svc_wait_process_wide_key_atomic(u32* key, u32* tag_location, u32 self_tag, u64 timeout);
 
 /**
  * @brief Performs a condition variable wake-up operation in userspace.
  * @note Syscall number 0x1D.
  */
-void __nx_svc_signal_process_wide_key(u32* key, s32 num);
+void __nx_svc__svc_signal_process_wide_key(u32* key, s32 num);
 
 ///@}
 
@@ -673,7 +673,7 @@ void __nx_svc_signal_process_wide_key(u32* key, s32 num);
  * @return The current system tick.
  * @note Syscall number 0x1E.
  */
-u64 __nx_svc_get_system_tick(void);
+u64 __nx_svc__svc_get_system_tick(void);
 
 ///@}
 
@@ -685,21 +685,21 @@ u64 __nx_svc_get_system_tick(void);
  * @return Result code.
  * @note Syscall number 0x1F.
  */
-Result __nx_svc_connect_to_named_port(Handle* session, const char* name);
+Result __nx_svc__svc_connect_to_named_port(Handle* session, const char* name);
 
 /**
  * @brief Sends a light IPC synchronization request to a session.
  * @return Result code.
  * @note Syscall number 0x20.
  */
-Result __nx_svc_send_sync_request_light(Handle session);
+Result __nx_svc__svc_send_sync_request_light(Handle session);
 
 /**
  * @brief Sends an IPC synchronization request to a session.
  * @return Result code.
  * @note Syscall number 0x21.
  */
-Result __nx_svc_send_sync_request(Handle session);
+Result __nx_svc__svc_send_sync_request(Handle session);
 
 /**
  * @brief Sends an IPC synchronization request to a session from an user allocated buffer.
@@ -707,7 +707,7 @@ Result __nx_svc_send_sync_request(Handle session);
  * @remark size must be allocated to 0x1000 bytes.
  * @note Syscall number 0x22.
  */
-Result __nx_svc_send_sync_request_with_user_buffer(void* usrBuffer, u64 size, Handle session);
+Result __nx_svc__svc_send_sync_request_with_user_buffer(void* usrBuffer, u64 size, Handle session);
 
 /**
  * @brief Sends an IPC synchronization request to a session from an user allocated buffer (asynchronous version).
@@ -715,7 +715,7 @@ Result __nx_svc_send_sync_request_with_user_buffer(void* usrBuffer, u64 size, Ha
  * @remark size must be allocated to 0x1000 bytes.
  * @note Syscall number 0x23.
  */
-Result __nx_svc_send_async_request_with_user_buffer(Handle* handle, void* usrBuffer, u64 size, Handle session);
+Result __nx_svc__svc_send_async_request_with_user_buffer(Handle* handle, void* usrBuffer, u64 size, Handle session);
 
 ///@}
 
@@ -727,14 +727,14 @@ Result __nx_svc_send_async_request_with_user_buffer(Handle* handle, void* usrBuf
  * @return Result code.
  * @note Syscall number 0x24.
  */
-Result __nx_svc_get_process_id(u64 *processID, Handle handle);
+Result __nx_svc__svc_get_process_id(u64 *processID, Handle handle);
 
 /**
  * @brief Gets the TID associated with a process.
  * @return Result code.
  * @note Syscall number 0x25.
  */
-Result __nx_svc_get_thread_id(u64 *threadID, Handle handle);
+Result __nx_svc__svc_get_thread_id(u64 *threadID, Handle handle);
 
 ///@}
 
@@ -749,7 +749,7 @@ Result __nx_svc_get_thread_id(u64 *threadID, Handle handle);
  * @return Result code.
  * @note Syscall number 0x26.
  */
-Result __nx_svc_break(u32 breakReason, uintptr_t address, uintptr_t size);
+Result __nx_svc__svc_break(u32 breakReason, uintptr_t address, uintptr_t size);
 
 ///@}
 
@@ -763,7 +763,7 @@ Result __nx_svc_break(u32 breakReason, uintptr_t address, uintptr_t size);
  * @return Result code.
  * @note Syscall number 0x27.
  */
-Result __nx_svc_output_debug_string(const char *str, u64 size);
+Result __nx_svc__svc_output_debug_string(const char *str, u64 size);
 
 ///@}
 
@@ -775,7 +775,7 @@ Result __nx_svc_output_debug_string(const char *str, u64 size);
  * @param[in] res Result code.
  * @note Syscall number 0x28.
  */
-void NX_NORETURN __nx_svc_return_from_exception(Result res);
+void NX_NORETURN __nx_svc__svc_return_from_exception(Result res);
 
 /**
  * @brief Retrieves information about the system, or a certain kernel object.
@@ -787,7 +787,7 @@ void NX_NORETURN __nx_svc_return_from_exception(Result res);
  * @remark The full list of property IDs can be found on the <a href="https://switchbrew.org/wiki/SVC#svcGetInfo">switchbrew.org wiki</a>.
  * @note Syscall number 0x29.
  */
-Result __nx_svc_get_info(u64* out, u32 id0, Handle handle, u64 id1);
+Result __nx_svc__svc_get_info(u64* out, u32 id0, Handle handle, u64 id1);
 
 ///@}
 
@@ -800,7 +800,7 @@ Result __nx_svc_get_info(u64* out, u32 id0, Handle handle, u64 id1);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning This syscall is dangerous, and should not be used.
  */
-void __nx_svc_flush_entire_data_cache(void);
+void __nx_svc__svc_flush_entire_data_cache(void);
 
 /**
  * @brief Flushes data cache for a virtual address range.
@@ -809,7 +809,7 @@ void __nx_svc_flush_entire_data_cache(void);
  * @remark armDCacheFlush should be used instead of this syscall whenever possible.
  * @note Syscall number 0x2B.
  */
-Result __nx_svc_flush_data_cache(void *address, size_t size);
+Result __nx_svc__svc_flush_data_cache(void *address, size_t size);
 
 ///@}
 
@@ -821,14 +821,14 @@ Result __nx_svc_flush_data_cache(void *address, size_t size);
  * @return Result code.
  * @note Syscall number 0x2C.
  */
-Result __nx_svc_map_physical_memory(void *address, u64 size);
+Result __nx_svc__svc_map_physical_memory(void *address, u64 size);
 
 /**
  * @brief Undoes the effects of \ref svcMapPhysicalMemory. [3.0.0+]
  * @return Result code.
  * @note Syscall number 0x2D.
  */
-Result __nx_svc_unmap_physical_memory(void *address, u64 size);
+Result __nx_svc__svc_unmap_physical_memory(void *address, u64 size);
 
 ///@}
 
@@ -845,7 +845,7 @@ Result __nx_svc_unmap_physical_memory(void *address, u64 size);
  * @note Syscall number 0x2E.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_debug_future_thread_info(LastThreadContext *_out_context, u64 *out_thread_id, Handle debug, s64 ns);
+Result __nx_svc__svc_get_debug_future_thread_info(LastThreadContext *_out_context, u64 *out_thread_id, Handle debug, s64 ns);
 
 /**
  * @brief Gets information about the previously-scheduled thread.
@@ -855,7 +855,7 @@ Result __nx_svc_get_debug_future_thread_info(LastThreadContext *_out_context, u6
  * @return Result code.
  * @note Syscall number 0x2F.
  */
-Result __nx_svc_get_last_thread_info(LastThreadContext *_out_context, u64 *out_tls_address, u32 *out_flags);
+Result __nx_svc__svc_get_last_thread_info(LastThreadContext *_out_context, u64 *out_tls_address, u32 *out_flags);
 
 ///@}
 
@@ -868,7 +868,7 @@ Result __nx_svc_get_last_thread_info(LastThreadContext *_out_context, u64 *out_t
  * @note Syscall number 0x30.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_resource_limit_limit_value(s64 *out, Handle reslimit_h, LimitableResource which);
+Result __nx_svc__svc_get_resource_limit_limit_value(s64 *out, Handle reslimit_h, LimitableResource which);
 
 /**
  * @brief Gets the maximum value a LimitableResource can have, for a Resource Limit handle.
@@ -876,7 +876,7 @@ Result __nx_svc_get_resource_limit_limit_value(s64 *out, Handle reslimit_h, Limi
  * @note Syscall number 0x31.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_resource_limit_current_value(s64 *out, Handle reslimit_h, LimitableResource which);
+Result __nx_svc__svc_get_resource_limit_current_value(s64 *out, Handle reslimit_h, LimitableResource which);
 
 ///@}
 
@@ -888,7 +888,7 @@ Result __nx_svc_get_resource_limit_current_value(s64 *out, Handle reslimit_h, Li
  * @return Result code.
  * @note Syscall number 0x32.
  */
-Result __nx_svc_set_thread_activity(Handle thread, ThreadActivity paused);
+Result __nx_svc__svc_set_thread_activity(Handle thread, ThreadActivity paused);
 
 /**
  * @brief Dumps the registers of a thread paused by @ref svcSetThreadActivity (register groups: all).
@@ -898,7 +898,7 @@ Result __nx_svc_set_thread_activity(Handle thread, ThreadActivity paused);
  * @note Syscall number 0x33.
  * @warning Official kernel will not dump x0..x18 if the thread is currently executing a system call, and prior to 6.0.0 doesn't dump TPIDR_EL0.
  */
-Result __nx_svc_get_thread_context3(ThreadContext* ctx, Handle thread);
+Result __nx_svc__svc_get_thread_context3(ThreadContext* ctx, Handle thread);
 
 ///@}
 
@@ -914,7 +914,7 @@ Result __nx_svc_get_thread_context3(ThreadContext* ctx, Handle thread);
  * @return Result code.
  * @note Syscall number 0x34.
  */
-Result __nx_svc_wait_for_address(void *address, u32 arb_type, s64 value, s64 timeout);
+Result __nx_svc__svc_wait_for_address(void *address, u32 arb_type, s64 value, s64 timeout);
 
 /**
  * @brief Signals (and updates) an address depending on type and value. [4.0.0+]
@@ -925,7 +925,7 @@ Result __nx_svc_wait_for_address(void *address, u32 arb_type, s64 value, s64 tim
  * @return Result code.
  * @note Syscall number 0x35.
  */
-Result __nx_svc_signal_to_address(void *address, u32 signal_type, s32 value, s32 count);
+Result __nx_svc__svc_signal_to_address(void *address, u32 signal_type, s32 value, s32 count);
 
 ///@}
 
@@ -936,7 +936,7 @@ Result __nx_svc_signal_to_address(void *address, u32 signal_type, s32 value, s32
  * @brief Sets thread preemption state (used during abort/panic). [8.0.0+]
  * @note Syscall number 0x36.
  */
-void __nx_svc_synchronize_preemption_state(void);
+void __nx_svc__svc_synchronize_preemption_state(void);
 
 ///@}
 
@@ -949,7 +949,7 @@ void __nx_svc_synchronize_preemption_state(void);
  * @note Syscall number 0x37.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_resource_limit_peak_value(s64 *out, Handle reslimit_h, LimitableResource which);
+Result __nx_svc__svc_get_resource_limit_peak_value(s64 *out, Handle reslimit_h, LimitableResource which);
 
 ///@}
 
@@ -962,7 +962,7 @@ Result __nx_svc_get_resource_limit_peak_value(s64 *out, Handle reslimit_h, Limit
  * @note Syscall number 0x39.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_io_pool(Handle *out_handle, u32 pool_type);
+Result __nx_svc__svc_create_io_pool(Handle *out_handle, u32 pool_type);
 
 /**
  * @brief Creates an IO Region. [13.0.0+]
@@ -970,7 +970,7 @@ Result __nx_svc_create_io_pool(Handle *out_handle, u32 pool_type);
  * @note Syscall number 0x3A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_io_region(Handle *out_handle, Handle io_pool_h, u64 physical_address, u64 size, u32 memory_mapping, u32 perm);
+Result __nx_svc__svc_create_io_region(Handle *out_handle, Handle io_pool_h, u64 physical_address, u64 size, u32 memory_mapping, u32 perm);
 
 ///@}
 
@@ -983,7 +983,7 @@ Result __nx_svc_create_io_region(Handle *out_handle, Handle io_pool_h, u64 physi
  * @note Syscall number 0x3C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-void __nx_svc_dump_info(u32 dump_info_type, u64 arg0);
+void __nx_svc__svc_dump_info(u32 dump_info_type, u64 arg0);
 
 /**
  * @brief Performs a debugging operation on the kernel. [4.0.0+]
@@ -994,7 +994,7 @@ void __nx_svc_dump_info(u32 dump_info_type, u64 arg0);
  * @note Syscall number 0x3C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-void __nx_svc_kernel_debug(u32 kern_debug_type, u64 arg0, u64 arg1, u64 arg2);
+void __nx_svc__svc_kernel_debug(u32 kern_debug_type, u64 arg0, u64 arg1, u64 arg2);
 
 /**
  * @brief Performs a debugging operation on the kernel. [4.0.0+]
@@ -1002,7 +1002,7 @@ void __nx_svc_kernel_debug(u32 kern_debug_type, u64 arg0, u64 arg1, u64 arg2);
  * @note Syscall number 0x3D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-void __nx_svc_change_kernel_trace_state(u32 kern_trace_state);
+void __nx_svc__svc_change_kernel_trace_state(u32 kern_trace_state);
 
 ///@}
                                                                                                                                                                                                                       \
@@ -1015,7 +1015,7 @@ void __nx_svc_change_kernel_trace_state(u32 kern_trace_state);
  * @note Syscall number 0x40.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_session(Handle *server_handle, Handle *client_handle, u32 unk0, u64 unk1);//unk* are normally 0?
+Result __nx_svc__svc_create_session(Handle *server_handle, Handle *client_handle, u32 unk0, u64 unk1);//unk* are normally 0?
 
 /**
  * @brief Accepts an IPC session.
@@ -1023,7 +1023,7 @@ Result __nx_svc_create_session(Handle *server_handle, Handle *client_handle, u32
  * @note Syscall number 0x41.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_accept_session(Handle *session_handle, Handle port_handle);
+Result __nx_svc__svc_accept_session(Handle *session_handle, Handle port_handle);
 
 /**
  * @brief Performs light IPC input/output.
@@ -1032,7 +1032,7 @@ Result __nx_svc_accept_session(Handle *session_handle, Handle port_handle);
  * @note Syscall number 0x42.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_reply_and_receive_light(Handle handle);
+Result __nx_svc__svc_reply_and_receive_light(Handle handle);
 
 /**
  * @brief Performs IPC input/output.
@@ -1040,7 +1040,7 @@ Result __nx_svc_reply_and_receive_light(Handle handle);
  * @note Syscall number 0x43.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_reply_and_receive(s32* index, const Handle* handles, s32 handleCount, Handle replyTarget, u64 timeout);
+Result __nx_svc__svc_reply_and_receive(s32* index, const Handle* handles, s32 handleCount, Handle replyTarget, u64 timeout);
 
 /**
  * @brief Performs IPC input/output from an user allocated buffer.
@@ -1048,7 +1048,7 @@ Result __nx_svc_reply_and_receive(s32* index, const Handle* handles, s32 handleC
  * @note Syscall number 0x44.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_reply_and_receive_with_user_buffer(s32* index, void* usrBuffer, u64 size, const Handle* handles, s32 handleCount, Handle replyTarget, u64 timeout);
+Result __nx_svc__svc_reply_and_receive_with_user_buffer(s32* index, void* usrBuffer, u64 size, const Handle* handles, s32 handleCount, Handle replyTarget, u64 timeout);
 
 ///@}
 
@@ -1061,7 +1061,7 @@ Result __nx_svc_reply_and_receive_with_user_buffer(s32* index, void* usrBuffer, 
  * @note Syscall number 0x45.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_event(Handle* server_handle, Handle* client_handle);
+Result __nx_svc__svc_create_event(Handle* server_handle, Handle* client_handle);
 
 ///@}
 
@@ -1074,7 +1074,7 @@ Result __nx_svc_create_event(Handle* server_handle, Handle* client_handle);
  * @note Syscall number 0x46.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_io_region(Handle io_region_h, void *address, u64 size, u32 perm);
+Result __nx_svc__svc_map_io_region(Handle io_region_h, void *address, u64 size, u32 perm);
 
 /**
  * @brief Undoes the effects of \ref svcMapIoRegion. [13.0.0+]
@@ -1082,7 +1082,7 @@ Result __nx_svc_map_io_region(Handle io_region_h, void *address, u64 size, u32 p
  * @note Syscall number 0x47.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_unmap_io_region(Handle io_region_h, void *address, u64 size);
+Result __nx_svc__svc_unmap_io_region(Handle io_region_h, void *address, u64 size);
 
 /**
  * @brief Maps unsafe memory (usable for GPU DMA) for a system module at the desired address. [5.0.0+]
@@ -1090,7 +1090,7 @@ Result __nx_svc_unmap_io_region(Handle io_region_h, void *address, u64 size);
  * @note Syscall number 0x48.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_physical_memory_unsafe(void *address, u64 size);
+Result __nx_svc__svc_map_physical_memory_unsafe(void *address, u64 size);
 
 /**
  * @brief Undoes the effects of \ref svcMapPhysicalMemoryUnsafe. [5.0.0+]
@@ -1098,7 +1098,7 @@ Result __nx_svc_map_physical_memory_unsafe(void *address, u64 size);
  * @note Syscall number 0x49.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_unmap_physical_memory_unsafe(void *address, u64 size);
+Result __nx_svc__svc_unmap_physical_memory_unsafe(void *address, u64 size);
 
 /**
  * @brief Sets the system-wide limit for unsafe memory mappable using \ref svcMapPhysicalMemoryUnsafe. [5.0.0+]
@@ -1106,7 +1106,7 @@ Result __nx_svc_unmap_physical_memory_unsafe(void *address, u64 size);
  * @note Syscall number 0x4A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_set_unsafe_limit(u64 size);
+Result __nx_svc__svc_set_unsafe_limit(u64 size);
 
 ///@}
 
@@ -1119,7 +1119,7 @@ Result __nx_svc_set_unsafe_limit(u64 size);
  * @note Syscall number 0x4B.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_code_memory(Handle* code_handle, void* src_addr, u64 size);
+Result __nx_svc__svc_create_code_memory(Handle* code_handle, void* src_addr, u64 size);
 
 /**
  * @brief Maps code memory in the caller's address space [4.0.0+].
@@ -1127,7 +1127,7 @@ Result __nx_svc_create_code_memory(Handle* code_handle, void* src_addr, u64 size
  * @note Syscall number 0x4C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_control_code_memory(Handle code_handle, CodeMapOperation op, void* dst_addr, u64 size, u64 perm);
+Result __nx_svc__svc_control_code_memory(Handle code_handle, CodeMapOperation op, void* dst_addr, u64 size, u64 perm);
 
 ///@}
 
@@ -1139,7 +1139,7 @@ Result __nx_svc_control_code_memory(Handle code_handle, CodeMapOperation op, voi
  * @note Syscall number 0x4D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-void __nx_svc_sleep_system(void);
+void __nx_svc__svc_sleep_system(void);
 
 ///@}
 
@@ -1152,7 +1152,7 @@ void __nx_svc_sleep_system(void);
  * @note Syscall number 0x4E.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_read_write_register(u32* outVal, u64 regAddr, u32 rwMask, u32 inVal);
+Result __nx_svc__svc_read_write_register(u32* outVal, u64 regAddr, u32 rwMask, u32 inVal);
 
 ///@}
 
@@ -1165,7 +1165,7 @@ Result __nx_svc_read_write_register(u32* outVal, u64 regAddr, u32 rwMask, u32 in
  * @note Syscall number 0x4F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_set_process_activity(Handle process, ProcessActivity paused);
+Result __nx_svc__svc_set_process_activity(Handle process, ProcessActivity paused);
 
 ///@}
 
@@ -1178,7 +1178,7 @@ Result __nx_svc_set_process_activity(Handle process, ProcessActivity paused);
  * @note Syscall number 0x50.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_shared_memory(Handle* out, size_t size, u32 local_perm, u32 other_perm);
+Result __nx_svc__svc_create_shared_memory(Handle* out, size_t size, u32 local_perm, u32 other_perm);
 
 /**
  * @brief Maps a block of transfer memory.
@@ -1186,7 +1186,7 @@ Result __nx_svc_create_shared_memory(Handle* out, size_t size, u32 local_perm, u
  * @note Syscall number 0x51.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_transfer_memory(Handle tmem_handle, void* addr, size_t size, u32 perm);
+Result __nx_svc__svc_map_transfer_memory(Handle tmem_handle, void* addr, size_t size, u32 perm);
 
 /**
  * @brief Unmaps a block of transfer memory.
@@ -1194,7 +1194,7 @@ Result __nx_svc_map_transfer_memory(Handle tmem_handle, void* addr, size_t size,
  * @note Syscall number 0x52.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_unmap_transfer_memory(Handle tmem_handle, void* addr, size_t size);
+Result __nx_svc__svc_unmap_transfer_memory(Handle tmem_handle, void* addr, size_t size);
 
 ///@}
 
@@ -1207,7 +1207,7 @@ Result __nx_svc_unmap_transfer_memory(Handle tmem_handle, void* addr, size_t siz
  * @note Syscall number 0x53.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_interrupt_event(Handle* handle, u64 irqNum, u32 flag);
+Result __nx_svc__svc_create_interrupt_event(Handle* handle, u64 irqNum, u32 flag);
 
 /**
  * @brief Queries information about a certain virtual address, including its physical address.
@@ -1215,7 +1215,7 @@ Result __nx_svc_create_interrupt_event(Handle* handle, u64 irqNum, u32 flag);
  * @note Syscall number 0x54.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_query_physical_address(PhysicalMemoryInfo *out, u64 virtaddr);
+Result __nx_svc__svc_query_physical_address(PhysicalMemoryInfo *out, u64 virtaddr);
 
 /**
  * @brief Returns a virtual address mapped to a given IO range.
@@ -1224,7 +1224,7 @@ Result __nx_svc_query_physical_address(PhysicalMemoryInfo *out, u64 virtaddr);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [10.0.0+]. For older versions use \ref svcLegacyQueryIoMapping.
  */
-Result __nx_svc_query_memory_mapping(u64* virtaddr, u64* out_size, u64 physaddr, u64 size);
+Result __nx_svc__svc_query_memory_mapping(u64* virtaddr, u64* out_size, u64 physaddr, u64 size);
 
 /**
  * @brief Returns a virtual address mapped to a given IO range.
@@ -1233,7 +1233,7 @@ Result __nx_svc_query_memory_mapping(u64* virtaddr, u64* out_size, u64 physaddr,
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [1.0.0-9.2.0]. For newer versions use \ref svcQueryMemoryMapping.
  */
-Result __nx_svc_legacy_query_io_mapping(u64* virtaddr, u64 physaddr, u64 size);
+Result __nx_svc__svc_legacy_query_io_mapping(u64* virtaddr, u64 physaddr, u64 size);
 
 ///@}
 
@@ -1246,7 +1246,7 @@ Result __nx_svc_legacy_query_io_mapping(u64* virtaddr, u64 physaddr, u64 size);
  * @note Syscall number 0x56.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_device_address_space(Handle *handle, u64 dev_addr, u64 dev_size);
+Result __nx_svc__svc_create_device_address_space(Handle *handle, u64 dev_addr, u64 dev_size);
 
 /**
  * @brief Attaches a device address space to a device.
@@ -1254,7 +1254,7 @@ Result __nx_svc_create_device_address_space(Handle *handle, u64 dev_addr, u64 de
  * @note Syscall number 0x57.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_attach_device_address_space(u64 device, Handle handle);
+Result __nx_svc__svc_attach_device_address_space(u64 device, Handle handle);
 
 /**
  * @brief Detaches a device address space from a device.
@@ -1262,7 +1262,7 @@ Result __nx_svc_attach_device_address_space(u64 device, Handle handle);
  * @note Syscall number 0x58.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_detach_device_address_space(u64 device, Handle handle);
+Result __nx_svc__svc_detach_device_address_space(u64 device, Handle handle);
 
 /**
  * @brief Maps an attached device address space to an userspace address.
@@ -1271,7 +1271,7 @@ Result __nx_svc_detach_device_address_space(u64 device, Handle handle);
  * @note Syscall number 0x59.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_device_address_space_by_force(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
+Result __nx_svc__svc_map_device_address_space_by_force(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
 
 /**
  * @brief Maps an attached device address space to an userspace address.
@@ -1280,7 +1280,7 @@ Result __nx_svc_map_device_address_space_by_force(Handle handle, Handle proc_han
  * @note Syscall number 0x5A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_device_address_space_aligned(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
+Result __nx_svc__svc_map_device_address_space_aligned(Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 option);
 
 /**
  * @brief Maps an attached device address space to an userspace address. [1.0.0-12.1.0]
@@ -1289,7 +1289,7 @@ Result __nx_svc_map_device_address_space_aligned(Handle handle, Handle proc_hand
  * @note Syscall number 0x5B.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_device_address_space(u64 *out_mapped_size, Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 perm);
+Result __nx_svc__svc_map_device_address_space(u64 *out_mapped_size, Handle handle, Handle proc_handle, u64 map_addr, u64 dev_size, u64 dev_addr, u32 perm);
 
 /**
  * @brief Unmaps an attached device address space from an userspace address.
@@ -1297,7 +1297,7 @@ Result __nx_svc_map_device_address_space(u64 *out_mapped_size, Handle handle, Ha
  * @note Syscall number 0x5C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_unmap_device_address_space(Handle handle, Handle proc_handle, u64 map_addr, u64 map_size, u64 dev_addr);
+Result __nx_svc__svc_unmap_device_address_space(Handle handle, Handle proc_handle, u64 map_addr, u64 map_size, u64 dev_addr);
 
 ///@}
 
@@ -1311,7 +1311,7 @@ Result __nx_svc_unmap_device_address_space(Handle handle, Handle proc_handle, u6
  * @note Syscall number 0x5D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_invalidate_process_data_cache(Handle process, uintptr_t address, size_t size);
+Result __nx_svc__svc_invalidate_process_data_cache(Handle process, uintptr_t address, size_t size);
 
 /**
  * @brief Stores data cache for a virtual address range within a process.
@@ -1320,7 +1320,7 @@ Result __nx_svc_invalidate_process_data_cache(Handle process, uintptr_t address,
  * @note Syscall number 0x5E.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_store_process_data_cache(Handle process, uintptr_t address, size_t size);
+Result __nx_svc__svc_store_process_data_cache(Handle process, uintptr_t address, size_t size);
 
 /**
  * @brief Flushes data cache for a virtual address range within a process.
@@ -1329,7 +1329,7 @@ Result __nx_svc_store_process_data_cache(Handle process, uintptr_t address, size
  * @note Syscall number 0x5F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_flush_process_data_cache(Handle process, uintptr_t address, size_t size);
+Result __nx_svc__svc_flush_process_data_cache(Handle process, uintptr_t address, size_t size);
 
 ///@}
 
@@ -1342,7 +1342,7 @@ Result __nx_svc_flush_process_data_cache(Handle process, uintptr_t address, size
  * @note Syscall number 0x60.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_debug_active_process(Handle* debug, u64 processID);
+Result __nx_svc__svc_debug_active_process(Handle* debug, u64 processID);
 
 /**
  * @brief Breaks an active debugging session.
@@ -1350,7 +1350,7 @@ Result __nx_svc_debug_active_process(Handle* debug, u64 processID);
  * @note Syscall number 0x61.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_break_debug_process(Handle debug);
+Result __nx_svc__svc_break_debug_process(Handle debug);
 
 /**
  * @brief Terminates the process of an active debugging session.
@@ -1358,7 +1358,7 @@ Result __nx_svc_break_debug_process(Handle debug);
  * @note Syscall number 0x62.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_terminate_debug_process(Handle debug);
+Result __nx_svc__svc_terminate_debug_process(Handle debug);
 
 /**
  * @brief Gets an incoming debug event from a debugging session.
@@ -1366,7 +1366,7 @@ Result __nx_svc_terminate_debug_process(Handle debug);
  * @note Syscall number 0x63.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_debug_event(void* event_out, Handle debug);
+Result __nx_svc__svc_get_debug_event(void* event_out, Handle debug);
 
 /**
  * @brief Continues a debugging session.
@@ -1375,7 +1375,7 @@ Result __nx_svc_get_debug_event(void* event_out, Handle debug);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [3.0.0+]. For older versions use \ref svcLegacyContinueDebugEvent.
  */
-Result __nx_svc_continue_debug_event(Handle debug, u32 flags, u64* tid_list, u32 num_tids);
+Result __nx_svc__svc_continue_debug_event(Handle debug, u32 flags, u64* tid_list, u32 num_tids);
 
 /**
  * @brief Continues a debugging session.
@@ -1384,7 +1384,7 @@ Result __nx_svc_continue_debug_event(Handle debug, u32 flags, u64* tid_list, u32
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [1.0.0-2.3.0]. For newer versions use \ref svcContinueDebugEvent.
  */
-Result __nx_svc_legacy_continue_debug_event(Handle debug, u32 flags, u64 threadID);
+Result __nx_svc__svc_legacy_continue_debug_event(Handle debug, u32 flags, u64 threadID);
 
 ///@}
 
@@ -1397,7 +1397,7 @@ Result __nx_svc_legacy_continue_debug_event(Handle debug, u32 flags, u64 threadI
  * @note Syscall number 0x65.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_process_list(s32 *num_out, u64 *pids_out, u32 max_pids);
+Result __nx_svc__svc_get_process_list(s32 *num_out, u64 *pids_out, u32 max_pids);
 
 /**
  * @brief Retrieves a list of all threads for a debug handle (or zero).
@@ -1405,7 +1405,7 @@ Result __nx_svc_get_process_list(s32 *num_out, u64 *pids_out, u32 max_pids);
  * @note Syscall number 0x66.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_thread_list(s32 *num_out, u64 *tids_out, u32 max_tids, Handle debug);
+Result __nx_svc__svc_get_thread_list(s32 *num_out, u64 *tids_out, u32 max_tids, Handle debug);
 
 ///@}
 
@@ -1423,7 +1423,7 @@ Result __nx_svc_get_thread_list(s32 *num_out, u64 *tids_out, u32 max_tids, Handl
  * @warning Official kernel will not dump any CPU GPR if the thread is currently executing a system call (except @ref svcBreak and @ref svcReturnFromException).
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_debug_thread_context(ThreadContext* ctx, Handle debug, u64 threadID, u32 flags);
+Result __nx_svc__svc_get_debug_thread_context(ThreadContext* ctx, Handle debug, u64 threadID, u32 flags);
 
 /**
  * @brief Gets the context (dump the registers) of a thread in a debugging session.
@@ -1436,7 +1436,7 @@ Result __nx_svc_get_debug_thread_context(ThreadContext* ctx, Handle debug, u64 t
  * @warning Official kernel will return an error if the thread is currently executing a system call (except @ref svcBreak and @ref svcReturnFromException).
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_set_debug_thread_context(Handle debug, u64 threadID, const ThreadContext* ctx, u32 flags);
+Result __nx_svc__svc_set_debug_thread_context(Handle debug, u64 threadID, const ThreadContext* ctx, u32 flags);
 
 /**
  * @brief Queries memory information from a process that is being debugged.
@@ -1444,7 +1444,7 @@ Result __nx_svc_set_debug_thread_context(Handle debug, u64 threadID, const Threa
  * @note Syscall number 0x69.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_query_debug_process_memory(MemoryInfo* meminfo_ptr, u32* pageinfo, Handle debug, u64 addr);
+Result __nx_svc__svc_query_debug_process_memory(MemoryInfo* meminfo_ptr, u32* pageinfo, Handle debug, u64 addr);
 
 /**
  * @brief Reads memory from a process that is being debugged.
@@ -1452,7 +1452,7 @@ Result __nx_svc_query_debug_process_memory(MemoryInfo* meminfo_ptr, u32* pageinf
  * @note Syscall number 0x6A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_read_debug_process_memory(void* buffer, Handle debug, u64 addr, u64 size);
+Result __nx_svc__svc_read_debug_process_memory(void* buffer, Handle debug, u64 addr, u64 size);
 
 /**
  * @brief Writes to memory in a process that is being debugged.
@@ -1460,7 +1460,7 @@ Result __nx_svc_read_debug_process_memory(void* buffer, Handle debug, u64 addr, 
  * @note Syscall number 0x6B.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_write_debug_process_memory(Handle debug, const void* buffer, u64 addr, u64 size);
+Result __nx_svc__svc_write_debug_process_memory(Handle debug, const void* buffer, u64 addr, u64 size);
 
 /**
  * @brief Sets one of the hardware breakpoints.
@@ -1468,7 +1468,7 @@ Result __nx_svc_write_debug_process_memory(Handle debug, const void* buffer, u64
  * @note Syscall number 0x6C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_set_hardware_break_point(u32 which, u64 flags, u64 value);
+Result __nx_svc__svc_set_hardware_break_point(u32 which, u64 flags, u64 value);
 
 /**
  * @brief Gets parameters from a thread in a debugging session.
@@ -1476,7 +1476,7 @@ Result __nx_svc_set_hardware_break_point(u32 which, u64 flags, u64 value);
  * @note Syscall number 0x6D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_debug_thread_param(u64* out_64, u32* out_32, Handle debug, u64 threadID, DebugThreadParam param);
+Result __nx_svc__svc_get_debug_thread_param(u64* out_64, u32* out_32, Handle debug, u64 threadID, DebugThreadParam param);
 
 ///@}
 
@@ -1494,7 +1494,7 @@ Result __nx_svc_get_debug_thread_param(u64* out_64, u32* out_32, Handle debug, u
  * @note Syscall number 0x6F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_system_info(u64* out, u64 id0, Handle handle, u64 id1);
+Result __nx_svc__svc_get_system_info(u64* out, u64 id0, Handle handle, u64 id1);
 
 ///@}
 
@@ -1507,7 +1507,7 @@ Result __nx_svc_get_system_info(u64* out, u64 id0, Handle handle, u64 id1);
  * @note Syscall number 0x70.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_port(Handle* portServer, Handle *portClient, s32 max_sessions, bool is_light, const char* name);
+Result __nx_svc__svc_create_port(Handle* portServer, Handle *portClient, s32 max_sessions, bool is_light, const char* name);
 
 /**
  * @brief Manages a named port.
@@ -1515,7 +1515,7 @@ Result __nx_svc_create_port(Handle* portServer, Handle *portClient, s32 max_sess
  * @note Syscall number 0x71.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_manage_named_port(Handle* portServer, const char* name, s32 maxSessions);
+Result __nx_svc__svc_manage_named_port(Handle* portServer, const char* name, s32 maxSessions);
 
 /**
  * @brief Manages a named port.
@@ -1523,7 +1523,7 @@ Result __nx_svc_manage_named_port(Handle* portServer, const char* name, s32 maxS
  * @note Syscall number 0x72.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_connect_to_port(Handle* session, Handle port);
+Result __nx_svc__svc_connect_to_port(Handle* session, Handle port);
 
 ///@}
 
@@ -1541,7 +1541,7 @@ Result __nx_svc_connect_to_port(Handle* session, Handle port);
  * @note Syscall number 0x73.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_set_process_memory_permission(Handle proc, u64 addr, u64 size, u32 perm);
+Result __nx_svc__svc_set_process_memory_permission(Handle proc, u64 addr, u64 size, u32 perm);
 
 /**
  * @brief Maps the src address from the supplied process handle into the current process.
@@ -1554,7 +1554,7 @@ Result __nx_svc_set_process_memory_permission(Handle proc, u64 addr, u64 size, u
  * @note Syscall number 0x74.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_process_memory(void* dst, Handle proc, u64 src, u64 size);
+Result __nx_svc__svc_map_process_memory(void* dst, Handle proc, u64 src, u64 size);
 
 /**
  * @brief Undoes the effects of \ref svcMapProcessMemory.
@@ -1567,7 +1567,7 @@ Result __nx_svc_map_process_memory(void* dst, Handle proc, u64 src, u64 size);
  * @note Syscall number 0x75.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_unmap_process_memory(void* dst, Handle proc, u64 src, u64 size);
+Result __nx_svc__svc_unmap_process_memory(void* dst, Handle proc, u64 src, u64 size);
 
 /**
  * @brief Equivalent to \ref svcQueryMemory, for another process.
@@ -1579,7 +1579,7 @@ Result __nx_svc_unmap_process_memory(void* dst, Handle proc, u64 src, u64 size);
  * @note Syscall number 0x76.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_query_process_memory(MemoryInfo* meminfo_ptr, u32 *pageinfo, Handle proc, u64 addr);
+Result __nx_svc__svc_query_process_memory(MemoryInfo* meminfo_ptr, u32 *pageinfo, Handle proc, u64 addr);
 
 /**
  * @brief Maps normal heap in a certain process as executable code (used when loading NROs).
@@ -1591,7 +1591,7 @@ Result __nx_svc_query_process_memory(MemoryInfo* meminfo_ptr, u32 *pageinfo, Han
  * @note Syscall number 0x77.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_map_process_code_memory(Handle proc, u64 dst, u64 src, u64 size);
+Result __nx_svc__svc_map_process_code_memory(Handle proc, u64 dst, u64 src, u64 size);
 
 /**
  * @brief Undoes the effects of \ref svcMapProcessCodeMemory.
@@ -1603,7 +1603,7 @@ Result __nx_svc_map_process_code_memory(Handle proc, u64 dst, u64 src, u64 size)
  * @note Syscall number 0x78.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_unmap_process_code_memory(Handle proc, u64 dst, u64 src, u64 size);
+Result __nx_svc__svc_unmap_process_code_memory(Handle proc, u64 dst, u64 src, u64 size);
 
 ///@}
 
@@ -1616,7 +1616,7 @@ Result __nx_svc_unmap_process_code_memory(Handle proc, u64 dst, u64 src, u64 siz
  * @note Syscall number 0x79.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_process(Handle* out, const void* proc_info, const u32* caps, u64 cap_num);
+Result __nx_svc__svc_create_process(Handle* out, const void* proc_info, const u32* caps, u64 cap_num);
 
 /**
  * @brief Starts executing a freshly created process.
@@ -1624,7 +1624,7 @@ Result __nx_svc_create_process(Handle* out, const void* proc_info, const u32* ca
  * @note Syscall number 0x7A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_start_process(Handle proc, s32 main_prio, s32 default_cpu, u32 stack_size);
+Result __nx_svc__svc_start_process(Handle proc, s32 main_prio, s32 default_cpu, u32 stack_size);
 
 /**
  * @brief Terminates a running process.
@@ -1632,7 +1632,7 @@ Result __nx_svc_start_process(Handle proc, s32 main_prio, s32 default_cpu, u32 s
  * @note Syscall number 0x7B.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_terminate_process(Handle proc);
+Result __nx_svc__svc_terminate_process(Handle proc);
 
 /**
  * @brief Gets a \ref ProcessInfoType for a process.
@@ -1640,7 +1640,7 @@ Result __nx_svc_terminate_process(Handle proc);
  * @note Syscall number 0x7C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_get_process_info(s64 *out, Handle proc, ProcessInfoType which);
+Result __nx_svc__svc_get_process_info(s64 *out, Handle proc, ProcessInfoType which);
 
 ///@}
 
@@ -1653,7 +1653,7 @@ Result __nx_svc_get_process_info(s64 *out, Handle proc, ProcessInfoType which);
  * @note Syscall number 0x7D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_create_resource_limit(Handle* out);
+Result __nx_svc__svc_create_resource_limit(Handle* out);
 
 /**
  * @brief Sets the value for a \ref LimitableResource for a Resource Limit handle.
@@ -1661,7 +1661,7 @@ Result __nx_svc_create_resource_limit(Handle* out);
  * @note Syscall number 0x7E.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result __nx_svc_set_resource_limit_limit_value(Handle reslimit, LimitableResource which, u64 value);
+Result __nx_svc__svc_set_resource_limit_limit_value(Handle reslimit, LimitableResource which, u64 value);
 
 ///@}
 
@@ -1674,7 +1674,7 @@ Result __nx_svc_set_resource_limit_limit_value(Handle reslimit, LimitableResourc
  * @note Syscall number 0x7F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-void __nx_svc_call_secure_monitor(SecmonArgs* regs);
+void __nx_svc__svc_call_secure_monitor(SecmonArgs* regs);
 
 ///@}
 
@@ -1686,14 +1686,14 @@ void __nx_svc_call_secure_monitor(SecmonArgs* regs);
  * @return Result code.
  * @note Syscall number 0x90.
  */
-Result __nx_svc_map_insecure_physical_memory(void *address, u64 size);
+Result __nx_svc__svc_map_insecure_physical_memory(void *address, u64 size);
 
 /**
  * @brief Undoes the effects of \ref svcMapInsecureMemory. [15.0.0+]
  * @return Result code.
  * @note Syscall number 0x91.
  */
-Result __nx_svc_unmap_insecure_physical_memory(void *address, u64 size);
+Result __nx_svc__svc_unmap_insecure_physical_memory(void *address, u64 size);
 
 ///@}
 

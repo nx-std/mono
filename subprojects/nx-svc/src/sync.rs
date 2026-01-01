@@ -26,7 +26,7 @@ pub const HANDLE_WAIT_MASK: u32 = 0x40000000;
 /// | IN | _curr_thread_handle_ | The current thread's kernel handle requesting the lock. |
 ///
 /// # Behavior
-/// This function calls the [`__nx_svc_arbitrate_lock`] syscall with the provided arguments.
+/// This function calls the [`__nx_svc__svc_arbitrate_lock`] syscall with the provided arguments.
 ///
 /// Then the kernel will:
 /// 1. Validate the current thread's state and memory access
@@ -102,7 +102,7 @@ pub enum ArbitrateLockError {
 /// | IN | _mutex_ | Pointer to the mutex tag value in userspace memory. |
 ///
 /// # Behavior
-/// This function calls the [`__nx_svc_arbitrate_unlock`] syscall with the provided arguments.
+/// This function calls the [`__nx_svc__svc_arbitrate_unlock`] syscall with the provided arguments.
 ///
 /// Then the kernel will:
 /// 1. Validate the current thread's state and memory access
@@ -160,7 +160,7 @@ pub enum ArbitrateUnlockError {
 /// | IN | _timeout_ns_ | Timeout in nanoseconds. Use 0 for no timeout, -1 for infinite wait. |
 ///
 /// # Behavior
-/// This function calls the [`__nx_svc_wait_process_wide_key_atomic`] syscall with the provided arguments.
+/// This function calls the [`__nx_svc__svc_wait_process_wide_key_atomic`] syscall with the provided arguments.
 ///
 /// Then the kernel will:
 /// 1. Validate the current thread's state and memory access
@@ -247,7 +247,7 @@ impl ToRawResultCode for WaitProcessWideKeyError {
 /// | IN | _count_ | Number of threads to wake. If greater than the number of waiting threads, all threads are woken. If less than or equal to 0, wakes all waiting threads. |
 ///
 /// # Behavior
-/// This function calls the [`__nx_svc_signal_process_wide_key`] syscall with the provided arguments.
+/// This function calls the [`__nx_svc__svc_signal_process_wide_key`] syscall with the provided arguments.
 ///
 /// Then the kernel will:
 /// 1. Select threads to wake based on:
@@ -375,14 +375,14 @@ where
 /// [`WaitSyncError`] if the wait fails.
 ///
 /// # Behavior
-/// This function calls the [`__nx_svc_wait_synchronization`] syscall under the hood.
+/// This function calls the [`__nx_svc__svc_wait_synchronization`] syscall under the hood.
 /// The kernel will:
 /// 1. Validate all provided handles and memory access.
 /// 2. If any of the objects are already signalled, return immediately with its index.
 /// 3. Otherwise, block the current thread until either:
 ///    - One of the objects becomes signalled → success, returning its index.
 ///    - The timeout expires              → [`WaitSyncError::TimedOut`].
-///    - The wait gets cancelled via [`__nx_svc_cancel_synchronization`] → [`WaitSyncError::Cancelled`].
+///    - The wait gets cancelled via [`__nx_svc__svc_cancel_synchronization`] → [`WaitSyncError::Cancelled`].
 ///
 /// # Notes
 /// - Passing an empty slice results in a sleep until `timeout_ns` elapses (or indefinitely when
@@ -447,7 +447,7 @@ pub enum WaitSyncError {
     /// The wait operation timed out.
     #[error("Operation timed out")]
     TimedOut,
-    /// The wait was cancelled via [`a__nx_svc_cancel_synchronization`].
+    /// The wait was cancelled via [`__nx_svc__svc_cancel_synchronization`].
     #[error("Wait cancelled")]
     Cancelled,
     /// The number of handles supplied is out of range (must be ≤ 0x40).
