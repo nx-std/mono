@@ -15,7 +15,7 @@ use crate::mutex::Mutex;
 /// - Requires that `mutex` is valid and properly aligned
 /// - Requires that `mutex` points to memory that can be safely written to
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_mutex_init(mutex: *mut Mutex) {
+pub unsafe extern "C" fn __nx_sys_sync__mutex_init(mutex: *mut Mutex) {
     unsafe { mutex.write(Mutex::new()) }
 }
 
@@ -27,7 +27,7 @@ pub unsafe extern "C" fn __nx_sys_sync_mutex_init(mutex: *mut Mutex) {
 /// - Requires that `mutex` points to a valid Mutex instance
 /// - Requires that `mutex` is properly aligned
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_mutex_lock(mutex: *mut Mutex) {
+pub unsafe extern "C" fn __nx_sys_sync__mutex_lock(mutex: *mut Mutex) {
     unsafe { &*mutex }.lock()
 }
 
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn __nx_sys_sync_mutex_lock(mutex: *mut Mutex) {
 ///
 /// Returns `true` if the mutex was successfully locked, `false` if it was already locked.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_mutex_try_lock(mutex: *mut Mutex) -> bool {
+pub unsafe extern "C" fn __nx_sys_sync__mutex_try_lock(mutex: *mut Mutex) -> bool {
     unsafe { &*mutex }.try_lock()
 }
 
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn __nx_sys_sync_mutex_try_lock(mutex: *mut Mutex) -> bool
 /// - Requires that `mutex` points to a valid Mutex instance
 /// - Requires that `mutex` is properly aligned
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_mutex_unlock(mutex: *mut Mutex) {
+pub unsafe extern "C" fn __nx_sys_sync__mutex_unlock(mutex: *mut Mutex) {
     unsafe { &*mutex }.unlock()
 }
 
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn __nx_sys_sync_mutex_unlock(mutex: *mut Mutex) {
 /// Returns `true` if the mutex is currently locked by the calling thread,
 /// `false` otherwise.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_mutex_is_locked_by_current_thread(
+pub unsafe extern "C" fn __nx_sys_sync__mutex_is_locked_by_current_thread(
     mutex: *mut Mutex,
 ) -> bool {
     unsafe { &*mutex }.is_locked_by_current_thread()

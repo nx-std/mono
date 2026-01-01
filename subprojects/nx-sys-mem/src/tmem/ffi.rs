@@ -42,7 +42,11 @@ const LIBNX_ERR_BAD_INPUT: u32 = libnx_rc(11);
 ///
 /// Corresponds to `tmemCreate()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_create(t: *mut TransferMemory, size: usize, perm: u32) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__tmem_create(
+    t: *mut TransferMemory,
+    size: usize,
+    perm: u32,
+) -> u32 {
     let Some(t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -72,7 +76,7 @@ unsafe extern "C" fn __nx_tmem_create(t: *mut TransferMemory, size: usize, perm:
 ///
 /// Corresponds to `tmemCreateFromMemory()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_create_from_memory(
+unsafe extern "C" fn __nx_sys_mem__tmem_create_from_memory(
     t: *mut TransferMemory,
     buf: *mut c_void,
     size: usize,
@@ -112,7 +116,7 @@ unsafe extern "C" fn __nx_tmem_create_from_memory(
 ///
 /// Corresponds to `tmemLoadRemote()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_load_remote(
+unsafe extern "C" fn __nx_sys_mem__tmem_load_remote(
     t: *mut TransferMemory,
     handle: RawHandle,
     size: usize,
@@ -138,7 +142,7 @@ unsafe extern "C" fn __nx_tmem_load_remote(
 ///
 /// Corresponds to `tmemMap()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_map(t: *mut TransferMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__tmem_map(t: *mut TransferMemory) -> u32 {
     let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -179,7 +183,7 @@ unsafe extern "C" fn __nx_tmem_map(t: *mut TransferMemory) -> u32 {
 ///
 /// Corresponds to `tmemUnmap()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_unmap(t: *mut TransferMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__tmem_unmap(t: *mut TransferMemory) -> u32 {
     let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -218,7 +222,7 @@ unsafe extern "C" fn __nx_tmem_unmap(t: *mut TransferMemory) -> u32 {
 ///
 /// Corresponds to `tmemCloseHandle()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_close_handle(t: *mut TransferMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__tmem_close_handle(t: *mut TransferMemory) -> u32 {
     let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -251,7 +255,10 @@ unsafe extern "C" fn __nx_tmem_close_handle(t: *mut TransferMemory) -> u32 {
 ///
 /// Corresponds to `tmemWaitForPermission()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_wait_for_permission(t: *mut TransferMemory, perm: u32) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__tmem_wait_for_permission(
+    t: *mut TransferMemory,
+    perm: u32,
+) -> u32 {
     let Some(t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -277,7 +284,7 @@ unsafe extern "C" fn __nx_tmem_wait_for_permission(t: *mut TransferMemory, perm:
 ///
 /// Corresponds to `tmemClose()` in `tmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_tmem_close(t: *mut TransferMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__tmem_close(t: *mut TransferMemory) -> u32 {
     let Some(mut t) = NonNull::new(t) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -285,7 +292,7 @@ unsafe extern "C" fn __nx_tmem_close(t: *mut TransferMemory) -> u32 {
 
     // If mapped, unmap first.
     if !tm.map_addr.is_null() {
-        let rc = unsafe { __nx_tmem_unmap(t.as_ptr()) };
+        let rc = unsafe { __nx_sys_mem__tmem_unmap(t.as_ptr()) };
         if rc != 0 {
             return rc;
         }

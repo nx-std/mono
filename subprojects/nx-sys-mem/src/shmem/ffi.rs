@@ -29,7 +29,7 @@ struct SharedMemory {
 ///
 /// Corresponds to `shmemCreate()` in `shmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_shmem_create(
+unsafe extern "C" fn __nx_sys_mem__shmem_create(
     s: *mut SharedMemory,
     size: usize,
     local_perm: u32,
@@ -65,7 +65,7 @@ unsafe extern "C" fn __nx_shmem_create(
 ///
 /// Corresponds to `shmemLoadRemote()` in `shmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_shmem_load_remote(
+unsafe extern "C" fn __nx_sys_mem__shmem_load_remote(
     s: *mut SharedMemory,
     handle: u32,
     size: usize,
@@ -88,7 +88,7 @@ unsafe extern "C" fn __nx_shmem_load_remote(
 ///
 /// Corresponds to `shmemMap()` in `shmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_shmem_map(s: *mut SharedMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__shmem_map(s: *mut SharedMemory) -> u32 {
     let Some(mut s) = NonNull::new(s) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -128,7 +128,7 @@ unsafe extern "C" fn __nx_shmem_map(s: *mut SharedMemory) -> u32 {
 ///
 /// Corresponds to `shmemUnmap()` in `shmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_shmem_unmap(s: *mut SharedMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__shmem_unmap(s: *mut SharedMemory) -> u32 {
     let Some(mut s) = NonNull::new(s) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -161,7 +161,7 @@ unsafe extern "C" fn __nx_shmem_unmap(s: *mut SharedMemory) -> u32 {
 ///
 /// Corresponds to `shmemGetAddr()` in `shmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_shmem_get_addr(s: *mut SharedMemory) -> *mut c_void {
+unsafe extern "C" fn __nx_sys_mem__shmem_get_addr(s: *mut SharedMemory) -> *mut c_void {
     let Some(s) = NonNull::new(s) else {
         return ptr::null_mut();
     };
@@ -174,7 +174,7 @@ unsafe extern "C" fn __nx_shmem_get_addr(s: *mut SharedMemory) -> *mut c_void {
 ///
 /// Corresponds to `shmemClose()` in `shmem.h`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_shmem_close(s: *mut SharedMemory) -> u32 {
+unsafe extern "C" fn __nx_sys_mem__shmem_close(s: *mut SharedMemory) -> u32 {
     let Some(mut s) = NonNull::new(s) else {
         return KernelError::InvalidPointer.to_rc();
     };
@@ -182,7 +182,7 @@ unsafe extern "C" fn __nx_shmem_close(s: *mut SharedMemory) -> u32 {
 
     // If mapped, unmap first.
     if !sm.map_addr.is_null() {
-        let rc = unsafe { __nx_shmem_unmap(s.as_ptr()) };
+        let rc = unsafe { __nx_sys_mem__shmem_unmap(s.as_ptr()) };
         if rc != 0 {
             return rc;
         }

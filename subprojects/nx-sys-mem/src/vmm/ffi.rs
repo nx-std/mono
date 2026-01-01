@@ -16,7 +16,7 @@ pub type VirtmemReservation = sys::VirtmemReservation;
 ///
 /// See: virtmem.h's `virtmemLock()`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_lock() {
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_lock() {
     // Acquire the lock and intentionally leak the guard so the mutex remains
     // held for subsequent FFI calls.
     let guard = sys::lock();
@@ -32,7 +32,7 @@ pub unsafe extern "C" fn __nx_virtmem_lock() {
 ///
 /// See: virtmem.h's `virtmemUnlock()`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_unlock() {
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_unlock() {
     unsafe { sys::VMM.force_unlock() };
 }
 
@@ -41,14 +41,17 @@ pub unsafe extern "C" fn __nx_virtmem_unlock() {
 /// This is called by the libnx runtime during early initialization.
 /// It initializes internal state but does **not** keep the mutex locked.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_setup() {
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_setup() {
     // Acquire the mutex, initialize state if needed, then immediately release.
     sys::lock().init();
 }
 
 /// Finds a random slice of free general purpose address space
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_find_aslr(size: usize, guard_size: usize) -> *mut c_void {
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_aslr(
+    size: usize,
+    guard_size: usize,
+) -> *mut c_void {
     if !sys::VMM.is_locked_by_current_thread() {
         return ptr::null_mut();
     }
@@ -61,7 +64,10 @@ pub unsafe extern "C" fn __nx_virtmem_find_aslr(size: usize, guard_size: usize) 
 
 /// Finds a random slice of free stack address space
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_find_stack(size: usize, guard_size: usize) -> *mut c_void {
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_stack(
+    size: usize,
+    guard_size: usize,
+) -> *mut c_void {
     if !sys::VMM.is_locked_by_current_thread() {
         return ptr::null_mut();
     }
@@ -73,7 +79,7 @@ pub unsafe extern "C" fn __nx_virtmem_find_stack(size: usize, guard_size: usize)
 
 /// Finds a random slice of free code memory address space
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_find_code_memory(
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_code_memory(
     size: usize,
     guard_size: usize,
 ) -> *mut c_void {
@@ -88,7 +94,7 @@ pub unsafe extern "C" fn __nx_virtmem_find_code_memory(
 
 /// Reserves a range of memory address space
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_add_reservation(
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_add_reservation(
     mem: *mut c_void,
     size: usize,
 ) -> *mut VirtmemReservation {
@@ -102,7 +108,7 @@ pub unsafe extern "C" fn __nx_virtmem_add_reservation(
 
 /// Releases a memory address space reservation
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_virtmem_remove_reservation(rv: *mut VirtmemReservation) {
+pub unsafe extern "C" fn __nx_sys_mem__virtmem_remove_reservation(rv: *mut VirtmemReservation) {
     if !sys::VMM.is_locked_by_current_thread() {
         return;
     }

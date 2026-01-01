@@ -17,7 +17,7 @@ use super::sys;
 /// * `buf` - Pointer to the buffer to fill with random data
 /// * `len` - Size of the buffer in bytes
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_rand_get(buf: *mut c_void, len: usize) {
+pub unsafe extern "C" fn __nx_rand__random_get(buf: *mut c_void, len: usize) {
     let slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, len) };
     sys::fill_bytes(slice)
 }
@@ -31,6 +31,6 @@ pub unsafe extern "C" fn __nx_rand_get(buf: *mut c_void, len: usize) {
 ///
 /// A random 64-bit value
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_rand_get64() -> u64 {
+pub unsafe extern "C" fn __nx_rand__random_get64() -> u64 {
     sys::next_u64()
 }

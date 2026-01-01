@@ -19,7 +19,7 @@ struct Receiver(oneshot::Receiver<DataType>);
 /// The caller is responsible for freeing the sender and receiver with the appropriate `free` functions,
 /// unless they are consumed by `send` or `recv`.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sync_oneshot_create(tx: *mut *mut Sender, rx: *mut *mut Receiver) {
+unsafe extern "C" fn __nx_std_sync__oneshot_create(tx: *mut *mut Sender, rx: *mut *mut Receiver) {
     let (inner_tx, inner_rx) = oneshot::channel::<DataType>();
     unsafe { *tx = Box::into_raw(Box::new(Sender(inner_tx))) };
     unsafe { *rx = Box::into_raw(Box::new(Receiver(inner_rx))) };
@@ -29,7 +29,7 @@ unsafe extern "C" fn __nx_sync_oneshot_create(tx: *mut *mut Sender, rx: *mut *mu
 ///
 /// If `sender` is `NULL`, this function does nothing.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sync_oneshot_sender_free(tx: *mut Sender) {
+unsafe extern "C" fn __nx_std_sync__oneshot_sender_free(tx: *mut Sender) {
     if tx.is_null() {
         return;
     }
@@ -40,7 +40,7 @@ unsafe extern "C" fn __nx_sync_oneshot_sender_free(tx: *mut Sender) {
 ///
 /// If `receiver` is `NULL`, this function does nothing.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sync_oneshot_receiver_free(rx: *mut Receiver) {
+unsafe extern "C" fn __nx_std_sync__oneshot_receiver_free(rx: *mut Receiver) {
     if rx.is_null() {
         return;
     }
@@ -56,7 +56,7 @@ unsafe extern "C" fn __nx_sync_oneshot_receiver_free(rx: *mut Receiver) {
 /// \param value The value to send.
 /// \return 0 on success, -1 on failure (e.g., receiver was dropped).
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sync_oneshot_send(tx: *mut Sender, value: DataType) -> i32 {
+unsafe extern "C" fn __nx_std_sync__oneshot_send(tx: *mut Sender, value: DataType) -> i32 {
     if tx.is_null() {
         return -1;
     }
@@ -77,7 +77,10 @@ unsafe extern "C" fn __nx_sync_oneshot_send(tx: *mut Sender, value: DataType) ->
 /// \param out_value Pointer to write the received value to.
 /// \return 0 on success, -1 on failure (e.g., sender was dropped).
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_sync_oneshot_recv(rx: *mut Receiver, out_value: *mut DataType) -> i32 {
+unsafe extern "C" fn __nx_std_sync__oneshot_recv(
+    rx: *mut Receiver,
+    out_value: *mut DataType,
+) -> i32 {
     if rx.is_null() {
         return -1;
     }

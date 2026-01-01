@@ -5,12 +5,12 @@ use crate::global as global_allocator;
 
 /// Override fn for libnx's __libnx_initheap
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc_init_heap() {
+pub unsafe extern "C" fn __nx_alloc__initheap() {
     global_allocator::init();
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc_malloc(size: usize) -> *mut c_void {
+pub unsafe extern "C" fn __nx_alloc__malloc(size: usize) -> *mut c_void {
     let Ok(layout) = Layout::from_size(size) else {
         return ptr::null_mut();
     };
@@ -32,7 +32,7 @@ pub unsafe extern "C" fn __nx_alloc_malloc(size: usize) -> *mut c_void {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc_aligned_alloc(align: usize, size: usize) -> *mut c_void {
+pub unsafe extern "C" fn __nx_alloc__aligned_alloc(align: usize, size: usize) -> *mut c_void {
     let Ok(layout) = Layout::from_size_align(size, align) else {
         return ptr::null_mut();
     };
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn __nx_alloc_aligned_alloc(align: usize, size: usize) -> 
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc_free(ptr: *mut c_void) {
+pub unsafe extern "C" fn __nx_alloc__free(ptr: *mut c_void) {
     let Some(alloc_ptr) = ptr::NonNull::new(ptr) else {
         return; // If the pointer is null, no-op
     };
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn __nx_alloc_free(ptr: *mut c_void) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc_calloc(nmemb: usize, size: usize) -> *mut c_void {
+pub unsafe extern "C" fn __nx_alloc__calloc(nmemb: usize, size: usize) -> *mut c_void {
     // Check for overflow
     let total = match nmemb.checked_mul(size) {
         Some(t) => t,
@@ -97,15 +97,15 @@ pub unsafe extern "C" fn __nx_alloc_calloc(nmemb: usize, size: usize) -> *mut c_
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc_realloc(ptr: *mut c_void, new_size: usize) -> *mut c_void {
+pub unsafe extern "C" fn __nx_alloc__realloc(ptr: *mut c_void, new_size: usize) -> *mut c_void {
     // If ptr is null, realloc is equivalent to malloc
     if ptr.is_null() {
-        return unsafe { __nx_alloc_malloc(new_size) };
+        return unsafe { __nx_alloc__malloc(new_size) };
     }
 
     // If new_size is zero, free and return null
     if new_size == 0 {
-        unsafe { __nx_alloc_free(ptr) };
+        unsafe { __nx_alloc__free(ptr) };
         return ptr::null_mut();
     }
 
@@ -152,8 +152,8 @@ mod newlib {
     use core::ffi::c_void;
 
     use super::{
-        __nx_alloc_aligned_alloc, __nx_alloc_calloc, __nx_alloc_free, __nx_alloc_malloc,
-        __nx_alloc_realloc,
+        __nx_alloc__aligned_alloc, __nx_alloc__calloc, __nx_alloc__free, __nx_alloc__malloc,
+        __nx_alloc__realloc,
     };
 
     /// Opaque newlib reentrant struct
@@ -163,40 +163,43 @@ mod newlib {
     }
 
     #[unsafe(no_mangle)]
-    pub unsafe extern "C" fn __nx_alloc_newlib_malloc_r(_: *mut Reent, size: usize) -> *mut c_void {
-        unsafe { __nx_alloc_malloc(size) }
+    pub unsafe extern "C" fn __nx_alloc__newlib_malloc_r(
+        _: *mut Reent,
+        size: usize,
+    ) -> *mut c_void {
+        unsafe { __nx_alloc__malloc(size) }
     }
 
     #[unsafe(no_mangle)]
-    pub unsafe extern "C" fn __nx_alloc_newlib_calloc_r(
+    pub unsafe extern "C" fn __nx_alloc__newlib_calloc_r(
         _: *mut Reent,
         nmemb: usize,
         size: usize,
     ) -> *mut c_void {
-        unsafe { __nx_alloc_calloc(nmemb, size) }
+        unsafe { __nx_alloc__calloc(nmemb, size) }
     }
 
     #[unsafe(no_mangle)]
-    pub unsafe extern "C" fn __nx_alloc_newlib_realloc_r(
+    pub unsafe extern "C" fn __nx_alloc__newlib_realloc_r(
         _: *mut Reent,
         ptr: *mut c_void,
         new_size: usize,
     ) -> *mut c_void {
-        unsafe { __nx_alloc_realloc(ptr, new_size) }
+        unsafe { __nx_alloc__realloc(ptr, new_size) }
     }
 
     #[unsafe(no_mangle)]
-    pub unsafe extern "C" fn __nx_alloc_newlib_memalign_r(
+    pub unsafe extern "C" fn __nx_alloc__newlib_memalign_r(
         _: *mut Reent,
         align: usize,
         size: usize,
     ) -> *mut c_void {
-        unsafe { __nx_alloc_aligned_alloc(align, size) }
+        unsafe { __nx_alloc__aligned_alloc(align, size) }
     }
 
     #[unsafe(no_mangle)]
-    pub unsafe extern "C" fn __nx_alloc_newlib_free_r(_: *mut Reent, ptr: *mut c_void) {
-        unsafe { __nx_alloc_free(ptr) }
+    pub unsafe extern "C" fn __nx_alloc__newlib_free_r(_: *mut Reent, ptr: *mut c_void) {
+        unsafe { __nx_alloc__free(ptr) }
     }
 }
 

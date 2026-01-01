@@ -232,7 +232,7 @@ pub enum InfoType {
 }
 
 impl InfoType {
-    /// Returns the (id0, id1) pair for [`__nx_svc_get_info`].
+    /// Returns the (id0, id1) pair for [`__nx_svc__svc_get_info`].
     pub fn to_ids(&self) -> (u32, u64) {
         match *self {
             InfoType::CoreMask => (0, 0),

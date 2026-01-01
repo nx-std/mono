@@ -18,7 +18,7 @@ use crate::barrier::Barrier;
 /// This function is unsafe because:
 /// * `bar` must point to valid memory that can hold a [`Barrier`]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_barrier_init(bar: *mut Barrier, thread_count: u64) {
+pub unsafe extern "C" fn __nx_sys_sync__barrier_init(bar: *mut Barrier, thread_count: u64) {
     unsafe { bar.write(Barrier::new(thread_count)) };
 }
 
@@ -33,6 +33,6 @@ pub unsafe extern "C" fn __nx_sys_sync_barrier_init(bar: *mut Barrier, thread_co
 /// This function is unsafe because:
 /// * `bar` must point to a valid, initialized [`Barrier`]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_barrier_wait(bar: *mut Barrier) {
+pub unsafe extern "C" fn __nx_sys_sync__barrier_wait(bar: *mut Barrier) {
     unsafe { &*bar }.wait()
 }
