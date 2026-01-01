@@ -243,115 +243,16 @@ just configure -Duse_nx=enabled -Duse_nx_time=disabled  # Everything except time
 
 Rust implementations transparently replace libnx C functions at link time using **linker override scripts**.
 
-### How It Works
+> **For detailed information** about FFI naming conventions, linker override file format, and meson integration patterns, see [libnx_overrides.md](libnx_overrides.md).
 
-The replacement mechanism has four components:
+### High-Level Flow
 
-#### 1. Rust FFI Exports
+1. **Rust crates** implement libnx functions with C FFI (when built with `--features ffi`)
+2. **Linker override scripts** (`*_override.ld`) redirect libnx symbols to Rust implementations
+3. **Meson** collects override scripts from enabled crates based on `use_nx_*` options
+4. **At link time**, the linker applies all override scripts transparently
 
-Rust crates expose C-compatible functions when built with the `ffi` feature:
-
-```rust
-// In nx-svc/src/ffi.rs
-#[unsafe(no_mangle)]
-unsafe extern "C" fn __nx_svc_set_heap_size(
-    out_addr: *mut *mut c_void,
-    size: usize
-) -> ResultCode {
-    unsafe { raw::set_heap_size(out_addr, size) }
-}
-```
-
-**Naming convention**: All Rust FFI exports use the `__nx_<crate>_<function>` prefix.
-
-#### 2. Static Library Compilation
-
-Rust crates are built as static libraries (`.a` files) via Meson custom targets:
-
-```meson
-nx_svc_tgt = custom_target('nx-svc',
-    command : [cargo, 'build', '--features', 'ffi', ...],
-    output : ['libnx_svc.a', 'libnx_svc.rlib'],
-)
-```
-
-#### 3. Linker Override Scripts
-
-Each Rust crate provides a linker script (`*_override.ld`) that redirects libnx symbols to Rust implementations using
-GNU ld symbol aliasing:
-
-**Example**: `subprojects/nx-svc/svc_override.ld`
-
-```ld
-/* Ensure Rust symbols are pulled in */
-EXTERN(__nx_svc_set_heap_size);
-EXTERN(__nx_svc_create_thread);
-EXTERN(__nx_svc_start_thread);
-
-/* Redirect libnx symbols to Rust implementations */
-svcSetHeapSize = __nx_svc_set_heap_size;
-svcCreateThread = __nx_svc_create_thread;
-svcStartThread = __nx_svc_start_thread;
-```
-
-**Example**: `subprojects/nx-alloc/alloc_override.ld`
-
-```ld
-/* Override libnx heap initialization */
-EXTERN(__nx_alloc_init_heap)
-__libnx_initheap = __nx_alloc_init_heap;
-
-/* Override newlib malloc family */
-EXTERN(__nx_alloc_newlib_malloc_r)
-_malloc_r = __nx_alloc_newlib_malloc_r;
-_calloc_r = __nx_alloc_newlib_calloc_r;
-_realloc_r = __nx_alloc_newlib_realloc_r;
-_free_r = __nx_alloc_newlib_free_r;
-```
-
-**How symbol redirection works**:
-
-- `EXTERN()` tells the linker to pull in the Rust symbol from the static library
-- `old_symbol = new_symbol` creates an alias, redirecting all references
-
-**Result**: Code calling `svcSetHeapSize()` transparently calls `__nx_svc_set_heap_size()` from Rust.
-
-#### 4. Override Link Args Collection
-
-Linker scripts are collected and propagated through the dependency chain:
-
-```meson
-# In nx-std/meson.build
-deps_override_link_args = []
-
-if get_option('use_nx_alloc').enabled()
-    nx_alloc_proj = subproject('nx-alloc')
-    deps += nx_alloc_proj.get_variable('nx_alloc_dep')
-    deps_override_link_args += ['-T', nx_alloc_proj.get_variable('nx_alloc_ld_override')]
-endif
-
-if get_option('use_nx_svc').enabled()
-    nx_svc_proj = subproject('nx-svc')
-    deps += nx_svc_proj.get_variable('nx_svc_dep')
-    deps_override_link_args += ['-T', nx_svc_proj.get_variable('nx_svc_ld_override')]
-endif
-
-# Export for consumers
-nx_std_dep_override_link_args = deps_override_link_args
-```
-
-These override link args flow to the final executable:
-
-```meson
-# In libnx/meson.build
-nx_dep = declare_dependency(
-    link_with : nx_lib,
-    link_args : deps_override_link_args,  # -T svc_override.ld -T alloc_override.ld ...
-    dependencies : deps,
-)
-```
-
-### Complete Flow Example
+### Quick Example
 
 **Setup**: Build with SVC overrides enabled
 
@@ -363,27 +264,19 @@ just configure -Duse_nx_svc=enabled
 
 1. **Cargo builds** `nx-svc` with `--features ffi` → produces `libnx_svc.a`
 2. **Meson collects** `-T svc_override.ld` from nx-svc subproject
-3. **Link args** propagate: `nx-svc` → `nx-std` → `libnx` → `tests.elf`
-4. **At link time**, the linker:
-    - Pulls in `__nx_svc_set_heap_size` from `libnx_svc.a`
-    - Applies `svc_override.ld`: redirects `svcSetHeapSize` → `__nx_svc_set_heap_size`
-5. **Final executable**: All `svcSetHeapSize()` calls execute the Rust implementation
+3. **Link args** propagate: `nx-svc` → `nx-std` → `libnx` → final executable
+4. **At link time**: All `svcSetHeapSize()` calls execute the Rust implementation
 
 **Verification**: Check the symbol table
 
 ```bash
 nm buildDir/subprojects/tests/tests.elf | grep svcSetHeapSize
-# Shows: svcSetHeapSize = __nx_svc_set_heap_size
+# Shows: svcSetHeapSize = __nx_svc__svc_set_heap_size
 ```
 
 ### Available Override Crates
 
-Each Rust crate that provides FFI exports includes a corresponding linker override script following the naming
-convention `<name>_override.ld` (e.g., `nx-svc` → `svc_override.ld`).
-
-Override crates correspond to the `use_nx_*` Meson options documented in
-the [Configuration Options](#configuration-options) table. When an option is enabled, its crate's override script
-redirects libnx symbols to the Rust implementations.
+Override crates correspond to the `use_nx_*` Meson options documented in the [Configuration Options](#configuration-options) table. When an option is enabled, its crate's override script redirects libnx symbols to Rust implementations.
 
 To see which symbols a crate overrides, inspect its `*_override.ld` file in the crate's directory.
 
@@ -437,28 +330,8 @@ nx_svc_tgt = custom_target(
 - `--profile` - Map Meson `buildtype` to Cargo profile (`dev` or `release`)
 - `--target-dir` - Shared Cargo target directory (`buildDir/cargo-target/`)
 - `--artifact-dir` - Place output (`.a`, `.rlib`) in Meson's output directory
-- `--features ffi` - Enable FFI feature for C interop
+- `--features ffi` - Enable FFI feature for C interop (see [libnx_overrides.md](libnx_overrides.md#rust-crate-structure))
 - `build_always_stale : true` - Always invoke Cargo (it handles incremental builds)
-
-### FFI Feature Flag
-
-The `ffi` Cargo feature enables C-compatible function exports:
-
-**In `Cargo.toml`**:
-
-```toml
-[features]
-ffi = []
-```
-
-**In `lib.rs`**:
-
-```rust
-#[cfg(feature = "ffi")]
-mod ffi;  // Only compile FFI module when feature is enabled
-```
-
-**Meson controls** whether FFI is enabled based on setup-time configuration.
 
 ## Build Artifacts
 
