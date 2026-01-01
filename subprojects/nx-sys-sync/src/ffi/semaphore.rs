@@ -16,7 +16,7 @@ use crate::semaphore::Semaphore;
 /// The caller must ensure that:
 /// * `sem` points to valid memory that is properly aligned for a Semaphore object
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_semaphore_init(sem: *mut Semaphore, count: u64) {
+pub unsafe extern "C" fn __nx_sys_sync__semaphore_init(sem: *mut Semaphore, count: u64) {
     unsafe { sem.write(Semaphore::new(count)) };
 }
 
@@ -32,7 +32,7 @@ pub unsafe extern "C" fn __nx_sys_sync_semaphore_init(sem: *mut Semaphore, count
 /// The caller must ensure that:
 /// * `sem` points to a valid, initialized Semaphore object
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_semaphore_signal(sem: *mut Semaphore) {
+pub unsafe extern "C" fn __nx_sys_sync__semaphore_signal(sem: *mut Semaphore) {
     unsafe { &*sem }.signal()
 }
 
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn __nx_sys_sync_semaphore_signal(sem: *mut Semaphore) {
 /// The caller must ensure that:
 /// * `sem` points to a valid, initialized Semaphore object
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_semaphore_wait(sem: *mut Semaphore) {
+pub unsafe extern "C" fn __nx_sys_sync__semaphore_wait(sem: *mut Semaphore) {
     unsafe { &*sem }.wait()
 }
 
@@ -65,6 +65,6 @@ pub unsafe extern "C" fn __nx_sys_sync_semaphore_wait(sem: *mut Semaphore) {
 /// The caller must ensure that:
 /// * `sem` points to a valid, initialized Semaphore object
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_semaphore_try_wait(sem: *mut Semaphore) -> bool {
+pub unsafe extern "C" fn __nx_sys_sync__semaphore_try_wait(sem: *mut Semaphore) -> bool {
     unsafe { &*sem }.try_wait()
 }

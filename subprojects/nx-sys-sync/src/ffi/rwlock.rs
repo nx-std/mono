@@ -13,7 +13,7 @@ use crate::rwlock::RwLock;
 /// - `rw` must point to a valid, properly aligned memory location for a `RwLock`
 /// - The memory at `rw` must be writeable
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_init(rw: *mut RwLock) {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_init(rw: *mut RwLock) {
     unsafe { rw.write(RwLock::new()) };
 }
 
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_init(rw: *mut RwLock) {
 /// - `rw` must point to a valid, initialized `RwLock`
 /// - The `RwLock` must not be concurrently modified except through its synchronized methods
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_read_lock(rw: *mut RwLock) {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_read_lock(rw: *mut RwLock) {
     unsafe { &*rw }.read_lock()
 }
 
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_read_lock(rw: *mut RwLock) {
 /// - `rw` must point to a valid, initialized `RwLock`
 /// - The `RwLock` must not be concurrently modified except through its synchronized methods
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_try_read_lock(rw: *mut RwLock) -> bool {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_try_read_lock(rw: *mut RwLock) -> bool {
     unsafe { &*rw }.try_read_lock()
 }
 
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_try_read_lock(rw: *mut RwLock) -> 
 /// - The current thread must hold a read lock on the `RwLock`
 /// - The `RwLock` must not be concurrently modified except through its synchronized methods
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_read_unlock(rw: *mut RwLock) {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_read_unlock(rw: *mut RwLock) {
     unsafe { &*rw }.read_unlock()
 }
 
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_read_unlock(rw: *mut RwLock) {
 /// - `rw` must point to a valid, initialized `RwLock`
 /// - The `RwLock` must not be concurrently modified except through its synchronized methods
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_write_lock(rw: *mut RwLock) {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_write_lock(rw: *mut RwLock) {
     unsafe { &*rw }.write_lock()
 }
 
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_write_lock(rw: *mut RwLock) {
 /// - `rw` must point to a valid, initialized `RwLock`
 /// - The `RwLock` must not be concurrently modified except through its synchronized methods
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_try_write_lock(rw: *mut RwLock) -> bool {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_try_write_lock(rw: *mut RwLock) -> bool {
     unsafe { &*rw }.try_write_lock()
 }
 
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_try_write_lock(rw: *mut RwLock) ->
 /// - The current thread must hold the write lock
 /// - The `RwLock` must not be concurrently modified except through its synchronized methods
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_write_unlock(rw: *mut RwLock) {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_write_unlock(rw: *mut RwLock) {
     unsafe { &*rw }.write_unlock()
 }
 
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_write_unlock(rw: *mut RwLock) {
 ///
 /// - `rw` must point to a valid, initialized `RwLock`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_is_write_lock_held_by_current_thread(
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_is_write_lock_held_by_current_thread(
     rw: *mut RwLock,
 ) -> bool {
     unsafe { &*rw }.is_write_lock_held_by_current_thread()
@@ -129,6 +129,6 @@ pub unsafe extern "C" fn __nx_sys_sync_rwlock_is_write_lock_held_by_current_thre
 ///
 /// - `rw` must point to a valid, initialized `RwLock`
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_sync_rwlock_is_owned_by_current_thread(rw: *mut RwLock) -> bool {
+pub unsafe extern "C" fn __nx_sys_sync__rwlock_is_owned_by_current_thread(rw: *mut RwLock) -> bool {
     unsafe { &*rw }.is_owned_by_current_thread()
 }
