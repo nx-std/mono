@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "subprojects/linkle",
     "subprojects/nx-alloc",
     "subprojects/nx-cpu",
     "subprojects/nx-panic-handler",
