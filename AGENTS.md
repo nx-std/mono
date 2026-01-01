@@ -95,6 +95,80 @@ The custom libnx build links against Rust crates when `use_nx*` options are enab
 - Imports grouped: std, external crates, local
 - Import granularity at crate level
 
+## Development Workflow
+
+Follow this workflow when implementing features or fixing bugs.
+
+### 1. Research Phase
+
+- Understand the codebase and existing patterns
+- Identify related modules and dependencies
+- Review test files and usage examples
+- Consult `docs/` for implementation guidance
+
+### 2. Planning Phase
+
+- Create detailed implementation plan
+- Identify validation checkpoints
+- Consider edge cases and error handling
+- Ask user questions if requirements are unclear
+
+### 3. Implementation Phase
+
+🚨 **CRITICAL: Before running ANY command, consult the relevant Skill file in `.claude/skills/`.**
+
+**Development checklist:**
+
+```
+- [ ] Write code following project conventions
+- [ ] Format code (just fmt-rs for Rust, just fmt-meson for Meson)
+- [ ] Check compilation (just check-rs)
+- [ ] Run clippy (just clippy)
+- [ ] Fix ALL warnings
+- [ ] Build target (just meson-compile <target>)
+- [ ] Run tests if applicable
+- [ ] All checks pass ✅
+```
+
+**Workflow for EVERY code change:**
+
+1. **Write code** following patterns from `docs/`
+
+2. **Format immediately** (MANDATORY after EVERY edit):
+   - Rust files: `just fmt-rs`
+   - Meson files: `just fmt-meson`
+   - See `.claude/skills/format/SKILL.md`
+
+3. **Check compilation**:
+   - Rust: `just check-rs` or `just check-crate <crate>`
+   - Meson: `just meson-configure` then `just meson-compile`
+   - See `.claude/skills/build/SKILL.md`
+
+4. **Lint with clippy**:
+   - Command: `just clippy` or `just clippy-crate <crate>`
+   - Fix ALL warnings before proceeding
+
+5. **Build and test**:
+   - Build targets: `just meson-compile <target>`
+   - Build tests: `just build-tests`
+
+6. **Iterate**: If any validation fails → fix → return to step 2
+
+### 4. Completion Phase
+
+- Ensure all automated checks pass (format, check, clippy, build)
+- Review changes against project conventions
+- Document any warnings you couldn't fix and why
+
+### 5. Hardware Validation (Optional)
+
+To validate changes on actual hardware, deploy the test suite to a Nintendo Switch:
+
+1. Build tests: `just build-tests`
+2. Deploy to Switch: `just deploy buildDir/subprojects/tests/nx-tests.nro`
+3. Ask user to confirm tests PASSED on the console
+4. See `.claude/skills/deploy/SKILL.md` for details
+
 ## Testing
 
 Tests are compiled as Switch homebrew (NRO) that run on-device or emulator. Located in `subprojects/tests/`:

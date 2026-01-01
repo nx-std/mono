@@ -87,6 +87,7 @@ clippy-crate CRATE *EXTRA_FLAGS:
 ## Build (Meson)
 
 alias configure := meson-configure
+alias reconfigure := meson-reconfigure
 alias compile := meson-compile
 alias build := meson-compile
 
@@ -94,6 +95,11 @@ alias build := meson-compile
 [group: 'build']
 meson-configure *EXTRA_FLAGS:
     meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
+
+# Reconfigure meson build directory (meson setup --reconfigure)
+[group: 'build']
+meson-reconfigure *EXTRA_FLAGS:
+    meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}} --reconfigure
 
 # Ensure build directory is configured (idempotent)
 [group: 'build']
