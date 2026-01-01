@@ -15,7 +15,7 @@ use crate::sys::clock;
 ///
 /// Returns the current system tick as a `u64`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_time_get_system_tick() -> u64 {
+pub unsafe extern "C" fn __nx_time__arm_get_system_tick() -> u64 {
     clock::aarch64::get_system_tick()
 }
 
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn __nx_time_get_system_tick() -> u64 {
 ///
 /// Returns the system counter-timer frequency, in Hz.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_time_get_system_tick_freq() -> u64 {
+pub unsafe extern "C" fn __nx_time__arm_get_system_tick_freq() -> u64 {
     clock::aarch64::get_system_tick_freq()
 }
 
@@ -35,7 +35,7 @@ pub unsafe extern "C" fn __nx_time_get_system_tick_freq() -> u64 {
 /// Returns the equivalent CPU ticks for a given time in nanoseconds, based on the
 /// system counter frequency.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_time_ns_to_ticks(ns: u64) -> u64 {
+pub unsafe extern "C" fn __nx_time__arm_ns_to_ticks(ns: u64) -> u64 {
     clock::aarch64::ns_to_cpu_ticks(ns)
 }
 
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn __nx_time_ns_to_ticks(ns: u64) -> u64 {
 ///
 /// Returns the equivalent time in nanoseconds for a given number of CPU ticks.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_time_ticks_to_ns(tick: u64) -> u64 {
+pub unsafe extern "C" fn __nx_time__arm_ticks_to_ns(tick: u64) -> u64 {
     clock::aarch64::cpu_ticks_to_ns(tick)
 }
 
