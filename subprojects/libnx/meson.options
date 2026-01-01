@@ -1,0 +1,69 @@
+option(
+    'use_nx',
+    type : 'feature', value : 'disabled',
+    description : 'Override all libnx functions with nx- functions',
+    yield : true
+)
+
+option(
+    'use_nx_alloc',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-alloc functions',
+    yield : true
+)
+
+option(
+    'use_nx_rand',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-rand functions',
+    yield : true
+)
+
+option(
+    'use_nx_rt_env',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-rt-env functions',
+    yield : true
+)
+
+option(
+    'use_nx_std_sync',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-std-sync functions',
+    yield : true
+)
+
+option(
+    'use_nx_svc',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-svc functions',
+    yield : true
+)
+
+option(
+    'use_nx_sys_mem',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-sys-mem functions',
+    yield : true
+)
+
+option(
+    'use_nx_sys_sync',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-sys-sync functions',
+    yield : true
+)
+
+option(
+    'use_nx_sys_thread',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-sys-thread functions',
+    yield : true
+)
+
+option(
+    'use_nx_time',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-time functions',
+    yield : true
+)
