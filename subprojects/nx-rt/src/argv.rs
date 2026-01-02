@@ -20,11 +20,6 @@ static ARGV_INIT: Once = Once::new();
 /// Parsed arguments (owns all argument memory)
 static PARSED_ARGS: AtomicPtr<ParsedArgs> = AtomicPtr::new(ptr::null_mut());
 
-unsafe extern "C" {
-    /// nxlink setup - handles _NXLINK_ suffix stripping
-    fn nxlinkSetup();
-}
-
 /// Returns an iterator over command-line arguments (like `std::env::args`)
 ///
 /// The first argument is typically the program name.
@@ -57,7 +52,22 @@ pub unsafe fn setup() {
         };
 
         // Parse the arguments string
-        let parsed = parse_argv(args_str);
+        let mut parsed = parse_argv(args_str);
+
+        // Strip nxlink suffix if present (XXXXXXXX_NXLINK_ pattern)
+        if parsed.len() > 1
+            && let Some(last) = parsed.last()
+            && last.len() == 16
+            && last.ends_with("_NXLINK_")
+        {
+            // Parse the first 8 hex characters as the IP address
+            if let Ok(_addr) = u32::from_str_radix(&last[..8], 16) {
+                #[cfg(feature = "ffi")]
+                crate::ffi::set_nxlink_host(_addr);
+                parsed.pop();
+            }
+        }
+
         if parsed.is_empty() {
             return;
         }
@@ -83,9 +93,6 @@ pub unsafe fn setup() {
             argv_ptrs,
         });
         PARSED_ARGS.store(Box::into_raw(parsed_args), Ordering::Release);
-
-        // Call nxlink setup to handle _NXLINK_ suffix
-        unsafe { nxlinkSetup() };
 
         // Update FFI statics for C compatibility
         #[cfg(feature = "ffi")]
