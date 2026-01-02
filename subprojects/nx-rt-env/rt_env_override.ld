@@ -42,3 +42,12 @@ envGetLastLoadResult = __nx_rt_env__env_get_last_load_result;
 envHasRandomSeed = __nx_rt_env__env_has_random_seed;
 envGetRandomSeed = __nx_rt_env__env_get_random_seed;
 envGetUserIdStorage = __nx_rt_env__env_get_user_id_storage;
+
+/* hosversion API redirections */
+EXTERN(__nx_rt_env__hosversion_get);
+EXTERN(__nx_rt_env__hosversion_set);
+EXTERN(__nx_rt_env__hosversion_is_atmosphere);
+
+hosversionGet = __nx_rt_env__hosversion_get;
+hosversionSet = __nx_rt_env__hosversion_set;
+hosversionIsAtmosphere = __nx_rt_env__hosversion_is_atmosphere;
