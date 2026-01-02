@@ -74,6 +74,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-rt"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-rt-env",
+ "nx-svc",
+ "nx-sys-sync",
+]
+
+[[package]]
 name = "nx-rt-env"
 version = "0.1.0"
 dependencies = [
@@ -88,6 +99,7 @@ dependencies = [
  "nx-alloc",
  "nx-panic-handler",
  "nx-rand",
+ "nx-rt",
  "nx-rt-env",
  "nx-std-sync",
  "nx-svc",

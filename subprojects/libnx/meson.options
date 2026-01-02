@@ -27,6 +27,13 @@ option(
 )
 
 option(
+    'use_nx_rt',
+    type : 'feature', value : 'auto',
+    description : 'Override libnx runtime functions with nx-rt',
+    yield : true
+)
+
+option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-std-sync functions',
