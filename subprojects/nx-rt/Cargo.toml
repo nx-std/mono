@@ -1,0 +1,21 @@
+[package]
+name = "nx-rt"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt"
+crate-type = ["rlib", "staticlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+ffi = []
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rt-env = { version = "0.1.0", path = "../nx-rt-env" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }

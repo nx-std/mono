@@ -111,6 +111,17 @@ if get_option('use_nx_rt_env').enabled()
     deps_cargo_features += ['rt-env']
 endif
 
+# nx-rt
+if get_option('use_nx_rt').enabled()
+    nx_rt_proj = subproject('nx-rt')
+
+    deps += nx_rt_proj.get_variable('nx_rt_dep')
+    deps_override_link_args += ['-T', nx_rt_proj.get_variable('nx_rt_ld_override')]
+
+    debug('rt feature: enabled')
+    deps_cargo_features += ['rt']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

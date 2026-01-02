@@ -20,6 +20,13 @@ option(
 )
 
 option(
+    'use_nx_rt',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `rt` feature',
+    yield : true
+)
+
+option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
     description : 'Enable the `sync` feature',

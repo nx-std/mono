@@ -21,6 +21,7 @@ sys = ["svc", "sys-mem", "sys-sync", "sys-thread"]
 ffi = [
     "nx-alloc?/ffi",
     "nx-rand?/ffi",
+    "nx-rt?/ffi",
     "nx-rt-env?/ffi",
     "nx-std-sync?/ffi",
     "nx-svc?/ffi",
@@ -33,6 +34,7 @@ ffi = [
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 rand = ["dep:nx-rand"]
+rt = ["dep:nx-rt"]
 rt-env = ["dep:nx-rt-env"]
 sync = ["dep:nx-std-sync", "alloc"]
 svc = ["dep:nx-svc"]
@@ -45,6 +47,7 @@ time = ["dep:nx-time"]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
+nx-rt = { version = "0.1.0", path = "../nx-rt", optional = true }
 nx-rt-env = { version = "0.1.0", path = "../nx-rt-env", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }

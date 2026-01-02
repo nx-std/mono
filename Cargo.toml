@@ -5,6 +5,8 @@ members = [
     "subprojects/nx-cpu",
     "subprojects/nx-panic-handler",
     "subprojects/nx-rand",
+    "subprojects/nx-rt",
+    "subprojects/nx-rt-env",
     "subprojects/nx-std",
     "subprojects/nx-std-sync",
     "subprojects/nx-svc",
