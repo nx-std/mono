@@ -17,13 +17,19 @@ use core::{
     cell::UnsafeCell,
     ffi::{c_char, c_void},
     ptr::{self, NonNull},
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::{AtomicPtr, AtomicU32, Ordering},
 };
 
 use nx_sys_sync::{Mutex, Once};
 
 /// Loader return function type
 pub type LoaderReturnFn = Option<unsafe extern "C" fn(i32) -> !>;
+
+/// Atmosphere flag bit position
+const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
+
+/// Atmosphere magic value in entry.value[1]: 'ATMOSPHR' in little-endian
+const ATMOSPHERE_MAGIC: u64 = 0x41544d4f53504852;
 
 /// Global environment state (immutable after initialization)
 static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
@@ -34,24 +40,8 @@ static ENV_INIT: Once = Once::new();
 /// Exit function pointer (mutable at runtime)
 static EXIT_FUNC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
-/// Chain loading state (mutable at runtime)
-struct NextLoadState {
-    path: UnsafeCell<[u8; 512]>,
-    argv: UnsafeCell<[u8; 2048]>,
-    mutex: Mutex,
-}
-
-impl NextLoadState {
-    const fn new() -> Self {
-        Self {
-            path: UnsafeCell::new([0; 512]),
-            argv: UnsafeCell::new([0; 2048]),
-            mutex: Mutex::new(),
-        }
-    }
-}
-
-unsafe impl Sync for NextLoadState {}
+/// Global HOS version storage (mutable at runtime, bit 31 = Atmosphere flag)
+static HOS_VERSION: AtomicU32 = AtomicU32::new(0);
 
 static NEXT_LOAD: NextLoadState = NextLoadState::new();
 
@@ -157,6 +147,14 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
             }
             Some(EntryType::UserIdStorage) => {
                 state.user_id_storage = NonNull::new(entry.value[0] as *mut AccountUid);
+            }
+            Some(EntryType::HosVersion) => {
+                let mut version = entry.value[0] as u32;
+                // Check for Atmosphere magic 'ATMOSPHR' in value[1]
+                if entry.value[1] == ATMOSPHERE_MAGIC {
+                    version |= HOS_VERSION_ATMOSPHERE_BIT;
+                }
+                set_hos_version(version);
             }
             Some(EntryType::EndOfList) => {
                 // Loader info is in the final entry's Value fields
@@ -283,6 +281,25 @@ pub fn has_next_load() -> bool {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.has_next_load
+}
+
+/// Returns the current Horizon OS version.
+///
+/// Returns `HosVersion::default()` (0.0.0) if the version has not been set.
+pub fn hos_version() -> HosVersion {
+    HosVersion::from_u32(HOS_VERSION.load(Ordering::Acquire))
+}
+
+/// Returns true if running on Atmosphere custom firmware.
+pub fn is_atmosphere() -> bool {
+    (HOS_VERSION.load(Ordering::Acquire) & HOS_VERSION_ATMOSPHERE_BIT) != 0
+}
+
+/// Sets the HOS version (internal use only).
+///
+/// This is called during environment initialization and from FFI.
+pub(crate) fn set_hos_version(version: u32) {
+    HOS_VERSION.store(version, Ordering::Release);
 }
 
 /// Set next NRO to load (chain loading)
@@ -509,4 +526,65 @@ pub struct ConfigEntry {
     pub key: u32,
     pub flags: u32,
     pub value: [u64; 2],
+}
+
+/// Chain loading state (mutable at runtime)
+struct NextLoadState {
+    path: UnsafeCell<[u8; 512]>,
+    argv: UnsafeCell<[u8; 2048]>,
+    mutex: Mutex,
+}
+
+impl NextLoadState {
+    const fn new() -> Self {
+        Self {
+            path: UnsafeCell::new([0; 512]),
+            argv: UnsafeCell::new([0; 2048]),
+            mutex: Mutex::new(),
+        }
+    }
+}
+
+unsafe impl Sync for NextLoadState {}
+
+/// Represents a Horizon OS version (major.minor.patch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct HosVersion(u32);
+
+impl HosVersion {
+    /// Creates a new HosVersion from major, minor, and patch components.
+    #[inline]
+    pub const fn new(major: u8, minor: u8, patch: u8) -> Self {
+        Self(((major as u32) << 16) | ((minor as u32) << 8) | (patch as u32))
+    }
+
+    /// Creates a HosVersion from a raw packed value.
+    #[inline]
+    pub const fn from_u32(raw: u32) -> Self {
+        Self(raw & !HOS_VERSION_ATMOSPHERE_BIT)
+    }
+
+    /// Returns the raw packed version value (without Atmosphere bit).
+    #[inline]
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Returns the major version component.
+    #[inline]
+    pub const fn major(self) -> u8 {
+        ((self.0 >> 16) & 0xFF) as u8
+    }
+
+    /// Returns the minor version component.
+    #[inline]
+    pub const fn minor(self) -> u8 {
+        ((self.0 >> 8) & 0xFF) as u8
+    }
+
+    /// Returns the patch version component.
+    #[inline]
+    pub const fn patch(self) -> u8 {
+        (self.0 & 0xFF) as u8
+    }
 }

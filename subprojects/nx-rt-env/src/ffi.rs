@@ -4,8 +4,9 @@ use core::ffi::{c_char, c_uint, c_void};
 
 use crate::{
     AccountUid, ConfigEntry, LoaderReturnFn, argv, exit_func_ptr, has_next_load, heap_override,
-    is_nso, is_syscall_hinted, last_load_result, loader_info, main_thread_handle,
-    own_process_handle, random_seed, set_exit_func_ptr, set_next_load, setup, user_id_storage,
+    hos_version, is_atmosphere, is_nso, is_syscall_hinted, last_load_result, loader_info,
+    main_thread_handle, own_process_handle, random_seed, set_exit_func_ptr, set_hos_version,
+    set_next_load, setup, user_id_storage,
 };
 
 /// Parse the homebrew loader environment configuration
@@ -165,4 +166,29 @@ pub unsafe extern "C" fn __nx_rt_env__env_get_user_id_storage() -> *mut AccountU
         Some(ptr) => ptr.as_ptr(),
         None => core::ptr::null_mut(),
     }
+}
+
+/// Get the current HOS version (without Atmosphere bit).
+///
+/// Equivalent to libnx's `hosversionGet()`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_env__hosversion_get() -> u32 {
+    hos_version().as_u32()
+}
+
+/// Set the HOS version.
+///
+/// Equivalent to libnx's `hosversionSet()`.
+/// This should only be called from envSetup/appInit in C code.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_env__hosversion_set(version: u32) {
+    set_hos_version(version)
+}
+
+/// Check if running on Atmosphere.
+///
+/// Equivalent to libnx's `hosversionIsAtmosphere()`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_env__hosversion_is_atmosphere() -> bool {
+    is_atmosphere()
 }
