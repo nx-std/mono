@@ -34,6 +34,10 @@ int main()
 
     // Print the test header
     printf("NX-TESTS (%s)\n", VERSION);
+    u32 ver = hosversionGet();
+    printf("HOS %d.%d.%d%s\n",
+        HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
+        hosversionIsAtmosphere() ? " (AMS)" : "");
     printf("Press + to exit\n");
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
