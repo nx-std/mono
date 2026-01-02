@@ -2,6 +2,7 @@
 /* Redirects libnx env functions to nx-rt-env __nx_rt_env__* implementations */
 
 EXTERN(__nx_rt_env__env_setup);
+EXTERN(__nx_rt_env__setup_main_thread_tls);
 EXTERN(__nx_rt_env__env_get_loader_info);
 EXTERN(__nx_rt_env__env_get_loader_info_size);
 EXTERN(__nx_rt_env__env_get_main_thread_handle);
@@ -23,6 +24,7 @@ EXTERN(__nx_rt_env__env_get_random_seed);
 EXTERN(__nx_rt_env__env_get_user_id_storage);
 
 envSetup = __nx_rt_env__env_setup;
+newlibSetup = __nx_rt_env__setup_main_thread_tls;
 envGetLoaderInfo = __nx_rt_env__env_get_loader_info;
 envGetLoaderInfoSize = __nx_rt_env__env_get_loader_info_size;
 envGetMainThreadHandle = __nx_rt_env__env_get_main_thread_handle;
