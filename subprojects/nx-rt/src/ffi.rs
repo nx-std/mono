@@ -43,3 +43,26 @@ pub(crate) unsafe fn set_system_argv(argc: i32, argv: *mut *mut c_char) {
         __nx_rt__system_argv = argv;
     }
 }
+
+/// nxlink host address (C-compatible, network byte order)
+///
+/// This corresponds to `struct in_addr __nxlink_host` in libnx.
+#[unsafe(no_mangle)]
+pub static mut __nx_rt__nxlink_host: u32 = 0;
+
+/// Set the nxlink host address
+///
+/// Called from nxlink::strip_nxlink_suffix() when the _NXLINK_ suffix is detected.
+pub(crate) fn set_nxlink_host(addr: u32) {
+    unsafe {
+        __nx_rt__nxlink_host = addr;
+    }
+}
+
+/// Get the nxlink host address
+///
+/// Returns None if no nxlink host was detected.
+pub(crate) fn get_nxlink_host() -> Option<u32> {
+    let addr = unsafe { __nx_rt__nxlink_host };
+    if addr != 0 { Some(addr) } else { None }
+}
