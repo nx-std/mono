@@ -103,7 +103,7 @@ pub fn get_aslr_region_info() -> Result<(usize, usize), GetInfoError> {
 }
 
 /// Retrieves the base address and size of the stack region for the current process.
-
+///
 /// This function provides a safe wrapper around the `svcGetInfo` system call, allowing
 /// retrieval of the base address and size of the stack region for the current process.
 ///
@@ -112,6 +112,23 @@ pub fn get_stack_region_info() -> Result<(usize, usize), GetInfoError> {
     let base = get_info(InfoType::StackRegionAddress, raw::CUR_PROCESS_HANDLE)?;
     let size = get_info(InfoType::StackRegionSize, raw::CUR_PROCESS_HANDLE)?;
     Ok((base as usize, size as usize))
+}
+
+/// Returns true if the current process has a debugger attached.
+///
+/// This queries the kernel using [`InfoType::DebuggerAttached`] and returns
+/// `true` only if the call succeeds AND the returned value is non-zero.
+pub fn is_debugger_attached() -> bool {
+    get_info(InfoType::DebuggerAttached, CUR_PROCESS_HANDLE).is_ok_and(|val| val != 0)
+}
+
+/// Returns true if the underlying kernel is Mesosphère.
+///
+/// Mesosphère is an open-source reimplementation of the Horizon OS kernel.
+/// This function attempts to query Mesosphère-specific metadata and returns
+/// `true` if the kernel responds (regardless of the value).
+pub fn is_mesosphere() -> bool {
+    get_info(InfoType::MesosphereMeta, INVALID_HANDLE).is_ok()
 }
 
 /// Retrieves information about the system or a kernel object.
@@ -229,6 +246,8 @@ pub enum InfoType {
     TransferMemoryHint,
     /// [1.0.0-12.1.0] Number of ticks spent on thread (deprecated).
     ThreadTickCountDeprecated,
+    /// [Mesosphère] Metadata for Mesosphère kernel detection.
+    MesosphereMeta,
 }
 
 impl InfoType {
@@ -266,6 +285,7 @@ impl InfoType {
             InfoType::AliasRegionExtraSize => (28, 0),
             InfoType::TransferMemoryHint => (34, 0),
             InfoType::ThreadTickCountDeprecated => (0xF0000002, 0),
+            InfoType::MesosphereMeta => (65000, 0),
         }
     }
 }
