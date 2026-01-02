@@ -19,6 +19,7 @@ pub mod debug;
 pub mod error;
 pub mod mem;
 pub mod misc;
+pub mod process;
 pub mod raw;
 pub mod result;
 pub mod sync;

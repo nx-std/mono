@@ -26,17 +26,17 @@ macro_rules! define_handle_type {
             /// # Safety
             ///
             /// Caller must guarantee that the raw handle is valid.
-            pub unsafe fn from_raw(raw: $crate::raw::Handle) -> Self {
+            pub const unsafe fn from_raw(raw: $crate::raw::Handle) -> Self {
                 Self(raw)
             }
 
             /// Returns `true` if the handle is valid.
-            pub fn is_valid(&self) -> bool {
+            pub const fn is_valid(&self) -> bool {
                 self.0 != $crate::raw::INVALID_HANDLE
             }
 
             /// Converts the [`$name`] to a raw handle.
-            pub fn to_raw(&self) -> $crate::raw::Handle {
+            pub const fn to_raw(&self) -> $crate::raw::Handle {
                 self.0
             }
         }

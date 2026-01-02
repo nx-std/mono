@@ -2,11 +2,12 @@
 
 use core::ffi::{c_char, c_uint, c_void};
 
+use nx_svc::thread::Handle as ThreadHandle;
+
 use crate::{
     AccountUid, ConfigEntry, LoaderReturnFn, argv, exit_func_ptr, has_next_load, heap_override,
-    hos_version, is_atmosphere, is_nso, is_syscall_hinted, last_load_result, loader_info,
-    main_thread_handle, own_process_handle, random_seed, set_exit_func_ptr, set_hos_version,
-    set_next_load, setup, user_id_storage,
+    hos_version, is_nso, last_load_result, loader_info, main_thread_handle, own_process_handle,
+    random_seed, set_exit_func_ptr, set_next_load, setup, syscall_hints, user_id_storage,
 };
 
 /// Parse the homebrew loader environment configuration
@@ -18,7 +19,19 @@ pub unsafe extern "C" fn __nx_rt_env__env_setup(
 ) {
     // SAFETY: Caller (libnx CRT0) guarantees that ctx is either null (NSO mode)
     // or points to a valid ConfigEntry array terminated by EndOfList.
-    unsafe { setup(ctx, main_thread, saved_lr) }
+    // The main_thread handle is provided by the kernel/loader and is guaranteed valid.
+    unsafe { setup(ctx, ThreadHandle::from_raw(main_thread), saved_lr) }
+}
+
+/// Initialize main thread TLS (ThreadVars and .tdata copy)
+///
+/// Rust port of libnx's `newlibSetup()`. Must be called after `envSetup()`
+/// and before the allocator is initialized.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_env__setup_main_thread_tls() {
+    // SAFETY: Caller (libnx initialization sequence) guarantees this is called
+    // exactly once during main thread startup, before any allocator use.
+    unsafe { crate::main_thread::setup() }
 }
 
 /// Get loader info string pointer
@@ -42,7 +55,7 @@ pub unsafe extern "C" fn __nx_rt_env__env_get_loader_info_size() -> u64 {
 /// Get main thread handle
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__env_get_main_thread_handle() -> u32 {
-    main_thread_handle()
+    main_thread_handle().to_raw()
 }
 
 /// Returns true if running as NSO
@@ -93,13 +106,13 @@ pub unsafe extern "C" fn __nx_rt_env__env_get_argv() -> *const c_char {
 /// Returns true if the given syscall is hinted as available
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__env_is_syscall_hinted(svc: c_uint) -> bool {
-    is_syscall_hinted(svc)
+    syscall_hints().is_available(svc)
 }
 
 /// Get process handle
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__env_get_own_process_handle() -> u32 {
-    own_process_handle()
+    own_process_handle().to_raw()
 }
 
 /// Get exit function pointer
@@ -173,7 +186,7 @@ pub unsafe extern "C" fn __nx_rt_env__env_get_user_id_storage() -> *mut AccountU
 /// Equivalent to libnx's `hosversionGet()`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__hosversion_get() -> u32 {
-    hos_version().as_u32()
+    hos_version::get().as_u32()
 }
 
 /// Set the HOS version.
@@ -182,7 +195,7 @@ pub unsafe extern "C" fn __nx_rt_env__hosversion_get() -> u32 {
 /// This should only be called from envSetup/appInit in C code.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__hosversion_set(version: u32) {
-    set_hos_version(version)
+    hos_version::set(version)
 }
 
 /// Check if running on Atmosphere.
@@ -190,5 +203,5 @@ pub unsafe extern "C" fn __nx_rt_env__hosversion_set(version: u32) {
 /// Equivalent to libnx's `hosversionIsAtmosphere()`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__hosversion_is_atmosphere() -> bool {
-    is_atmosphere()
+    hos_version::is_atmosphere()
 }

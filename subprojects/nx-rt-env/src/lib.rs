@@ -13,23 +13,31 @@ extern crate nx_panic_handler as _;
 #[cfg(feature = "ffi")]
 mod ffi;
 
+pub mod hos_version;
+pub mod main_thread;
+mod syscall_hint;
+
 use core::{
     cell::UnsafeCell,
     ffi::{c_char, c_void},
     ptr::{self, NonNull},
-    sync::atomic::{AtomicPtr, AtomicU32, Ordering},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
+use nx_svc::{
+    process::Handle as ProcessHandle, raw::INVALID_HANDLE, thread::Handle as ThreadHandle,
+};
 use nx_sys_sync::{Mutex, Once};
+pub use syscall_hint::SyscallHints;
 
 /// Loader return function type
 pub type LoaderReturnFn = Option<unsafe extern "C" fn(i32) -> !>;
 
-/// Atmosphere flag bit position
-const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
-
 /// Atmosphere magic value in entry.value[1]: 'ATMOSPHR' in little-endian
 const ATMOSPHERE_MAGIC: u64 = 0x41544d4f53504852;
+
+/// Atmosphere flag bit position (used to set bit 31 when Atmosphere is detected)
+const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
 
 /// Global environment state (immutable after initialization)
 static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
@@ -40,9 +48,6 @@ static ENV_INIT: Once = Once::new();
 /// Exit function pointer (mutable at runtime)
 static EXIT_FUNC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
-/// Global HOS version storage (mutable at runtime, bit 31 = Atmosphere flag)
-static HOS_VERSION: AtomicU32 = AtomicU32::new(0);
-
 static NEXT_LOAD: NextLoadState = NextLoadState::new();
 
 /// Parse the homebrew loader environment configuration
@@ -52,7 +57,7 @@ static NEXT_LOAD: NextLoadState = NextLoadState::new();
 /// This function must be called exactly once during initialization.
 /// The `ctx` pointer must either be null (NSO mode) or point to a valid
 /// ConfigEntry array terminated by EndOfList.
-pub unsafe fn setup(ctx: *const ConfigEntry, main_thread: u32, saved_lr: LoaderReturnFn) {
+pub unsafe fn setup(ctx: *const ConfigEntry, main_thread: ThreadHandle, saved_lr: LoaderReturnFn) {
     // Use Once to ensure this only runs once
     ENV_INIT.call_once(|| {
         // SAFETY: We're inside Once::call_once, which guarantees exclusive access
@@ -71,7 +76,7 @@ pub unsafe fn setup(ctx: *const ConfigEntry, main_thread: u32, saved_lr: LoaderR
 /// # Safety
 ///
 /// Must only be called from within `Once::call_once`.
-unsafe fn env_init_nso(state: &mut EnvState, main_thread: u32, saved_lr: LoaderReturnFn) {
+unsafe fn env_init_nso(state: &mut EnvState, main_thread: ThreadHandle, saved_lr: LoaderReturnFn) {
     // Initialize exit function pointer
     let exit_ptr = match saved_lr {
         None => ptr::null_mut(),
@@ -84,9 +89,7 @@ unsafe fn env_init_nso(state: &mut EnvState, main_thread: u32, saved_lr: LoaderR
     state.main_thread_handle = main_thread;
 
     // In NSO mode, all syscalls are hinted as available
-    state.syscall_hints[0] = u64::MAX;
-    state.syscall_hints[1] = u64::MAX;
-    state.syscall_hints[2] = u64::MAX;
+    state.syscall_hints = SyscallHints::all_available();
 }
 
 /// NRO initialization
@@ -113,12 +116,21 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
         let entry = unsafe { &*entry_ptr };
 
         match EntryType::from_u32(entry.key) {
-            Some(EntryType::MainThreadHandle) => {
-                state.main_thread_handle = entry.value[0] as u32;
+            Some(EntryType::HosVersion) => {
+                let mut version = entry.value[0] as u32;
+                // Check for Atmosphere magic 'ATMOSPHR' in value[1]
+                if entry.value[1] == ATMOSPHERE_MAGIC {
+                    version |= HOS_VERSION_ATMOSPHERE_BIT;
+                }
+                hos_version::set(version);
             }
-            Some(EntryType::NextLoadPath) => {
-                state.has_next_load = true;
-                // Value[0] and Value[1] are buffer pointers set by loader
+            Some(EntryType::MainThreadHandle) => {
+                // SAFETY: The handle is provided by the loader and guaranteed valid
+                state.main_thread_handle = unsafe { ThreadHandle::from_raw(entry.value[0] as u32) };
+            }
+            Some(EntryType::ProcessHandle) => {
+                // SAFETY: The handle is provided by the loader and guaranteed valid
+                state.process_handle = unsafe { ProcessHandle::from_raw(entry.value[0] as u32) };
             }
             Some(EntryType::OverrideHeap) => {
                 state.heap_override = NonNull::new(entry.value[0] as *mut c_void)
@@ -127,34 +139,28 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
             Some(EntryType::Argv) => {
                 state.argv = NonNull::new(entry.value[1] as *mut c_char);
             }
+            Some(EntryType::RandomSeed) => {
+                state.random_seed = Some([entry.value[0], entry.value[1]]);
+            }
             Some(EntryType::SyscallAvailableHint) => {
                 // SVCs 0x00-0x7F
-                state.syscall_hints[0] = entry.value[0];
-                state.syscall_hints[1] = entry.value[1];
+                state
+                    .syscall_hints
+                    .set_hint_0_7f(entry.value[0], entry.value[1]);
             }
             Some(EntryType::SyscallAvailableHint2) => {
                 // SVCs 0x80-0xBF
-                state.syscall_hints[2] = entry.value[0];
-            }
-            Some(EntryType::ProcessHandle) => {
-                state.process_handle = entry.value[0] as u32;
-            }
-            Some(EntryType::LastLoadResult) => {
-                state.last_load_result = entry.value[0] as u32;
-            }
-            Some(EntryType::RandomSeed) => {
-                state.random_seed = Some([entry.value[0], entry.value[1]]);
+                state.syscall_hints.set_hint_80_bf(entry.value[0]);
             }
             Some(EntryType::UserIdStorage) => {
                 state.user_id_storage = NonNull::new(entry.value[0] as *mut AccountUid);
             }
-            Some(EntryType::HosVersion) => {
-                let mut version = entry.value[0] as u32;
-                // Check for Atmosphere magic 'ATMOSPHR' in value[1]
-                if entry.value[1] == ATMOSPHERE_MAGIC {
-                    version |= HOS_VERSION_ATMOSPHERE_BIT;
-                }
-                set_hos_version(version);
+            Some(EntryType::LastLoadResult) => {
+                state.last_load_result = entry.value[0] as u32;
+            }
+            Some(EntryType::NextLoadPath) => {
+                state.has_next_load = true;
+                // Value[0] and Value[1] are buffer pointers set by loader
             }
             Some(EntryType::EndOfList) => {
                 // Loader info is in the final entry's Value fields
@@ -184,7 +190,7 @@ pub fn loader_info() -> Option<(NonNull<c_char>, u64)> {
 }
 
 /// Get main thread handle
-pub fn main_thread_handle() -> u32 {
+pub fn main_thread_handle() -> ThreadHandle {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.main_thread_handle
@@ -214,22 +220,15 @@ pub fn argv() -> Option<*const c_char> {
     state.argv.map(|ptr| ptr.as_ptr() as *const c_char)
 }
 
-/// Returns true if the given syscall is hinted as available
-pub fn is_syscall_hinted(svc: u32) -> bool {
-    if svc >= 192 {
-        return false;
-    }
-
+/// Get syscall availability hints
+pub fn syscall_hints() -> SyscallHints {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    let hint_index = (svc / 64) as usize;
-    let bit_index = svc % 64;
-
-    (state.syscall_hints[hint_index] & (1u64 << bit_index)) != 0
+    state.syscall_hints
 }
 
 /// Get process handle
-pub fn own_process_handle() -> u32 {
+pub fn own_process_handle() -> ProcessHandle {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.process_handle
@@ -281,25 +280,6 @@ pub fn has_next_load() -> bool {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.has_next_load
-}
-
-/// Returns the current Horizon OS version.
-///
-/// Returns `HosVersion::default()` (0.0.0) if the version has not been set.
-pub fn hos_version() -> HosVersion {
-    HosVersion::from_u32(HOS_VERSION.load(Ordering::Acquire))
-}
-
-/// Returns true if running on Atmosphere custom firmware.
-pub fn is_atmosphere() -> bool {
-    (HOS_VERSION.load(Ordering::Acquire) & HOS_VERSION_ATMOSPHERE_BIT) != 0
-}
-
-/// Sets the HOS version (internal use only).
-///
-/// This is called during environment initialization and from FFI.
-pub(crate) fn set_hos_version(version: u32) {
-    HOS_VERSION.store(version, Ordering::Release);
 }
 
 /// Set next NRO to load (chain loading)
@@ -373,12 +353,11 @@ struct EnvState {
     argv: Option<NonNull<c_char>>,
 
     /// Thread and process handles
-    main_thread_handle: u32,
-    process_handle: u32,
+    main_thread_handle: ThreadHandle,
+    process_handle: ProcessHandle,
 
     /// Syscall availability hints (192 bits for SVCs 0x00-0xBF)
-    /// Each bit represents a syscall: bit 0 = SVC 0, bit 1 = SVC 1, etc.
-    syscall_hints: [u64; 3],
+    syscall_hints: SyscallHints,
 
     /// Random seed data
     random_seed: Option<[u64; 2]>,
@@ -402,9 +381,11 @@ impl EnvState {
             is_nso: false,
             heap_override: None,
             argv: None,
-            main_thread_handle: 0,
-            process_handle: 0,
-            syscall_hints: [0; 3],
+            // SAFETY: INVALID_HANDLE is a valid (invalid) handle value
+            main_thread_handle: unsafe { ThreadHandle::from_raw(INVALID_HANDLE) },
+            // SAFETY: INVALID_HANDLE is a valid (invalid) handle value
+            process_handle: unsafe { ProcessHandle::from_raw(INVALID_HANDLE) },
+            syscall_hints: SyscallHints::new(),
             random_seed: None,
             last_load_result: 0,
             loader_info: None,
@@ -546,45 +527,3 @@ impl NextLoadState {
 }
 
 unsafe impl Sync for NextLoadState {}
-
-/// Represents a Horizon OS version (major.minor.patch).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct HosVersion(u32);
-
-impl HosVersion {
-    /// Creates a new HosVersion from major, minor, and patch components.
-    #[inline]
-    pub const fn new(major: u8, minor: u8, patch: u8) -> Self {
-        Self(((major as u32) << 16) | ((minor as u32) << 8) | (patch as u32))
-    }
-
-    /// Creates a HosVersion from a raw packed value.
-    #[inline]
-    pub const fn from_u32(raw: u32) -> Self {
-        Self(raw & !HOS_VERSION_ATMOSPHERE_BIT)
-    }
-
-    /// Returns the raw packed version value (without Atmosphere bit).
-    #[inline]
-    pub const fn as_u32(self) -> u32 {
-        self.0
-    }
-
-    /// Returns the major version component.
-    #[inline]
-    pub const fn major(self) -> u8 {
-        ((self.0 >> 16) & 0xFF) as u8
-    }
-
-    /// Returns the minor version component.
-    #[inline]
-    pub const fn minor(self) -> u8 {
-        ((self.0 >> 8) & 0xFF) as u8
-    }
-
-    /// Returns the patch version component.
-    #[inline]
-    pub const fn patch(self) -> u8 {
-        (self.0 & 0xFF) as u8
-    }
-}
