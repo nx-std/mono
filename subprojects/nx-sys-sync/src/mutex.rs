@@ -22,8 +22,6 @@ use nx_svc::{
 };
 use static_assertions::const_assert_eq;
 
-use crate::tls;
-
 /// A mutual exclusion primitive useful for protecting shared data
 ///
 /// A mutex is a synchronization primitive that can be used to protect shared data from being
@@ -307,5 +305,5 @@ impl MutexTag {
 /// Get the current thread's kernel handle.
 #[inline(always)]
 fn get_curr_thread_handle() -> Handle {
-    tls::get_current_thread_handle().to_raw()
+    nx_sys_thread_tls::get_current_thread_handle().to_raw()
 }

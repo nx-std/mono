@@ -55,6 +55,13 @@ option(
 )
 
 option(
+    'use_nx_sys_thread_tls',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `sys-thread-tls` feature',
+    yield : true
+)
+
+option(
     'use_nx_sys_thread',
     type : 'feature', value : 'auto',
     description : 'Enable the `sys-thread` feature',

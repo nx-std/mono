@@ -1,21 +1,21 @@
 [package]
-name = "nx-rt-env"
+name = "nx-sys-thread-tls"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_rt_env"
+name = "nx_sys_thread_tls"
 crate-type = ["rlib", "staticlib"]
 test = false
 doctest = false
 bench = false
 
 [features]
-# Enable the __nx_rt_env FFI
+# Enable the __nx_sys_thread_tls FFI
 ffi = []
 
 [dependencies]
+nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
-nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
-nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+static_assertions = "1.1.0"

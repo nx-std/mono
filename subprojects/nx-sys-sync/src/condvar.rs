@@ -13,7 +13,6 @@ use nx_svc::{
 };
 
 use super::Mutex;
-use crate::tls;
 
 /// A condition variable primitive for thread synchronization.
 ///
@@ -123,5 +122,5 @@ impl Default for Condvar {
 /// Get the current thread's kernel handle
 #[inline(always)]
 fn get_curr_thread_handle() -> Handle {
-    tls::get_current_thread_handle().to_raw()
+    nx_sys_thread_tls::get_current_thread_handle().to_raw()
 }

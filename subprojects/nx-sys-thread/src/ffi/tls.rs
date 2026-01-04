@@ -19,7 +19,7 @@ use crate::{
 /// Returns a pointer to the thread-local storage buffer.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __nx_sys_thread__arm_get_tls() -> *mut c_void {
-    tls_region::get_ptr()
+    tls_region::get_ptr().cast()
 }
 
 /// Returns a mutable reference to the `ThreadVars` structure for the current thread.

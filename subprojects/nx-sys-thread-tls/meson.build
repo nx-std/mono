@@ -1,4 +1,4 @@
-project('nx-rt-env', version : '0.1.0')
+project('nx-sys-thread-tls', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
@@ -10,27 +10,22 @@ cargo = find_program('cargo', required : true)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-sys-sync
-nx_sys_sync_proj = subproject('nx-sys-sync')
-nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
-
-# nx-sys-thread-tls
-nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
-nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
+# nx-svc
+nx_svc_proj = subproject('nx-svc')
+nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
-    nx_sys_sync_dep,
-    nx_sys_thread_tls_dep,
+    nx_svc_dep,
 ]
 
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------
 # Target
-nx_rt_env_tgt = custom_target(
-    'nx-rt-env',
+nx_sys_thread_tls_tgt = custom_target(
+    'nx-sys-thread-tls',
     command : [
         cargo, 'build',
         '--package', meson.project_name(),
@@ -39,7 +34,7 @@ nx_rt_env_tgt = custom_target(
         '--artifact-dir', '@OUTDIR@',
         '--features', 'ffi',
     ],
-    output : ['libnx_rt_env.a', 'libnx_rt_env.rlib'],
+    output : ['libnx_sys_thread_tls.a', 'libnx_sys_thread_tls.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -48,10 +43,10 @@ nx_rt_env_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Dependency declaration
 #---------------------------------------------------------------------------------
-# Linker script for overriding libnx env functions
-nx_rt_env_ld_override = meson.current_source_dir() / 'rt_env_override.ld'
+# Linker script for overriding libnx TLS functions
+nx_sys_thread_tls_ld_override = meson.current_source_dir() / 'thread_tls_override.ld'
 
-nx_rt_env_dep = declare_dependency(
-    link_with : nx_rt_env_tgt[0],
+nx_sys_thread_tls_dep = declare_dependency(
+    link_with : nx_sys_thread_tls_tgt[0],
     dependencies : deps,
 )
