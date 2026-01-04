@@ -377,17 +377,27 @@ pub unsafe fn init_thread_vars(
 ///
 /// This is a generic accessor for the `ThreadVars.thread_info_ptr` field. It returns
 /// `*mut T` instead of `*mut c_void`, allowing type-safe access to thread objects.
-///
-/// # Type Parameter
-///
-/// - `T`: The type of the thread object (e.g., `Thread` from `nx-sys-thread`)
 #[inline]
 pub fn get_thread_info_ptr<T>() -> *mut T {
     let tv_ptr = thread_vars_ptr();
-
     // SAFETY: Reading the thread_info_ptr field from ThreadVars with volatile semantics
     // to prevent compiler optimizations from reordering the load.
     unsafe { ptr::read_volatile(&raw const (*tv_ptr).thread_info_ptr).cast() }
+}
+
+/// Sets the current thread's language-specific thread object pointer.
+///
+/// This is a generic setter for the `ThreadVars.thread_info_ptr` field.
+///
+/// # Safety
+///
+/// - The pointer must be valid for the lifetime of the thread
+/// - Must not be called concurrently with reads/writes to the same field
+#[inline]
+pub unsafe fn set_thread_info_ptr<T>(ptr: *mut T) {
+    let tv_ptr = thread_vars_ptr();
+    // SAFETY: Writing the thread_info_ptr field with volatile semantics
+    unsafe { ptr::write_volatile(&raw mut (*tv_ptr).thread_info_ptr, ptr.cast()) };
 }
 
 /// Returns the [`Handle`] of the current thread.

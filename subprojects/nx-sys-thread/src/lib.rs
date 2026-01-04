@@ -1,21 +1,15 @@
 #![no_std]
 
-extern crate nx_panic_handler as _; // provides #[panic_handler]
-
-// The `alloc` crate enables memory allocation.
 extern crate alloc;
-// The `nx-alloc` crate exposes the `#[global_allocator]` for the dependent crates.
-extern crate nx_alloc;
-
-mod init;
-mod registry;
-mod thread_impl;
-pub mod tls_block;
-
-pub use init::*;
-pub use nx_sys_thread_tls as tls_region;
-pub use registry::*;
-pub use thread_impl::*;
+extern crate nx_alloc; // Provides #[global_allocator]
+extern crate nx_panic_handler; // provides #[panic_handler]
 
 #[cfg(feature = "ffi")]
 mod ffi;
+
+mod thread_impl;
+pub mod tls_block;
+
+pub use nx_sys_thread_tls as tls_region;
+
+pub use self::thread_impl::*;

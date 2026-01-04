@@ -22,17 +22,37 @@ nx_rt_env_dep = nx_rt_env_proj.get_variable('nx_rt_env_dep')
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
+# nx-std-sync
+nx_std_sync_proj = subproject('nx-std-sync')
+nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
+
+# nx-sys-mem
+nx_sys_mem_proj = subproject('nx-sys-mem')
+nx_sys_mem_dep = nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
+
 # nx-sys-sync
 nx_sys_sync_proj = subproject('nx-sys-sync')
 nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
+
+# nx-sys-thread
+nx_sys_thread_proj = subproject('nx-sys-thread')
+nx_sys_thread_dep = nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
+
+# nx-sys-thread-tls
+nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
+nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
 
 # Dependencies list
 deps = [
     nx_alloc_dep,
     nx_panic_handler_dep,
     nx_rt_env_dep,
+    nx_std_sync_dep,
     nx_svc_dep,
+    nx_sys_mem_dep,
     nx_sys_sync_dep,
+    nx_sys_thread_dep,
+    nx_sys_thread_tls_dep,
 ]
 
 #---------------------------------------------------------------------------------

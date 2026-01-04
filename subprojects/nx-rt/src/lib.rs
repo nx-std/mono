@@ -15,6 +15,7 @@ extern crate nx_panic_handler; // Provides #[panic_handler]
 mod ffi;
 
 pub mod argv;
+pub mod thread_registry;
 
 // Re-export all nx-rt-env APIs
 pub mod env {

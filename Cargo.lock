@@ -176,8 +176,12 @@ dependencies = [
  "nx-alloc",
  "nx-panic-handler",
  "nx-rt-env",
+ "nx-std-sync",
  "nx-svc",
+ "nx-sys-mem",
  "nx-sys-sync",
+ "nx-sys-thread",
+ "nx-sys-thread-tls",
 ]
 
 [[package]]
@@ -257,7 +261,6 @@ dependencies = [
  "intrusive-collections",
  "nx-alloc",
  "nx-panic-handler",
- "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-thread-tls",

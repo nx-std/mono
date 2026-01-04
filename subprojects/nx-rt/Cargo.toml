@@ -17,5 +17,9 @@ ffi = []
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rt-env = { version = "0.1.0", path = "../nx-rt-env" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
+nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
