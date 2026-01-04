@@ -14,5 +14,6 @@ members = [
     "subprojects/nx-sys-mem",
     "subprojects/nx-sys-sync",
     "subprojects/nx-sys-thread",
+    "subprojects/nx-sys-thread-tls",
     "subprojects/nx-time",
 ]

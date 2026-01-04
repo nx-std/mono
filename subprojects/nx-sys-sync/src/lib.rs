@@ -27,8 +27,6 @@ mod remutex;
 mod rwlock;
 mod semaphore;
 
-mod tls;
-
 #[doc(inline)]
 pub use self::{
     barrier::Barrier, condvar::Condvar, mutex::Mutex, once::Once, remutex::ReentrantMutex,

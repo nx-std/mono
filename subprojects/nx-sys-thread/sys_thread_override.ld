@@ -2,12 +2,8 @@
 /* Redirects libnx thread functions to __nx_sys_thread_* implementations */
 
 /* Thread Local Storage (TLS) */
-EXTERN(__nx_sys_thread__arm_get_tls);
-EXTERN(__nx_sys_thread__get_thread_vars);
 EXTERN(__nx_sys_thread__get_tls_start_offset);
 
-armGetTls         = __nx_sys_thread__arm_get_tls;
-getThreadVars     = __nx_sys_thread__get_thread_vars;
 getTlsStartOffset = __nx_sys_thread__get_tls_start_offset;
 
 /* Thread */

@@ -15,7 +15,7 @@ bench = false
 ffi = []
 
 [dependencies]
-nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 static_assertions = "1.1.0"

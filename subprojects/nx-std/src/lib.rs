@@ -32,7 +32,8 @@ pub mod time {
     feature = "svc",
     feature = "sys-mem",
     feature = "sys-sync",
-    feature = "sys-thread"
+    feature = "sys-thread",
+    feature = "sys-thread-tls"
 ))]
 pub mod sys {
     #[cfg(any(feature = "sys", feature = "svc"))]
@@ -43,4 +44,6 @@ pub mod sys {
     pub use nx_sys_sync as sync;
     #[cfg(any(feature = "sys", feature = "sys-thread"))]
     pub use nx_sys_thread as thread;
+    #[cfg(any(feature = "sys", feature = "sys-thread-tls"))]
+    pub use nx_sys_thread_tls as thread_tls;
 }

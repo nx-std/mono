@@ -11,8 +11,9 @@ mod init;
 mod registry;
 mod thread_impl;
 pub mod tls_block;
-pub mod tls_region;
+
 pub use init::*;
+pub use nx_sys_thread_tls as tls_region;
 pub use registry::*;
 pub use thread_impl::*;
 

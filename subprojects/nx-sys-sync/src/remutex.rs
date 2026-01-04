@@ -33,7 +33,6 @@ use core::cell::UnsafeCell;
 use nx_svc::raw::{Handle, INVALID_HANDLE};
 
 use super::mutex::Mutex;
-use crate::tls;
 
 /// A reentrant mutual exclusion primitive useful for protecting shared data.
 ///
@@ -136,5 +135,5 @@ impl ReentrantMutex {
 /// Get the current thread's kernel handle.
 #[inline(always)]
 fn get_curr_thread_handle() -> Handle {
-    tls::get_current_thread_handle().to_raw()
+    nx_sys_thread_tls::get_current_thread_handle().to_raw()
 }

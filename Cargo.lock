@@ -184,10 +184,10 @@ dependencies = [
 name = "nx-rt-env"
 version = "0.1.0"
 dependencies = [
- "nx-cpu",
  "nx-panic-handler",
  "nx-svc",
  "nx-sys-sync",
+ "nx-sys-thread-tls",
 ]
 
 [[package]]
@@ -204,6 +204,7 @@ dependencies = [
  "nx-sys-mem",
  "nx-sys-sync",
  "nx-sys-thread",
+ "nx-sys-thread-tls",
  "nx-time",
 ]
 
@@ -243,9 +244,9 @@ dependencies = [
 name = "nx-sys-sync"
 version = "0.1.0"
 dependencies = [
- "nx-cpu",
  "nx-panic-handler",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
 ]
 
@@ -255,14 +256,24 @@ version = "0.1.0"
 dependencies = [
  "intrusive-collections",
  "nx-alloc",
- "nx-cpu",
  "nx-panic-handler",
  "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",
+ "nx-sys-thread-tls",
  "nx-time",
  "static_assertions",
  "thiserror",
+]
+
+[[package]]
+name = "nx-sys-thread-tls"
+version = "0.1.0"
+dependencies = [
+ "nx-cpu",
+ "nx-panic-handler",
+ "nx-svc",
+ "static_assertions",
 ]
 
 [[package]]

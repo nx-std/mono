@@ -63,6 +63,13 @@ option(
 )
 
 option(
+    'use_nx_sys_thread_tls',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx functions with nx-sys-thread-tls functions',
+    yield : true
+)
+
+option(
     'use_nx_sys_thread',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Override all libnx functions with nx-sys-thread functions',

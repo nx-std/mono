@@ -67,6 +67,17 @@ if get_option('use_nx_sys_sync').enabled()
     deps_cargo_features += ['sys-sync']
 endif
 
+# nx-sys-thread-tls
+if get_option('use_nx_sys_thread_tls').enabled()
+    nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
+
+    deps += nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
+    deps_override_link_args += ['-T', nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_ld_override')]
+
+    debug('sys-thread-tls feature: enabled')
+    deps_cargo_features += ['sys-thread-tls']
+endif
+
 # nx-sys-mem
 if get_option('use_nx_sys_mem').enabled()
     nx_sys_mem_proj = subproject('nx-sys-mem')

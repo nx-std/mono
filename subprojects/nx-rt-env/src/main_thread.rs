@@ -1,7 +1,7 @@
 //! Main thread TLS initialization.
 //!
-//! This module provides [`setup_main_thread_tls`], the Rust port of libnx's `newlibSetup()`
-//! function. It initializes the main thread's `ThreadVars` structure and copies the `.tdata`
+//! This module provides [`setup`], the Rust port of libnx's `newlibSetup()` function.
+//! It initializes the main thread's `ThreadVars` structure and copies the `.tdata`
 //! section into the main thread's TLS block.
 //!
 //! ## Initialization Order Requirement
@@ -13,79 +13,16 @@
 //!
 //! The correct initialization sequence (matching libnx C runtime) is:
 //! 1. `envSetup()` - Parse homebrew environment
-//! 2. `newlibSetup()` / `setup_main_thread_tls()` - Initialize ThreadVars ← **THIS FUNCTION**
+//! 2. `newlibSetup()` / [`setup()`] - Initialize ThreadVars ← **THIS FUNCTION**
 //! 3. `virtmemSetup()` - Virtual memory setup
 //! 4. `__libnx_initheap()` - Allocate heap ← Requires ThreadVars to be initialized
-//!
-//! ## Why Not in `nx-sys-thread`?
-//!
-//! The full `ThreadVars` type and related utilities live in `nx-sys-thread`, but that crate
-//! depends on `nx-alloc` (creating a dependency chain: `nx-sys-thread` → `nx-alloc` →
-//! `nx-sys-sync`). Since we need to initialize `ThreadVars` *before* the allocator, this
-//! function must live in a crate that doesn't depend on the allocator.
-//!
-//! Following the same pattern as `nx-sys-sync::tls`, we use hardcoded offset constants
-//! rather than importing types from `nx-sys-thread`. These offsets must be kept in sync
-//! with the `ThreadVars` definition in `nx-sys-thread::tls_region`.
-//!
-//! ## TLS Memory Layout
-//!
-//! ```text
-//! TLS base (TPIDRRO_EL0)
-//! 0x000  ┌────────────────────────────┐
-//!        │ IPC Message Buffer         │ 0x100 bytes
-//! 0x100  ├────────────────────────────┤
-//!        │ <Unknown>                  │
-//! 0x108  ├────────────────────────────┤
-//!        │ Dynamic TLS slots (27)     │ 27 × 8 = 0xD8 bytes
-//! 0x1E0  ├────────────────────────────┤ ← THREAD_VARS_OFFSET
-//!        │ ThreadVars (32 bytes)      │
-//!        │   0x00: magic     (u32)    │ ← MAGIC_OFFSET
-//!        │   0x04: handle    (u32)    │ ← HANDLE_OFFSET
-//!        │   0x08: thread_ptr         │ ← THREAD_INFO_PTR_OFFSET
-//!        │   0x10: reent              │ ← REENT_OFFSET
-//!        │   0x18: tls_tp             │ ← TLS_PTR_OFFSET
-//! 0x200  └────────────────────────────┘
-//! ```
 //!
 //! ## References
 //!
 //! - C implementation: `libnx/nx/source/runtime/newlib.c::newlibSetup()`
-//! - `nx-sys-thread::tls_region::ThreadVars` - Canonical ThreadVars definition
-//! - `nx-sys-sync::tls` - Similar hardcoded offset approach
+//! - [`nx_sys_thread_tls`] - TLS types and utilities
 
 use core::{ffi::c_void, ptr};
-
-use nx_cpu::control_regs;
-
-// ThreadVars layout constants (must match nx-sys-thread::tls_region::ThreadVars)
-/// Size of the Thread Local Storage (TLS) region
-const TLS_REGION_SIZE: usize = 0x200;
-
-/// Size of the ThreadVars structure
-const THREAD_VARS_SIZE: usize = 0x20;
-
-/// Offset of ThreadVars from TLS base (0x200 - 0x20 = 0x1E0)
-const THREAD_VARS_OFFSET: usize = TLS_REGION_SIZE - THREAD_VARS_SIZE;
-
-// ThreadVars field offsets (from ThreadVars base address)
-/// Offset of the magic field (u32)
-const MAGIC_OFFSET: usize = 0x00;
-
-/// Offset of the handle field (u32)
-const HANDLE_OFFSET: usize = 0x04;
-
-/// Offset of the thread_info_ptr field (*mut c_void)
-const THREAD_INFO_PTR_OFFSET: usize = 0x08;
-
-/// Offset of the reent field (*mut c_void)
-const REENT_OFFSET: usize = 0x10;
-
-/// Offset of the tls_ptr field (*mut c_void)
-const TLS_PTR_OFFSET: usize = 0x18;
-
-/// Magic value used to verify ThreadVars is initialized ("!TV$")
-const THREAD_VARS_MAGIC: u32 = 0x21545624;
 
 // Linker symbols for TLS block management
 unsafe extern "C" {
@@ -182,15 +119,6 @@ unsafe extern "C" {
 /// }
 /// ```
 pub unsafe fn setup() {
-    // SAFETY: TPIDRRO_EL0 is set by the kernel and guaranteed to point to a valid
-    // 0x200-byte TLS block for the current thread
-    let tls_base = unsafe { control_regs::tpidrro_el0() as *mut u8 };
-
-    // ThreadVars structure is located at the end of the TLS block (offset 0x1E0)
-    // SAFETY: tls_base is valid for 0x200 bytes, and THREAD_VARS_OFFSET (0x1E0)
-    // is within bounds
-    let thread_vars = unsafe { tls_base.add(THREAD_VARS_OFFSET) };
-
     // Calculate the thread pointer (TP) value for __aarch64_read_tp()
     // This matches the C code: __tls_start - getTlsStartOffset()
     let tls_start = &raw const __tls_start as usize;
@@ -206,58 +134,22 @@ pub unsafe fn setup() {
     };
     let tls_tp = (tls_start - tls_start_offset) as *mut c_void;
 
-    // Initialize ThreadVars fields by writing to each offset
-
-    // Field: magic (u32 at offset 0x00)
-    // SAFETY: thread_vars + MAGIC_OFFSET is within the 0x20-byte ThreadVars structure
-    unsafe {
-        ptr::write(thread_vars.add(MAGIC_OFFSET) as *mut u32, THREAD_VARS_MAGIC);
-    }
-
-    // Field: handle (u32 at offset 0x04)
-    // SAFETY: thread_vars + HANDLE_OFFSET is within the ThreadVars structure
-    unsafe {
-        ptr::write(
-            thread_vars.add(HANDLE_OFFSET) as *mut u32,
-            crate::main_thread_handle().to_raw(),
-        );
-    }
-
-    // Field: thread_info_ptr (*mut c_void at offset 0x08)
-    // Set to null - will be filled later by __libnx_init_thread()
-    // SAFETY: thread_vars + THREAD_INFO_PTR_OFFSET is within bounds
-    unsafe {
-        ptr::write(
-            thread_vars.add(THREAD_INFO_PTR_OFFSET) as *mut *mut c_void,
-            ptr::null_mut(),
-        );
-    }
-
-    // Field: reent (*mut c_void at offset 0x10)
-    // Point to newlib's global reentrancy structure if available (with ffi feature),
-    // otherwise set to NULL
-    // SAFETY: thread_vars + REENT_OFFSET is within bounds
+    // Get the reent pointer (newlib reentrancy state)
     #[cfg(feature = "ffi")]
-    unsafe {
-        // SAFETY: _impure_ptr is a valid global provided by newlib when ffi is enabled
-        ptr::write(
-            thread_vars.add(REENT_OFFSET) as *mut *mut c_void,
-            _impure_ptr,
-        );
-    }
+    let reent = unsafe { _impure_ptr };
     #[cfg(not(feature = "ffi"))]
-    unsafe {
-        ptr::write(
-            thread_vars.add(REENT_OFFSET) as *mut *mut c_void,
-            ptr::null_mut(),
-        );
-    }
+    let reent = ptr::null_mut();
 
-    // Field: tls_ptr (*mut c_void at offset 0x18)
-    // This is the value returned by __aarch64_read_tp() for thread-local variable access
-    // SAFETY: thread_vars + TLS_PTR_OFFSET is within bounds
+    // Initialize ThreadVars structure using nx-sys-thread-tls
+    // SAFETY: This is called exactly once during main thread initialization,
+    // after the kernel has set up TPIDRRO_EL0 to point to a valid TLS block.
     unsafe {
-        ptr::write(thread_vars.add(TLS_PTR_OFFSET) as *mut *mut c_void, tls_tp);
+        nx_sys_thread_tls::init_thread_vars(
+            crate::main_thread_handle(),
+            ptr::null_mut(), // thread_info_ptr - filled later by thread registry
+            reent,
+            tls_tp,
+        );
     }
 
     // Copy .tdata section (initialized thread-local data) to the TLS block

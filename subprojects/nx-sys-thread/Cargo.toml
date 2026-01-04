@@ -17,11 +17,11 @@ ffi = []
 [dependencies]
 intrusive-collections = "0.9.7"
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
-nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 nx-time = { version = "0.1.0", path = "../nx-time" }
 static_assertions = "1.1.0"
 thiserror = { version = "2.0.12", default-features = false }

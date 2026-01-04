@@ -14,10 +14,15 @@ nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep'
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
+# nx-sys-thread-tls
+nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
+nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
+
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
     nx_svc_dep,
+    nx_sys_thread_tls_dep,
 ]
 
 #---------------------------------------------------------------------------------

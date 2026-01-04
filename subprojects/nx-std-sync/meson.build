@@ -51,6 +51,9 @@ nx_std_sync_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Dependency declaration
 #---------------------------------------------------------------------------------
+# Linker script for overriding libnx std-sync functions
+nx_std_sync_ld_override = meson.current_source_dir() / 'std_sync_override.ld'
+
 nx_std_sync_dep = declare_dependency(
     include_directories : inc,
     link_with : nx_std_sync_tgt[0],
