@@ -4,6 +4,8 @@
 //!
 //! - [switchbrew/libnx: switch/arm/counter.h](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/include/switch/arm/counter.h)
 
+mod libsysbase;
+
 use crate::sys::clock;
 
 //<editor-fold desc="switch/arm/counter.h">

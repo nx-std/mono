@@ -11,3 +11,8 @@ armGetSystemTick = __nx_time__arm_get_system_tick;
 armGetSystemTickFreq = __nx_time__arm_get_system_tick_freq;
 armNsToTicks = __nx_time__arm_ns_to_ticks;
 armTicksToNs = __nx_time__arm_ticks_to_ns;
+
+/* libsysbase (newlib) syscall overrides */
+EXTERN(__nx_time__libsysbase_syscall_clock_getres);
+
+__syscall_clock_getres = __nx_time__libsysbase_syscall_clock_getres;

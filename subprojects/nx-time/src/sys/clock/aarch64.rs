@@ -10,10 +10,10 @@ use nx_cpu::control_regs;
 use crate::sys::timespec::Timespec;
 
 /// System counter-timer frequency (19.2MHz)
-const TIMER_FREQ: u64 = 19_200_000; // Hz
+pub const TIMER_FREQ: u64 = 19_200_000; // Hz
 
 /// Clock resolution in nanoseconds (~52.083ns per tick)
-const NSEC_PER_TICK: u64 = 1_000_000_000 / 19_200_000; // ns
+pub const NSEC_PER_TICK: u64 = 1_000_000_000 / 19_200_000; // ns
 
 /// Gets the current system tick.
 ///
@@ -44,7 +44,7 @@ pub fn get_system_tick_freq() -> u64 {
 /// Returns the equivalent CPU ticks for a given time in nanoseconds, based on the
 /// system counter frequency.
 #[inline]
-pub fn ns_to_cpu_ticks(ns: u64) -> u64 {
+pub const fn ns_to_cpu_ticks(ns: u64) -> u64 {
     (ns * 12) / 625
 }
 
@@ -56,20 +56,8 @@ pub fn ns_to_cpu_ticks(ns: u64) -> u64 {
 ///
 /// Returns the equivalent time in nanoseconds for a given number of CPU ticks.
 #[inline]
-pub fn cpu_ticks_to_ns(tick: u64) -> u64 {
+pub const fn cpu_ticks_to_ns(tick: u64) -> u64 {
     (tick * 625) / 12
-}
-
-/// Get system clock resolution.
-///
-/// # References
-///
-/// - [switchbrew/nx: `__syscall_clock_getres`](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/source/runtime/newlib.c#L345-L359)
-#[allow(dead_code)]
-pub fn getres() -> Result<Timespec, i32> {
-    // Create timespec with resolution
-    // Safety: We know the clock resolution is within valid range
-    unsafe { Ok(Timespec::new_unchecked(0, NSEC_PER_TICK as i64)) }
 }
 
 /// Get system clock time.
