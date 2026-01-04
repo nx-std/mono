@@ -78,3 +78,30 @@ semaphoreInit = __nx_sys_sync__semaphore_init;
 semaphoreSignal = __nx_sys_sync__semaphore_signal;
 semaphoreWait = __nx_sys_sync__semaphore_wait;
 semaphoreTryWait = __nx_sys_sync__semaphore_try_wait;
+
+/* libsysbase (newlib) syscall overrides */
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_acquire);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_try_acquire);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_release);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_init);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_acquire_recursive);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_try_acquire_recursive);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_release_recursive);
+EXTERN(__nx_sys_sync__libsysbase_syscall_lock_init_recursive);
+EXTERN(__nx_sys_sync__libsysbase_syscall_cond_signal);
+EXTERN(__nx_sys_sync__libsysbase_syscall_cond_broadcast);
+EXTERN(__nx_sys_sync__libsysbase_syscall_cond_wait);
+EXTERN(__nx_sys_sync__libsysbase_syscall_cond_wait_recursive);
+
+__syscall_lock_acquire               = __nx_sys_sync__libsysbase_syscall_lock_acquire;
+__syscall_lock_try_acquire           = __nx_sys_sync__libsysbase_syscall_lock_try_acquire;
+__syscall_lock_release               = __nx_sys_sync__libsysbase_syscall_lock_release;
+__syscall_lock_init                  = __nx_sys_sync__libsysbase_syscall_lock_init;
+__syscall_lock_acquire_recursive     = __nx_sys_sync__libsysbase_syscall_lock_acquire_recursive;
+__syscall_lock_try_acquire_recursive = __nx_sys_sync__libsysbase_syscall_lock_try_acquire_recursive;
+__syscall_lock_release_recursive     = __nx_sys_sync__libsysbase_syscall_lock_release_recursive;
+__syscall_lock_init_recursive        = __nx_sys_sync__libsysbase_syscall_lock_init_recursive;
+__syscall_cond_signal                = __nx_sys_sync__libsysbase_syscall_cond_signal;
+__syscall_cond_broadcast             = __nx_sys_sync__libsysbase_syscall_cond_broadcast;
+__syscall_cond_wait                  = __nx_sys_sync__libsysbase_syscall_cond_wait;
+__syscall_cond_wait_recursive        = __nx_sys_sync__libsysbase_syscall_cond_wait_recursive;

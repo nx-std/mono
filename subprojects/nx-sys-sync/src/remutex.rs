@@ -130,6 +130,40 @@ impl ReentrantMutex {
             self.mutex.unlock();
         }
     }
+
+    /// Waits on a condition variable while holding this reentrant mutex.
+    ///
+    /// Used by libsysbase's `__syscall_cond_wait_recursive`. The mutex must be held
+    /// exactly once (counter == 1) for this operation to succeed.
+    #[cfg(feature = "ffi")]
+    pub(crate) fn cond_wait(
+        &self,
+        condvar: &super::Condvar,
+        timeout_ns: u64,
+    ) -> Result<nx_svc::result::ResultCode, ()> {
+        let counter = unsafe { *self.counter.get() };
+        if counter != 1 {
+            return Err(());
+        }
+
+        // Save the thread tag and reset state before waiting
+        let thread_tag_backup = unsafe { *self.thread_tag.get() };
+        unsafe {
+            *self.thread_tag.get() = 0;
+            *self.counter.get() = 0;
+        }
+
+        // Wait on the condition variable (this releases and reacquires the inner mutex)
+        let result = condvar.wait_timeout(&self.mutex, timeout_ns);
+
+        // Restore the thread tag and counter
+        unsafe {
+            *self.thread_tag.get() = thread_tag_backup;
+            *self.counter.get() = 1;
+        }
+
+        Ok(result)
+    }
 }
 
 /// Get the current thread's kernel handle.

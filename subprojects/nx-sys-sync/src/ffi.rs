@@ -10,6 +10,7 @@
 
 mod barrier;
 mod condvar;
+mod libsysbase;
 mod mutex;
 mod remutex;
 mod rwlock;
