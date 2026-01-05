@@ -11,7 +11,7 @@
 
 use core::ffi::c_int;
 
-use nx_svc::error::KernelError;
+use nx_svc::error::{KernelError, ToRawResultCode as _};
 
 use crate::{condvar::Condvar, mutex::Mutex, remutex::ReentrantMutex};
 
