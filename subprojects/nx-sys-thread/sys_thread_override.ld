@@ -7,12 +7,12 @@ EXTERN(__nx_sys_thread__get_tls_start_offset);
 getTlsStartOffset = __nx_sys_thread__get_tls_start_offset;
 
 /* Thread */
-EXTERN(__nx_sys_thread__thread_start)
-EXTERN(__nx_sys_thread__thread_pause)
-EXTERN(__nx_sys_thread__thread_resume)
-EXTERN(__nx_sys_thread__thread_dump_context)
+EXTERN(__nx_sys_thread__thread_start);
+EXTERN(__nx_sys_thread__thread_pause);
+EXTERN(__nx_sys_thread__thread_resume);
+EXTERN(__nx_sys_thread__thread_dump_context);
 EXTERN(__nx_sys_thread__thread_get_cur_handle);
-EXTERN(__nx_sys_thread__thread_wait_for_exit)
+EXTERN(__nx_sys_thread__thread_wait_for_exit);
 EXTERN(__nx_sys_thread__thread_get_self);
 EXTERN(__nx_sys_thread__thread_tls_get);
 EXTERN(__nx_sys_thread__thread_tls_set);
@@ -28,15 +28,15 @@ threadTlsGet       = __nx_sys_thread__thread_tls_get;
 threadTlsSet       = __nx_sys_thread__thread_tls_set;
 
 /* libc (newlib - libsysbase) */
-EXTERN(__nx_sys_thread__libsysbase_syscall_thread_create)
-EXTERN(__nx_sys_thread__libsysbase_syscall_thread_join)
-EXTERN(__nx_sys_thread__libsysbase_syscall_thread_exit)
-EXTERN(__nx_sys_thread__libsysbase_syscall_thread_self)
-EXTERN(__nx_sys_thread__libsysbase_syscall_thread_detach)
-EXTERN(__nx_sys_thread__libsysbase_syscall_tls_create)
-EXTERN(__nx_sys_thread__libsysbase_syscall_tls_set)
-EXTERN(__nx_sys_thread__libsysbase_syscall_tls_get)
-EXTERN(__nx_sys_thread__libsysbase_syscall_tls_delete)
+EXTERN(__nx_sys_thread__libsysbase_syscall_thread_create);
+EXTERN(__nx_sys_thread__libsysbase_syscall_thread_join);
+EXTERN(__nx_sys_thread__libsysbase_syscall_thread_exit);
+EXTERN(__nx_sys_thread__libsysbase_syscall_thread_self);
+EXTERN(__nx_sys_thread__libsysbase_syscall_thread_detach);
+EXTERN(__nx_sys_thread__libsysbase_syscall_tls_create);
+EXTERN(__nx_sys_thread__libsysbase_syscall_tls_set);
+EXTERN(__nx_sys_thread__libsysbase_syscall_tls_get);
+EXTERN(__nx_sys_thread__libsysbase_syscall_tls_delete);
 
 __syscall_thread_create = __nx_sys_thread__libsysbase_syscall_thread_create;
 __syscall_thread_join   = __nx_sys_thread__libsysbase_syscall_thread_join;
@@ -48,11 +48,11 @@ __syscall_tls_set       = __nx_sys_thread__libsysbase_syscall_tls_set;
 __syscall_tls_get       = __nx_sys_thread__libsysbase_syscall_tls_get;
 __syscall_tls_delete    = __nx_sys_thread__libsysbase_syscall_tls_delete;
 
-EXTERN(__nx_sys_thread__libsysbase_sleep)
-EXTERN(__nx_sys_thread__libsysbase_usleep)
-EXTERN(__nx_sys_thread__libsysbase_nanosleep)
-EXTERN(__nx_sys_thread__libsysbase_sched_yield)
-EXTERN(__nx_sys_thread__libsysbase_sched_getcpu)
+EXTERN(__nx_sys_thread__libsysbase_sleep);
+EXTERN(__nx_sys_thread__libsysbase_usleep);
+EXTERN(__nx_sys_thread__libsysbase_nanosleep);
+EXTERN(__nx_sys_thread__libsysbase_sched_yield);
+EXTERN(__nx_sys_thread__libsysbase_sched_getcpu);
 
 sleep        = __nx_sys_thread__libsysbase_sleep;
 usleep       = __nx_sys_thread__libsysbase_usleep;

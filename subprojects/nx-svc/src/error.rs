@@ -212,8 +212,8 @@ impl ToRawResultCode for u32 {
 
 impl ToRawResultCode for (Module, Description) {
     fn to_rc(self) -> ResultCode {
-        // The module is shifted left by 9 bits, and the error code is OR'd with it.
-        ((self.0 as u32) << 9) | self.1
+        // The description is shifted left by 9 bits, and the module is OR'd with it.
+        (self.0 as u32) | ((self.1 & 0x1FFF) << 9)
     }
 }
 

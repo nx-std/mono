@@ -52,7 +52,7 @@ typedef void (*TestSuiteFn)(void);
         } else if (test_res == TEST_TODO) { \
             printf(CONSOLE_MAGENTA "TODO" CONSOLE_RESET "\n"); \
         } else { \
-            printf(CONSOLE_RED "FAILED" CONSOLE_RESET " (%d)\n", test_res); \
+            printf(CONSOLE_RED "FAILED" CONSOLE_RESET " (0x%X)\n", test_res); \
         } \
     }
 
