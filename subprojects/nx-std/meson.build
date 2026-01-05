@@ -133,6 +133,17 @@ if get_option('use_nx_rt').enabled()
     deps_cargo_features += ['rt']
 endif
 
+# nx-sf
+if get_option('use_nx_sf').enabled()
+    nx_sf_proj = subproject('nx-sf')
+
+    deps += nx_sf_proj.get_variable('nx_sf_dep')
+    deps_override_link_args += ['-T', nx_sf_proj.get_variable('nx_sf_ld_override')]
+
+    debug('sf feature: enabled')
+    deps_cargo_features += ['sf']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

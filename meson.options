@@ -96,3 +96,10 @@ option(
     description : 'Override libnx runtime functions with nx-rt',
     yield : true
 )
+
+option(
+    'use_nx_sf',
+    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    description : 'Override libnx functions with nx-sf (Service Framework) functions',
+    yield : true
+)

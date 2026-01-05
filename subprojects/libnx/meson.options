@@ -81,3 +81,10 @@ option(
     description : 'Override all libnx functions with nx-time functions',
     yield : true
 )
+
+option(
+    'use_nx_sf',
+    type : 'feature', value : 'auto',
+    description : 'Override libnx functions with nx-sf (Service Framework) functions',
+    yield : true
+)

@@ -74,3 +74,10 @@ option(
     description : 'Enable the `time` feature',
     yield : true
 )
+
+option(
+    'use_nx_sf',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `sf` feature',
+    yield : true
+)
