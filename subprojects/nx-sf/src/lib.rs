@@ -29,14 +29,15 @@
 //! - **HIPC**: Low-level message format handling buffer descriptors, handles,
 //!   and raw data layout. See the [`hipc`] module for details.
 //! - **CMIF**: Command interface with domain support (object multiplexing).
-//!   Uses `"SFCI"`/`"SFCO"` magic headers.
+//!   Uses `"SFCI"`/`"SFCO"` magic headers. See the [`cmif`] module for details.
 //! - **TIPC**: Simplified protocol introduced in HOS 12.0.0. No domains,
-//!   command ID stored in HIPC message type.
+//!   command ID stored in HIPC message type. *(not yet implemented)*
 
 #![no_std]
 
 extern crate nx_panic_handler; // Provides #[panic_handler]
 
+pub mod cmif;
 pub mod hipc;
 
 #[cfg(feature = "ffi")]
