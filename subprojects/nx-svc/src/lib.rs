@@ -17,6 +17,7 @@ mod handle;
 pub mod code;
 pub mod debug;
 pub mod error;
+pub mod ipc;
 pub mod mem;
 pub mod misc;
 pub mod process;
