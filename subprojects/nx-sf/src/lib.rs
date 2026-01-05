@@ -31,7 +31,7 @@
 //! - **CMIF**: Command interface with domain support (object multiplexing).
 //!   Uses `"SFCI"`/`"SFCO"` magic headers. See the [`cmif`] module for details.
 //! - **TIPC**: Simplified protocol introduced in HOS 12.0.0. No domains,
-//!   command ID stored in HIPC message type. *(not yet implemented)*
+//!   command ID stored in HIPC message type. See the [`tipc`] module for details.
 
 #![no_std]
 
@@ -39,6 +39,7 @@ extern crate nx_panic_handler; // Provides #[panic_handler]
 
 pub mod cmif;
 pub mod hipc;
+pub mod tipc;
 
 #[cfg(feature = "ffi")]
 mod ffi;
