@@ -2,13 +2,24 @@
 
 use core::ffi::{c_char, c_uint, c_void};
 
-use nx_svc::thread::Handle as ThreadHandle;
+use nx_svc::{raw::INVALID_HANDLE, thread::Handle as ThreadHandle};
 
 use crate::{
-    AccountUid, ConfigEntry, LoaderReturnFn, argv, exit_func_ptr, has_next_load, heap_override,
-    hos_version, is_nso, last_load_result, loader_info, main_thread_handle, own_process_handle,
-    random_seed, set_exit_func_ptr, set_next_load, setup, syscall_hints, user_id_storage,
+    AccountUid, ConfigEntry, LoaderReturnFn, applet_type, argv, exit_func_ptr, has_next_load,
+    heap_override, hos_version, is_nso, last_load_result, loader_info, main_thread_handle,
+    own_process_handle, random_seed, service_overrides, set_exit_func_ptr, set_next_load, setup,
+    syscall_hints, user_id_storage,
 };
+
+// libnx C symbols
+unsafe extern "C" {
+    /// Register a service override handle (libnx sm.c)
+    /// Note: SmServiceName is `struct { char name[8]; }` which is ABI-equivalent to u64
+    fn smAddOverrideHandle(name: u64, handle: u32);
+
+    /// Global applet type variable (libnx applet.c)
+    static mut __nx_applet_type: u32;
+}
 
 /// Parse the homebrew loader environment configuration
 #[unsafe(no_mangle)]
@@ -21,6 +32,16 @@ pub unsafe extern "C" fn __nx_rt_env__env_setup(
     // or points to a valid ConfigEntry array terminated by EndOfList.
     // The main_thread handle is provided by the kernel/loader and is guaranteed valid.
     unsafe { setup(ctx, ThreadHandle::from_raw(main_thread), saved_lr) }
+
+    // Sync parsed values with libnx globals
+    for ovr in service_overrides().iter().flatten() {
+        // SAFETY: smAddOverrideHandle is safe to call during init
+        // Pass the raw u64 value which is ABI-equivalent to SmServiceName
+        unsafe { smAddOverrideHandle(ovr.name.to_raw(), ovr.handle.to_raw()) }
+    }
+
+    // SAFETY: Single-threaded initialization, exclusive access to the global variable.
+    unsafe { __nx_applet_type = applet_type().as_raw() };
 }
 
 /// Initialize main thread TLS (ThreadVars and .tdata copy)
@@ -109,10 +130,10 @@ pub unsafe extern "C" fn __nx_rt_env__env_is_syscall_hinted(svc: c_uint) -> bool
     syscall_hints().is_available(svc)
 }
 
-/// Get process handle
+/// Get process handle (returns INVALID_HANDLE if not set)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_env__env_get_own_process_handle() -> u32 {
-    own_process_handle().to_raw()
+    own_process_handle().map_or(INVALID_HANDLE, |h| h.to_raw())
 }
 
 /// Get exit function pointer

@@ -25,7 +25,7 @@ use core::{
 };
 
 use nx_svc::{
-    process::Handle as ProcessHandle, raw::INVALID_HANDLE, thread::Handle as ThreadHandle,
+    ipc::Handle as ServiceHandle, process::Handle as ProcessHandle, thread::Handle as ThreadHandle,
 };
 use nx_sys_sync::{Mutex, Once};
 pub use syscall_hint::SyscallHints;
@@ -38,6 +38,9 @@ const ATMOSPHERE_MAGIC: u64 = 0x41544d4f53504852;
 
 /// Atmosphere flag bit position (used to set bit 31 when Atmosphere is detected)
 const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
+
+/// Maximum number of service overrides (matches libnx MAX_OVERRIDES)
+const MAX_SERVICE_OVERRIDES: usize = 32;
 
 /// Global environment state (immutable after initialization)
 static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
@@ -86,10 +89,10 @@ unsafe fn env_init_nso(state: &mut EnvState, main_thread: ThreadHandle, saved_lr
 
     // NSO mode
     state.is_nso = true;
-    state.main_thread_handle = main_thread;
+    state.main_thread_handle = Some(main_thread);
 
     // In NSO mode, all syscalls are hinted as available
-    state.syscall_hints = SyscallHints::all_available();
+    state.syscall_hints = Some(SyscallHints::all_available());
 }
 
 /// NRO initialization
@@ -126,11 +129,13 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
             }
             Some(EntryType::MainThreadHandle) => {
                 // SAFETY: The handle is provided by the loader and guaranteed valid
-                state.main_thread_handle = unsafe { ThreadHandle::from_raw(entry.value[0] as u32) };
+                state.main_thread_handle =
+                    Some(unsafe { ThreadHandle::from_raw(entry.value[0] as u32) });
             }
             Some(EntryType::ProcessHandle) => {
                 // SAFETY: The handle is provided by the loader and guaranteed valid
-                state.process_handle = unsafe { ProcessHandle::from_raw(entry.value[0] as u32) };
+                state.process_handle =
+                    Some(unsafe { ProcessHandle::from_raw(entry.value[0] as u32) });
             }
             Some(EntryType::OverrideHeap) => {
                 state.heap_override = NonNull::new(entry.value[0] as *mut c_void)
@@ -146,11 +151,15 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
                 // SVCs 0x00-0x7F
                 state
                     .syscall_hints
+                    .get_or_insert_with(SyscallHints::new)
                     .set_hint_0_7f(entry.value[0], entry.value[1]);
             }
             Some(EntryType::SyscallAvailableHint2) => {
                 // SVCs 0x80-0xBF
-                state.syscall_hints.set_hint_80_bf(entry.value[0]);
+                state
+                    .syscall_hints
+                    .get_or_insert_with(SyscallHints::new)
+                    .set_hint_80_bf(entry.value[0]);
             }
             Some(EntryType::UserIdStorage) => {
                 state.user_id_storage = NonNull::new(entry.value[0] as *mut AccountUid);
@@ -161,6 +170,21 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
             Some(EntryType::NextLoadPath) => {
                 state.has_next_load = true;
                 // Value[0] and Value[1] are buffer pointers set by loader
+            }
+            Some(EntryType::OverrideService) => {
+                // Store in Rust state (FFI registration happens separately)
+                if state.service_override_count < MAX_SERVICE_OVERRIDES {
+                    let name = ServiceName::from_u64(entry.value[0]);
+                    // SAFETY: The handle is provided by the loader and guaranteed valid
+                    let handle = unsafe { ServiceHandle::from_raw(entry.value[1] as u32) };
+
+                    state.service_overrides[state.service_override_count] =
+                        Some(ServiceOverride::new(name, handle));
+                    state.service_override_count += 1;
+                }
+            }
+            Some(EntryType::AppletType) => {
+                state.applet_type = AppletType::from_raw(entry.value[0] as u32, entry.value[1]);
             }
             Some(EntryType::EndOfList) => {
                 // Loader info is in the final entry's Value fields
@@ -190,10 +214,16 @@ pub fn loader_info() -> Option<(NonNull<c_char>, u64)> {
 }
 
 /// Get main thread handle
+///
+/// # Panics
+///
+/// Panics if called before the environment is initialized.
 pub fn main_thread_handle() -> ThreadHandle {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.main_thread_handle
+    state
+        .main_thread_handle
+        .expect("main thread handle not set")
 }
 
 /// Returns true if running as NSO, false if NRO
@@ -221,14 +251,18 @@ pub fn argv() -> Option<*const c_char> {
 }
 
 /// Get syscall availability hints
+///
+/// # Panics
+///
+/// Panics if called before the environment is initialized.
 pub fn syscall_hints() -> SyscallHints {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.syscall_hints
+    state.syscall_hints.expect("syscall hints not set")
 }
 
-/// Get process handle
-pub fn own_process_handle() -> ProcessHandle {
+/// Get process handle if present
+pub fn own_process_handle() -> Option<ProcessHandle> {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.process_handle
@@ -280,6 +314,20 @@ pub fn has_next_load() -> bool {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state.has_next_load
+}
+
+/// Get service overrides as a slice of Options (first `count` are Some)
+pub fn service_overrides() -> &'static [Option<ServiceOverride>] {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
+    let state = unsafe { ENV_STATE.get_ref() };
+    &state.service_overrides[..state.service_override_count]
+}
+
+/// Get applet type
+pub fn applet_type() -> AppletType {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
+    let state = unsafe { ENV_STATE.get_ref() };
+    state.applet_type
 }
 
 /// Set next NRO to load (chain loading)
@@ -353,11 +401,11 @@ struct EnvState {
     argv: Option<NonNull<c_char>>,
 
     /// Thread and process handles
-    main_thread_handle: ThreadHandle,
-    process_handle: ProcessHandle,
+    main_thread_handle: Option<ThreadHandle>,
+    process_handle: Option<ProcessHandle>,
 
     /// Syscall availability hints (192 bits for SVCs 0x00-0xBF)
-    syscall_hints: SyscallHints,
+    syscall_hints: Option<SyscallHints>,
 
     /// Random seed data
     random_seed: Option<[u64; 2]>,
@@ -373,6 +421,13 @@ struct EnvState {
 
     /// Chain loading capability flag (set once during init)
     has_next_load: bool,
+
+    /// Service override entries from loader
+    service_overrides: [Option<ServiceOverride>; MAX_SERVICE_OVERRIDES],
+    service_override_count: usize,
+
+    /// Applet type from loader
+    applet_type: AppletType,
 }
 
 impl EnvState {
@@ -381,16 +436,17 @@ impl EnvState {
             is_nso: false,
             heap_override: None,
             argv: None,
-            // SAFETY: INVALID_HANDLE is a valid (invalid) handle value
-            main_thread_handle: unsafe { ThreadHandle::from_raw(INVALID_HANDLE) },
-            // SAFETY: INVALID_HANDLE is a valid (invalid) handle value
-            process_handle: unsafe { ProcessHandle::from_raw(INVALID_HANDLE) },
-            syscall_hints: SyscallHints::new(),
+            main_thread_handle: None,
+            process_handle: None,
+            syscall_hints: None,
             random_seed: None,
             last_load_result: 0,
             loader_info: None,
             user_id_storage: None,
             has_next_load: false,
+            service_overrides: [None; MAX_SERVICE_OVERRIDES],
+            service_override_count: 0,
+            applet_type: AppletType::Default,
         }
     }
 }
@@ -507,6 +563,86 @@ pub struct ConfigEntry {
     pub key: u32,
     pub flags: u32,
     pub value: [u64; 2],
+}
+
+/// Service name (8-byte null-padded string, matches libnx SmServiceName)
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ServiceName(u64);
+
+impl ServiceName {
+    /// Create from raw u64 (matches libnx's smServiceNameFromU64)
+    pub const fn from_u64(val: u64) -> Self {
+        Self(val)
+    }
+
+    /// Get raw u64 value
+    pub const fn to_raw(self) -> u64 {
+        self.0
+    }
+}
+
+/// A service override entry (name + handle)
+#[derive(Clone, Copy, Debug)]
+pub struct ServiceOverride {
+    pub name: ServiceName,
+    pub handle: ServiceHandle,
+}
+
+impl ServiceOverride {
+    /// Create a new service override entry.
+    pub const fn new(name: ServiceName, handle: ServiceHandle) -> Self {
+        Self { name, handle }
+    }
+}
+
+/// Applet type values (matches libnx AppletType enum)
+#[repr(i32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppletType {
+    /// Default/unset
+    Default = -1,
+    /// Regular application
+    Application = 0,
+    /// System applet
+    SystemApplet = 1,
+    /// Library applet
+    LibraryApplet = 2,
+    /// Overlay applet
+    OverlayApplet = 3,
+    /// System application
+    SystemApplication = 4,
+}
+
+impl AppletType {
+    /// Applet flags: ApplicationOverride bit
+    const FLAG_APPLICATION_OVERRIDE: u64 = 1 << 0;
+
+    /// Create from raw loader values, applying flags
+    pub const fn from_raw(value: u32, flags: u64) -> Self {
+        let mut applet_type = match value {
+            0 => Self::Application,
+            1 => Self::SystemApplet,
+            2 => Self::LibraryApplet,
+            3 => Self::OverlayApplet,
+            4 => Self::SystemApplication,
+            _ => Self::Default,
+        };
+
+        // Apply ApplicationOverride flag if applicable
+        if (flags & Self::FLAG_APPLICATION_OVERRIDE) != 0 {
+            if matches!(applet_type, Self::SystemApplication) {
+                applet_type = Self::Application;
+            }
+        }
+
+        applet_type
+    }
+
+    /// Get raw value for FFI
+    pub const fn as_raw(self) -> u32 {
+        self as i32 as u32
+    }
 }
 
 /// Chain loading state (mutable at runtime)
