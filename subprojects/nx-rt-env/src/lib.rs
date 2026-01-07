@@ -51,6 +51,9 @@ static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
 /// Initialization guard to ensure env_setup runs exactly once
 static ENV_INIT: Once = Once::new();
 
+/// Raw config entry pointer (stored during setup for later iteration)
+static CONFIG_PTR: AtomicPtr<ConfigEntry> = AtomicPtr::new(ptr::null_mut());
+
 /// Exit function pointer (mutable at runtime)
 static EXIT_FUNC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
@@ -111,6 +114,9 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
         Some(f) => f as *mut c_void,
     };
     EXIT_FUNC.store(exit_ptr, Ordering::Relaxed);
+
+    // Store pointer for later iteration by other crates
+    CONFIG_PTR.store(ctx.as_ptr(), Ordering::Release);
 
     // NRO mode
     state.is_nso = false;
@@ -204,6 +210,17 @@ pub fn loader_info() -> Option<(NonNull<c_char>, u64)> {
     // After initialization, the state is read-only.
     let state = unsafe { ENV_STATE.get_ref() };
     state.loader_info
+}
+
+/// Get an iterator over the config entries.
+///
+/// Returns `None` if running in NSO mode (no config entries).
+/// The iterator yields typed [`Entry`] values.
+pub fn config_entries() -> Option<ConfigEntries<'static>> {
+    let ptr = CONFIG_PTR.load(Ordering::Acquire);
+    // SAFETY: If non-null, the pointer was stored during env_init_nro and points to a valid
+    // ConfigEntry array that remains valid for the program lifetime ('static).
+    NonNull::new(ptr).map(|p| unsafe { ConfigEntries::from_ptr(p) })
 }
 
 /// Get main thread handle
