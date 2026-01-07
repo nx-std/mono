@@ -74,6 +74,10 @@ c_src = files(
     'source/sync/semaphore/test_0001_semaphore_wait_signal_single_thread.c',
     'source/sync/semaphore/test_0002_semaphore_multiple_threads_initial_count.c',
     'source/sync/semaphore/test_0003_semaphore_producer_consumer.c',
+    'source/sync/oneshot/suite.h',
+    'source/sync/oneshot/test_0001_oneshot_two_threads_send_recv.c',
+    'source/sync/oneshot/test_0002_oneshot_recv_sender_dropped.c',
+    'source/sync/oneshot/test_0003_oneshot_send_receiver_dropped.c',
     'source/main.c',
 )
 

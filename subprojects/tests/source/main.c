@@ -19,6 +19,7 @@ static TestSuiteFn test_suites[] = {
     sync_barrier_suite,
     sync_rwlock_suite,
     sync_semaphore_suite,
+    sync_oneshot_suite,
 };
 
 int main()

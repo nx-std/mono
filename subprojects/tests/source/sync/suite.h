@@ -6,3 +6,4 @@
 #include "barrier/suite.h"
 #include "rwlock/suite.h"
 #include "semaphore/suite.h"
+#include "oneshot/suite.h"
