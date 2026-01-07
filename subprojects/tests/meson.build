@@ -31,6 +31,10 @@ nx_dep = nx_proj.get_variable('nx_dep')
 nx_switch_specs = nx_proj.get_variable('nx_switch_specs')
 nx_default_icon = nx_proj.get_variable('nx_default_icon')
 
+# nx-std-sync
+nx_std_sync_proj = subproject('nx-std-sync')
+nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
+
 #---------------------------------------------------------------------------------
 # ELF
 #---------------------------------------------------------------------------------
@@ -91,7 +95,7 @@ ld_flags = ['-specs=@0@'.format(nx_switch_specs), '-g'] + arch_opts + ['-Wl,-Map
 elf = executable(
     '@0@.elf'.format(name),
     c_src,
-    dependencies : [nx_dep],
+    dependencies : [nx_dep, nx_std_sync_dep],
     c_args : c_opts,
     cpp_args : cpp_opts,
     link_args : ld_flags,
