@@ -11,6 +11,9 @@
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 #[macro_use]
 mod handle;
 
@@ -25,6 +28,3 @@ pub mod raw;
 pub mod result;
 pub mod sync;
 pub mod thread;
-
-#[cfg(feature = "ffi")]
-mod ffi;

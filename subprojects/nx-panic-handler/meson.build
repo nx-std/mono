@@ -14,7 +14,7 @@ nx_panic_handler_tgt = custom_target(
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
     ],
-    output : ['libnx_panic_handler.a', 'libnx_panic_handler.rlib'],
+    output : ['libnx_panic_handler.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -24,5 +24,5 @@ nx_panic_handler_tgt = custom_target(
 # Dependency declaration
 #---------------------------------------------------------------------------------
 nx_panic_handler_dep = declare_dependency(
-    link_with : nx_panic_handler_tgt[0],
+    sources : nx_panic_handler_tgt,
 )

@@ -247,10 +247,11 @@ Rust implementations transparently replace libnx C functions at link time using 
 
 ### High-Level Flow
 
-1. **Rust crates** implement libnx functions with C FFI (when built with `--features ffi`)
-2. **Linker override scripts** (`*_override.ld`) redirect libnx symbols to Rust implementations
-3. **Meson** collects override scripts from enabled crates based on `use_nx_*` options
-4. **At link time**, the linker applies all override scripts transparently
+1. **Rust crates** implement libnx functions with C FFI via public `ffi` modules
+2. **`nx-std`** is the only staticlib; it re-exports FFI symbols from enabled crates
+3. **Linker override scripts** (`*_override.ld`) redirect libnx symbols to Rust implementations
+4. **Meson** collects override scripts from enabled crates based on `use_nx_*` options
+5. **At link time**, the linker applies all override scripts transparently
 
 ### Quick Example
 
@@ -262,9 +263,9 @@ just configure -Duse_nx_svc=enabled
 
 **What happens**:
 
-1. **Cargo builds** `nx-svc` with `--features ffi` → produces `libnx_svc.a`
+1. **Cargo builds** `nx-svc` as rlib, `nx-std` with `--features ffi,svc` → produces `libnx_std.a`
 2. **Meson collects** `-T svc_override.ld` from nx-svc subproject
-3. **Link args** propagate: `nx-svc` → `nx-std` → `libnx` → final executable
+3. **Link args** propagate: `nx-std` → `libnx` → final executable
 4. **At link time**: All `svcSetHeapSize()` calls execute the Rust implementation
 
 **Verification**: Check the symbol table
@@ -302,7 +303,9 @@ All Rust crates are part of a single Cargo workspace defined in `Cargo.toml`. Th
 
 ### Meson Custom Target Pattern
 
-Each Rust crate uses a standard `custom_target()` invocation:
+Individual crates compile as rlib only. Only `nx-std` produces a staticlib:
+
+**Individual crate pattern** (e.g., `nx-svc`):
 
 ```meson
 cargo = find_program('cargo', required : true)
@@ -315,12 +318,30 @@ nx_svc_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_svc.a', 'libnx_svc.rlib'],
+    output : ['libnx_svc.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,  # Delegate incremental compilation to Cargo
+)
+```
+
+**nx-std pattern** (staticlib with FFI):
+
+```meson
+nx_std_tgt = custom_target(
+    'nx-std',
+    command : [
+        cargo, 'build',
+        '--package', meson.project_name(),
+        '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
+        '--target-dir', meson.global_build_root() / 'cargo-target',
+        '--artifact-dir', '@OUTDIR@',
+        '--no-default-features',
+        '--features', ','.join(['ffi'] + deps_cargo_features),
+    ],
+    output : ['libnx_std.a', 'libnx_std.rlib'],
+    ...
 )
 ```
 
@@ -329,8 +350,8 @@ nx_svc_tgt = custom_target(
 - `--package` - Build specific crate (Meson project name matches crate name)
 - `--profile` - Map Meson `buildtype` to Cargo profile (`dev` or `release`)
 - `--target-dir` - Shared Cargo target directory (`buildDir/cargo-target/`)
-- `--artifact-dir` - Place output (`.a`, `.rlib`) in Meson's output directory
-- `--features ffi` - Enable FFI feature for C interop (see [libnx_overrides.md](libnx_overrides.md#rust-crate-structure))
+- `--artifact-dir` - Place output (`.rlib` or `.a`) in Meson's output directory
+- `--features ffi,<crates>` - Enable FFI and crate features (nx-std only)
 - `build_always_stale : true` - Always invoke Cargo (it handles incremental builds)
 
 ## Build Artifacts

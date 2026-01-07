@@ -40,9 +40,8 @@ nx_alloc_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_alloc.a', 'libnx_alloc.rlib'],
+    output : ['libnx_alloc.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -56,6 +55,6 @@ nx_alloc_ld_override = meson.current_source_dir() / 'alloc_override.ld'
 
 nx_alloc_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_alloc_tgt[0],
+    sources : nx_alloc_tgt,
     dependencies : deps,
 )

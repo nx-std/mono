@@ -43,4 +43,4 @@ pub mod service;
 pub mod tipc;
 
 #[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;

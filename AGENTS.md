@@ -12,11 +12,12 @@ This is a Meson-based monorepo implementing a Rust replacement for `libnx` (the 
 
 **How it works**:
 1. Rust crates implement Switch OS functionality (memory, threads, sync primitives, etc.)
-2. When built with the `ffi` feature, crates export C-compatible functions (`__nx_*` prefix)
-3. Linker scripts (`*_override.ld`) redirect `libnx` symbols to Rust implementations
-4. At link time, code calling `libnx` functions transparently uses the Rust implementations instead
+2. Each crate has a public `ffi` module with C-compatible functions (`__nx_*` prefix)
+3. `nx-std` is the only staticlib; it re-exports FFI symbols from enabled crates via `src/ffi.rs`
+4. Linker scripts (`*_override.ld`) redirect `libnx` symbols to Rust implementations
+5. At link time, code calling `libnx` functions transparently uses the Rust implementations instead
 
-**Configuration**: Meson setup-time options (`use_nx_alloc`, `use_nx_svc`, etc.) control which Rust implementations are linked, enabling selective or full replacement.
+**Configuration**: Meson setup-time options (`use_nx_alloc`, `use_nx_svc`, etc.) control which crates are enabled, selecting corresponding Cargo features for `nx-std`.
 
 ## Build System
 
@@ -72,7 +73,9 @@ nx-std (umbrella crate)
 
 ### FFI Integration
 
-Each Rust crate can expose C-compatible FFI via the `ffi` feature flag. When enabled, Rust implementations replace corresponding `libnx` functions at link time. This is controlled via Meson options:
+The `nx-std` crate is the single staticlib that exports all FFI symbols. Individual crates compile as rlib and expose their FFI functions via public `ffi` modules. When `nx-std` builds, it re-exports these modules based on enabled Cargo features, ensuring symbols compile once without duplication.
+
+Meson options control which crates are included:
 
 ```
 use_nx         - Master switch for all replacements

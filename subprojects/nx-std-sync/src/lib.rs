@@ -9,7 +9,7 @@ extern crate alloc;
 extern crate nx_alloc;
 
 #[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;
 
 pub mod barrier;
 pub mod condvar;

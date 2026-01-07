@@ -40,9 +40,8 @@ nx_sys_sync_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_sys_sync.a', 'libnx_sys_sync.rlib'],
+    output : ['libnx_sys_sync.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -56,6 +55,6 @@ nx_sys_sync_ld_override = meson.current_source_dir() / 'sys_sync_override.ld'
 
 nx_sys_sync_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_sys_sync_tgt[0],
+    sources : nx_sys_sync_tgt,
     dependencies : deps,
 )

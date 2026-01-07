@@ -37,9 +37,8 @@ nx_sf_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_sf.a', 'libnx_sf.rlib'],
+    output : ['libnx_sf.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -52,6 +51,6 @@ nx_sf_tgt = custom_target(
 nx_sf_ld_override = meson.current_source_dir() / 'sf_override.ld'
 
 nx_sf_dep = declare_dependency(
-    link_with : nx_sf_tgt[0],
+    sources : nx_sf_tgt,
     dependencies : deps,
 )

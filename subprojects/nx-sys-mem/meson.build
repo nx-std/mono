@@ -50,9 +50,8 @@ nx_sys_mem_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_sys_mem.a', 'libnx_sys_mem.rlib'],
+    output : ['libnx_sys_mem.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -66,6 +65,6 @@ nx_sys_mem_ld_override = meson.current_source_dir() / 'sys_mem_override.ld'
 
 nx_sys_mem_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_sys_mem_tgt[0],
+    sources : nx_sys_mem_tgt,
     dependencies : deps,
 )

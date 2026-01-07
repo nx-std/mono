@@ -16,8 +16,8 @@ This document describes how Rust crates in this project can override `libnx` fun
 The libnx override system allows Rust crates to replace libnx C functions transparently at link time. This enables gradual migration from C to Rust while maintaining compatibility with existing homebrew code.
 
 **How it works**:
-1. Rust crates implement Nintendo Switch OS functionality
-2. When built with the `ffi` feature, crates export C-compatible functions
+1. Rust crates implement Nintendo Switch OS functionality with public `ffi` modules
+2. `nx-std` is the only staticlib; it re-exports FFI symbols from enabled crates
 3. Linker scripts redirect libnx symbols to Rust implementations
 4. At link time, code calling libnx functions transparently uses Rust implementations
 
@@ -56,11 +56,10 @@ For functions starting with `__libnx_`, strip the prefix and keep the rest as-is
 
 ### lib.rs
 
-Feature-gate the FFI module in `src/lib.rs`:
+Expose the FFI module publicly in `src/lib.rs` so `nx-std` can re-export it:
 
 ```rust
-#[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;
 ```
 
 ### ffi.rs
@@ -84,6 +83,7 @@ unsafe extern "C" fn __nx_svc__svc_set_heap_size(
 - `#[unsafe(no_mangle)]`: Prevents name mangling so the linker can find the symbol
 - `extern "C"`: Uses C calling convention for ABI compatibility
 - Match libnx function signature exactly
+- Module must be `pub` for `nx-std` re-export visibility
 
 ## Linker Override Files
 
@@ -114,26 +114,25 @@ svcMapMemory = __nx_svc__svc_map_memory;
 
 ### meson.build
 
-Each crate's `meson.build` must:
+Individual crates build as rlib only. Each crate's `meson.build` must:
 
-1. Build Rust crate with `ffi` feature
+1. Build Rust crate as rlib (no `--features ffi`)
 2. Declare linker override file variable
 3. Export dependency
 
 **Example**: `subprojects/nx-svc/meson.build`
 
 ```meson
-# Build static library with FFI enabled
+# Build rlib (no staticlib, no FFI feature)
 nx_svc_tgt = custom_target(
     'nx-svc',
     command : [
         cargo, 'build',
         '--package', meson.project_name(),
-        '--features', 'ffi',  # Enable FFI exports
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
     ],
-    output : ['libnx_svc.a', 'libnx_svc.rlib'],
+    output : ['libnx_svc.rlib'],
     build_by_default : true,
     build_always_stale : true,
 )
@@ -143,7 +142,7 @@ nx_svc_ld_override = meson.current_source_dir() / 'svc_override.ld'
 
 # Export dependency
 nx_svc_dep = declare_dependency(
-    link_with : nx_svc_tgt[0],
+    sources : nx_svc_tgt,
     dependencies : deps,
 )
 ```
@@ -168,24 +167,55 @@ option(
 
 ## nx-std Integration
 
-The `nx-std` umbrella crate collects override link args from all enabled dependencies.
+The `nx-std` crate is the single staticlib. It collects Cargo features and override link args from all enabled dependencies.
+
+**Key files**:
+- `nx-std/src/ffi.rs` - Re-exports FFI modules from dependent crates
+- `nx-std/meson.build` - Builds staticlib with `--features ffi,<enabled-crates>`
 
 **Example**: `subprojects/nx-std/meson.build`
 
 ```meson
 deps_override_link_args = []
+deps_cargo_features = []
 
 # Conditionally add each crate's override based on meson options
 if get_option('use_nx_svc').enabled()
     nx_svc_proj = subproject('nx-svc')
     deps += nx_svc_proj.get_variable('nx_svc_dep')
     deps_override_link_args += ['-T', nx_svc_proj.get_variable('nx_svc_ld_override')]
+    deps_cargo_features += ['svc']
 endif
 
 # ... repeat for other crates ...
 
+# Build staticlib with FFI and enabled crate features
+nx_std_tgt = custom_target(
+    'nx-std',
+    command : [
+        cargo, 'build',
+        '--package', meson.project_name(),
+        '--no-default-features',
+        '--features', ','.join(['ffi'] + deps_cargo_features),
+        ...
+    ],
+    output : ['libnx_std.a', 'libnx_std.rlib'],
+    ...
+)
+
 # Export collected link args
 nx_std_dep_override_link_args = deps_override_link_args
+```
+
+**FFI re-export pattern** (`nx-std/src/ffi.rs`):
+
+```rust
+#[cfg(feature = "svc")]
+pub use nx_svc::ffi as svc;
+
+#[cfg(feature = "alloc")]
+pub use nx_alloc::ffi as alloc;
+// ... other crates
 ```
 
 ### Usage in Applications

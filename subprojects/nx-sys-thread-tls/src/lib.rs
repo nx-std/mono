@@ -212,7 +212,7 @@ use nx_svc::thread::Handle as ThreadHandle;
 use static_assertions::const_assert_eq;
 
 #[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;
 
 /// Size of the Thread Local Storage (TLS) region in bytes.
 ///

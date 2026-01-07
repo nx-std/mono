@@ -28,13 +28,13 @@ nx_cpu_tgt = custom_target(
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
     ],
-    output : ['libnx_cpu.a', 'libnx_cpu.rlib'],
+    output : ['libnx_cpu.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
 )
 
 nx_cpu_dep = declare_dependency(
-    link_with : nx_cpu_tgt[0],
+    sources : nx_cpu_tgt,
     dependencies : deps,
 )

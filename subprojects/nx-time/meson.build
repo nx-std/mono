@@ -35,9 +35,8 @@ nx_time_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_time.a', 'libnx_time.rlib'],
+    output : ['libnx_time.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -51,6 +50,6 @@ nx_time_ld_override = meson.current_source_dir() / 'time_override.ld'
 
 nx_time_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_time_tgt[0],
+    sources : nx_time_tgt,
     dependencies : deps,
 )

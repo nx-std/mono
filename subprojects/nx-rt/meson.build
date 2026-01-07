@@ -62,9 +62,8 @@ nx_rt_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_rt.a', 'libnx_rt.rlib'],
+    output : ['libnx_rt.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -77,6 +76,6 @@ nx_rt_tgt = custom_target(
 nx_rt_ld_override = meson.current_source_dir() / 'rt_override.ld'
 
 nx_rt_dep = declare_dependency(
-    link_with : nx_rt_tgt[0],
+    sources : nx_rt_tgt,
     dependencies : deps,
 )

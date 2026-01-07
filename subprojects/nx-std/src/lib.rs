@@ -1,19 +1,19 @@
 //! # nx-std
 #![no_std]
 
-extern crate nx_panic_handler as _; // provides #[panic_handler]
-
-// The `alloc` crate enables memory allocation.
-#[cfg(feature = "alloc")]
-extern crate alloc as _;
-// The `nx-alloc` crate exposes the `#[global_allocator]` for the dependent crates.
-#[cfg(feature = "alloc")]
-extern crate nx_alloc;
+extern crate nx_panic_handler; // provides #[panic_handler]
 
 #[cfg(feature = "alloc")]
-pub mod alloc {
-    pub use nx_alloc::*;
-}
+extern crate alloc;
+#[cfg(feature = "alloc")]
+pub extern crate nx_alloc; // Provides #[global_allocator]
+
+// FFI exports - re-export FFI symbols from dependent crates to ensure they're
+// included in the staticlib. This module is only compiled when the `ffi` feature
+// is enabled.
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 #[cfg(feature = "rand")]
 pub mod rand {
     pub use nx_rand::*;
@@ -26,9 +26,14 @@ pub mod sync {
 pub mod time {
     pub use nx_time::*;
 }
+#[cfg(feature = "rt")]
+pub mod rt {
+    pub use nx_rt::*;
+}
 
 #[cfg(any(
     feature = "sys",
+    feature = "alloc",
     feature = "svc",
     feature = "sys-mem",
     feature = "sys-sync",
@@ -36,6 +41,8 @@ pub mod time {
     feature = "sys-thread-tls"
 ))]
 pub mod sys {
+    #[cfg(any(feature = "sys", feature = "alloc"))]
+    pub use nx_alloc as alloc;
     #[cfg(any(feature = "sys", feature = "svc"))]
     pub use nx_svc as svc;
     #[cfg(any(feature = "sys", feature = "sys-mem"))]

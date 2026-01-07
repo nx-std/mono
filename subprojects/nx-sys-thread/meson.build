@@ -35,9 +35,8 @@ nx_sys_thread_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_sys_thread.a', 'libnx_sys_thread.rlib'],
+    output : ['libnx_sys_thread.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -51,6 +50,6 @@ nx_sys_thread_ld_override = meson.current_source_dir() / 'sys_thread_override.ld
 
 nx_sys_thread_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_sys_thread_tgt[0],
+    sources : nx_sys_thread_tgt,
     dependencies : deps,
 )

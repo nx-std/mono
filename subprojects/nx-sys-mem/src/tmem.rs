@@ -1,7 +1,7 @@
 //! Transfer memory management
 
 #[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;
 
 mod sys;
 

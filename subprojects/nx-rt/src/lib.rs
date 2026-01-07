@@ -10,7 +10,7 @@ extern crate nx_alloc; // Provides #[global_allocator]
 extern crate nx_panic_handler; // Provides #[panic_handler]
 
 #[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;
 
 pub mod argv;
 pub mod env;

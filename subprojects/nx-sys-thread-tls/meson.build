@@ -32,9 +32,8 @@ nx_sys_thread_tls_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_sys_thread_tls.a', 'libnx_sys_thread_tls.rlib'],
+    output : ['libnx_sys_thread_tls.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -47,6 +46,6 @@ nx_sys_thread_tls_tgt = custom_target(
 nx_sys_thread_tls_ld_override = meson.current_source_dir() / 'thread_tls_override.ld'
 
 nx_sys_thread_tls_dep = declare_dependency(
-    link_with : nx_sys_thread_tls_tgt[0],
+    sources : nx_sys_thread_tls_tgt,
     dependencies : deps,
 )

@@ -28,7 +28,7 @@ nx_object_tgt = custom_target(
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
     ],
-    output : ['libnx_object.a', 'libnx_object.rlib'],
+    output : ['libnx_object.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -38,6 +38,6 @@ nx_object_tgt = custom_target(
 # Dependency declaration
 #---------------------------------------------------------------------------------
 nx_object_dep = declare_dependency(
-    link_with : nx_object_tgt[0],
+    sources : nx_object_tgt,
     dependencies : deps,
 )

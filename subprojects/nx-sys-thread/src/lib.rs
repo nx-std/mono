@@ -5,7 +5,7 @@ extern crate nx_alloc; // Provides #[global_allocator]
 extern crate nx_panic_handler; // provides #[panic_handler]
 
 #[cfg(feature = "ffi")]
-mod ffi;
+pub mod ffi;
 
 mod thread_impl;
 pub mod tls_block;

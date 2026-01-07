@@ -30,9 +30,8 @@ nx_svc_tgt = custom_target(
         '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
     ],
-    output : ['libnx_svc.a', 'libnx_svc.rlib'],
+    output : ['libnx_svc.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -46,6 +45,6 @@ nx_svc_ld_override = meson.current_source_dir() / 'svc_override.ld'
 
 nx_svc_dep = declare_dependency(
     include_directories : inc,
-    link_with : nx_svc_tgt[0],
+    sources : nx_svc_tgt,
     dependencies : deps,
 )
