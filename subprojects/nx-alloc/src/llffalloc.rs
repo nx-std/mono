@@ -4,17 +4,14 @@
 //! It is used to allocate memory for the entire program.
 //!
 //! It is based on the [linked_list_allocator](https://github.com/rust-osdev/linked_list_allocator) crate.
-use core::{
-    alloc::Layout,
-    ffi::{c_char, c_void},
-    ptr,
-};
+use core::{alloc::Layout, ffi::c_char, ptr};
 
-use nx_rt_env::{self as env, Entry};
 use nx_svc::{
     mem::set_heap_size,
     misc::{get_total_memory_size, get_used_memory_size},
 };
+
+use crate::config;
 
 /// A wrapper around the linked list allocator that provides
 /// a lazy initialization mechanism for the heap.
@@ -62,8 +59,8 @@ impl Heap {
 /// This function is used to initialize the linked-list allocator heap.
 /// It is either called by the `init` function or when the heap is first used.
 fn init_inner_heap() -> linked_list_allocator::Heap {
-    // Check if homebrew loader provided a heap override
-    if let Some((heap_addr, heap_size)) = env::config_entries().and_then(find_heap_override) {
+    // Check if runtime provided a heap override
+    if let Some((heap_addr, heap_size)) = config::heap_override() {
         // SAFETY: The homebrew loader guarantees this region is valid and owned by us.
         return unsafe {
             linked_list_allocator::Heap::new(heap_addr.as_ptr() as *mut u8, heap_size)
@@ -98,16 +95,4 @@ fn init_inner_heap() -> linked_list_allocator::Heap {
 
     // SAFETY: The kernel guarantees this region is valid and owned by us.
     unsafe { linked_list_allocator::Heap::new(heap_bottom as *mut u8, heap_size) }
-}
-
-/// Find heap override entry in config entries.
-///
-/// Returns `Some((addr, size))` if a heap override entry is found.
-fn find_heap_override(
-    mut entries: env::ConfigEntries<'_>,
-) -> Option<(ptr::NonNull<c_void>, usize)> {
-    entries.find_map(|entry| match entry {
-        Entry::OverrideHeap { addr, size } => addr.map(|a| (a, size)),
-        _ => None,
-    })
 }

@@ -84,13 +84,6 @@ option(
 )
 
 option(
-    'use_nx_rt_env',
-    type : 'feature', value : 'auto',
-    description : 'Override all libnx functions with nx-rt-env functions',
-    yield : true
-)
-
-option(
     'use_nx_rt',
     type : 'feature', value : 'auto',
     description : 'Override libnx runtime functions with nx-rt',

@@ -111,17 +111,6 @@ if get_option('use_nx_time').enabled()
     deps_cargo_features += ['time']
 endif
 
-# nx-rt-env
-if get_option('use_nx_rt_env').enabled()
-    nx_rt_env_proj = subproject('nx-rt-env')
-
-    deps += nx_rt_env_proj.get_variable('nx_rt_env_dep')
-    deps_override_link_args += ['-T', nx_rt_env_proj.get_variable('nx_rt_env_ld_override')]
-
-    debug('rt-env feature: enabled')
-    deps_cargo_features += ['rt-env']
-endif
-
 # nx-rt
 if get_option('use_nx_rt').enabled()
     nx_rt_proj = subproject('nx-rt')

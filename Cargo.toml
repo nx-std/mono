@@ -7,7 +7,6 @@ members = [
     "subprojects/nx-panic-handler",
     "subprojects/nx-rand",
     "subprojects/nx-rt",
-    "subprojects/nx-rt-env",
     "subprojects/nx-sf",
     "subprojects/nx-std",
     "subprojects/nx-std-sync",

@@ -50,7 +50,7 @@ For functions starting with `__libnx_`, strip the prefix and keep the rest as-is
 | libnx Function | Rust FFI Function |
 |---|---|
 | `__libnx_initheap` | `__nx_alloc__initheap` |
-| `__libnx_exception_entry` | `__nx_rt_env__exception_entry` |
+| `__libnx_exception_entry` | `__nx_rt__exception_entry` |
 
 ## Rust Crate Structure
 

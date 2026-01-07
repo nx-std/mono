@@ -145,7 +145,7 @@ pub unsafe fn setup() {
     // after the kernel has set up TPIDRRO_EL0 to point to a valid TLS block.
     unsafe {
         nx_sys_thread_tls::init_thread_vars(
-            crate::main_thread_handle(),
+            super::main_thread_handle(),
             ptr::null_mut(), // thread_info_ptr - filled later by thread registry
             reent,
             tls_tp,

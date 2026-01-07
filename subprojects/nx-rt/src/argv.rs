@@ -10,9 +10,10 @@ use core::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use nx_rt_env as env;
 use nx_svc::mem::query_memory;
 use nx_sys_sync::Once;
+
+use crate::env;
 
 /// Initialization guard - ensures setup runs exactly once
 static ARGV_INIT: Once = Once::new();

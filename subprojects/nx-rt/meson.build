@@ -14,10 +14,6 @@ nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-rt-env
-nx_rt_env_proj = subproject('nx-rt-env')
-nx_rt_env_dep = nx_rt_env_proj.get_variable('nx_rt_env_dep')
-
 # nx-svc
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
@@ -46,7 +42,6 @@ nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_d
 deps = [
     nx_alloc_dep,
     nx_panic_handler_dep,
-    nx_rt_env_dep,
     nx_std_sync_dep,
     nx_svc_dep,
     nx_sys_mem_dep,
