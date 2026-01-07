@@ -1,10 +1,5 @@
 /* Static linker script for allocation function symbols redirection */
-/* Redirects libnx functions to nx-alloc __nx_alloc_* implementations */
-
-/* init.c */
-EXTERN(__nx_alloc__initheap)
-
-__libnx_initheap = __nx_alloc__initheap;
+/* Redirects libnx functions to nx-alloc __nx_alloc__* implementations */
 
 /* libc (newlib) */
 EXTERN(__nx_alloc__newlib_malloc_r)

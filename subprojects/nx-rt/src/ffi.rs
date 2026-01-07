@@ -6,12 +6,8 @@ use nx_svc::{raw::INVALID_HANDLE, thread::Handle as ThreadHandle};
 
 use crate::{
     argv,
-    env::{
-        self, AccountUid, ConfigEntry, LoaderReturnFn, applet_type, argv as env_argv,
-        exit_func_ptr, has_next_load, heap_override, hos_version, is_nso, last_load_result,
-        loader_info, main_thread_handle, own_process_handle, random_seed, service_overrides,
-        set_exit_func_ptr, set_next_load, setup, syscall_hints, user_id_storage,
-    },
+    env::{self, AccountUid, ConfigEntry, LoaderReturnFn},
+    init,
 };
 
 // libnx C symbols
@@ -34,17 +30,17 @@ pub unsafe extern "C" fn __nx_rt__env_setup(
     // SAFETY: Caller (libnx CRT0) guarantees that ctx is either null (NSO mode)
     // or points to a valid ConfigEntry array terminated by EndOfList.
     // The main_thread handle is provided by the kernel/loader and is guaranteed valid.
-    unsafe { setup(ctx, ThreadHandle::from_raw(main_thread), saved_lr) }
+    unsafe { env::setup(ctx, ThreadHandle::from_raw(main_thread), saved_lr) }
 
     // Sync parsed values with libnx globals
-    for ovr in service_overrides().iter().flatten() {
+    for ovr in env::service_overrides().iter().flatten() {
         // SAFETY: smAddOverrideHandle is safe to call during init
         // Pass the raw u64 value which is ABI-equivalent to SmServiceName
         unsafe { smAddOverrideHandle(ovr.name.to_raw(), ovr.handle.to_raw()) }
     }
 
     // SAFETY: Single-threaded initialization, exclusive access to the global variable.
-    unsafe { __nx_applet_type = applet_type().as_raw() };
+    unsafe { __nx_applet_type = env::applet_type().as_raw() };
 }
 
 /// Initialize main thread TLS (ThreadVars and .tdata copy)
@@ -61,7 +57,7 @@ pub unsafe extern "C" fn __nx_rt__setup_main_thread_tls() {
 /// Get loader info string pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_loader_info() -> *const c_char {
-    match loader_info() {
+    match env::loader_info() {
         Some((ptr, _)) => ptr.as_ptr() as *const c_char,
         None => core::ptr::null(),
     }
@@ -70,7 +66,7 @@ pub unsafe extern "C" fn __nx_rt__env_get_loader_info() -> *const c_char {
 /// Get loader info size
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_loader_info_size() -> u64 {
-    match loader_info() {
+    match env::loader_info() {
         Some((_, size)) => size,
         None => 0,
     }
@@ -79,25 +75,25 @@ pub unsafe extern "C" fn __nx_rt__env_get_loader_info_size() -> u64 {
 /// Get main thread handle
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_main_thread_handle() -> u32 {
-    main_thread_handle().to_raw()
+    env::main_thread_handle().to_raw()
 }
 
 /// Returns true if running as NSO
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_is_nso() -> bool {
-    is_nso()
+    env::is_nso()
 }
 
 /// Returns true if heap override is present
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_has_heap_override() -> bool {
-    heap_override().is_some()
+    env::heap_override().is_some()
 }
 
 /// Get heap override address
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_heap_override_addr() -> *mut c_void {
-    match heap_override() {
+    match env::heap_override() {
         Some((addr, _)) => addr.as_ptr(),
         None => core::ptr::null_mut(),
     }
@@ -106,49 +102,55 @@ pub unsafe extern "C" fn __nx_rt__env_get_heap_override_addr() -> *mut c_void {
 /// Get heap override size
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_heap_override_size() -> u64 {
-    match heap_override() {
+    match env::heap_override() {
         Some((_, size)) => size as u64,
         None => 0,
     }
 }
 
+/// Initialize the allocator heap.
+///
+/// Override for libnx's `__libnx_initheap`. Uses heap override from loader
+/// config if available, otherwise allocates via SVC.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt__initheap() {
+    init::setup_heap();
+}
+
 /// Returns true if argv is present
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_has_argv() -> bool {
-    env_argv().is_some()
+    env::argv().is_some()
 }
 
 /// Get argv string pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_argv() -> *const c_char {
-    match env_argv() {
-        Some(ptr) => ptr,
-        None => core::ptr::null(),
-    }
+    env::argv().unwrap_or_else(|| core::ptr::null())
 }
 
 /// Returns true if the given syscall is hinted as available
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_is_syscall_hinted(svc: c_uint) -> bool {
-    syscall_hints().is_available(svc)
+    env::syscall_hints().is_available(svc)
 }
 
 /// Get process handle (returns INVALID_HANDLE if not set)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_own_process_handle() -> u32 {
-    own_process_handle().map_or(INVALID_HANDLE, |h| h.to_raw())
+    env::own_process_handle().map_or(INVALID_HANDLE, |h| h.to_raw())
 }
 
 /// Get exit function pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_exit_func_ptr() -> LoaderReturnFn {
-    exit_func_ptr()
+    env::exit_func_ptr()
 }
 
 /// Set exit function pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_set_exit_func_ptr(func: LoaderReturnFn) {
-    set_exit_func_ptr(func)
+    env::set_exit_func_ptr(func)
 }
 
 /// Set next NRO to load (chain loading)
@@ -159,25 +161,25 @@ pub unsafe extern "C" fn __nx_rt__env_set_next_load(
     path: *const c_char,
     argv: *const c_char,
 ) -> u32 {
-    set_next_load(path, argv)
+    env::set_next_load(path, argv)
 }
 
 /// Returns true if chain loading is supported
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_has_next_load() -> bool {
-    has_next_load()
+    env::has_next_load()
 }
 
 /// Get last load result
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_last_load_result() -> u32 {
-    last_load_result()
+    env::last_load_result()
 }
 
 /// Returns true if random seed is present
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_has_random_seed() -> bool {
-    random_seed().is_some()
+    env::random_seed().is_some()
 }
 
 /// Get random seed (copies to output buffer)
@@ -186,7 +188,7 @@ pub unsafe extern "C" fn __nx_rt__env_get_random_seed(out: *mut u64) {
     if out.is_null() {
         return;
     }
-    if let Some([seed0, seed1]) = random_seed() {
+    if let Some([seed0, seed1]) = env::random_seed() {
         // SAFETY: Caller guarantees out points to a valid buffer with space for 2 u64 values.
         // We verified out is non-null above.
         unsafe {
@@ -199,7 +201,7 @@ pub unsafe extern "C" fn __nx_rt__env_get_random_seed(out: *mut u64) {
 /// Get user ID storage pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__env_get_user_id_storage() -> *mut AccountUid {
-    match user_id_storage() {
+    match env::user_id_storage() {
         Some(ptr) => ptr.as_ptr(),
         None => core::ptr::null_mut(),
     }
@@ -210,7 +212,7 @@ pub unsafe extern "C" fn __nx_rt__env_get_user_id_storage() -> *mut AccountUid {
 /// Equivalent to libnx's `hosversionGet()`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__hosversion_get() -> u32 {
-    hos_version::get().as_u32()
+    env::hos_version::get().as_u32()
 }
 
 /// Set the HOS version.
@@ -219,7 +221,7 @@ pub unsafe extern "C" fn __nx_rt__hosversion_get() -> u32 {
 /// This should only be called from envSetup/appInit in C code.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__hosversion_set(version: u32) {
-    hos_version::set(version)
+    env::hos_version::set(version)
 }
 
 /// Check if running on Atmosphere.
@@ -227,7 +229,7 @@ pub unsafe extern "C" fn __nx_rt__hosversion_set(version: u32) {
 /// Equivalent to libnx's `hosversionIsAtmosphere()`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__hosversion_is_atmosphere() -> bool {
-    hos_version::is_atmosphere()
+    env::hos_version::is_atmosphere()
 }
 
 /// Wrapper for static argv array to implement Sync

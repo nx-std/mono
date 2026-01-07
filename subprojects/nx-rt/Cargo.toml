@@ -14,7 +14,7 @@ bench = false
 ffi = []
 
 [dependencies]
-nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }

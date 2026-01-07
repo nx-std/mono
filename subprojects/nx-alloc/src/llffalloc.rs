@@ -4,14 +4,16 @@
 //! It is used to allocate memory for the entire program.
 //!
 //! It is based on the [linked_list_allocator](https://github.com/rust-osdev/linked_list_allocator) crate.
-use core::{alloc::Layout, ffi::c_char, ptr};
+use core::{
+    alloc::Layout,
+    ffi::{c_char, c_void},
+    ptr::{self, NonNull},
+};
 
 use nx_svc::{
     mem::set_heap_size,
     misc::{get_total_memory_size, get_used_memory_size},
 };
-
-use crate::config;
 
 /// A wrapper around the linked list allocator that provides
 /// a lazy initialization mechanism for the heap.
@@ -23,9 +25,25 @@ impl Heap {
         Self(None)
     }
 
-    /// Initialize the heap.
+    /// Returns `true` if the heap has been initialized.
+    pub fn is_initialized(&self) -> bool {
+        self.0.is_some()
+    }
+
+    /// Initialize the heap using SVC memory allocation.
     pub fn init(&mut self) {
         self.0 = Some(init_inner_heap());
+    }
+
+    /// Initialize the heap with a pre-allocated memory region.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    /// - `addr` points to a valid, owned memory region of at least `size` bytes
+    /// - The memory region will remain valid for the lifetime of the allocator
+    pub unsafe fn init_with_heap_override(&mut self, addr: NonNull<c_void>, size: usize) {
+        self.0 = Some(unsafe { linked_list_allocator::Heap::new(addr.as_ptr() as *mut u8, size) });
     }
 
     /// Allocate memory from the heap.
@@ -54,20 +72,11 @@ impl Heap {
     }
 }
 
-/// Initialize the linked-list allocator heap
+/// Initialize the heap via SVC memory allocation.
 ///
-/// This function is used to initialize the linked-list allocator heap.
+/// This function allocates heap memory using the kernel's SetHeapSize SVC.
 /// It is either called by the `init` function or when the heap is first used.
 fn init_inner_heap() -> linked_list_allocator::Heap {
-    // Check if runtime provided a heap override
-    if let Some((heap_addr, heap_size)) = config::heap_override() {
-        // SAFETY: The homebrew loader guarantees this region is valid and owned by us.
-        return unsafe {
-            linked_list_allocator::Heap::new(heap_addr.as_ptr() as *mut u8, heap_size)
-        };
-    }
-
-    // No heap override - allocate via SVC
     // Default heap size if not specified (0x2000000 * 16)
     const DEFAULT_HEAP_SIZE: usize = 0x2_000_000 * 16;
     const HEAP_SIZE_ALIGN: usize = 0x200_000;

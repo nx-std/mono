@@ -127,11 +127,6 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
             }
             Entry::OverrideHeap { addr, size } => {
                 state.heap_override = addr.map(|a| (a, size));
-                // Push heap override to nx-alloc config before allocator initialization
-                if let Some(a) = addr {
-                    // SAFETY: Called during initialization before any heap allocations
-                    unsafe { nx_alloc::config::set_heap_override(a, size) };
-                }
             }
             Entry::Argv(ptr) => {
                 state.argv = ptr;

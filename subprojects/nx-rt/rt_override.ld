@@ -1,5 +1,9 @@
 /* Linker script to override libnx runtime functions */
 
+/* Heap initialization */
+EXTERN(__nx_rt__initheap);
+__libnx_initheap = __nx_rt__initheap;
+
 /* Argv and nxlink symbols */
 EXTERN(__nx_rt__argv_setup);
 argvSetup = __nx_rt__argv_setup;

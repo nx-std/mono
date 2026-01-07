@@ -3,12 +3,6 @@ use core::{ffi::c_void, ptr};
 use self::meta::{Allocation, Layout};
 use crate::global as global_allocator;
 
-/// Override fn for libnx's __libnx_initheap
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_alloc__initheap() {
-    global_allocator::init();
-}
-
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc__malloc(size: usize) -> *mut c_void {
     let Ok(layout) = Layout::from_size(size) else {

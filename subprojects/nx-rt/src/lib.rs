@@ -14,4 +14,5 @@ pub mod ffi;
 
 pub mod argv;
 pub mod env;
+pub mod init;
 pub mod thread_registry;
