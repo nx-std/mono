@@ -42,6 +42,9 @@ const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
 /// Maximum number of service overrides (matches libnx MAX_OVERRIDES)
 const MAX_SERVICE_OVERRIDES: usize = 32;
 
+/// Maximum possible config entries (15 single-instance types + 32 service overrides + 1 margin)
+const MAX_CONFIG_ENTRIES: usize = 48;
+
 /// Global environment state (immutable after initialization)
 static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
 
@@ -112,96 +115,86 @@ unsafe fn env_init_nro(state: &mut EnvState, ctx: NonNull<ConfigEntry>, saved_lr
     // NRO mode
     state.is_nso = false;
 
-    let mut entry_ptr = ctx.as_ptr();
-    loop {
-        // SAFETY: Caller guarantees ctx points to a valid ConfigEntry array.
-        // entry_ptr starts at ctx and only advances via add(1) below.
-        let entry = unsafe { &*entry_ptr };
+    // SAFETY: Caller guarantees ctx points to valid ConfigEntry array terminated by EndOfList
+    let entries = unsafe { ConfigEntries::from_ptr(ctx) };
 
-        match EntryType::from_u32(entry.key) {
-            Some(EntryType::HosVersion) => {
-                let mut version = entry.value[0] as u32;
-                // Check for Atmosphere magic 'ATMOSPHR' in value[1]
-                if entry.value[1] == ATMOSPHERE_MAGIC {
-                    version |= HOS_VERSION_ATMOSPHERE_BIT;
+    for entry in entries {
+        match entry {
+            Entry::HosVersion {
+                version,
+                is_atmosphere,
+            } => {
+                let mut v = version;
+                if is_atmosphere {
+                    v |= HOS_VERSION_ATMOSPHERE_BIT;
                 }
-                hos_version::set(version);
+                hos_version::set(v);
             }
-            Some(EntryType::MainThreadHandle) => {
+            Entry::MainThreadHandle(raw) => {
                 // SAFETY: The handle is provided by the loader and guaranteed valid
-                state.main_thread_handle =
-                    Some(unsafe { ThreadHandle::from_raw(entry.value[0] as u32) });
+                state.main_thread_handle = Some(unsafe { ThreadHandle::from_raw(raw) });
             }
-            Some(EntryType::ProcessHandle) => {
+            Entry::ProcessHandle(raw) => {
                 // SAFETY: The handle is provided by the loader and guaranteed valid
-                state.process_handle =
-                    Some(unsafe { ProcessHandle::from_raw(entry.value[0] as u32) });
+                state.process_handle = Some(unsafe { ProcessHandle::from_raw(raw) });
             }
-            Some(EntryType::OverrideHeap) => {
-                state.heap_override = NonNull::new(entry.value[0] as *mut c_void)
-                    .map(|addr| (addr, entry.value[1] as usize));
+            Entry::OverrideHeap { addr, size } => {
+                state.heap_override = addr.map(|a| (a, size));
             }
-            Some(EntryType::Argv) => {
-                state.argv = NonNull::new(entry.value[1] as *mut c_char);
+            Entry::Argv(ptr) => {
+                state.argv = ptr;
             }
-            Some(EntryType::RandomSeed) => {
-                state.random_seed = Some([entry.value[0], entry.value[1]]);
+            Entry::RandomSeed(seed) => {
+                state.random_seed = Some(seed);
             }
-            Some(EntryType::SyscallAvailableHint) => {
-                // SVCs 0x00-0x7F
+            Entry::SyscallHint {
+                hint_0_3f,
+                hint_40_7f,
+            } => {
                 state
                     .syscall_hints
                     .get_or_insert_with(SyscallHints::new)
-                    .set_hint_0_7f(entry.value[0], entry.value[1]);
+                    .set_hint_0_7f(hint_0_3f, hint_40_7f);
             }
-            Some(EntryType::SyscallAvailableHint2) => {
-                // SVCs 0x80-0xBF
+            Entry::SyscallHint2 { hint_80_bf } => {
                 state
                     .syscall_hints
                     .get_or_insert_with(SyscallHints::new)
-                    .set_hint_80_bf(entry.value[0]);
+                    .set_hint_80_bf(hint_80_bf);
             }
-            Some(EntryType::UserIdStorage) => {
-                state.user_id_storage = NonNull::new(entry.value[0] as *mut AccountUid);
+            Entry::UserIdStorage(ptr) => {
+                state.user_id_storage = ptr;
             }
-            Some(EntryType::LastLoadResult) => {
-                state.last_load_result = entry.value[0] as u32;
+            Entry::LastLoadResult(result) => {
+                state.last_load_result = result;
             }
-            Some(EntryType::NextLoadPath) => {
+            Entry::NextLoadPath => {
                 state.has_next_load = true;
-                // Value[0] and Value[1] are buffer pointers set by loader
             }
-            Some(EntryType::OverrideService) => {
-                // Store in Rust state (FFI registration happens separately)
+            Entry::OverrideService { name, handle } => {
                 if state.service_override_count < MAX_SERVICE_OVERRIDES {
-                    let name = ServiceName::from_u64(entry.value[0]);
                     // SAFETY: The handle is provided by the loader and guaranteed valid
-                    let handle = unsafe { ServiceHandle::from_raw(entry.value[1] as u32) };
-
+                    let service_handle = unsafe { ServiceHandle::from_raw(handle) };
                     state.service_overrides[state.service_override_count] =
-                        Some(ServiceOverride::new(name, handle));
+                        Some(ServiceOverride::new(name, service_handle));
                     state.service_override_count += 1;
                 }
             }
-            Some(EntryType::AppletType) => {
-                state.applet_type = AppletType::from_raw(entry.value[0] as u32, entry.value[1]);
+            Entry::AppletType { kind, flags } => {
+                state.applet_type = AppletType::from_raw(kind, flags);
             }
-            Some(EntryType::EndOfList) => {
-                // Loader info is in the final entry's Value fields
-                if entry.value[1] > 0 {
-                    state.loader_info = NonNull::new(entry.value[0] as *mut c_char)
-                        .map(|ptr| (ptr, entry.value[1]));
+            Entry::AppletWorkaround => {
+                state.applet_workaround = true;
+            }
+            Entry::LoaderInfo { ptr, len } => {
+                if len > 0 {
+                    state.loader_info = ptr.map(|p| (p, len));
                 }
-                break;
             }
-            _ => {
+            Entry::Unknown { .. } => {
                 // Ignore unknown entry types
             }
         }
-
-        // SAFETY: The array is terminated by EndOfList, which breaks the loop.
-        // We only advance the pointer if we haven't reached the end marker yet.
-        entry_ptr = unsafe { entry_ptr.add(1) };
     }
 }
 
@@ -330,6 +323,13 @@ pub fn applet_type() -> AppletType {
     state.applet_type
 }
 
+/// Returns true if APT workaround is active (APT is broken and should not be used)
+pub fn applet_workaround() -> bool {
+    // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
+    let state = unsafe { ENV_STATE.get_ref() };
+    state.applet_workaround
+}
+
 /// Set next NRO to load (chain loading)
 ///
 /// Returns 0 on success, non-zero on error
@@ -428,6 +428,9 @@ struct EnvState {
 
     /// Applet type from loader
     applet_type: AppletType,
+
+    /// APT workaround flag (true if APT is broken and should not be used)
+    applet_workaround: bool,
 }
 
 impl EnvState {
@@ -447,6 +450,7 @@ impl EnvState {
             service_overrides: [None; MAX_SERVICE_OVERRIDES],
             service_override_count: 0,
             applet_type: AppletType::Default,
+            applet_workaround: false,
         }
     }
 }
@@ -486,66 +490,185 @@ impl EnvStateWrapper {
 
 unsafe impl Sync for EnvStateWrapper {}
 
-/// Entry type in the homebrew environment configuration
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EntryType {
-    /// Entry list terminator
-    EndOfList = 0,
-    /// Provides the handle to the main thread
-    MainThreadHandle = 1,
-    /// Provides a buffer containing information about the next homebrew application to load
-    NextLoadPath = 2,
-    /// Provides heap override information (address and size)
-    OverrideHeap = 3,
-    /// Provides service override information
-    OverrideService = 4,
-    /// Provides argv string pointer
-    Argv = 5,
-    /// Provides syscall availability hints for SVCs 0x00-0x7F
-    SyscallAvailableHint = 6,
-    /// Provides APT applet type
-    AppletType = 7,
-    /// Indicates that APT is broken and should not be used
-    AppletWorkaround = 8,
-    /// Unused/reserved entry type (formerly used by StdioSockets)
-    Reserved9 = 9,
-    /// Provides the process handle
-    ProcessHandle = 10,
-    /// Provides the last load result code
-    LastLoadResult = 11,
-    /// Provides random data used to seed the pseudo-random number generator
-    RandomSeed = 14,
-    /// Provides persistent storage for the preselected user id
-    UserIdStorage = 15,
-    /// Provides the currently running Horizon OS version
-    HosVersion = 16,
-    /// Provides syscall availability hints for SVCs 0x80-0xBF
-    SyscallAvailableHint2 = 17,
+/// Typed view over a [`ConfigEntry`].
+///
+/// This enum provides type-safe access to the values in a config entry,
+/// parsing the raw `[u64; 2]` values into their appropriate types.
+/// Zero-copy: only extracts scalar values, no allocation.
+#[derive(Debug, Clone, Copy)]
+pub enum Entry {
+    /// Loader info (appears in the EndOfList entry).
+    LoaderInfo {
+        ptr: Option<NonNull<c_char>>,
+        len: u64,
+    },
+    /// Main thread handle (raw u32 value)
+    MainThreadHandle(u32),
+    /// Process handle (raw u32 value)
+    ProcessHandle(u32),
+    /// Chain loading path buffer available
+    NextLoadPath,
+    /// Heap override (address and size)
+    OverrideHeap {
+        addr: Option<NonNull<c_void>>,
+        size: usize,
+    },
+    /// Service override (name and handle)
+    OverrideService { name: ServiceName, handle: u32 },
+    /// Argv string pointer
+    Argv(Option<NonNull<c_char>>),
+    /// Syscall availability hints for SVCs 0x00-0x7F
+    SyscallHint { hint_0_3f: u64, hint_40_7f: u64 },
+    /// Syscall availability hints for SVCs 0x80-0xBF
+    SyscallHint2 { hint_80_bf: u64 },
+    /// Applet type (raw kind value and flags)
+    AppletType { kind: u32, flags: u64 },
+    /// APT workaround flag. If present, APT is broken and should not be used.
+    AppletWorkaround,
+    /// User ID storage pointer
+    UserIdStorage(Option<NonNull<AccountUid>>),
+    /// Last load result code
+    LastLoadResult(u32),
+    /// Random seed data
+    RandomSeed([u64; 2]),
+    /// HOS version (raw version and atmosphere flag)
+    HosVersion { version: u32, is_atmosphere: bool },
+    /// Unknown or reserved entry type
+    Unknown {
+        key: u32,
+        flags: u32,
+        value: [u64; 2],
+    },
 }
 
-impl EntryType {
-    /// Convert from u32 to EntryType
-    pub const fn from_u32(value: u32) -> Option<Self> {
-        match value {
-            0 => Some(Self::EndOfList),
-            1 => Some(Self::MainThreadHandle),
-            2 => Some(Self::NextLoadPath),
-            3 => Some(Self::OverrideHeap),
-            4 => Some(Self::OverrideService),
-            5 => Some(Self::Argv),
-            6 => Some(Self::SyscallAvailableHint),
-            7 => Some(Self::AppletType),
-            8 => Some(Self::AppletWorkaround),
-            9 => Some(Self::Reserved9),
-            10 => Some(Self::ProcessHandle),
-            11 => Some(Self::LastLoadResult),
-            14 => Some(Self::RandomSeed),
-            15 => Some(Self::UserIdStorage),
-            16 => Some(Self::HosVersion),
-            17 => Some(Self::SyscallAvailableHint2),
-            _ => None,
+impl Entry {
+    /// Loader info. This is always the last entry and marks the end of the list.
+    pub const KEY_LOADER_INFO: u32 = 0;
+    /// Main thread handle.
+    pub const KEY_MAIN_THREAD_HANDLE: u32 = 1;
+    /// Next NRO path for chain loading.
+    pub const KEY_NEXT_LOAD_PATH: u32 = 2;
+    /// Heap override (addr, size).
+    pub const KEY_OVERRIDE_HEAP: u32 = 3;
+    /// Service override (name, handle).
+    pub const KEY_OVERRIDE_SERVICE: u32 = 4;
+    /// Argv string pointer.
+    pub const KEY_ARGV: u32 = 5;
+    /// Syscall availability hints for SVCs 0x00-0x7F.
+    pub const KEY_SYSCALL_AVAILABLE_HINT: u32 = 6;
+    /// Applet type and flags.
+    pub const KEY_APPLET_TYPE: u32 = 7;
+    /// APT workaround. If present, APT is broken and should not be used.
+    pub const KEY_APPLET_WORKAROUND: u32 = 8;
+    /// Own process handle.
+    pub const KEY_PROCESS_HANDLE: u32 = 10;
+    /// Previous load result code.
+    pub const KEY_LAST_LOAD_RESULT: u32 = 11;
+    /// PRNG seed data.
+    pub const KEY_RANDOM_SEED: u32 = 14;
+    /// Preselected user ID storage.
+    pub const KEY_USER_ID_STORAGE: u32 = 15;
+    /// Horizon OS version.
+    pub const KEY_HOS_VERSION: u32 = 16;
+    /// Syscall availability hints for SVCs 0x80-0xBF.
+    pub const KEY_SYSCALL_AVAILABLE_HINT2: u32 = 17;
+
+    /// Parse a [`ConfigEntry`] into a typed [`Entry`].
+    pub fn from_config(entry: &ConfigEntry) -> Self {
+        match entry.key {
+            Self::KEY_LOADER_INFO => Entry::LoaderInfo {
+                ptr: NonNull::new(entry.value[0] as *mut c_char),
+                len: entry.value[1],
+            },
+            Self::KEY_MAIN_THREAD_HANDLE => Entry::MainThreadHandle(entry.value[0] as u32),
+            Self::KEY_PROCESS_HANDLE => Entry::ProcessHandle(entry.value[0] as u32),
+            Self::KEY_NEXT_LOAD_PATH => Entry::NextLoadPath,
+            Self::KEY_OVERRIDE_HEAP => Entry::OverrideHeap {
+                addr: NonNull::new(entry.value[0] as *mut c_void),
+                size: entry.value[1] as usize,
+            },
+            Self::KEY_OVERRIDE_SERVICE => Entry::OverrideService {
+                name: ServiceName::from_u64(entry.value[0]),
+                handle: entry.value[1] as u32,
+            },
+            Self::KEY_ARGV => Entry::Argv(NonNull::new(entry.value[1] as *mut c_char)),
+            Self::KEY_SYSCALL_AVAILABLE_HINT => Entry::SyscallHint {
+                hint_0_3f: entry.value[0],
+                hint_40_7f: entry.value[1],
+            },
+            Self::KEY_SYSCALL_AVAILABLE_HINT2 => Entry::SyscallHint2 {
+                hint_80_bf: entry.value[0],
+            },
+            Self::KEY_APPLET_TYPE => Entry::AppletType {
+                kind: entry.value[0] as u32,
+                flags: entry.value[1],
+            },
+            Self::KEY_APPLET_WORKAROUND => Entry::AppletWorkaround,
+            Self::KEY_USER_ID_STORAGE => {
+                Entry::UserIdStorage(NonNull::new(entry.value[0] as *mut AccountUid))
+            }
+            Self::KEY_LAST_LOAD_RESULT => Entry::LastLoadResult(entry.value[0] as u32),
+            Self::KEY_RANDOM_SEED => Entry::RandomSeed([entry.value[0], entry.value[1]]),
+            Self::KEY_HOS_VERSION => Entry::HosVersion {
+                version: entry.value[0] as u32,
+                is_atmosphere: entry.value[1] == ATMOSPHERE_MAGIC,
+            },
+            _ => Entry::Unknown {
+                key: entry.key,
+                flags: entry.flags,
+                value: entry.value,
+            },
         }
+    }
+}
+
+/// Iterator over ConfigEntry array with compile-time bound.
+///
+/// Stops at `EndOfList` or after `MAX_CONFIG_ENTRIES`, whichever comes first.
+/// Yields parsed [`Entry`] values directly.
+pub struct ConfigEntries<'a> {
+    entries: &'a [ConfigEntry],
+    index: usize,
+    done: bool,
+}
+
+impl<'a> ConfigEntries<'a> {
+    /// Create bounded iterator from raw pointer.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must point to a valid ConfigEntry array terminated by `EndOfList`,
+    /// with at least `MAX_CONFIG_ENTRIES` readable elements OR an `EndOfList` before that.
+    pub unsafe fn from_ptr(ptr: NonNull<ConfigEntry>) -> Self {
+        // SAFETY: Create slice with max bound. Safe because:
+        // 1. Loader guarantees EndOfList terminator
+        // 2. We stop iteration at EndOfList anyway
+        // 3. MAX_CONFIG_ENTRIES is the theoretical maximum
+        let entries = unsafe { core::slice::from_raw_parts(ptr.as_ptr(), MAX_CONFIG_ENTRIES) };
+        Self {
+            entries,
+            index: 0,
+            done: false,
+        }
+    }
+}
+
+impl Iterator for ConfigEntries<'_> {
+    type Item = Entry;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done || self.index >= self.entries.len() {
+            return None;
+        }
+
+        let entry = Entry::from_config(&self.entries[self.index]);
+        self.index += 1;
+
+        if matches!(entry, Entry::LoaderInfo { .. }) {
+            self.done = true;
+        }
+
+        Some(entry)
     }
 }
 
