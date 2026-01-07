@@ -188,10 +188,15 @@ unsafe extern "C" fn __nx_sys_mem__shmem_close(s: *mut SharedMemory) -> u32 {
         }
     }
 
+    let Some(handle) = Handle::new(sm.handle) else {
+        // Handle already closed
+        return 0;
+    };
+
     let unmapped = unsafe {
         {
             sys::SharedMemory::<Unmapped>::from_parts(
-                Handle::from_raw(sm.handle),
+                handle,
                 sm.size,
                 sys::Permissions::from_bits_retain(sm.perm),
             )

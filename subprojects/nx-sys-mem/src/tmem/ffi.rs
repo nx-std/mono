@@ -228,10 +228,15 @@ unsafe extern "C" fn __nx_sys_mem__tmem_close_handle(t: *mut TransferMemory) -> 
     };
     let tm = unsafe { t.as_ref() };
 
+    let Some(handle) = Handle::new(tm.handle) else {
+        // Handle already closed
+        return 0;
+    };
+
     let src_option = NonNull::new(tm.src_addr);
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm.handle),
+            handle,
             tm.size,
             sys::Permissions::from_bits_retain(tm.perm),
             src_option,
@@ -290,6 +295,11 @@ unsafe extern "C" fn __nx_sys_mem__tmem_close(t: *mut TransferMemory) -> u32 {
     };
     let tm = unsafe { t.as_ref() };
 
+    let Some(handle) = Handle::new(tm.handle) else {
+        // Handle already closed
+        return 0;
+    };
+
     // If mapped, unmap first.
     if !tm.map_addr.is_null() {
         let rc = unsafe { __nx_sys_mem__tmem_unmap(t.as_ptr()) };
@@ -301,7 +311,7 @@ unsafe extern "C" fn __nx_sys_mem__tmem_close(t: *mut TransferMemory) -> u32 {
     let src_option = NonNull::new(tm.src_addr);
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm.handle),
+            handle,
             tm.size,
             sys::Permissions::from_bits_retain(tm.perm),
             src_option,

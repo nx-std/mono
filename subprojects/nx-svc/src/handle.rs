@@ -21,6 +21,15 @@ macro_rules! define_handle_type {
         $vis struct $name($crate::raw::Handle);
 
         impl $name {
+            /// Creates a new handle from a raw value, returning `None` if invalid.
+            pub const fn new(raw: $crate::raw::Handle) -> Option<Self> {
+                if raw == $crate::raw::INVALID_HANDLE {
+                    None
+                } else {
+                    Some(Self(raw))
+                }
+            }
+
             /// Converts a raw handle to a [`$name`].
             ///
             /// # Safety
