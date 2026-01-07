@@ -1,9 +1,9 @@
 [submodule "subprojects/libnx"]
 	path = subprojects/libnx
-	url = git@github.com:LNSD/libnx.git
+	url = git@github.com:nx-std/libnx.git
 [submodule "subprojects/examples"]
 	path = subprojects/examples
-	url = git@github.com:LNSD/switch-examples.git
+	url = git@github.com:nx-std/switch-examples.git
 [submodule "subprojects/nx-hbmenu"]
 	path = subprojects/nx-hbmenu
-	url = git@github.com:LNSD/nx-hbmenu.git
+	url = git@github.com:nx-std/nx-hbmenu.git
