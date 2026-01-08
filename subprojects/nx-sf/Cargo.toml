@@ -17,6 +17,7 @@ ffi = []
 [dependencies]
 modular-bitfield = "0.11"
 static_assertions = "1.1"
+thiserror = { version = "2", default-features = false }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }

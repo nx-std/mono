@@ -51,24 +51,24 @@
 //!
 //! Domains allow multiplexing multiple service objects over a single session
 //! handle, reducing kernel resource usage. Each object within a domain is
-//! identified by a 32-bit object ID.
+//! identified by a 32-bit [`ObjectId`].
 //!
 //! # References
 //!
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/cmif.h` (fincs, SciresM)
 
-use core::{mem::size_of, ptr, slice};
+use core::{mem::size_of, ptr, ptr::NonNull, slice};
 
 use static_assertions::const_assert_eq;
 
 use crate::hipc::{self, BufferMode};
 
 /// Magic number for CMIF input headers ("SFCI" - Service Framework Command Input).
-pub const IN_HEADER_MAGIC: u32 = 0x49434653;
+const IN_HEADER_MAGIC: u32 = 0x49434653;
 
 /// Magic number for CMIF output headers ("SFCO" - Service Framework Command Output).
-pub const OUT_HEADER_MAGIC: u32 = 0x4F434653;
+const OUT_HEADER_MAGIC: u32 = 0x4F434653;
 
 /// Builds a CMIF request message in the given buffer.
 ///
@@ -80,13 +80,13 @@ pub const OUT_HEADER_MAGIC: u32 = 0x4F434653;
 ///
 /// `base` must point to a valid buffer (typically TLS IPC buffer) with at least
 /// 0x200 bytes available.
-pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static> {
+pub unsafe fn make_request(base: NonNull<u8>, fmt: RequestFormat) -> Request<'static> {
     // Calculate total size needed
     let mut actual_size: u32 = 16; // alignment padding
-    if fmt.object_id != 0 {
+    if fmt.object_id.is_some() {
         actual_size += size_of::<DomainInHeader>() as u32 + fmt.num_objects * 4;
     }
-    actual_size += size_of::<InHeader>() as u32 + fmt.data_size;
+    actual_size += size_of::<InHeader>() as u32 + fmt.data_size as u32;
     actual_size = (actual_size + 1) & !1; // half-word align
 
     let out_pointer_size_table_offset = actual_size;
@@ -102,16 +102,23 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
         CommandType::Request
     };
 
+    let num_recv_statics = out_pointer_size_table_size + fmt.num_out_fixed_pointers;
+    let recv_static_mode = if num_recv_statics > 0 {
+        Some(hipc::RecvStaticMode::Explicit(num_recv_statics as u8))
+    } else {
+        None
+    };
+
     let hipc_meta = hipc::Metadata {
-        message_type: command_type as u32,
-        num_send_statics: fmt.num_in_auto_buffers + fmt.num_in_pointers,
-        num_send_buffers: fmt.num_in_auto_buffers + fmt.num_in_buffers,
-        num_recv_buffers: fmt.num_out_auto_buffers + fmt.num_out_buffers,
-        num_exch_buffers: fmt.num_inout_buffers,
-        num_data_words,
-        num_recv_statics: out_pointer_size_table_size + fmt.num_out_fixed_pointers,
-        send_pid: if fmt.send_pid { 1 } else { 0 },
-        num_copy_handles: fmt.num_handles,
+        message_type: command_type.into(),
+        num_send_statics: (fmt.num_in_auto_buffers + fmt.num_in_pointers) as usize,
+        num_send_buffers: (fmt.num_in_auto_buffers + fmt.num_in_buffers) as usize,
+        num_recv_buffers: (fmt.num_out_auto_buffers + fmt.num_out_buffers) as usize,
+        num_exch_buffers: fmt.num_inout_buffers as usize,
+        num_data_words: num_data_words as usize,
+        recv_static_mode,
+        send_pid: fmt.send_pid,
+        num_copy_handles: fmt.num_handles as usize,
         num_move_handles: 0,
     };
 
@@ -119,9 +126,9 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
     let hipc_req = unsafe { hipc::make_request(base, hipc_meta) };
 
     // Get aligned start for CMIF data
-    let start = get_aligned_data_start(hipc_req.data_words.as_mut_ptr(), base);
+    let start = get_aligned_data_start(hipc_req.data_words.as_mut_ptr(), base.as_ptr());
 
-    let (cmif_header_ptr, objects_ptr) = if fmt.object_id != 0 {
+    let (cmif_header_ptr, objects) = if let Some(object_id) = fmt.object_id {
         // Domain request: write domain header first
         let domain_hdr = start as *mut DomainInHeader;
         let payload_size = size_of::<InHeader>() as u16 + fmt.data_size as u16;
@@ -134,8 +141,8 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
                     request_type: DomainRequestType::SendMessage as u8,
                     num_in_objects: fmt.num_objects as u8,
                     data_size: payload_size,
-                    object_id: fmt.object_id,
-                    padding: 0,
+                    object_id: object_id.to_raw(),
+                    _padding: 0,
                     token: fmt.context,
                 },
             );
@@ -144,10 +151,12 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
         // SAFETY: domain_hdr is valid and we're advancing by one DomainInHeader.
         let cmif_hdr = unsafe { domain_hdr.add(1) } as *mut InHeader;
         // SAFETY: cmif_hdr is valid and payload_size was calculated from layout.
-        let objects = unsafe { (cmif_hdr as *mut u8).add(payload_size as usize) } as *mut u32;
+        let objects_ptr = unsafe { (cmif_hdr as *mut u8).add(payload_size as usize) } as *mut u32;
+        // SAFETY: objects_ptr is valid, size matches num_objects.
+        let objects = unsafe { slice::from_raw_parts_mut(objects_ptr, fmt.num_objects as usize) };
         (cmif_hdr, objects)
     } else {
-        (start as *mut InHeader, ptr::null_mut())
+        (start as *mut InHeader, &mut [][..])
     };
 
     // SAFETY: cmif_header_ptr points to valid aligned location within buffer.
@@ -158,13 +167,20 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
                 magic: IN_HEADER_MAGIC,
                 version: if fmt.context != 0 { 1 } else { 0 },
                 command_id: fmt.request_id,
-                token: if fmt.object_id != 0 { 0 } else { fmt.context },
+                token: if fmt.object_id.is_some() {
+                    0
+                } else {
+                    fmt.context
+                },
             },
         );
     }
 
     // SAFETY: cmif_header_ptr is valid, advancing by one InHeader.
     let data_ptr = unsafe { cmif_header_ptr.add(1) } as *mut u8;
+    // SAFETY: data_ptr points to valid region, size matches allocated space.
+    let data = unsafe { slice::from_raw_parts_mut(data_ptr, fmt.data_size) };
+
     // SAFETY: data_words is valid and offset was calculated from layout.
     let out_pointer_sizes_ptr = unsafe {
         hipc_req
@@ -173,21 +189,16 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
             .cast::<u8>()
             .add(out_pointer_size_table_offset as usize)
     } as *mut u16;
+    // SAFETY: out_pointer_sizes_ptr is valid, size matches allocation.
+    let out_pointer_sizes = unsafe {
+        slice::from_raw_parts_mut(out_pointer_sizes_ptr, out_pointer_size_table_size as usize)
+    };
 
     Request {
         hipc: hipc_req,
-        // SAFETY: data_ptr points to valid region, size matches allocated space.
-        data: unsafe { slice::from_raw_parts_mut(data_ptr, fmt.data_size as usize) },
-        // SAFETY: out_pointer_sizes_ptr is valid, size matches allocation.
-        out_pointer_sizes: unsafe {
-            slice::from_raw_parts_mut(out_pointer_sizes_ptr, out_pointer_size_table_size as usize)
-        },
-        objects: if objects_ptr.is_null() {
-            &mut []
-        } else {
-            // SAFETY: objects_ptr is valid when non-null, size matches num_objects.
-            unsafe { slice::from_raw_parts_mut(objects_ptr, fmt.num_objects as usize) }
-        },
+        data,
+        out_pointer_sizes,
+        objects,
         server_pointer_size: fmt.server_pointer_size,
         cur_in_ptr_id: 0,
         send_buffer_idx: 0,
@@ -210,19 +221,19 @@ pub unsafe fn make_request(base: *mut u8, fmt: RequestFormat) -> Request<'static
 /// # Safety
 ///
 /// `base` must point to a valid buffer with sufficient space.
-pub unsafe fn make_control_request(base: *mut u8, request_id: u32, size: u32) -> *mut u8 {
+pub unsafe fn make_control_request(base: NonNull<u8>, request_id: u32, size: u32) -> *mut u8 {
     let actual_size = 16 + size_of::<InHeader>() as u32 + size;
     let num_data_words = actual_size.div_ceil(4);
 
     let hipc_meta = hipc::Metadata {
-        message_type: CommandType::Control as u32,
-        num_data_words,
+        message_type: CommandType::Control.into(),
+        num_data_words: num_data_words as usize,
         ..Default::default()
     };
 
     // SAFETY: Caller guarantees `base` points to valid buffer with sufficient space.
     let hipc_req = unsafe { hipc::make_request(base, hipc_meta) };
-    let start = get_aligned_data_start(hipc_req.data_words.as_mut_ptr(), base);
+    let start = get_aligned_data_start(hipc_req.data_words.as_mut_ptr(), base.as_ptr());
     let hdr = start as *mut InHeader;
 
     // SAFETY: hdr points to aligned location within valid buffer.
@@ -242,25 +253,25 @@ pub unsafe fn make_control_request(base: *mut u8, request_id: u32, size: u32) ->
 
 /// Builds a CMIF close request message.
 ///
-/// If `object_id` is non-zero, closes a domain object. Otherwise, closes
+/// If `object_id` is `Some`, closes a domain object. Otherwise, closes
 /// the entire session.
 ///
 /// # Safety
 ///
 /// `base` must point to a valid buffer with sufficient space.
-pub unsafe fn make_close_request(base: *mut u8, object_id: u32) {
-    if object_id != 0 {
+pub unsafe fn make_close_request(base: NonNull<u8>, object_id: Option<ObjectId>) {
+    if let Some(object_id) = object_id {
         // Domain object close
         let num_data_words = (16 + size_of::<DomainInHeader>() as u32) / 4;
         let hipc_meta = hipc::Metadata {
-            message_type: CommandType::Request as u32,
-            num_data_words,
+            message_type: CommandType::Request.into(),
+            num_data_words: num_data_words as usize,
             ..Default::default()
         };
 
         // SAFETY: Caller guarantees `base` points to valid buffer.
         let hipc_req = unsafe { hipc::make_request(base, hipc_meta) };
-        let start = get_aligned_data_start(hipc_req.data_words.as_mut_ptr(), base);
+        let start = get_aligned_data_start(hipc_req.data_words.as_mut_ptr(), base.as_ptr());
         let domain_hdr = start as *mut DomainInHeader;
 
         // SAFETY: domain_hdr points to aligned location within valid buffer.
@@ -271,8 +282,8 @@ pub unsafe fn make_close_request(base: *mut u8, object_id: u32) {
                     request_type: DomainRequestType::Close as u8,
                     num_in_objects: 0,
                     data_size: 0,
-                    object_id,
-                    padding: 0,
+                    object_id: object_id.to_raw(),
+                    _padding: 0,
                     token: 0,
                 },
             );
@@ -280,7 +291,7 @@ pub unsafe fn make_close_request(base: *mut u8, object_id: u32) {
     } else {
         // Session close
         let hipc_meta = hipc::Metadata {
-            message_type: CommandType::Close as u32,
+            message_type: CommandType::Close.into(),
             ..Default::default()
         };
         // SAFETY: Caller guarantees `base` points to valid buffer.
@@ -291,31 +302,34 @@ pub unsafe fn make_close_request(base: *mut u8, object_id: u32) {
 /// Parses a CMIF response message.
 ///
 /// Validates the magic number and extracts the result code. On success,
-/// returns a [`Response`] with pointers to the response data. On failure,
-/// returns the error result code from the service.
+/// returns a [`Response`] with pointers to the response data.
 ///
 /// # Safety
 ///
 /// `base` must point to a valid CMIF response message buffer.
 pub unsafe fn parse_response(
-    base: *const u8,
+    base: NonNull<u8>,
     is_domain: bool,
-    size: u32,
-) -> Result<Response<'static>, u32> {
+    size: usize,
+) -> Result<Response<'static>, ParseResponseError> {
     // SAFETY: Caller guarantees `base` points to valid CMIF response buffer.
     let hipc_resp = unsafe { hipc::parse_response(base) };
-    let start = get_aligned_data_start(hipc_resp.data_words.as_ptr() as *mut u32, base);
+    let start = get_aligned_data_start(hipc_resp.data_words.as_ptr() as *mut u32, base.as_ptr());
 
-    let (out_header_ptr, objects_ptr) = if is_domain {
+    let (out_header_ptr, objects) = if is_domain {
         let domain_hdr = start as *const DomainOutHeader;
         // SAFETY: domain_hdr is valid, advancing by one DomainOutHeader.
         let cmif_hdr = unsafe { domain_hdr.add(1) } as *const OutHeader;
         // SAFETY: cmif_hdr is valid, offset calculated from layout.
-        let objects = unsafe { (cmif_hdr as *const u8).add(size_of::<OutHeader>() + size as usize) }
-            as *const u32;
+        let objects_ptr =
+            unsafe { (cmif_hdr as *const u8).add(size_of::<OutHeader>() + size) } as *const u32;
+        // SAFETY: domain_hdr points to valid DomainOutHeader.
+        let count = unsafe { ptr::read(domain_hdr) }.num_out_objects as usize;
+        // SAFETY: objects_ptr is valid, count from domain header.
+        let objects = unsafe { slice::from_raw_parts(objects_ptr, count) };
         (cmif_hdr, objects)
     } else {
-        (start as *const OutHeader, ptr::null())
+        (start as *const OutHeader, &[][..])
     };
 
     // SAFETY: out_header_ptr points to valid aligned OutHeader.
@@ -323,36 +337,36 @@ pub unsafe fn parse_response(
 
     // Validate magic
     if out_header.magic != OUT_HEADER_MAGIC {
-        // Return a generic error for invalid magic
-        return Err(0xFFFF);
+        return Err(ParseResponseError::InvalidMagic);
     }
 
     // Check result
     if out_header.result != 0 {
-        return Err(out_header.result);
+        return Err(ParseResponseError::ServiceError(out_header.result));
     }
 
     // SAFETY: out_header_ptr is valid, advancing by one OutHeader.
     let data_ptr = unsafe { out_header_ptr.add(1) } as *const u8;
+    // SAFETY: data_ptr points to valid region, size matches expected payload.
+    let data = unsafe { slice::from_raw_parts(data_ptr, size) };
 
     Ok(Response {
-        // SAFETY: data_ptr points to valid region, size matches expected payload.
-        data: unsafe { slice::from_raw_parts(data_ptr, size as usize) },
-        objects: if objects_ptr.is_null() {
-            &[]
-        } else if is_domain {
-            // Get object count from domain header
-            let domain_hdr = start as *const DomainOutHeader;
-            // SAFETY: domain_hdr points to valid DomainOutHeader.
-            let count = unsafe { ptr::read(domain_hdr) }.num_out_objects as usize;
-            // SAFETY: objects_ptr is valid, count from domain header.
-            unsafe { slice::from_raw_parts(objects_ptr, count) }
-        } else {
-            &[]
-        },
+        data,
+        objects,
         copy_handles: hipc_resp.copy_handles,
         move_handles: hipc_resp.move_handles,
     })
+}
+
+/// Error returned by [`parse_response`].
+#[derive(Debug, thiserror::Error)]
+pub enum ParseResponseError {
+    /// Response contains invalid CMIF magic header.
+    #[error("invalid CMIF magic header")]
+    InvalidMagic,
+    /// Service returned a non-zero result code.
+    #[error("service error: {0:#x}")]
+    ServiceError(u32),
 }
 
 /// Calculates the 16-byte aligned start of the data section.
@@ -362,7 +376,7 @@ pub unsafe fn parse_response(
 fn get_aligned_data_start(data_words: *mut u32, base: *const u8) -> *mut u8 {
     // SAFETY: Both pointers are within the same IPC buffer allocation.
     let offset = unsafe { (data_words as *const u8).offset_from(base) } as usize;
-    let aligned_offset = (offset + 15) & !15;
+    let aligned_offset = (offset + 0xF) & !0xF;
     // SAFETY: aligned_offset is within buffer bounds (base + aligned_offset <= buffer end).
     unsafe { (base as *mut u8).add(aligned_offset) }
 }
@@ -387,6 +401,12 @@ pub enum CommandType {
     RequestWithContext = 6,
     /// Control request with context token.
     ControlWithContext = 7,
+}
+
+impl From<CommandType> for hipc::MessageType {
+    fn from(cmd: CommandType) -> Self {
+        hipc::MessageType::from_raw(cmd as u16)
+    }
 }
 
 /// Domain request type (stored in domain header).
@@ -433,6 +453,7 @@ pub struct OutHeader {
     /// Echo of request token.
     pub token: u32,
 }
+
 const_assert_eq!(size_of::<OutHeader>(), 16);
 
 /// Domain input header (16 bytes).
@@ -450,10 +471,11 @@ pub struct DomainInHeader {
     /// Target object ID within domain.
     pub object_id: u32,
     /// Reserved padding.
-    pub padding: u32,
+    _padding: u32,
     /// Context token.
     pub token: u32,
 }
+
 const_assert_eq!(size_of::<DomainInHeader>(), 16);
 
 /// Domain output header (16 bytes).
@@ -465,8 +487,9 @@ pub struct DomainOutHeader {
     /// Number of object IDs returned.
     pub num_out_objects: u32,
     /// Reserved padding.
-    pub padding: [u32; 3],
+    _padding: [u32; 3],
 }
+
 const_assert_eq!(size_of::<DomainOutHeader>(), 16);
 
 /// Request format descriptor.
@@ -474,16 +497,16 @@ const_assert_eq!(size_of::<DomainOutHeader>(), 16);
 /// Describes the layout of a CMIF request to be built.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RequestFormat {
-    /// Domain object ID (0 for non-domain).
-    pub object_id: u32,
+    /// Domain object ID (`None` for non-domain sessions).
+    pub object_id: Option<ObjectId>,
     /// Command/method ID.
     pub request_id: u32,
     /// Context token for versioning.
     pub context: u32,
     /// Size of payload data in bytes.
-    pub data_size: u32,
+    pub data_size: usize,
     /// Server's pointer buffer capacity.
-    pub server_pointer_size: u32,
+    pub server_pointer_size: usize,
     /// Number of auto-select input buffers.
     pub num_in_auto_buffers: u32,
     /// Number of auto-select output buffers.
@@ -523,7 +546,7 @@ pub struct Request<'a> {
     /// Object IDs array (domain only).
     pub objects: &'a mut [u32],
     /// Remaining server pointer buffer space.
-    pub server_pointer_size: u32,
+    pub server_pointer_size: usize,
     /// Current input pointer index.
     pub cur_in_ptr_id: u32,
     // Internal indices for tracking position
@@ -566,7 +589,7 @@ impl Request<'_> {
             hipc::StaticDescriptor::new_send(buffer, size, self.cur_in_ptr_id as u8);
         self.send_static_idx += 1;
         self.cur_in_ptr_id += 1;
-        self.server_pointer_size = self.server_pointer_size.saturating_sub(size as u32);
+        self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
     }
 
     /// Adds a fixed-size output pointer (Type C / Recv List).
@@ -574,7 +597,7 @@ impl Request<'_> {
         let idx = self.recv_list_idx;
         self.hipc.recv_list[idx] = hipc::RecvListEntry::new_recv(buffer, size);
         self.recv_list_idx += 1;
-        self.server_pointer_size = self.server_pointer_size.saturating_sub(size as u32);
+        self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
     }
 
     /// Adds a variable-size output pointer with size tracking.
@@ -590,7 +613,7 @@ impl Request<'_> {
     /// Uses inline pointer if the buffer fits in the server's pointer buffer,
     /// otherwise falls back to a mapped buffer.
     pub fn add_in_auto_buffer(&mut self, buffer: *const u8, size: usize, mode: BufferMode) {
-        if self.server_pointer_size > 0 && size <= self.server_pointer_size as usize {
+        if self.server_pointer_size > 0 && size <= self.server_pointer_size {
             self.add_in_pointer(buffer, size);
             self.add_in_buffer(ptr::null(), 0, mode);
         } else {
@@ -604,7 +627,7 @@ impl Request<'_> {
     /// Uses inline pointer if the buffer fits in the server's pointer buffer,
     /// otherwise falls back to a mapped buffer.
     pub fn add_out_auto_buffer(&mut self, buffer: *mut u8, size: usize, mode: BufferMode) {
-        if self.server_pointer_size > 0 && size <= self.server_pointer_size as usize {
+        if self.server_pointer_size > 0 && size <= self.server_pointer_size {
             self.add_out_pointer(buffer, size);
             self.add_out_buffer(ptr::null_mut(), 0, mode);
         } else {
@@ -614,9 +637,9 @@ impl Request<'_> {
     }
 
     /// Adds a domain object ID to the request.
-    pub fn add_object(&mut self, object_id: u32) {
+    pub fn add_object(&mut self, id: ObjectId) {
         let idx = self.object_idx;
-        self.objects[idx] = object_id;
+        self.objects[idx] = id.to_raw();
         self.object_idx += 1;
     }
 
@@ -641,4 +664,82 @@ pub struct Response<'a> {
     pub copy_handles: &'a [u32],
     /// Returned move handles.
     pub move_handles: &'a [u32],
+}
+
+/// A domain object identifier.
+///
+/// Identifies a specific service object within a CMIF domain session.
+/// Object ID 0 is invalid; valid object IDs start at 1.
+///
+/// # Object IDs in CMIF Domains
+///
+/// When a service session is converted to a **domain**, it can multiplex
+/// multiple service objects over a single IPC session handle. Each object
+/// within the domain is identified by a unique 32-bit **Object ID**.
+///
+/// ## How Domains Work
+///
+/// Without domains, each service object requires its own kernel session handle.
+/// This consumes kernel resources and limits scalability. Domains solve this by:
+///
+/// 1. Converting a session to a domain via `ConvertToDomain` control request
+/// 2. The original service becomes object ID 1 within the domain
+/// 3. Subsequent service objects acquired through this session get unique IDs
+/// 4. All objects share the single underlying session handle
+///
+/// ## Message Format
+///
+/// In domain mode, CMIF requests include a [`DomainInHeader`] that specifies:
+/// - The target object ID for the request
+/// - Input object IDs being passed to the service
+///
+/// Responses include a [`DomainOutHeader`] with output object IDs.
+///
+/// ## Relationship to HIPC
+///
+/// Object IDs are a CMIF-layer concept built on top of HIPC:
+///
+/// ```text
+/// ┌─────────────────────────────────────┐
+/// │  Service (object_id = N)            │  ← ObjectId identifies target
+/// ├─────────────────────────────────────┤
+/// │  CMIF DomainInHeader { object_id }  │  ← ObjectId encoded here
+/// ├─────────────────────────────────────┤
+/// │  HIPC (session handle)              │  ← Single handle for all objects
+/// └─────────────────────────────────────┘
+/// ```
+///
+/// HIPC itself knows nothing about object IDs - it only deals with session
+/// handles, buffer descriptors, and raw data. The CMIF layer adds the domain
+/// abstraction on top.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct ObjectId(u32);
+
+impl ObjectId {
+    /// Creates an `ObjectId` from a raw value.
+    ///
+    /// Returns `None` if `raw` is zero, as zero is not a valid object ID.
+    /// Valid object IDs start at 1 when a session is converted to a domain.
+    #[inline]
+    pub(crate) const fn new(raw: u32) -> Option<Self> {
+        if raw == 0 { None } else { Some(Self(raw)) }
+    }
+
+    /// Creates an `ObjectId` from a raw value without validation.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the value is non-zero and represents a valid
+    /// object ID obtained from the kernel (via `ConvertToDomain` or similar).
+    #[inline]
+    pub(crate) const unsafe fn new_unchecked(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the raw `u32` value of this object ID.
+    #[inline]
+    pub const fn to_raw(self) -> u32 {
+        self.0
+    }
 }

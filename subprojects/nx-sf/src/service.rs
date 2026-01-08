@@ -20,139 +20,26 @@
 
 use core::{mem::size_of, ptr};
 
+use nx_svc::ipc::{self, Handle as SessionHandle};
 use static_assertions::const_assert_eq;
 
-use crate::cmif;
-
-/// Invalid handle sentinel value.
-pub const INVALID_HANDLE: u32 = 0;
+use crate::cmif::{self, ObjectId};
 
 // Control request IDs for CMIF session management.
 const CTRL_CONVERT_TO_DOMAIN: u32 = 0;
+const CTRL_COPY_FROM_DOMAIN: u32 = 1;
 const CTRL_CLONE_OBJECT: u32 = 2;
 const CTRL_QUERY_POINTER_BUFFER_SIZE: u32 = 3;
 const CTRL_CLONE_OBJECT_EX: u32 = 4;
 
-/// Queries the server's pointer buffer size via control request 3.
-///
-/// # Safety
-///
-/// `session` must be a valid IPC session handle.
-pub unsafe fn query_pointer_buffer_size(session: u32) -> Result<u16, u32> {
-    let tls = nx_sys_thread_tls::get_ptr();
+/// Maximum number of buffers in a single dispatch.
+pub const MAX_BUFFERS: usize = 8;
 
-    // SAFETY: TLS pointer is valid for the current thread.
-    let ipc_buf = unsafe { (*tls).ipc_buffer.as_mut_ptr() };
+/// Maximum number of input objects in a single dispatch.
+pub const MAX_IN_OBJECTS: usize = 8;
 
-    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
-    unsafe { cmif::make_control_request(ipc_buf, CTRL_QUERY_POINTER_BUFFER_SIZE, 0) };
-
-    // SAFETY: session is a valid handle per caller contract.
-    let rc = unsafe { nx_svc::raw::send_sync_request(session) };
-    if rc != 0 {
-        return Err(rc);
-    }
-
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u16>() as u32) }?;
-
-    // SAFETY: Response data contains u16 per CMIF protocol.
-    let size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u16>()) };
-    Ok(size)
-}
-
-/// Clones the current session object via control request 2.
-///
-/// # Safety
-///
-/// `session` must be a valid IPC session handle.
-pub unsafe fn clone_current_object(session: u32) -> Result<u32, u32> {
-    let tls = nx_sys_thread_tls::get_ptr();
-
-    // SAFETY: TLS pointer is valid for the current thread.
-    let ipc_buf = unsafe { (*tls).ipc_buffer.as_mut_ptr() };
-
-    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
-    unsafe { cmif::make_control_request(ipc_buf, CTRL_CLONE_OBJECT, 0) };
-
-    // SAFETY: session is a valid handle per caller contract.
-    let rc = unsafe { nx_svc::raw::send_sync_request(session) };
-    if rc != 0 {
-        return Err(rc);
-    }
-
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }?;
-
-    // Clone returns a move handle
-    if resp.move_handles.is_empty() {
-        return Err(0xFFFF);
-    }
-    Ok(resp.move_handles[0])
-}
-
-/// Clones the current session object with a tag via control request 4.
-///
-/// # Safety
-///
-/// `session` must be a valid IPC session handle.
-pub unsafe fn clone_current_object_ex(session: u32, tag: u32) -> Result<u32, u32> {
-    let tls = nx_sys_thread_tls::get_ptr();
-
-    // SAFETY: TLS pointer is valid for the current thread.
-    let ipc_buf = unsafe { (*tls).ipc_buffer.as_mut_ptr() };
-
-    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
-    let data_ptr = unsafe {
-        cmif::make_control_request(ipc_buf, CTRL_CLONE_OBJECT_EX, size_of::<u32>() as u32)
-    };
-
-    // SAFETY: data_ptr points to valid payload area within IPC buffer.
-    unsafe { ptr::write_unaligned(data_ptr.cast::<u32>(), tag) };
-
-    // SAFETY: session is a valid handle per caller contract.
-    let rc = unsafe { nx_svc::raw::send_sync_request(session) };
-    if rc != 0 {
-        return Err(rc);
-    }
-
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }?;
-
-    // Clone returns a move handle
-    if resp.move_handles.is_empty() {
-        return Err(0xFFFF);
-    }
-    Ok(resp.move_handles[0])
-}
-
-/// Converts the current session to a domain via control request 0.
-///
-/// # Safety
-///
-/// `session` must be a valid IPC session handle.
-pub unsafe fn convert_current_object_to_domain(session: u32) -> Result<u32, u32> {
-    let tls = nx_sys_thread_tls::get_ptr();
-
-    // SAFETY: TLS pointer is valid for the current thread.
-    let ipc_buf = unsafe { (*tls).ipc_buffer.as_mut_ptr() };
-
-    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
-    unsafe { cmif::make_control_request(ipc_buf, CTRL_CONVERT_TO_DOMAIN, 0) };
-
-    // SAFETY: session is a valid handle per caller contract.
-    let rc = unsafe { nx_svc::raw::send_sync_request(session) };
-    if rc != 0 {
-        return Err(rc);
-    }
-
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u32>() as u32) }?;
-
-    // SAFETY: Response data contains object_id as u32.
-    let object_id = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-    Ok(object_id)
-}
+/// Maximum number of input handles in a single dispatch.
+pub const MAX_IN_HANDLES: usize = 8;
 
 /// IPC service wrapper.
 ///
@@ -162,7 +49,7 @@ pub unsafe fn convert_current_object_to_domain(session: u32) -> Result<u32, u32>
 #[repr(C)]
 pub struct Service {
     /// IPC session handle.
-    pub session: u32,
+    pub session: SessionHandle,
     /// Whether this service owns the session handle (1 = yes, 0 = no).
     pub own_handle: u32,
     /// Domain object ID (0 = non-domain or override).
@@ -172,42 +59,27 @@ pub struct Service {
 }
 const_assert_eq!(size_of::<Service>(), 16);
 
-impl Default for Service {
-    fn default() -> Self {
-        Self {
-            session: INVALID_HANDLE,
-            own_handle: 0,
-            object_id: 0,
-            pointer_buffer_size: 0,
-        }
-    }
-}
-
 impl Service {
     /// Creates a new service from a session handle.
     ///
     /// Queries the server's pointer buffer size automatically.
-    ///
-    /// # Safety
-    ///
-    /// `handle` must be a valid IPC session handle.
-    pub unsafe fn new(handle: u32) -> Result<Self, u32> {
-        // SAFETY: handle is valid per caller contract.
-        let pointer_buffer_size = unsafe { query_pointer_buffer_size(handle) }.unwrap_or(0);
+    /// If the query fails, pointer buffer size defaults to 0.
+    pub fn new(handle: SessionHandle) -> Self {
+        let pointer_buffer_size = query_pointer_buffer_size(handle).unwrap_or(0);
 
-        Ok(Self {
+        Self {
             session: handle,
             own_handle: 1,
             object_id: 0,
             pointer_buffer_size,
-        })
+        }
     }
 
     /// Creates a non-domain subservice from a parent service's handle.
     ///
     /// The new service inherits the parent's pointer buffer size but owns
     /// the provided handle independently.
-    pub fn new_subservice(parent: &Service, handle: u32) -> Self {
+    pub fn new_subservice(parent: &Service, handle: SessionHandle) -> Self {
         Self {
             session: handle,
             own_handle: 1,
@@ -220,61 +92,47 @@ impl Service {
     ///
     /// The new service shares the parent's session handle but has its own
     /// domain object ID.
-    pub fn new_domain_subservice(parent: &Service, object_id: u32) -> Self {
+    pub fn new_domain_subservice(parent: &Service, object_id: ObjectId) -> Self {
         Self {
             session: parent.session,
             own_handle: 0,
-            object_id,
+            object_id: object_id.to_raw(),
             pointer_buffer_size: parent.pointer_buffer_size,
         }
     }
 
     /// Closes the service and releases resources.
     ///
-    /// For domain subservices, sends a domain close request. For services
-    /// that own their handle, closes the kernel handle.
-    pub fn close(&mut self) {
-        if !self.is_active() {
-            return;
-        }
+    /// Consumes `self` to prevent use-after-close.
+    pub fn close(self) {
+        let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-        let tls = nx_sys_thread_tls::get_ptr();
-        // SAFETY: TLS pointer is valid for the current thread.
-        let ipc_buf = unsafe { (*tls).ipc_buffer.as_mut_ptr() };
-
-        // Determine what to close based on ownership
+        // Determine what to close based on ownership.
+        // If we own the handle, close the session (None).
+        // Otherwise, close the domain object (Some(object_id)).
         let close_object_id = if self.own_handle != 0 {
-            0
+            None
         } else {
-            self.object_id
+            ObjectId::new(self.object_id)
         };
 
         // SAFETY: ipc_buf points to valid IPC buffer.
         unsafe { cmif::make_close_request(ipc_buf, close_object_id) };
 
-        // SAFETY: session is valid for active service.
-        let _ = unsafe { nx_svc::raw::send_sync_request(self.session) };
+        // Send close request (ignore errors)
+        let _ = ipc::send_sync_request(self.session);
 
         // Close the handle if we own it
         if self.own_handle != 0 {
-            // SAFETY: session handle is valid and owned.
-            let _ = unsafe { nx_svc::raw::close_handle(self.session) };
+            let _ = ipc::close_handle(self.session);
         }
-
-        // Reset to default state
-        *self = Self::default();
     }
 
     /// Clones the current service.
     ///
     /// Returns a new service with a cloned session handle.
-    pub fn try_clone(&self) -> Result<Service, u32> {
-        if !self.is_active() {
-            return Err(0xFFFF);
-        }
-
-        // SAFETY: session is valid for active service.
-        let new_handle = unsafe { clone_current_object(self.session) }?;
+    pub fn try_clone(&self) -> Result<Service, TryCloneError> {
+        let new_handle = clone_current_object(self.session).map_err(TryCloneError)?;
 
         Ok(Self {
             session: new_handle,
@@ -287,13 +145,8 @@ impl Service {
     /// Clones the current service with a tag.
     ///
     /// Returns a new service with a cloned session handle.
-    pub fn try_clone_ex(&self, tag: u32) -> Result<Service, u32> {
-        if !self.is_active() {
-            return Err(0xFFFF);
-        }
-
-        // SAFETY: session is valid for active service.
-        let new_handle = unsafe { clone_current_object_ex(self.session, tag) }?;
+    pub fn try_clone_ex(&self, tag: u32) -> Result<Service, TryCloneExError> {
+        let new_handle = clone_current_object_ex(self.session, tag).map_err(TryCloneExError)?;
 
         Ok(Self {
             session: new_handle,
@@ -307,43 +160,54 @@ impl Service {
     ///
     /// After conversion, the service can multiplex multiple objects over
     /// a single session handle.
-    pub fn convert_to_domain(&mut self) -> Result<(), u32> {
-        if !self.is_active() {
-            return Err(0xFFFF);
-        }
-
-        // SAFETY: session is valid for active service.
-        let object_id = unsafe { convert_current_object_to_domain(self.session) }?;
-
-        self.object_id = object_id;
+    pub fn convert_to_domain(&mut self) -> Result<(), ServiceConvertToDomainError> {
+        let object_id =
+            convert_current_object_to_domain(self.session).map_err(ServiceConvertToDomainError)?;
+        self.object_id = object_id.to_raw();
         Ok(())
     }
 
-    /// Returns whether the service has a valid session handle.
-    #[inline]
-    pub fn is_active(&self) -> bool {
-        self.session != INVALID_HANDLE
+    /// Copies a domain object to a new standalone session handle.
+    ///
+    /// This extracts the specified domain object as an independent service
+    /// with its own session handle. Only valid for domain services.
+    pub fn copy_object_to_session(
+        &self,
+        object_id: ObjectId,
+    ) -> Result<Service, CopyObjectToSessionError> {
+        if !self.is_domain() && !self.is_domain_subservice() {
+            return Err(CopyObjectToSessionError::NotDomain);
+        }
+
+        let new_handle = copy_from_current_domain(self.session, object_id)
+            .map_err(CopyObjectToSessionError::CopyFailed)?;
+
+        Ok(Self {
+            session: new_handle,
+            own_handle: 1,
+            object_id: 0,
+            pointer_buffer_size: self.pointer_buffer_size,
+        })
     }
 
     /// Returns whether this is an override service (Rust implementation).
     ///
-    /// Override services have a valid session but don't own the handle and
-    /// have no domain object ID.
+    /// Override services don't own the handle and have no domain object ID.
     #[inline]
     pub fn is_override(&self) -> bool {
-        self.is_active() && self.own_handle == 0 && self.object_id == 0
+        self.own_handle == 0 && self.object_id == 0
     }
 
     /// Returns whether this is a domain service (owns handle with object ID).
     #[inline]
     pub fn is_domain(&self) -> bool {
-        self.is_active() && self.own_handle != 0 && self.object_id != 0
+        self.own_handle != 0 && self.object_id != 0
     }
 
     /// Returns whether this is a domain subservice (shares handle).
     #[inline]
     pub fn is_domain_subservice(&self) -> bool {
-        self.is_active() && self.own_handle == 0 && self.object_id != 0
+        self.own_handle == 0 && self.object_id != 0
     }
 
     /// Creates a dispatch builder for sending a command to this service.
@@ -353,14 +217,31 @@ impl Service {
     }
 }
 
-/// Maximum number of buffers in a single dispatch.
-pub const MAX_BUFFERS: usize = 8;
+/// Error returned by [`Service::try_clone`].
+#[derive(Debug, thiserror::Error)]
+#[error("failed to clone service")]
+pub struct TryCloneError(#[source] pub CloneObjectError);
 
-/// Maximum number of input objects in a single dispatch.
-pub const MAX_IN_OBJECTS: usize = 8;
+/// Error returned by [`Service::try_clone_ex`].
+#[derive(Debug, thiserror::Error)]
+#[error("failed to clone service with tag")]
+pub struct TryCloneExError(#[source] pub CloneObjectExError);
 
-/// Maximum number of input handles in a single dispatch.
-pub const MAX_IN_HANDLES: usize = 8;
+/// Error returned by [`Service::convert_to_domain`].
+#[derive(Debug, thiserror::Error)]
+#[error("failed to convert service to domain")]
+pub struct ServiceConvertToDomainError(#[source] pub ConvertToDomainError);
+
+/// Error returned by [`Service::copy_object_to_session`].
+#[derive(Debug, thiserror::Error)]
+pub enum CopyObjectToSessionError {
+    /// Service is not a domain or domain subservice.
+    #[error("service is not a domain")]
+    NotDomain,
+    /// Failed to copy the domain object.
+    #[error("failed to copy domain object")]
+    CopyFailed(#[source] CopyFromDomainError),
+}
 
 /// Buffer attribute flags for service dispatch.
 #[derive(Debug, Clone, Copy, Default)]
@@ -431,7 +312,7 @@ pub struct Dispatch<'a> {
     buffer_attrs: [BufferAttr; MAX_BUFFERS],
     buffers: [Buffer; MAX_BUFFERS],
     buffer_count: usize,
-    in_objects: [u32; MAX_IN_OBJECTS],
+    in_objects: [Option<ObjectId>; MAX_IN_OBJECTS],
     in_object_count: usize,
     in_handles: [u32; MAX_IN_HANDLES],
     in_handle_count: usize,
@@ -453,7 +334,7 @@ impl<'a> Dispatch<'a> {
             buffer_attrs: [BufferAttr::default(); MAX_BUFFERS],
             buffers: [Buffer::default(); MAX_BUFFERS],
             buffer_count: 0,
-            in_objects: [0; MAX_IN_OBJECTS],
+            in_objects: [None; MAX_IN_OBJECTS],
             in_object_count: 0,
             in_handles: [0; MAX_IN_HANDLES],
             in_handle_count: 0,
@@ -502,9 +383,9 @@ impl<'a> Dispatch<'a> {
 
     /// Adds an input domain object.
     #[inline]
-    pub fn in_object(mut self, object_id: u32) -> Self {
+    pub fn in_object(mut self, object_id: ObjectId) -> Self {
         if self.in_object_count < MAX_IN_OBJECTS {
-            self.in_objects[self.in_object_count] = object_id;
+            self.in_objects[self.in_object_count] = Some(object_id);
             self.in_object_count += 1;
         }
         self
@@ -548,14 +429,8 @@ impl<'a> Dispatch<'a> {
     /// On success, returns a [`DispatchResult`] containing response data,
     /// handles, and objects. The returned data references the TLS IPC buffer
     /// and is valid until the next IPC call on this thread.
-    pub fn send(self) -> Result<DispatchResult<'static>, u32> {
-        if !self.service.is_active() {
-            return Err(0xFFFF);
-        }
-
-        let tls = nx_sys_thread_tls::get_ptr();
-        // SAFETY: TLS pointer is valid for the current thread.
-        let ipc_buf = unsafe { (*tls).ipc_buffer.as_mut_ptr() };
+    pub fn send(self) -> Result<DispatchResult<'static>, DispatchError> {
+        let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
         let is_domain = self.service.is_domain() || self.service.is_domain_subservice();
 
@@ -603,11 +478,15 @@ impl<'a> Dispatch<'a> {
         }
 
         let fmt = cmif::RequestFormat {
-            object_id: if is_domain { self.service.object_id } else { 0 },
+            object_id: if is_domain {
+                ObjectId::new(self.service.object_id)
+            } else {
+                None
+            },
             request_id: self.request_id,
             context: self.context,
-            data_size: self.in_data_size as u32,
-            server_pointer_size: self.service.pointer_buffer_size as u32,
+            data_size: self.in_data_size,
+            server_pointer_size: self.service.pointer_buffer_size as usize,
             num_in_auto_buffers: num_in_auto,
             num_out_auto_buffers: num_out_auto,
             num_in_buffers,
@@ -678,7 +557,9 @@ impl<'a> Dispatch<'a> {
 
         // Add input objects (domain mode)
         for i in 0..self.in_object_count {
-            req.add_object(self.in_objects[i]);
+            if let Some(obj) = self.in_objects[i] {
+                req.add_object(obj);
+            }
         }
 
         // Add input handles
@@ -687,15 +568,12 @@ impl<'a> Dispatch<'a> {
         }
 
         // Send the request
-        // SAFETY: session is valid for active service.
-        let rc = unsafe { nx_svc::raw::send_sync_request(self.service.session) };
-        if rc != 0 {
-            return Err(rc);
-        }
+        ipc::send_sync_request(self.service.session).map_err(DispatchError::SendRequest)?;
 
         // Parse response
         // SAFETY: Response is in TLS buffer after successful send.
-        let resp = unsafe { cmif::parse_response(ipc_buf, is_domain, self.out_data_size as u32) }?;
+        let resp = unsafe { cmif::parse_response(ipc_buf, is_domain, self.out_data_size) }
+            .map_err(DispatchError::ParseResponse)?;
 
         Ok(DispatchResult {
             data: resp.data,
@@ -704,6 +582,17 @@ impl<'a> Dispatch<'a> {
             move_handles: resp.move_handles,
         })
     }
+}
+
+/// Error returned by [`Dispatch::send`].
+#[derive(Debug, thiserror::Error)]
+pub enum DispatchError {
+    /// Failed to send the IPC request.
+    #[error("failed to send IPC request")]
+    SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the service response.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseResponseError),
 }
 
 /// Result of a successful dispatch operation.
@@ -717,4 +606,197 @@ pub struct DispatchResult<'a> {
     pub copy_handles: &'a [u32],
     /// Returned move handles.
     pub move_handles: &'a [u32],
+}
+
+// =============================================================================
+// Helper functions for CMIF control requests
+// =============================================================================
+
+/// Queries the server's pointer buffer size via control request 3.
+pub fn query_pointer_buffer_size(
+    session: SessionHandle,
+) -> Result<u16, QueryPointerBufferSizeError> {
+    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+
+    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
+    unsafe { cmif::make_control_request(ipc_buf, CTRL_QUERY_POINTER_BUFFER_SIZE, 0) };
+
+    ipc::send_sync_request(session).map_err(QueryPointerBufferSizeError::SendRequest)?;
+
+    // SAFETY: Response is in TLS buffer after successful send.
+    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u16>()) }
+        .map_err(QueryPointerBufferSizeError::ParseResponse)?;
+
+    // SAFETY: Response data contains u16 per CMIF protocol.
+    let size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u16>()) };
+    Ok(size)
+}
+
+/// Error returned by [`query_pointer_buffer_size`].
+#[derive(Debug, thiserror::Error)]
+pub enum QueryPointerBufferSizeError {
+    /// Failed to send the IPC request.
+    #[error("failed to send IPC request")]
+    SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the service response.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseResponseError),
+}
+
+/// Clones the current session object via control request 2.
+pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, CloneObjectError> {
+    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+
+    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
+    unsafe { cmif::make_control_request(ipc_buf, CTRL_CLONE_OBJECT, 0) };
+
+    ipc::send_sync_request(session).map_err(CloneObjectError::SendRequest)?;
+
+    // SAFETY: Response is in TLS buffer after successful send.
+    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+        .map_err(CloneObjectError::ParseResponse)?;
+
+    // Clone returns a move handle
+    if resp.move_handles.is_empty() {
+        return Err(CloneObjectError::MissingHandle);
+    }
+
+    // SAFETY: Kernel returned a valid handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+}
+
+/// Error returned by [`clone_current_object`].
+#[derive(Debug, thiserror::Error)]
+pub enum CloneObjectError {
+    /// Failed to send the IPC request.
+    #[error("failed to send IPC request")]
+    SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the service response.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseResponseError),
+    /// Response did not contain the expected move handle.
+    #[error("missing move handle in response")]
+    MissingHandle,
+}
+
+/// Copies a domain object to a new session handle via control request 1.
+///
+/// This extracts a domain object as a standalone session handle, allowing
+/// it to be used independently of the domain.
+pub fn copy_from_current_domain(
+    session: SessionHandle,
+    object_id: ObjectId,
+) -> Result<SessionHandle, CopyFromDomainError> {
+    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+
+    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
+    let data_ptr = unsafe {
+        cmif::make_control_request(ipc_buf, CTRL_COPY_FROM_DOMAIN, size_of::<u32>() as u32)
+    };
+
+    // SAFETY: data_ptr points to valid payload area within IPC buffer.
+    unsafe { ptr::write_unaligned(data_ptr.cast::<u32>(), object_id.to_raw()) };
+
+    ipc::send_sync_request(session).map_err(CopyFromDomainError::SendRequest)?;
+
+    // SAFETY: Response is in TLS buffer after successful send.
+    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+        .map_err(CopyFromDomainError::ParseResponse)?;
+
+    if resp.move_handles.is_empty() {
+        return Err(CopyFromDomainError::MissingHandle);
+    }
+
+    // SAFETY: Kernel returned a valid handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+}
+
+/// Error returned by [`copy_from_current_domain`].
+#[derive(Debug, thiserror::Error)]
+pub enum CopyFromDomainError {
+    /// Failed to send the IPC request.
+    #[error("failed to send IPC request")]
+    SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the service response.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseResponseError),
+    /// Response did not contain the expected move handle.
+    #[error("missing move handle in response")]
+    MissingHandle,
+}
+
+/// Clones the current session object with a tag via control request 4.
+pub fn clone_current_object_ex(
+    session: SessionHandle,
+    tag: u32,
+) -> Result<SessionHandle, CloneObjectExError> {
+    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+
+    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
+    let data_ptr = unsafe {
+        cmif::make_control_request(ipc_buf, CTRL_CLONE_OBJECT_EX, size_of::<u32>() as u32)
+    };
+
+    // SAFETY: data_ptr points to valid payload area within IPC buffer.
+    unsafe { ptr::write_unaligned(data_ptr.cast::<u32>(), tag) };
+
+    ipc::send_sync_request(session).map_err(CloneObjectExError::SendRequest)?;
+
+    // SAFETY: Response is in TLS buffer after successful send.
+    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+        .map_err(CloneObjectExError::ParseResponse)?;
+
+    // Clone returns a move handle
+    if resp.move_handles.is_empty() {
+        return Err(CloneObjectExError::MissingHandle);
+    }
+
+    // SAFETY: Kernel returned a valid handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+}
+
+/// Error returned by [`clone_current_object_ex`].
+#[derive(Debug, thiserror::Error)]
+pub enum CloneObjectExError {
+    /// Failed to send the IPC request.
+    #[error("failed to send IPC request")]
+    SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the service response.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseResponseError),
+    /// Response did not contain the expected move handle.
+    #[error("missing move handle in response")]
+    MissingHandle,
+}
+
+/// Converts the current session to a domain via control request 0.
+pub fn convert_current_object_to_domain(
+    session: SessionHandle,
+) -> Result<ObjectId, ConvertToDomainError> {
+    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+
+    // SAFETY: ipc_buf points to valid IPC buffer with sufficient space.
+    unsafe { cmif::make_control_request(ipc_buf, CTRL_CONVERT_TO_DOMAIN, 0) };
+
+    ipc::send_sync_request(session).map_err(ConvertToDomainError::SendRequest)?;
+
+    // SAFETY: Response is in TLS buffer after successful send.
+    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u32>()) }
+        .map_err(ConvertToDomainError::ParseResponse)?;
+
+    // SAFETY: Response data contains object_id as u32. The kernel always returns
+    // a valid non-zero object ID when converting to domain.
+    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    Ok(unsafe { ObjectId::new_unchecked(raw) })
+}
+
+/// Error returned by [`convert_current_object_to_domain`].
+#[derive(Debug, thiserror::Error)]
+pub enum ConvertToDomainError {
+    /// Failed to send the IPC request.
+    #[error("failed to send IPC request")]
+    SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the service response.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseResponseError),
 }

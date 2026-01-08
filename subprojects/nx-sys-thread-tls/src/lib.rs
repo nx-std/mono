@@ -283,6 +283,26 @@ pub fn get_ptr() -> *mut ThreadLocalRegion {
     get_base_addr() as *mut ThreadLocalRegion
 }
 
+/// Returns a pointer to the current thread's IPC buffer.
+///
+/// The IPC buffer is a 256-byte region at the start of the Thread Local Region
+/// used by the Horizon OS kernel for inter-process communication messages.
+/// When a thread makes IPC calls to system services, request/response data
+/// is marshaled through this buffer.
+///
+/// # Returns
+///
+/// A `NonNull<u8>` pointing to the IPC buffer. The pointer is valid for the
+/// lifetime of the current thread.
+#[inline]
+pub fn ipc_buffer_ptr() -> NonNull<u8> {
+    let tls = get_ptr();
+
+    // SAFETY: get_ptr() returns a valid pointer to the current thread's TLS block.
+    // The TLS region is always valid for the current thread, so ipc_buffer is non-null.
+    unsafe { NonNull::new_unchecked((*tls).ipc_buffer.as_mut_ptr()) }
+}
+
 /// Returns a raw pointer to the TLS dynamic slots array for the current thread.
 ///
 /// The dynamic slots are an array of [`NUM_TLS_SLOTS`] (27) pointer-sized entries located

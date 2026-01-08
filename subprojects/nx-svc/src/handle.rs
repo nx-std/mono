@@ -51,14 +51,23 @@ macro_rules! define_handle_type {
         }
 
         impl ::core::cmp::PartialEq<$crate::raw::Handle> for $name {
+            #[inline]
             fn eq(&self, other: &$crate::raw::Handle) -> bool {
                 &self.0 == other
             }
         }
 
         impl ::core::cmp::PartialEq<$name> for $crate::raw::Handle {
+            #[inline]
             fn eq(&self, other: &$name) -> bool {
                 self == &other.0
+            }
+        }
+
+        impl ::core::convert::From<$name> for $crate::raw::Handle {
+            #[inline]
+            fn from(handle: $name) -> Self {
+                handle.0
             }
         }
     };
