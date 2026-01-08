@@ -40,7 +40,10 @@ extern crate nx_panic_handler; // Provides #[panic_handler]
 pub mod cmif;
 pub mod hipc;
 pub mod service;
+mod service_name;
 pub mod tipc;
+
+pub use service_name::ServiceName;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;

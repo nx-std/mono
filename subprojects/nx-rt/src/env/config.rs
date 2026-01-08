@@ -8,6 +8,8 @@ use core::{
     ptr::NonNull,
 };
 
+pub use nx_sf::ServiceName;
+
 /// Atmosphere magic value in entry.value[1]: 'ATMOSPHR' in little-endian
 const ATMOSPHERE_MAGIC: u64 = 0x41544d4f53504852;
 
@@ -112,7 +114,8 @@ impl Entry {
                 size: entry.value[1] as usize,
             },
             Self::KEY_OVERRIDE_SERVICE => Entry::OverrideService {
-                name: ServiceName::from_u64(entry.value[0]),
+                // SAFETY: Service names from loader config are always ASCII.
+                name: unsafe { ServiceName::from_u64(entry.value[0]) },
                 handle: entry.value[1] as u32,
             },
             Self::KEY_ARGV => Entry::Argv(NonNull::new(entry.value[1] as *mut c_char)),
@@ -210,23 +213,6 @@ pub struct ConfigEntry {
     pub key: u32,
     pub flags: u32,
     pub value: [u64; 2],
-}
-
-/// Service name (8-byte null-padded string, matches libnx SmServiceName)
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ServiceName(u64);
-
-impl ServiceName {
-    /// Create from raw u64 (matches libnx's smServiceNameFromU64)
-    pub const fn from_u64(val: u64) -> Self {
-        Self(val)
-    }
-
-    /// Get raw u64 value
-    pub const fn to_raw(self) -> u64 {
-        self.0
-    }
 }
 
 /// Applet type values (matches libnx AppletType enum)
