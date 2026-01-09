@@ -104,3 +104,14 @@ smDetachClient = __nx_rt__sm_detach_client;
 smDetachClientCmif = __nx_rt__sm_detach_client_cmif;
 smDetachClientTipc = __nx_rt__sm_detach_client_tipc;
 smGetServiceSession = __nx_rt__sm_get_service_session;
+
+/* System Settings (set:sys) API */
+EXTERN(__nx_rt__setsys_initialize);
+EXTERN(__nx_rt__setsys_exit);
+EXTERN(__nx_rt__setsys_get_service_session);
+EXTERN(__nx_rt__setsys_get_firmware_version);
+
+setsysInitialize = __nx_rt__setsys_initialize;
+setsysExit = __nx_rt__setsys_exit;
+setsysGetServiceSession = __nx_rt__setsys_get_service_session;
+setsysGetFirmwareVersion = __nx_rt__setsys_get_firmware_version;
