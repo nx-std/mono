@@ -98,6 +98,47 @@ The custom libnx build links against Rust crates when `use_nx*` options are enab
 - Imports grouped: std, external crates, local
 - Import granularity at crate level
 
+## Coding Patterns
+
+Pattern documents provide mandatory coding guidelines and project convention for specific domains. Located in `docs/patterns/`.
+
+### Pattern Document Format
+
+Each pattern document has YAML frontmatter:
+
+```yaml
+---
+name: "pattern-name"
+description: "When to apply this pattern - keywords and contexts for matching"
+---
+```
+
+### How to Use Patterns
+
+**BEFORE writing code**, check if any pattern applies:
+
+1. **Match by description**: Read the `description` field in each pattern's frontmatter
+2. **Load relevant patterns**: If your task matches a pattern's description, read the full document
+3. **Follow all guidelines**: Pattern rules are MANDATORY, not suggestions
+
+### When to Consult Patterns
+
+Consult patterns when:
+
+- Creating new types, functions, or modules in a pattern's domain
+- Modifying existing code that falls under a pattern's scope
+- Reviewing code for compliance
+
+### Discovering Patterns
+
+List all available patterns and their descriptions:
+
+```bash
+grep -Pzo '(?s)^---\n.*?\n---' docs/patterns/*.md
+```
+
+This outputs the YAML frontmatter (name and description) for each pattern document. Use the `description` field to determine which patterns apply to your current task.
+
 ## Development Workflow
 
 Follow this workflow when implementing features or fixing bugs.
