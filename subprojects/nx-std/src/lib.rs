@@ -31,6 +31,14 @@ pub mod rt {
     pub use nx_rt::*;
 }
 
+#[cfg(feature = "services")]
+pub mod services {
+    #[cfg(feature = "service-sm")]
+    pub mod sm {
+        pub use nx_service_sm::*;
+    }
+}
+
 #[cfg(any(
     feature = "sys",
     feature = "alloc",
