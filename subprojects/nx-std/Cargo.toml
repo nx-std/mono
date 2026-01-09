@@ -34,12 +34,13 @@ ffi = [
 ]
 
 # High-level features
-services = ["service-sm"]
+services = ["service-sm", "service-set"]
 
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 rand = ["dep:nx-rand"]
 rt = ["dep:nx-rt"]
+service-set = ["dep:nx-service-set"]
 service-sm = ["dep:nx-service-sm"]
 sf = ["dep:nx-sf"]
 svc = ["dep:nx-svc"]
@@ -55,6 +56,7 @@ nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-rt = { version = "0.1.0", path = "../nx-rt", optional = true }
+nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm", optional = true }
 nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }

@@ -81,3 +81,10 @@ option(
     description : 'Enable the `service-sm` feature',
     yield : true
 )
+
+option(
+    'use_nx_service_set',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-set` feature',
+    yield : true
+)
