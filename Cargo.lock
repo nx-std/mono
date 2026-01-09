@@ -195,6 +195,7 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-panic-handler",
+ "nx-service-set",
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
