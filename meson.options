@@ -98,6 +98,12 @@ option(
 )
 
 option(
+    'use_nx_service_set',
+    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    description : 'Enable nx-service-set (System Settings service)',
+)
+
+option(
     'use_nx_service_sm',
     type : 'feature', value : 'auto',
     description : 'Enable nx-service-sm (Service Manager protocol)',
