@@ -133,6 +133,16 @@ if get_option('use_nx_sf').enabled()
     deps_cargo_features += ['sf']
 endif
 
+# nx-service-sm
+if get_option('use_nx_service_sm').enabled()
+    nx_service_sm_proj = subproject('nx-service-sm')
+
+    deps += nx_service_sm_proj.get_variable('nx_service_sm_dep')
+
+    debug('service-sm feature: enabled')
+    deps_cargo_features += ['service-sm']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

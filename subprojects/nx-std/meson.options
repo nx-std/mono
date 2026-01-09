@@ -74,3 +74,10 @@ option(
     description : 'Enable the `sf` feature',
     yield : true
 )
+
+option(
+    'use_nx_service_sm',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-sm` feature',
+    yield : true
+)

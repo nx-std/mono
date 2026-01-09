@@ -1,0 +1,22 @@
+[package]
+name = "nx-service-sm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_service_sm"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Empty feature for backwards compatibility (FFI is now in nx-rt)
+ffi = []
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+thiserror = { version = "2", default-features = false }
