@@ -20,12 +20,12 @@ define_waitable_handle_type! {
 
 impl Handle {
     /// Creates a new [`Handle`] for the current thread.
-    pub fn current_thread() -> Self {
+    pub const fn current_thread() -> Self {
         Self(raw::CUR_THREAD_HANDLE)
     }
 
     /// Returns `true` if the handle is the current thread.
-    pub fn is_current_thread(&self) -> bool {
+    pub const fn is_current_thread(&self) -> bool {
         self.0 == raw::CUR_THREAD_HANDLE
     }
 }
