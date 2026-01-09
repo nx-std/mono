@@ -195,6 +195,7 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-panic-handler",
+ "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
@@ -202,6 +203,7 @@ dependencies = [
  "nx-sys-sync",
  "nx-sys-thread",
  "nx-sys-thread-tls",
+ "thiserror",
 ]
 
 [[package]]

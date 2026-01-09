@@ -81,3 +81,10 @@ option(
     description : 'Override libnx functions with nx-sf (Service Framework) functions',
     yield : true
 )
+
+option(
+    'use_nx_service_sm',
+    type : 'feature', value : 'auto',
+    description : 'Enable nx-service-sm (Service Manager protocol)',
+    yield : true
+)

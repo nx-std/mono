@@ -69,3 +69,38 @@ EXTERN(__nx_rt__hosversion_is_atmosphere);
 hosversionGet = __nx_rt__hosversion_get;
 hosversionSet = __nx_rt__hosversion_set;
 hosversionIsAtmosphere = __nx_rt__hosversion_is_atmosphere;
+
+/* Service Manager API */
+EXTERN(__nx_rt__sm_initialize);
+EXTERN(__nx_rt__sm_exit);
+EXTERN(__nx_rt__sm_get_service_wrapper);
+EXTERN(__nx_rt__sm_get_service_original);
+EXTERN(__nx_rt__sm_get_service_override);
+EXTERN(__nx_rt__sm_add_override_handle);
+EXTERN(__nx_rt__sm_register_service);
+EXTERN(__nx_rt__sm_register_service_cmif);
+EXTERN(__nx_rt__sm_register_service_tipc);
+EXTERN(__nx_rt__sm_unregister_service);
+EXTERN(__nx_rt__sm_unregister_service_cmif);
+EXTERN(__nx_rt__sm_unregister_service_tipc);
+EXTERN(__nx_rt__sm_detach_client);
+EXTERN(__nx_rt__sm_detach_client_cmif);
+EXTERN(__nx_rt__sm_detach_client_tipc);
+EXTERN(__nx_rt__sm_get_service_session);
+
+smInitialize = __nx_rt__sm_initialize;
+smExit = __nx_rt__sm_exit;
+smGetServiceWrapper = __nx_rt__sm_get_service_wrapper;
+smGetServiceOriginal = __nx_rt__sm_get_service_original;
+smGetServiceOverride = __nx_rt__sm_get_service_override;
+smAddOverrideHandle = __nx_rt__sm_add_override_handle;
+smRegisterService = __nx_rt__sm_register_service;
+smRegisterServiceCmif = __nx_rt__sm_register_service_cmif;
+smRegisterServiceTipc = __nx_rt__sm_register_service_tipc;
+smUnregisterService = __nx_rt__sm_unregister_service;
+smUnregisterServiceCmif = __nx_rt__sm_unregister_service_cmif;
+smUnregisterServiceTipc = __nx_rt__sm_unregister_service_tipc;
+smDetachClient = __nx_rt__sm_detach_client;
+smDetachClientCmif = __nx_rt__sm_detach_client_cmif;
+smDetachClientTipc = __nx_rt__sm_detach_client_tipc;
+smGetServiceSession = __nx_rt__sm_get_service_session;
