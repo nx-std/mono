@@ -165,36 +165,31 @@ Follow this workflow when implementing features or fixing bugs.
 
 ```
 - [ ] Write code following project conventions
-- [ ] Format code (just fmt-rs for Rust, just fmt-meson for Meson)
-- [ ] Check compilation (just check-rs)
-- [ ] Run clippy (just clippy)
+- [ ] Format code (use `/format` skill)
+- [ ] Check compilation (use `/check` skill)
+- [ ] Run clippy (use `/check` skill)
 - [ ] Fix ALL warnings
-- [ ] Build target (just meson-compile <target>)
+- [ ] Build target (use `/build` skill)
 - [ ] Run tests if applicable
 - [ ] All checks pass ✅
 ```
 
 **Workflow for EVERY code change:**
 
-1. **Write code** following patterns from `docs/`
+1. **Write code** following patterns from `docs/patterns/`
 
 2. **Format immediately** (MANDATORY after EVERY edit):
-   - Rust files: `just fmt-rs`
-   - Meson files: `just fmt-meson`
-   - See `.claude/skills/format/SKILL.md`
+   - Use the `/format` skill
 
 3. **Check compilation**:
-   - Rust: `just check-rs` or `just check-crate <crate>`
-   - Meson: `just meson-configure` then `just meson-compile`
-   - See `.claude/skills/build/SKILL.md`
+   - Use the `/check` skill
 
 4. **Lint with clippy**:
-   - Command: `just clippy` or `just clippy-crate <crate>`
+   - Use the `/check` skill
    - Fix ALL warnings before proceeding
 
 5. **Build and test**:
-   - Build targets: `just meson-compile <target>`
-   - Build tests: `just build-tests`
+   - Use the `/build` skill
 
 6. **Iterate**: If any validation fails → fix → return to step 2
 
@@ -206,12 +201,11 @@ Follow this workflow when implementing features or fixing bugs.
 
 ### 5. Hardware Validation (Optional)
 
-To validate changes on actual hardware, deploy the test suite to a Nintendo Switch:
+To validate changes on actual hardware, use the `/test` skill which orchestrates:
 
-1. Build tests: `just build-tests`
-2. Deploy to Switch: `just deploy buildDir/subprojects/tests/nx-tests.nro`
-3. Ask user to confirm tests PASSED on the console
-4. See `.claude/skills/deploy/SKILL.md` for details
+1. Building the test NRO
+2. Deploying to the Nintendo Switch
+3. Confirming tests passed on the console
 
 ## Testing
 

@@ -133,9 +133,8 @@ just install-cargo-nx
 
 🚨 **Do NOT run this command yourself.**
 
-## Next Steps
+## Related Skills
 
-Before deploying, ensure your build is complete:
-
-1. **Build targets** → See `.claude/skills/build/SKILL.md`
-2. **Format code** → See `.claude/skills/format/SKILL.md`
+- `/build` - Build targets before deploying
+- `/format` - Format code before building
+- `/test` - Full test workflow with deploy

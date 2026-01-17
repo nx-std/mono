@@ -1,7 +1,7 @@
 ---
 name: build
 description: Configure, reconfigure, and build targets in the nx-std monorepo using just tasks. Use when configuring build options, reconfiguring an existing build, or compiling NRO files and other build artifacts.
-allowed-tools: Bash(just --list:*), Bash(just list-targets:*), Bash(just list-options:*), Bash(just list-options-configured:*), Bash(just list-dependencies:*), Bash(just meson-compile:*), Bash(just meson-configure:*), Bash(just meson-reconfigure:*), Bash(just build-tests:*)
+allowed-tools: Bash(just --list:*), Bash(just configure:*), Bash(just reconfigure:*), Bash(just list-targets:*), Bash(just list-options:*), Bash(just list-options-configured:*), Bash(just list-dependencies:*), Bash(just build:*), Bash(just meson-compile:*), Bash(just compile:*), Bash(just build-tests:*)
 ---
 
 # Build Target Skill

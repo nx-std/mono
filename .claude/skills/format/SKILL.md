@@ -117,7 +117,7 @@ Meson formatting:
 
 After formatting your code:
 
-1. **Check compilation** → Run `just check-rs` for Rust
-2. **Run clippy** → Run `just clippy` for linting
-3. **Build targets** → See `.claude/skills/build/SKILL.md`
-4. **Run tests** → Run `just build-tests`
+1. **Check compilation** → Use `/check` skill
+2. **Run clippy** → Use `/check` skill
+3. **Build targets** → Use `/build` skill
+4. **Run tests** → Use `/test` skill
