@@ -112,9 +112,7 @@ impl From<raw::ThreadContext> for Context {
         let cpu_gprs: [CpuRegister; 29] = unsafe { core::mem::transmute(raw_ctx.cpu_gprs) };
         let fpu_gprs: [FpuRegister; 32] = unsafe { core::mem::transmute(raw_ctx.fpu_gprs) };
 
-        // SAFETY: `CpuRegister`/`FpuRegister` are layout-identical to their
-        // raw counterparts, hence a transmute is sound.
-        let pc = unsafe { core::mem::transmute(raw_ctx.pc) };
+        let pc = raw_ctx.pc;
 
         Self {
             cpu_gprs,

@@ -63,6 +63,11 @@ unsafe extern "C" {
 /// Address of the start of the TLS segment.
 ///
 /// The start address is the address of the first byte of the TLS segment.
+///
+/// # Safety
+///
+/// The caller must ensure that the linker script defines the `__tls_start` symbol
+/// and that it points to a valid memory location.
 #[inline(always)]
 pub unsafe fn start_addr() -> usize {
     &raw const __tls_start as usize
@@ -71,6 +76,11 @@ pub unsafe fn start_addr() -> usize {
 /// Address of the end of the TLS segment.
 ///
 /// The end address is the address of the last byte of the TLS segment.
+///
+/// # Safety
+///
+/// The caller must ensure that the linker script defines the `__tls_end` symbol
+/// and that it points to a valid memory location.
 #[inline(always)]
 pub unsafe fn end_addr() -> usize {
     &raw const __tls_end as usize
@@ -131,6 +141,11 @@ pub mod tdata {
     /// Address of the start of the `.tdata` section.
     ///
     /// Returns the address of the first byte of the `.tdata` section in the ELF file.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the linker script defines the `__tdata_lma` symbol
+    /// and that it points to a valid memory location.
     #[inline(always)]
     pub unsafe fn lma_start_addr() -> usize {
         &raw const __tdata_lma as usize
@@ -139,6 +154,11 @@ pub mod tdata {
     /// Address of the end of the `.tdata` section.
     ///
     /// Returns the address of the last byte of the `.tdata` section in the ELF file.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the linker script defines the `__tdata_lma_end` symbol
+    /// and that it points to a valid memory location.
     #[inline(always)]
     pub unsafe fn lma_end_addr() -> usize {
         &raw const __tdata_lma_end as usize

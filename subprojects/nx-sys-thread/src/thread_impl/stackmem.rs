@@ -145,7 +145,7 @@ impl Buf for PageAlignedBuffer {
 ///
 /// This allows borrowed references to be used wherever the [`Buf`] trait
 /// is required.
-impl<'a> Buf for &'a PageAlignedBuffer {
+impl Buf for &PageAlignedBuffer {
     fn ptr(&self) -> NonNull<c_void> {
         self.0.ptr()
     }
