@@ -118,12 +118,12 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
             }
 
             // Receive and process message
-            if let Ok(Some(msg)) = common_state_getter.receive_message() {
-                if matches!(msg, AppletMessage::FocusStateChanged) {
-                    focus_state = common_state_getter
-                        .get_current_focus_state()
-                        .map_err(ConnectError::GetFocusState)?;
-                }
+            if let Ok(Some(msg)) = common_state_getter.receive_message()
+                && matches!(msg, AppletMessage::FocusStateChanged)
+            {
+                focus_state = common_state_getter
+                    .get_current_focus_state()
+                    .map_err(ConnectError::GetFocusState)?;
             }
         }
 

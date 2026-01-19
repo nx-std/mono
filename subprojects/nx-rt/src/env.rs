@@ -54,7 +54,7 @@ pub unsafe fn setup(ctx: *const ConfigEntry, main_thread: ThreadHandle, saved_lr
     // Use Once to ensure this only runs once
     ENV_INIT.call_once(|| {
         // SAFETY: We're inside Once::call_once, which guarantees exclusive access
-        let state = unsafe { ENV_STATE.get() };
+        let state = unsafe { &mut *ENV_STATE.get() };
 
         // Select initialization based on whether ctx is null
         match NonNull::new(ctx as *mut ConfigEntry) {
@@ -264,7 +264,9 @@ pub fn exit_func_ptr() -> LoaderReturnFn {
         None
     } else {
         // SAFETY: The pointer was stored via set_exit_func_ptr which ensures validity
-        Some(unsafe { core::mem::transmute(ptr) })
+        Some(unsafe {
+            core::mem::transmute::<*mut core::ffi::c_void, unsafe extern "C" fn(i32) -> !>(ptr)
+        })
     }
 }
 
@@ -320,7 +322,12 @@ pub fn applet_workaround() -> bool {
 /// Set next NRO to load (chain loading)
 ///
 /// Returns 0 on success, non-zero on error
-pub fn set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
+///
+/// # Safety
+///
+/// The caller must ensure that `path` and `argv` (if not null) point to valid,
+/// null-terminated C strings that remain valid for the duration of this call.
+pub unsafe fn set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
     // SAFETY: ENV_STATE is initialized once via setup() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
 
@@ -341,7 +348,7 @@ pub fn set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
         while i < path_buf.len() - 1 {
             // SAFETY: Caller guarantees path points to a valid null-terminated C string.
             // We stop at the first null byte or buffer limit, whichever comes first.
-            let byte = unsafe { *path.add(i) } as u8;
+            let byte = unsafe { *path.add(i) };
             path_buf[i] = byte;
             if byte == 0 {
                 break;
@@ -359,7 +366,7 @@ pub fn set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
         while i < argv_buf.len() - 1 {
             // SAFETY: Caller guarantees argv points to a valid null-terminated C string.
             // We stop at the first null byte or buffer limit, whichever comes first.
-            let byte = unsafe { *argv.add(i) } as u8;
+            let byte = unsafe { *argv.add(i) };
             argv_buf[i] = byte;
             if byte == 0 {
                 break;
@@ -472,9 +479,9 @@ impl EnvStateWrapper {
     /// - Called from within Once::call_once during initialization, or
     /// - Called to mutate fields that are safe to modify post-initialization
     ///   (like exit_func and next_load buffers)
-    unsafe fn get(&self) -> &mut EnvState {
+    unsafe fn get(&self) -> *mut EnvState {
         // SAFETY: Caller guarantees exclusive access or safe mutation
-        unsafe { &mut *self.0.get() }
+        self.0.get()
     }
 
     /// Get immutable access to the environment state

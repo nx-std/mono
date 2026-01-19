@@ -201,9 +201,8 @@ fn parse_argv(args: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut current_arg = String::new();
     let mut in_quote = false;
-    let mut chars = args.chars().peekable();
 
-    while let Some(ch) = chars.next() {
+    for ch in args.chars() {
         if in_quote {
             if ch == '"' {
                 // End quote
