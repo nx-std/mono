@@ -77,7 +77,7 @@ impl TryFrom<i64> for Nanoseconds {
     /// If the value is not within the valid range, an [`OutOfRangeError`] is returned.
     #[inline]
     fn try_from(val: i64) -> Result<Self, Self::Error> {
-        if val >= NSEC_MIN && val <= NSEC_MAX {
+        if (NSEC_MIN..=NSEC_MAX).contains(&val) {
             Ok(unsafe { Nanoseconds::new_unchecked(val as u32) })
         } else {
             Err(OutOfRangeError(val))

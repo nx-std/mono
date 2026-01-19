@@ -13,6 +13,7 @@ use crate::sys::timespec::Timespec;
 pub const TIMER_FREQ: u64 = 19_200_000; // Hz
 
 /// Clock resolution in nanoseconds (~52.083ns per tick)
+#[expect(dead_code)]
 pub const NSEC_PER_TICK: u64 = 1_000_000_000 / 19_200_000; // ns
 
 /// Gets the current system tick.
@@ -30,6 +31,7 @@ pub fn get_system_tick() -> u64 {
 /// frequency of the system counter-timer.
 ///
 /// Returns the system counter-timer frequency, in Hz.
+#[expect(dead_code)]
 #[inline]
 pub fn get_system_tick_freq() -> u64 {
     unsafe { control_regs::cntfrq_el0() }
@@ -43,6 +45,7 @@ pub fn get_system_tick_freq() -> u64 {
 ///
 /// Returns the equivalent CPU ticks for a given time in nanoseconds, based on the
 /// system counter frequency.
+#[expect(dead_code)]
 #[inline]
 pub const fn ns_to_cpu_ticks(ns: u64) -> u64 {
     (ns * 12) / 625
