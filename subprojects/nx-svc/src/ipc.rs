@@ -20,7 +20,7 @@ use crate::{
     result::{Error, ResultCode, raw::Result as RawResult},
 };
 
-define_handle_type! {
+define_waitable_handle_type! {
     /// A handle to a client session kernel object.
     ///
     /// This represents the client side of an IPC session. It is obtained by

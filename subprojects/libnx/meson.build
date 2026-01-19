@@ -28,6 +28,7 @@ use_nx_sys_thread = get_option('use_nx_sys_thread').enable_auto_if(use_nx.enable
 use_nx_time = get_option('use_nx_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sf = get_option('use_nx_sf').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_apm = get_option('use_nx_service_apm').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_service_applet = get_option('use_nx_service_applet').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_set = get_option('use_nx_service_set').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_sm = get_option('use_nx_service_sm').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 
@@ -42,7 +43,7 @@ if (use_nx.enabled()
     or use_nx_alloc.enabled() or use_nx_rand.enabled() or use_nx_rt.enabled() or use_nx_std_sync.enabled()
     or use_nx_svc.enabled() or use_nx_sys_mem.enabled() or use_nx_sys_sync.enabled() or use_nx_sys_thread_tls.enabled()
     or use_nx_sys_thread.enabled() or use_nx_time.enabled() or use_nx_sf.enabled()
-    or use_nx_service_apm.enabled() or use_nx_service_set.enabled() or use_nx_service_sm.enabled())
+    or use_nx_service_apm.enabled() or use_nx_service_applet.enabled() or use_nx_service_set.enabled() or use_nx_service_sm.enabled())
 
     nx_std_proj = subproject(
         'nx-std',
@@ -59,6 +60,7 @@ if (use_nx.enabled()
             'use_nx_time' : '@0@'.format(use_nx_time),
             'use_nx_sf' : '@0@'.format(use_nx_sf),
             'use_nx_service_apm' : '@0@'.format(use_nx_service_apm),
+            'use_nx_service_applet' : '@0@'.format(use_nx_service_applet),
             'use_nx_service_set' : '@0@'.format(use_nx_service_set),
             'use_nx_service_sm' : '@0@'.format(use_nx_service_sm),
         },

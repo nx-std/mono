@@ -196,6 +196,7 @@ dependencies = [
  "nx-alloc",
  "nx-panic-handler",
  "nx-service-apm",
+ "nx-service-applet",
  "nx-service-set",
  "nx-service-sm",
  "nx-sf",
