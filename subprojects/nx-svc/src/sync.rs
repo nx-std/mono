@@ -313,9 +313,9 @@ pub const MAX_WAIT_HANDLES: usize = 64;
 ///
 /// # Arguments
 /// * `handle`     – Object implementing [`Waitable`].  Its underlying kernel handle is extracted
-///                  via [`Waitable::raw_handle`].
+///   via [`Waitable::raw_handle`].
 /// * `timeout`    – Timeout in nanoseconds (use `u64::MAX` for an infinite wait, `0` for an
-///                  immediate check).
+///   immediate check).
 ///
 /// Returns an [`Ok(())`] on success or a [`WaitSyncError`] if the wait fails.
 ///
@@ -340,8 +340,8 @@ where
 ///
 /// # Arguments
 /// * `handles`    – Any iterator yielding [`Waitable`] objects. If it produces more than
-///                  [`MAX_WAIT_HANDLES`] elements, only the first `MAX_WAIT_HANDLES` values are
-///                  considered; additional items are **silently ignored**.
+///   [`MAX_WAIT_HANDLES`] elements, only the first `MAX_WAIT_HANDLES` values are
+///   considered; additional items are **silently ignored**.
 /// * `timeout`    – Timeout in nanoseconds (`u64::MAX` ≅ infinite).
 ///
 /// Returns an [`Ok(usize)`] indicating the index of the signalled handle on success or a

@@ -32,7 +32,7 @@ impl Handle {
 
 /// Creates a new thread in the *created* (suspended) state.
 ///
-/// This is a safe wrapper around [`raw::create_thread`] that forwards its
+/// This is a wrapper around [`raw::create_thread`] that forwards its
 /// parameters verbatim:
 ///
 /// * `entry` – pointer to the thread's entry function.
@@ -48,7 +48,15 @@ impl Handle {
 /// execute.
 ///
 /// On failure, the function yields a [`CreateThreadError`] detailing the cause.
-pub fn create(
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `entry` points to a valid function with the correct signature
+/// - `arg` is valid to pass to the entry function (or null)
+/// - `stack_top` points to a valid, 16-byte aligned stack that remains valid
+///   for the thread's entire lifetime
+pub unsafe fn create(
     entry: *mut c_void,
     arg: *mut c_void,
     stack_top: *mut c_void,

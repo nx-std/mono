@@ -25,10 +25,7 @@ use super::{
 /// Returns the random entropy value on success, or a [`GetInfoError`] on failure.
 // TODO: Review the actual error codes this fn returns
 pub fn get_random_entropy(source: u64) -> Result<u64, GetInfoError> {
-    Ok(get_info(
-        InfoType::RandomEntropy { source },
-        INVALID_HANDLE,
-    )?)
+    get_info(InfoType::RandomEntropy { source }, INVALID_HANDLE)
 }
 
 /// Retrieves the total amount of memory available for the current process.

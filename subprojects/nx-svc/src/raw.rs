@@ -421,6 +421,11 @@ pub struct SecmonArgs {
 /// | IN | _size_ | Size of the heap, must be a multiple of 0x200000 and [2.0.0+] less than 0x18000000. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetHeapSize>
+///
+/// # Safety
+///
+/// The caller must ensure that `out_addr` is a valid, aligned pointer to writable memory
+/// where the heap address can be written.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_heap_size(out_addr: *mut *mut c_void, size: usize) -> ResultCode {
     core::arch::naked_asm!(
@@ -446,6 +451,11 @@ pub unsafe extern "C" fn set_heap_size(out_addr: *mut *mut c_void, size: usize) 
 /// | IN | _perm_ | Memory permissions (as u32 bitflags: R=1, W=2, X=4, DONT_CARE=1<<28). |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetMemoryPermission>
+///
+/// # Safety
+///
+/// The caller must ensure that `addr` points to a valid, page-aligned memory range
+/// that the current process owns.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_memory_permission(
     addr: *mut c_void,
@@ -473,6 +483,11 @@ pub unsafe extern "C" fn set_memory_permission(
 /// | IN | _attr_ | New attributes. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetMemoryAttribute>
+///
+/// # Safety
+///
+/// The caller must ensure that `addr` points to a valid, page-aligned memory range
+/// that the current process owns.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_memory_attribute(
     addr: *mut c_void,
@@ -503,6 +518,11 @@ pub unsafe extern "C" fn set_memory_attribute(
 /// | IN | _size_ | Size of the range. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that both `dst_addr` and `src_addr` point to valid,
+/// page-aligned memory ranges owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_memory(
     dst_addr: *mut c_void,
@@ -529,6 +549,11 @@ pub unsafe extern "C" fn map_memory(
 /// | IN | _size_ | Size of the range. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that both `dst_addr` and `src_addr` point to valid,
+/// page-aligned memory ranges that were previously mapped with [`map_memory`].
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_memory(
     dst_addr: *mut c_void,
@@ -556,6 +581,11 @@ pub unsafe extern "C" fn unmap_memory(
 /// | IN  | _addr_ | Address to query.
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that both `meminfo` and `pageinfo` are valid, aligned pointers
+/// to writable memory where the kernel can write the query results.
 #[unsafe(naked)]
 pub unsafe extern "C" fn query_memory(
     meminfo: *mut MemoryInfo,
@@ -583,6 +613,11 @@ pub unsafe extern "C" fn query_memory(
 /// Syscall code: [EXIT_PROCESS](crate::code::EXIT_PROCESS) (`0x7`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ExitProcess>
+///
+/// # Safety
+///
+/// This function never returns and terminates the entire process. No further cleanup occurs
+/// after the call.
 #[unsafe(naked)]
 pub unsafe extern "C" fn exit_process() -> ! {
     core::arch::naked_asm!(
@@ -608,6 +643,14 @@ pub unsafe extern "C" fn exit_process() -> ! {
 /// | IN | _cpuid_ | CPU core ID. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateThread>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid, aligned pointer to writable memory for the output handle
+/// - `entry` points to a valid function with the correct signature
+/// - `arg` is valid to pass to the entry function (or null)
+/// - `stack_top` points to a valid, page-aligned stack that remains valid for the thread's lifetime
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_thread(
     handle: *mut Handle,
@@ -638,6 +681,10 @@ pub unsafe extern "C" fn create_thread(
 /// | IN | _handle_ | Handle of the thread to start. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#StartThread>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel thread handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn start_thread(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -654,6 +701,11 @@ pub unsafe extern "C" fn start_thread(handle: Handle) -> ResultCode {
 /// Syscall code: [EXIT_THREAD](crate::code::EXIT_THREAD) (`0xA`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ExitThread>
+///
+/// # Safety
+///
+/// This function never returns and terminates the current thread. Stack and TLS cleanup
+/// is performed by the kernel.
 #[unsafe(naked)]
 pub unsafe extern "C" fn exit_thread() -> ! {
     core::arch::naked_asm!(
@@ -676,6 +728,11 @@ pub unsafe extern "C" fn exit_thread() -> ! {
 /// | IN | _nano_ | Number of nanoseconds to sleep, or [YieldType] for yield. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SleepThread>
+///
+/// # Safety
+///
+/// This function is safe to call from any context. The value passed is used directly
+/// by the kernel.
 #[unsafe(naked)]
 pub unsafe extern "C" fn sleep_thread(nano: i64) {
     core::arch::naked_asm!(
@@ -697,6 +754,12 @@ pub unsafe extern "C" fn sleep_thread(nano: i64) {
 /// | IN | _handle_ | Handle of the thread to query. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadPriority>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `priority` is a valid, aligned pointer to writable memory where the priority will be stored
+/// - `handle` is a valid kernel thread handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_thread_priority(priority: *mut i32, handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -723,6 +786,10 @@ pub unsafe extern "C" fn get_thread_priority(priority: *mut i32, handle: Handle)
 /// | IN | _priority_ | New priority. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetThreadPriority>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel thread handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_thread_priority(handle: Handle, priority: u32) -> ResultCode {
     core::arch::naked_asm!(
@@ -745,6 +812,12 @@ pub unsafe extern "C" fn set_thread_priority(handle: Handle, priority: u32) -> R
 /// | IN | _handle_ | Handle of the thread to query. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadCoreMask>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - Both `core_id` and `affinity_mask` are valid, aligned pointers to writable memory
+/// - `handle` is a valid kernel thread handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_thread_core_mask(
     core_id: *mut i32,
@@ -775,6 +848,10 @@ pub unsafe extern "C" fn get_thread_core_mask(
 /// | IN | _affinity_mask_ | New affinity mask. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetThreadCoreMask>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel thread handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_thread_core_mask(
     handle: Handle,
@@ -797,6 +874,10 @@ pub unsafe extern "C" fn set_thread_core_mask(
 /// Syscall code: [GET_CURRENT_PROCESSOR_NUMBER](crate::code::GET_CURRENT_PROCESSOR_NUMBER) (`0x10`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetCurrentProcessorNumber>
+///
+/// # Safety
+///
+/// This function is safe to call from any context.
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_current_processor_number() -> ResultCode {
     core::arch::naked_asm!(
@@ -826,6 +907,10 @@ pub unsafe extern "C" fn get_current_processor_number() -> ResultCode {
 /// | IN | _handle_ | Handle of the event to signal. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SignalEvent>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel event handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn signal_event(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -846,6 +931,10 @@ pub unsafe extern "C" fn signal_event(handle: Handle) -> ResultCode {
 /// | IN | _handle_ | Handle of the event to clear. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ClearEvent>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel event handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn clear_event(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -873,6 +962,12 @@ pub unsafe extern "C" fn clear_event(handle: Handle) -> ResultCode {
 /// | IN | _perm_ | Memory permissions (as u32 bitflags: R=1, W=2, X=4, DONT_CARE=1<<28). |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapSharedMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid kernel shared memory handle owned by the current process
+/// - `addr` points to a valid, page-aligned memory range owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_shared_memory(
     handle: Handle,
@@ -900,6 +995,12 @@ pub unsafe extern "C" fn map_shared_memory(
 /// | IN | _size_ | Size of the block. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapSharedMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid kernel shared memory handle owned by the current process
+/// - `addr` points to a valid, page-aligned memory range that was previously mapped
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_shared_memory(
     handle: Handle,
@@ -927,6 +1028,12 @@ pub unsafe extern "C" fn unmap_shared_memory(
 /// | IN | _perm_ | Memory permissions (as u32 bitflags: R=1, W=2, X=4, DONT_CARE=1<<28). |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateTransferMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid, aligned pointer to writable memory for the output handle
+/// - `addr` points to a valid, page-aligned memory range owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_transfer_memory(
     handle: *mut Handle,
@@ -959,6 +1066,10 @@ pub unsafe extern "C" fn create_transfer_memory(
 /// | IN | _handle_ | Handle to close. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CloseHandle>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn close_handle(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -983,6 +1094,10 @@ pub unsafe extern "C" fn close_handle(handle: Handle) -> ResultCode {
 /// | IN | _handle_ | Handle of the signal to reset. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ResetSignal>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel synchronization handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn reset_signal(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -1014,6 +1129,13 @@ pub unsafe extern "C" fn reset_signal(handle: Handle) -> ResultCode {
 /// | IN | _timeout_ | Timeout in nanoseconds. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WaitSynchronization>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `index` is a valid, aligned pointer to writable memory for the result index
+/// - `handles` points to a valid array of `handle_count` kernel handles owned by the current process
+/// - All handles in the array are valid and not pseudo-handles
 #[unsafe(naked)]
 pub unsafe extern "C" fn wait_synchronization(
     index: *mut i32,
@@ -1048,6 +1170,10 @@ pub unsafe extern "C" fn wait_synchronization(
 /// | IN | _handle_ | Handle to the thread to wait for. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CancelSynchronization>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel thread handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn cancel_synchronization(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -1070,6 +1196,12 @@ pub unsafe extern "C" fn cancel_synchronization(handle: Handle) -> ResultCode {
 /// | IN | _curr_thread_handle_ | The current thread's kernel handle. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ArbitrateLock>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - Both `owner_thread_handle` and `curr_thread_handle` are valid kernel thread handles
+/// - `mutex` points to a valid u32 value
 #[unsafe(naked)]
 pub unsafe extern "C" fn arbitrate_lock(
     owner_thread_handle: Handle,
@@ -1094,6 +1226,10 @@ pub unsafe extern "C" fn arbitrate_lock(
 /// | IN | _mutex_ | The mutex raw tag value. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ArbitrateUnlock>
+///
+/// # Safety
+///
+/// The caller must ensure that `mutex` points to a valid u32 value.
 #[unsafe(naked)]
 pub unsafe extern "C" fn arbitrate_unlock(mutex: *mut u32) -> ResultCode {
     core::arch::naked_asm!(
@@ -1117,6 +1253,10 @@ pub unsafe extern "C" fn arbitrate_unlock(mutex: *mut u32) -> ResultCode {
 /// | IN | _timeout_ns_ | Timeout in nanoseconds. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WaitProcessWideKeyAtomic>
+///
+/// # Safety
+///
+/// The caller must ensure that both `address` and `cv_key` point to valid u32 values.
 #[unsafe(naked)]
 pub unsafe extern "C" fn wait_process_wide_key_atomic(
     address: *mut u32,
@@ -1143,6 +1283,10 @@ pub unsafe extern "C" fn wait_process_wide_key_atomic(
 /// | IN | _count_ | Number of threads to wake up. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SignalProcessWideKey>
+///
+/// # Safety
+///
+/// The caller must ensure that `cv_key` points to a valid u32 value.
 #[unsafe(naked)]
 pub unsafe extern "C" fn signal_process_wide_key(cv_key: *mut u32, count: i32) {
     core::arch::naked_asm!(
@@ -1163,6 +1307,10 @@ pub unsafe extern "C" fn signal_process_wide_key(cv_key: *mut u32, count: i32) {
 /// Syscall code: [GET_SYSTEM_TICK](crate::code::GET_SYSTEM_TICK) (`0x1E`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetSystemTick>
+///
+/// # Safety
+///
+/// This function is safe to call from any context.
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_system_tick() -> u64 {
     core::arch::naked_asm!(
@@ -1188,6 +1336,12 @@ pub unsafe extern "C" fn get_system_tick() -> u64 {
 /// | IN | _name_ | Pointer to the name of the port. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ConnectToNamedPort>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `session` is a valid, aligned pointer to writable memory for the output handle
+/// - `name` points to a null-terminated C string that is valid and readable
 #[unsafe(naked)]
 pub unsafe extern "C" fn connect_to_named_port(
     session: *mut Handle,
@@ -1214,6 +1368,10 @@ pub unsafe extern "C" fn connect_to_named_port(
 /// | IN | _session_ | Session handle. |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendSyncRequestLight>
+///
+/// # Safety
+///
+/// The caller must ensure that `session` is a valid kernel session handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn send_sync_request_light(session: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -1234,6 +1392,10 @@ pub unsafe extern "C" fn send_sync_request_light(session: Handle) -> ResultCode 
 /// | IN | _session_ | Session handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendSyncRequest>
+///
+/// # Safety
+///
+/// The caller must ensure that `session` is a valid kernel session handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn send_sync_request(session: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -1256,6 +1418,12 @@ pub unsafe extern "C" fn send_sync_request(session: Handle) -> ResultCode {
 /// | IN | _session_ | Session handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendSyncRequestWithUserBuffer>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `usr_buffer` points to valid memory owned by the current process
+/// - `session` is a valid kernel session handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn send_sync_request_with_user_buffer(
     usr_buffer: *mut c_void,
@@ -1284,6 +1452,13 @@ pub unsafe extern "C" fn send_sync_request_with_user_buffer(
 /// | IN | _session_ | Session handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SendAsyncRequestWithUserBuffer>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid, aligned pointer to writable memory for the output handle
+/// - `usr_buffer` points to valid memory owned by the current process
+/// - `session` is a valid kernel session handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn send_async_request_with_user_buffer(
     handle: *mut Handle,
@@ -1317,6 +1492,12 @@ pub unsafe extern "C" fn send_async_request_with_user_buffer(
 /// | IN | _handle_ | Handle of the process to get the PID from |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetProcessId>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `process_id` is a valid, aligned pointer to writable memory where the ID will be stored
+/// - `handle` is a valid kernel process handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_process_id(process_id: *mut u64, handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -1341,6 +1522,12 @@ pub unsafe extern "C" fn get_process_id(process_id: *mut u64, handle: Handle) ->
 /// | IN | _handle_ | Handle of the thread to get the TID from |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadId>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `thread_id` is a valid, aligned pointer to writable memory where the ID will be stored
+/// - `handle` is a valid kernel thread handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_thread_id(thread_id: *mut u64, handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -1370,6 +1557,10 @@ pub unsafe extern "C" fn get_thread_id(thread_id: *mut u64, handle: Handle) -> R
 /// | IN | _size_ | Size of the buffer to pass to the debugger |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#Break>
+///
+/// # Safety
+///
+/// If debugging is active, `address` should point to valid readable memory for the debugger.
 #[unsafe(naked)]
 pub unsafe extern "C" fn r#break(reason: BreakReason, address: usize, size: usize) -> ResultCode {
     core::arch::naked_asm!(
@@ -1395,6 +1586,10 @@ pub unsafe extern "C" fn r#break(reason: BreakReason, address: usize, size: usiz
 /// | IN | _size_ | Size of the text in bytes |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#OutputDebugString>
+///
+/// # Safety
+///
+/// The caller must ensure that `dbg_str` points to readable memory of at least `size` bytes.
 #[unsafe(naked)]
 pub unsafe extern "C" fn output_debug_string(dbg_str: *const c_char, size: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -1419,6 +1614,10 @@ pub unsafe extern "C" fn output_debug_string(dbg_str: *const c_char, size: u64) 
 /// | IN | _res_ | Result code |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReturnFromException>
+///
+/// # Safety
+///
+/// This function never returns. It must only be called from an exception handler.
 #[unsafe(naked)]
 pub unsafe extern "C" fn return_from_exception(res: ResultCode) -> ! {
     core::arch::naked_asm!(
@@ -1477,6 +1676,12 @@ pub enum InfoTypeId0 {
 /// | IN | _id1_ | Second ID of the property to retrieve |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetInfo>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out` is a valid, aligned pointer to writable memory where the result will be stored
+/// - `handle` is a valid kernel handle (if not INVALID_HANDLE)
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_info(out: *mut u64, id0: u32, handle: Handle, id1: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -1503,6 +1708,11 @@ pub unsafe extern "C" fn get_info(out: *mut u64, id0: u32, handle: Handle, id1: 
 /// Syscall code: [FLUSH_ENTIRE_DATA_CACHE](crate::code::FLUSH_ENTIRE_DATA_CACHE) (`0x2A`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#FlushEntireDataCache>
+///
+/// # Safety
+///
+/// This is a privileged syscall that flushes the entire data cache. It may not be available
+/// on all processes. This is a dangerous operation that can affect system performance.
 #[unsafe(naked)]
 pub unsafe extern "C" fn flush_entire_data_cache() {
     core::arch::naked_asm!(
@@ -1523,6 +1733,10 @@ pub unsafe extern "C" fn flush_entire_data_cache() {
 /// | IN | _size_ | Size of region to flush |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#FlushDataCache>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid memory range owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn flush_data_cache(address: *mut c_void, size: usize) -> ResultCode {
     core::arch::naked_asm!(
@@ -1547,6 +1761,11 @@ pub unsafe extern "C" fn flush_data_cache(address: *mut c_void, size: usize) -> 
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapPhysicalMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid, page-aligned memory range
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -1567,6 +1786,11 @@ pub unsafe extern "C" fn map_physical_memory(address: *mut c_void, size: u64) ->
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapPhysicalMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid, page-aligned memory range
+/// that was previously mapped with [`map_physical_memory`].
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_physical_memory(address: *mut c_void, size: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -1597,6 +1821,12 @@ pub unsafe extern "C" fn unmap_physical_memory(address: *mut c_void, size: u64) 
 /// | IN | _ns_ | Nanoseconds in the future to get scheduled thread at.
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugFutureThreadInfo>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - Both `context` and `thread_id` are valid, aligned pointers to writable memory
+/// - `debug` is a valid debug handle
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_debug_future_thread_info(
     context: *mut LastThreadContext,
@@ -1628,6 +1858,11 @@ pub unsafe extern "C" fn get_debug_future_thread_info(
 /// | OUT | _flags_ | Output flags for the previously scheduled thread |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetLastThreadInfo>
+///
+/// # Safety
+///
+/// The caller must ensure that `context`, `tls_address`, and `flags` are all valid,
+/// aligned pointers to writable memory.
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_last_thread_info(
     context: *mut LastThreadContext,
@@ -1665,6 +1900,12 @@ pub unsafe extern "C" fn get_last_thread_info(
 /// | IN | _which_ | Resource to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetResourceLimitLimitValue>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `value` is a valid, aligned pointer to writable memory
+/// - `handle` is a valid resource limit handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_resource_limit_limit_value(
     value: *mut i64,
@@ -1693,6 +1934,12 @@ pub unsafe extern "C" fn get_resource_limit_limit_value(
 /// | IN | _which_ | Resource to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetResourceLimitCurrentValue>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out` is a valid, aligned pointer to writable memory
+/// - `reslimit` is a valid resource limit handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_resource_limit_current_value(
     out: *mut i64,
@@ -1724,6 +1971,10 @@ pub unsafe extern "C" fn get_resource_limit_current_value(
 /// | IN | _paused_ | Whether to pause or unpause the thread |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetThreadActivity>
+///
+/// # Safety
+///
+/// The caller must ensure that `thread` is a valid kernel thread handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_thread_activity(thread: Handle, paused: ThreadActivity) -> ResultCode {
     core::arch::naked_asm!(
@@ -1744,6 +1995,12 @@ pub unsafe extern "C" fn set_thread_activity(thread: Handle, paused: ThreadActiv
 /// | IN | _thread_ | Thread handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadContext3>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `ctx` is a valid, aligned pointer to writable memory for the thread context
+/// - `thread` is a valid kernel thread handle in a paused state
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_thread_context3(
     ctx: *mut ThreadContext,
@@ -1773,6 +2030,11 @@ pub unsafe extern "C" fn get_thread_context3(
 /// | IN | _timeout_ | Maximum time in nanoseconds to wait |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WaitForAddress>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid value within the process's
+/// address space.
 #[unsafe(naked)]
 pub unsafe extern "C" fn wait_for_address(
     address: *mut c_void,
@@ -1800,6 +2062,11 @@ pub unsafe extern "C" fn wait_for_address(
 /// | IN | _count_ | Number of waiting threads to signal |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SignalToAddress>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid value within the process's
+/// address space.
 #[unsafe(naked)]
 pub unsafe extern "C" fn signal_to_address(
     address: *mut c_void,
@@ -1824,6 +2091,10 @@ pub unsafe extern "C" fn signal_to_address(
 /// Syscall code: [SYNCHRONIZE_PREEMPTION_STATE](crate::code::SYNCHRONIZE_PREEMPTION_STATE) (`0x36`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SynchronizePreemptionState>
+///
+/// # Safety
+///
+/// This function is safe to call from any context.
 #[unsafe(naked)]
 pub unsafe extern "C" fn synchronize_preemption_state() {
     core::arch::naked_asm!(
@@ -1849,6 +2120,12 @@ pub unsafe extern "C" fn synchronize_preemption_state() {
 /// | IN | _which_ | Resource to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetResourceLimitPeakValue>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out` is a valid, aligned pointer to writable memory
+/// - `reslimit` is a valid resource limit handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_resource_limit_peak_value(
     out: *mut i64,
@@ -1884,6 +2161,11 @@ pub unsafe extern "C" fn get_resource_limit_peak_value(
 /// | IN | _which_ | [IoPoolType] to create |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x39,CreateIoPool>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid, aligned pointer to writable memory
+/// for the output handle.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_io_pool(handle: *mut Handle, which: IoPoolType) -> ResultCode {
     core::arch::naked_asm!(
@@ -1915,6 +2197,12 @@ pub unsafe extern "C" fn create_io_pool(handle: *mut Handle, which: IoPoolType) 
 /// | IN | _perm_ | [MemoryPermission] configuration |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x3A,CreateIoRegion>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid, aligned pointer to writable memory for the output handle
+/// - `io_pool_h` is a valid IO pool handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_io_region(
     handle: *mut Handle,
@@ -1949,6 +2237,10 @@ pub unsafe extern "C" fn create_io_region(
 /// | IN | _arg0_ | Additional argument |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#DumpInfo>
+///
+/// # Safety
+///
+/// This function is safe to call, though it may not be available on all processes.
 #[unsafe(naked)]
 pub unsafe extern "C" fn dump_info(dump_info_type: u32, arg0: u64) {
     core::arch::naked_asm!(
@@ -1971,6 +2263,10 @@ pub unsafe extern "C" fn dump_info(dump_info_type: u32, arg0: u64) {
 /// | IN | _arg2_ | Third additional argument |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#KernelDebug>
+///
+/// # Safety
+///
+/// This function is safe to call, though it may not be available on all processes.
 #[unsafe(naked)]
 pub unsafe extern "C" fn kernel_debug(kern_debug_type: u32, arg0: u64, arg1: u64, arg2: u64) {
     core::arch::naked_asm!(
@@ -1990,6 +2286,10 @@ pub unsafe extern "C" fn kernel_debug(kern_debug_type: u32, arg0: u64, arg1: u64
 /// | IN | _kern_trace_state_ | New kernel trace state |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ChangeKernelTraceState>
+///
+/// # Safety
+///
+/// This function is safe to call, though it may not be available on all processes.
 #[unsafe(naked)]
 pub unsafe extern "C" fn change_kernel_trace_state(kern_trace_state: u32) {
     core::arch::naked_asm!(
@@ -2016,6 +2316,11 @@ pub unsafe extern "C" fn change_kernel_trace_state(kern_trace_state: u32) {
 /// | IN | _unk1_ | Unknown parameter |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateSession>
+///
+/// # Safety
+///
+/// The caller must ensure that both `server_handle` and `client_handle` are valid,
+/// aligned pointers to writable memory for the output handles.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_session(
     server_handle: *mut Handle,
@@ -2045,6 +2350,12 @@ pub unsafe extern "C" fn create_session(
 /// | IN | _port_handle_ | Handle to the port to accept from |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#AcceptSession>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `session` is a valid, aligned pointer to writable memory for the output handle
+/// - `port_handle` is a valid port handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn accept_session(session: *mut Handle, port_handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -2067,6 +2378,10 @@ pub unsafe extern "C" fn accept_session(session: *mut Handle, port_handle: Handl
 /// | IN | _handle_ | Handle to perform IPC on |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReplyAndReceiveLight>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid kernel session handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn reply_and_receive_light(handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -2104,6 +2419,13 @@ pub unsafe extern "C" fn reply_and_receive_light(handle: Handle) -> ResultCode {
 /// | IN | _timeout_ | Timeout in nanoseconds |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReplyAndReceive>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `index` is a valid, aligned pointer to writable memory for the result index
+/// - `handles` points to a valid array of `handle_count` kernel handles
+/// - All handles are valid session handles owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn reply_and_receive(
     index: *mut i32,
@@ -2138,6 +2460,14 @@ pub unsafe extern "C" fn reply_and_receive(
 /// | IN | _timeout_ | Timeout in nanoseconds |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReplyAndReceiveWithUserBuffer>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `index` is a valid, aligned pointer to writable memory for the result index
+/// - `usr_buffer` points to valid memory owned by the current process
+/// - `handles` points to a valid array of `handle_count` kernel handles
+/// - All handles are valid session handles owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn reply_and_receive_with_user_buffer(
     index: *mut i32,
@@ -2173,6 +2503,11 @@ pub unsafe extern "C" fn reply_and_receive_with_user_buffer(
 /// | OUT | _client_handle_ | Output handle for client |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateEvent>
+///
+/// # Safety
+///
+/// The caller must ensure that both `server_handle` and `client_handle` are valid,
+/// aligned pointers to writable memory for the output handles.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_event(
     server_handle: *mut Handle,
@@ -2206,6 +2541,12 @@ pub unsafe extern "C" fn create_event(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x46,MapIoRegion>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `io_region_h` is a valid IO region handle owned by the current process
+/// - `address` points to a valid memory range owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_io_region(
     io_region_h: Handle,
@@ -2232,6 +2573,12 @@ pub unsafe extern "C" fn map_io_region(
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x47,UnmapIoRegion>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `io_region_h` is a valid IO region handle owned by the current process
+/// - `address` points to a memory range that was previously mapped
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_io_region(
     io_region_h: Handle,
@@ -2256,6 +2603,11 @@ pub unsafe extern "C" fn unmap_io_region(
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapPhysicalMemoryUnsafe>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a valid, page-aligned memory range
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_physical_memory_unsafe(address: *mut c_void, size: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -2276,6 +2628,11 @@ pub unsafe extern "C" fn map_physical_memory_unsafe(address: *mut c_void, size: 
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapPhysicalMemoryUnsafe>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` points to a memory range that was previously
+/// mapped with [`map_physical_memory_unsafe`].
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_physical_memory_unsafe(
     address: *mut c_void,
@@ -2298,6 +2655,10 @@ pub unsafe extern "C" fn unmap_physical_memory_unsafe(
 /// | IN | _size_ | Size limit |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetUnsafeLimit>
+///
+/// # Safety
+///
+/// This function is safe to call from any context.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_unsafe_limit(size: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -2327,6 +2688,12 @@ pub unsafe extern "C" fn set_unsafe_limit(size: u64) -> ResultCode {
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateCodeMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `handle` is a valid, aligned pointer to writable memory for the output handle
+/// - `src_addr` points to a valid memory range owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_code_memory(
     handle: *mut Handle,
@@ -2361,6 +2728,12 @@ pub unsafe extern "C" fn create_code_memory(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ControlCodeMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `code_handle` is a valid code memory handle owned by the current process
+/// - `dst_addr` points to a valid memory range owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn control_code_memory(
     code_handle: Handle,
@@ -2390,6 +2763,11 @@ pub unsafe extern "C" fn control_code_memory(
 /// Syscall code: [SLEEP_SYSTEM](crate::code::SLEEP_SYSTEM) (`0x4D`).
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SleepSystem>
+///
+/// # Safety
+///
+/// This is a privileged syscall. The function is safe to call if it's available, but it may
+/// terminate execution immediately.
 #[unsafe(naked)]
 pub unsafe extern "C" fn sleep_system() {
     core::arch::naked_asm!(
@@ -2420,6 +2798,11 @@ pub unsafe extern "C" fn sleep_system() {
 /// | IN | _value_ | Input value to write |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReadWriteRegister>
+///
+/// # Safety
+///
+/// The caller must ensure that `out_val` is a valid, aligned pointer to writable memory
+/// for the register value result.
 #[unsafe(naked)]
 pub unsafe extern "C" fn read_write_register(
     out_val: *mut u32,
@@ -2452,6 +2835,10 @@ pub unsafe extern "C" fn read_write_register(
 /// | IN | _paused_ | Whether to pause (1) or unpause (0) the process |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetProcessActivity>
+///
+/// # Safety
+///
+/// The caller must ensure that `process` is a valid kernel process handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_process_activity(
     process: Handle,
@@ -2481,6 +2868,11 @@ pub unsafe extern "C" fn set_process_activity(
 /// | IN | _other_perm_ | [MemoryPermission] for other processes |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateSharedMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid, aligned pointer to writable memory
+/// for the output handle.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_shared_memory(
     handle: *mut Handle,
@@ -2511,6 +2903,12 @@ pub unsafe extern "C" fn create_shared_memory(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapTransferMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `tmem_handle` is a valid transfer memory handle owned by the current process
+/// - `addr` points to a valid memory range owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_transfer_memory(
     tmem_handle: Handle,
@@ -2537,6 +2935,12 @@ pub unsafe extern "C" fn map_transfer_memory(
 /// | IN | _size_ | Size of the transfer memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapTransferMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `tmem_handle` is a valid transfer memory handle owned by the current process
+/// - `addr` points to a memory range that was previously mapped
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_transfer_memory(
     tmem_handle: Handle,
@@ -2566,6 +2970,11 @@ pub unsafe extern "C" fn unmap_transfer_memory(
 /// | IN | _flag_ | Flags for the event |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateInterruptEvent>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid, aligned pointer to writable memory
+/// for the output handle.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_interrupt_event(
     handle: *mut Handle,
@@ -2593,6 +3002,11 @@ pub unsafe extern "C" fn create_interrupt_event(
 /// | IN | _virtaddr_ | Virtual address to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryPhysicalAddress>
+///
+/// # Safety
+///
+/// The caller must ensure that `out` is a valid, aligned pointer to writable memory
+/// for the physical memory information result.
 #[unsafe(naked)]
 pub unsafe extern "C" fn query_physical_address(
     out: *mut PhysicalMemoryInfo,
@@ -2622,6 +3036,11 @@ pub unsafe extern "C" fn query_physical_address(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=%5B10.0.0%2B%5D-,0x55,QueryMemoryMapping,-uintptr_t%20*out_address%2C%20size_t>
+///
+/// # Safety
+///
+/// The caller must ensure that both `virtaddr` and `out_size` are valid, aligned pointers
+/// to writable memory for the results.
 #[unsafe(naked)]
 pub unsafe extern "C" fn query_memory_mapping(
     virtaddr: *mut u64,
@@ -2652,6 +3071,11 @@ pub unsafe extern "C" fn query_memory_mapping(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryIoMapping>
+///
+/// # Safety
+///
+/// The caller must ensure that `virtaddr` is a valid, aligned pointer to writable memory
+/// for the virtual address result.
 #[unsafe(naked)]
 pub unsafe extern "C" fn legacy_query_io_mapping(
     virtaddr: *mut u64,
@@ -2684,6 +3108,11 @@ pub unsafe extern "C" fn legacy_query_io_mapping(
 /// | IN | _dev_size_ | Size of the device address space |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateDeviceAddressSpace>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid, aligned pointer to writable memory
+/// for the output handle.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_device_address_space(
     handle: *mut Handle,
@@ -2711,6 +3140,11 @@ pub unsafe extern "C" fn create_device_address_space(
 /// | IN | _handle_ | Handle to the device address space |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#AttachDeviceAddressSpace>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid device address space handle
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn attach_device_address_space(device: u64, handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -2731,6 +3165,11 @@ pub unsafe extern "C" fn attach_device_address_space(device: u64, handle: Handle
 /// | IN | _handle_ | Handle to the device address space |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#DetachDeviceAddressSpace>
+///
+/// # Safety
+///
+/// The caller must ensure that `handle` is a valid device address space handle
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn detach_device_address_space(device: u64, handle: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -2755,6 +3194,11 @@ pub unsafe extern "C" fn detach_device_address_space(device: u64, handle: Handle
 /// | IN | _option_ | Mapping options |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapDeviceAddressSpaceByForce>
+///
+/// # Safety
+///
+/// The caller must ensure that both `handle` and `proc_handle` are valid kernel handles
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_device_address_space_by_force(
     handle: Handle,
@@ -2786,6 +3230,11 @@ pub unsafe extern "C" fn map_device_address_space_by_force(
 /// | IN | _option_ | Mapping options |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapDeviceAddressSpaceAligned>
+///
+/// # Safety
+///
+/// The caller must ensure that both `handle` and `proc_handle` are valid kernel handles
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_device_address_space_aligned(
     handle: Handle,
@@ -2818,6 +3267,12 @@ pub unsafe extern "C" fn map_device_address_space_aligned(
 /// | IN | _perm_ | Memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapDeviceAddressSpace>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out_mapped_size` is a valid, aligned pointer to writable memory
+/// - Both `handle` and `proc_handle` are valid kernel handles owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_device_address_space(
     out_mapped_size: *mut u64,
@@ -2852,6 +3307,11 @@ pub unsafe extern "C" fn map_device_address_space(
 /// | IN | _dev_addr_ | Device address |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapDeviceAddressSpace>
+///
+/// # Safety
+///
+/// The caller must ensure that both `handle` and `proc_handle` are valid kernel handles
+/// owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_device_address_space(
     handle: Handle,
@@ -2883,6 +3343,12 @@ pub unsafe extern "C" fn unmap_device_address_space(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#InvalidateProcessDataCache>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `process` is a valid kernel process handle owned by the current process
+/// - `address` points to a valid memory range in the target process
 #[unsafe(naked)]
 pub unsafe extern "C" fn invalidate_process_data_cache(
     process: Handle,
@@ -2908,6 +3374,12 @@ pub unsafe extern "C" fn invalidate_process_data_cache(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#StoreProcessDataCache>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `process` is a valid kernel process handle owned by the current process
+/// - `address` points to a valid memory range in the target process
 #[unsafe(naked)]
 pub unsafe extern "C" fn store_process_data_cache(
     process: Handle,
@@ -2933,6 +3405,12 @@ pub unsafe extern "C" fn store_process_data_cache(
 /// | IN | _size_ | Size of the region |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#FlushProcessDataCache>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `process` is a valid kernel process handle owned by the current process
+/// - `address` points to a valid memory range in the target process
 #[unsafe(naked)]
 pub unsafe extern "C" fn flush_process_data_cache(
     process: Handle,
@@ -2961,6 +3439,11 @@ pub unsafe extern "C" fn flush_process_data_cache(
 /// | IN | _process_id_ | Process ID to debug |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#DebugActiveProcess>
+///
+/// # Safety
+///
+/// The caller must ensure that `debug` is a valid, aligned pointer to writable memory
+/// for the output debug handle.
 #[unsafe(naked)]
 pub unsafe extern "C" fn debug_active_process(debug: *mut Handle, process_id: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -2983,6 +3466,10 @@ pub unsafe extern "C" fn debug_active_process(debug: *mut Handle, process_id: u6
 /// | IN | _debug_ | Debug handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#BreakDebugProcess>
+///
+/// # Safety
+///
+/// The caller must ensure that `debug` is a valid debug handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn break_debug_process(debug: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -3002,6 +3489,10 @@ pub unsafe extern "C" fn break_debug_process(debug: Handle) -> ResultCode {
 /// | IN | _debug_ | Debug handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#TerminateDebugProcess>
+///
+/// # Safety
+///
+/// The caller must ensure that `debug` is a valid debug handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn terminate_debug_process(debug: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -3022,6 +3513,12 @@ pub unsafe extern "C" fn terminate_debug_process(debug: Handle) -> ResultCode {
 /// | IN | _debug_ | Debug handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugEvent>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `event` is a valid, aligned pointer to writable memory for the event result
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_debug_event(event: *mut c_void, debug: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -3047,6 +3544,12 @@ pub unsafe extern "C" fn get_debug_event(event: *mut c_void, debug: Handle) -> R
 /// | IN | _num_tids_ | Number of thread IDs |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ContinueDebugEvent>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `debug` is a valid debug handle owned by the current process
+/// - `tid_list` points to a valid array of `num_tids` thread IDs
 #[unsafe(naked)]
 pub unsafe extern "C" fn continue_debug_event(
     debug: Handle,
@@ -3073,6 +3576,10 @@ pub unsafe extern "C" fn continue_debug_event(
 /// | IN | _thread_id_ | Thread ID |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ContinueDebugEvent>
+///
+/// # Safety
+///
+/// The caller must ensure that `debug` is a valid debug handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn legacy_continue_debug_event(
     debug: Handle,
@@ -3108,6 +3615,12 @@ pub unsafe extern "C" fn legacy_continue_debug_event(
 /// | IN | _max_pids_count_ | Maximum number of process IDs to write |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetProcessList>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `pids_count` is a valid, aligned pointer to writable memory for the count result
+/// - `pids_list` points to a valid array of at least `max_pids_count` u64 values
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_process_list(
     pids_count: *mut i32,
@@ -3137,6 +3650,13 @@ pub unsafe extern "C" fn get_process_list(
 /// | IN | _debug_ | Debug handle, or 0 to use the current process |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetThreadList>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `num_out` is a valid, aligned pointer to writable memory for the count result
+/// - `tids_out` points to a valid array of at least `max_tids` u64 values
+/// - If `debug` is non-zero, it must be a valid debug handle
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_thread_list(
     num_out: *mut i32,
@@ -3171,6 +3691,12 @@ pub unsafe extern "C" fn get_thread_list(
 /// | IN | _flags_ | Context flags |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugThreadContext>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `ctx` is a valid, aligned pointer to writable memory for the thread context
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_debug_thread_context(
     ctx: *mut ThreadContext,
@@ -3198,6 +3724,12 @@ pub unsafe extern "C" fn get_debug_thread_context(
 /// | IN | _flags_ | Context flags |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetDebugThreadContext>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `ctx` is a valid, aligned pointer to readable memory containing the thread context
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_debug_thread_context(
     debug: Handle,
@@ -3225,6 +3757,12 @@ pub unsafe extern "C" fn set_debug_thread_context(
 /// | IN | _addr_ | Address to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryDebugProcessMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - Both `meminfo_ptr` and `pageinfo` are valid, aligned pointers to writable memory
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn query_debug_process_memory(
     meminfo_ptr: *mut MemoryInfo,
@@ -3255,6 +3793,12 @@ pub unsafe extern "C" fn query_debug_process_memory(
 /// | IN | _size_ | Size to read |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ReadDebugProcessMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `buffer` points to writable memory of at least `size` bytes
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn read_debug_process_memory(
     buffer: *mut c_void,
@@ -3282,6 +3826,12 @@ pub unsafe extern "C" fn read_debug_process_memory(
 /// | IN | _size_ | Size to write |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#WriteDebugProcessMemory>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `buffer` points to readable memory of at least `size` bytes
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn write_debug_process_memory(
     debug: Handle,
@@ -3308,6 +3858,10 @@ pub unsafe extern "C" fn write_debug_process_memory(
 /// | IN | _value_ | Breakpoint value |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetHardwareBreakPoint>
+///
+/// # Safety
+///
+/// This function is safe to call from a debugging context.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_hardware_breakpoint(which: u32, flags: u64, value: u64) -> ResultCode {
     core::arch::naked_asm!(
@@ -3331,6 +3885,12 @@ pub unsafe extern "C" fn set_hardware_breakpoint(which: u32, flags: u64, value: 
 /// | IN | _param_ | Parameter to get |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetDebugThreadParam>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - Both `out_64` and `out_32` are valid, aligned pointers to writable memory
+/// - `debug` is a valid debug handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_debug_thread_param(
     out_64: *mut u64,
@@ -3367,6 +3927,12 @@ pub unsafe extern "C" fn get_debug_thread_param(
 /// | IN | _id1_ | Second ID |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetSystemInfo>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out` is a valid, aligned pointer to writable memory for the result
+/// - If `handle` is non-zero, it must be a valid kernel handle
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_system_info(
     out: *mut u64,
@@ -3402,6 +3968,12 @@ pub unsafe extern "C" fn get_system_info(
 /// | IN | _name_ | Name of the port |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreatePort>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - Both `port_server` and `port_client` are valid, aligned pointers to writable memory
+/// - `name` points to a null-terminated C string that is valid and readable
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_port(
     port_server: *mut Handle,
@@ -3433,6 +4005,12 @@ pub unsafe extern "C" fn create_port(
 /// | IN | _max_sessions_ | Maximum number of sessions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ManageNamedPort>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `port_server` is a valid, aligned pointer to writable memory for the output handle
+/// - `name` points to a null-terminated C string that is valid and readable
 #[unsafe(naked)]
 pub unsafe extern "C" fn manage_named_port(
     port_server: *mut Handle,
@@ -3460,6 +4038,11 @@ pub unsafe extern "C" fn manage_named_port(
 /// | IN | _port_ | Port handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#ConnectToPort>
+///
+/// # Safety
+///
+/// The caller must ensure that `session` is a valid, aligned pointer to writable memory
+/// where a Handle can be stored.
 #[unsafe(naked)]
 pub unsafe extern "C" fn connect_to_port(session: *mut Handle, port: Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -3489,6 +4072,12 @@ pub unsafe extern "C" fn connect_to_port(session: *mut Handle, port: Handle) -> 
 /// | IN | _perm_ | New memory permissions |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetProcessMemoryPermission>
+///
+/// # Safety
+///
+/// The caller must ensure that `proc` is a valid kernel process handle owned by the
+/// current process, and that the memory region defined by `addr` and `size` is valid
+/// within the target process's address space.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_process_memory_permission(
     proc: Handle,
@@ -3516,6 +4105,14 @@ pub unsafe extern "C" fn set_process_memory_permission(
 /// | IN | _size_ | Size of the memory to map |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapProcessMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that:
+/// - `dst` is a valid, aligned pointer to writable memory that can hold a mapping of the
+///   specified size
+/// - `proc` is a valid kernel process handle owned by the current process
+/// - The memory region defined by `src` and `size` is valid in the target process's address space
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_process_memory(
     dst: *mut c_void,
@@ -3543,6 +4140,14 @@ pub unsafe extern "C" fn map_process_memory(
 /// | IN | _size_ | Size of the memory |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapProcessMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that:
+/// - `dst` is a valid, aligned pointer to the memory region being unmapped
+/// - `proc` is a valid kernel process handle owned by the current process
+/// - The mapping was previously established by a call to [map_process_memory] with the same
+///   `dst` and `size` parameters
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_process_memory(
     dst: *mut c_void,
@@ -3574,6 +4179,14 @@ pub unsafe extern "C" fn unmap_process_memory(
 /// | IN | _addr_ | Address to query |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#QueryProcessMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that:
+/// - `meminfo_ptr` is a valid, aligned pointer to writable memory for a MemoryInfo structure
+/// - `pageinfo` is a valid, aligned pointer to writable memory for a u32
+/// - `proc` is a valid kernel process handle owned by the current process
+/// - The address `addr` is valid to query within the target process's address space
 #[unsafe(naked)]
 pub unsafe extern "C" fn query_process_memory(
     meminfo_ptr: *mut MemoryInfo,
@@ -3608,6 +4221,14 @@ pub unsafe extern "C" fn query_process_memory(
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#MapProcessCodeMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that:
+/// - `proc` is a valid kernel process handle owned by the current process (cannot be CUR_PROCESS_HANDLE)
+/// - `dst` and `src` are valid addresses within the target process's address space
+/// - The memory region defined by `src` and `size` is valid and readable in the target process
+/// - The destination region is valid and writable in the target process
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_process_code_memory(
     proc: Handle,
@@ -3639,6 +4260,14 @@ pub unsafe extern "C" fn map_process_code_memory(
 /// | IN | _size_ | Size of the mapping |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#UnmapProcessCodeMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that:
+/// - `proc` is a valid kernel process handle owned by the current process (cannot be CUR_PROCESS_HANDLE)
+/// - `dst` and `src` are valid addresses within the target process's address space
+/// - The mapping was previously established by a call to [map_process_code_memory] with the same
+///   process, addresses, and size
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_process_code_memory(
     proc: Handle,
@@ -3674,6 +4303,13 @@ pub unsafe extern "C" fn unmap_process_code_memory(
 /// | IN | _cap_num_ | Number of kernel capabilities |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateProcess>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out` is a valid, aligned pointer to writable memory for the output handle
+/// - `proc_info` points to valid process information structure
+/// - `caps` points to a valid array of `cap_num` capability descriptors
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_process(
     out: *mut Handle,
@@ -3706,6 +4342,10 @@ pub unsafe extern "C" fn create_process(
 /// | IN | _stack_size_ | Stack size for the main thread |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#StartProcess>
+///
+/// # Safety
+///
+/// The caller must ensure that `proc` is a valid kernel process handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn start_process(
     proc: Handle,
@@ -3735,6 +4375,9 @@ pub unsafe extern "C" fn start_process(
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#TerminateProcess>
 #[unsafe(naked)]
+/// # Safety
+///
+/// The caller must ensure that `proc` is a valid kernel process handle owned by the current process.
 pub unsafe extern "C" fn terminate_process(proc: Handle) -> ResultCode {
     core::arch::naked_asm!(
         "svc 0x7B", // Issue the SVC call with immediate value 0x7B
@@ -3759,6 +4402,12 @@ pub unsafe extern "C" fn terminate_process(proc: Handle) -> ResultCode {
 /// | IN | _which_ | Type of information to retrieve |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#GetProcessInfo>
+///
+/// # Safety
+///
+/// The caller must ensure:
+/// - `out` is a valid, aligned pointer to writable memory for the process info result
+/// - `proc` is a valid kernel process handle owned by the current process
 #[unsafe(naked)]
 pub unsafe extern "C" fn get_process_info(
     out: *mut i64,
@@ -3789,6 +4438,11 @@ pub unsafe extern "C" fn get_process_info(
 /// | OUT | _out_ | Output resource limit handle |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CreateResourceLimit>
+///
+/// # Safety
+///
+/// The caller must ensure that `out` is a valid, aligned pointer to writable memory
+/// for the output handle.
 #[unsafe(naked)]
 pub unsafe extern "C" fn create_resource_limit(out: *mut Handle) -> ResultCode {
     core::arch::naked_asm!(
@@ -3813,6 +4467,10 @@ pub unsafe extern "C" fn create_resource_limit(out: *mut Handle) -> ResultCode {
 /// | IN | _value_ | Value to set |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#SetResourceLimitLimitValue>
+///
+/// # Safety
+///
+/// The caller must ensure that `reslimit` is a valid resource limit handle owned by the current process.
 #[unsafe(naked)]
 pub unsafe extern "C" fn set_resource_limit_limit_value(
     reslimit: Handle,
@@ -3844,6 +4502,11 @@ pub unsafe extern "C" fn set_resource_limit_limit_value(
 /// | IN | _regs_ | Arguments to pass to the secure monitor |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#CallSecureMonitor>
+///
+/// # Safety
+///
+/// The caller must ensure that `regs` is a valid, aligned pointer to a SecmonArgs structure
+/// that will be read from and written to by the secure monitor.
 #[unsafe(naked)]
 pub unsafe extern "C" fn call_secure_monitor(regs: *mut SecmonArgs) {
     core::arch::naked_asm!(
@@ -3882,6 +4545,11 @@ pub unsafe extern "C" fn call_secure_monitor(regs: *mut SecmonArgs) {
 /// | IN | _size_ | Size of memory to map |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x90,MapInsecurePhysicalMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` is a valid, aligned pointer to writable memory
+/// that can hold the mapped physical memory region of the specified size.
 #[unsafe(naked)]
 pub unsafe extern "C" fn map_insecure_physical_memory(
     address: *mut c_void,
@@ -3905,6 +4573,11 @@ pub unsafe extern "C" fn map_insecure_physical_memory(
 /// | IN | _size_ | Size of memory to unmap |
 ///
 /// Ref: <https://switchbrew.org/wiki/SVC#:~:text=0x91,UnmapInsecurePhysicalMemory>
+///
+/// # Safety
+///
+/// The caller must ensure that `address` is a valid, aligned pointer that was previously
+/// mapped by a call to [map_insecure_physical_memory] with the same size parameter.
 #[unsafe(naked)]
 pub unsafe extern "C" fn unmap_insecure_physical_memory(
     address: *mut c_void,
