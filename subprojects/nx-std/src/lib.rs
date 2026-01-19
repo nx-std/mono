@@ -33,6 +33,10 @@ pub mod rt {
 
 #[cfg(feature = "services")]
 pub mod services {
+    #[cfg(feature = "service-apm")]
+    pub mod apm {
+        pub use nx_service_apm::*;
+    }
     #[cfg(feature = "service-set")]
     pub mod set {
         pub use nx_service_set::*;

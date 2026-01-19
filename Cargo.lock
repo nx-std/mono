@@ -208,6 +208,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-apm"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-set"
 version = "0.1.0"
 dependencies = [
@@ -251,6 +263,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-rand",
  "nx-rt",
+ "nx-service-apm",
  "nx-service-set",
  "nx-service-sm",
  "nx-sf",

@@ -133,6 +133,16 @@ if get_option('use_nx_sf').enabled()
     deps_cargo_features += ['sf']
 endif
 
+# nx-service-apm
+if get_option('use_nx_service_apm').enabled()
+    nx_service_apm_proj = subproject('nx-service-apm')
+
+    deps += nx_service_apm_proj.get_variable('nx_service_apm_dep')
+
+    debug('service-apm feature: enabled')
+    deps_cargo_features += ['service-apm']
+endif
+
 # nx-service-set
 if get_option('use_nx_service_set').enabled()
     nx_service_set_proj = subproject('nx-service-set')

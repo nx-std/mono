@@ -1,0 +1,25 @@
+[package]
+name = "nx-service-apm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_service_apm"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+thiserror = { version = "2", default-features = false }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
