@@ -90,6 +90,13 @@ option(
 )
 
 option(
+    'use_nx_service_applet',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-applet` feature',
+    yield : true
+)
+
+option(
     'use_nx_service_set',
     type : 'feature', value : 'auto',
     description : 'Enable the `service-set` feature',

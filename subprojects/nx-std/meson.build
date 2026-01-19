@@ -143,6 +143,16 @@ if get_option('use_nx_service_apm').enabled()
     deps_cargo_features += ['service-apm']
 endif
 
+# nx-service-applet
+if get_option('use_nx_service_applet').enabled()
+    nx_service_applet_proj = subproject('nx-service-applet')
+
+    deps += nx_service_applet_proj.get_variable('nx_service_applet_dep')
+
+    debug('service-applet feature: enabled')
+    deps_cargo_features += ['service-applet']
+endif
+
 # nx-service-set
 if get_option('use_nx_service_set').enabled()
     nx_service_set_proj = subproject('nx-service-set')

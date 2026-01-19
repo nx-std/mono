@@ -37,6 +37,10 @@ pub mod services {
     pub mod apm {
         pub use nx_service_apm::*;
     }
+    #[cfg(feature = "service-applet")]
+    pub mod applet {
+        pub use nx_service_applet::*;
+    }
     #[cfg(feature = "service-set")]
     pub mod set {
         pub use nx_service_set::*;

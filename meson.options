@@ -105,6 +105,13 @@ option(
 )
 
 option(
+    'use_nx_service_applet',
+    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    description : 'Enable nx-service-applet (Applet Manager service)',
+    yield : true
+)
+
+option(
     'use_nx_service_set',
     type : 'feature', value : 'auto',
     description : 'Enable nx-service-set (System Settings service)',
