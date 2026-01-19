@@ -1,3 +1,5 @@
+#![expect(dead_code)]
+
 use zerocopy::FromBytes;
 
 use crate::raw::mod0::{MOD0_MAGIC, Mod0Header};
