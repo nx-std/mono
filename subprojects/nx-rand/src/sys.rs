@@ -116,16 +116,19 @@ fn get_rng() -> &'static mut ChaCha20Rng {
 /// This function will panic if it fails to obtain entropy from the system TRNG.
 fn init_rng() {
     let mut seed = [0u64; 4];
-    for i in 0..4 {
+    for (i, item) in seed.iter_mut().enumerate() {
         // Get process TRNG seeds from kernel using the new helper
         match nx_svc::misc::get_random_entropy(i as u64) {
-            Ok(val) => seed[i] = val,
+            Ok(val) => *item = val,
             Err(err) => panic!("Failed to get random entropy: {}", err),
         }
     }
 
     unsafe {
-        RNG.write(ChaCha20Rng::from_seed(core::mem::transmute(seed)));
+        RNG.write(ChaCha20Rng::from_seed(core::mem::transmute::<
+            [u64; 4],
+            [u8; 32],
+        >(seed)));
     }
 }
 
