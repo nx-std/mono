@@ -21,7 +21,7 @@
 //! declared in `nx_tmem.h` and the high-level Rust API below.
 
 use alloc::alloc::{Layout, alloc_zeroed, dealloc};
-use core::{ffi::c_void, ptr, ptr::NonNull};
+use core::{ffi::c_void, ptr::NonNull};
 
 use nx_svc::{
     mem::{
@@ -300,7 +300,7 @@ pub unsafe fn wait_for_permission(
     // If we don't own the memory (`src == None`) we cannot wait because we have no
     // address to poll; in that (unlikely) scenario we just return success as
     // libnx would crash anyway with an invalid address.
-    let src_addr = tm.0.src().map(|nn| nn.as_ptr()).unwrap_or(ptr::null_mut());
+    let src_addr = tm.0.src().map(|nn| nn.as_ptr()).unwrap_or_default();
 
     loop {
         match memcore::query_memory(src_addr as usize) {

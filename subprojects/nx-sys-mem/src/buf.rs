@@ -172,7 +172,7 @@ impl Buf for Buffer {
 ///
 /// This allows borrowed references to be used wherever the [`Buf`] trait
 /// is required.
-impl<'a> Buf for &'a Buffer {
+impl Buf for &Buffer {
     fn ptr(&self) -> NonNull<c_void> {
         self.ptr
     }
