@@ -47,6 +47,12 @@ impl Heap {
     }
 
     /// Allocate memory from the heap.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the size and alignment parameters form a valid layout
+    /// (alignment must be a power of two, and size when rounded up to the nearest multiple
+    /// of alignment must not overflow).
     pub unsafe fn malloc(&mut self, size: usize, align: usize) -> *mut u8 {
         // Check if the layout is valid
         let Ok(layout) = Layout::from_size_align(size, align) else {
@@ -61,6 +67,13 @@ impl Heap {
     }
 
     /// Free memory to the heap.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    /// - `ptr` was previously allocated by this allocator with the same size and alignment
+    /// - `ptr` has not been freed already
+    /// - The memory region is no longer in use
     pub unsafe fn free(&mut self, ptr: *mut u8, size: usize, align: usize) {
         let Some(ptr) = ptr::NonNull::new(ptr) else {
             return;
@@ -103,5 +116,5 @@ fn init_inner_heap() -> linked_list_allocator::Heap {
     };
 
     // SAFETY: The kernel guarantees this region is valid and owned by us.
-    unsafe { linked_list_allocator::Heap::new(heap_bottom as *mut u8, heap_size) }
+    unsafe { linked_list_allocator::Heap::new(heap_bottom, heap_size) }
 }
