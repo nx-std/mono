@@ -126,6 +126,8 @@
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/hipc.h` (fincs, SciresM)
 
+#![allow(unused_parens)]
+
 use core::{mem::size_of, ptr::NonNull};
 
 use modular_bitfield::prelude::*;
