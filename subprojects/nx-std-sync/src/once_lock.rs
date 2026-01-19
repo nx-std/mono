@@ -161,7 +161,7 @@ impl<T> OnceLock<T> {
             //          would be invalidated, so callers must uphold that
             //          guarantee themselves.
             self.once = Once::new();
-            Some(unsafe { (&mut *self.value.get()).assume_init_read() })
+            Some(unsafe { (&*self.value.get()).assume_init_read() })
         } else {
             None
         }
