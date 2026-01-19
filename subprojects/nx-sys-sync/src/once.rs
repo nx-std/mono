@@ -76,7 +76,15 @@ impl Once {
             cvar: Condvar::new(),
         }
     }
+}
 
+impl Default for Once {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Once {
     /// Returns `true` if the initialization has already run to completion.
     #[inline]
     pub fn is_completed(&self) -> bool {
