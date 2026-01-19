@@ -12,6 +12,7 @@ extern crate nx_panic_handler; // Provides #[panic_handler]
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
+pub mod apm_manager;
 pub mod argv;
 pub mod env;
 pub mod init;
