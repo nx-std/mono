@@ -2,7 +2,7 @@
 
 use crate::{
     error::{KernelError as KError, ResultCode, ToRawResultCode},
-    handle::Waitable,
+    handle::{Reset, Waitable},
     raw::{self, Handle},
     result::{Error, Result, raw::Result as RawResult},
 };
@@ -13,6 +13,27 @@ use crate::{
 /// The mutex raw tag value is expected to be `owner_thread_handle | HANDLE_WAIT_MASK` when threads
 /// are waiting.
 pub const HANDLE_WAIT_MASK: u32 = 0x40000000;
+
+define_reset_handle_type! {
+    /// A handle to a kernel event object (KReadableEvent).
+    ///
+    /// This represents a waitable event handle obtained from services via copy handles.
+    /// Events are signaled by the system when specific conditions occur, and can be
+    /// waited on using `wait_synchronization_single` or `wait_synchronization_multiple`.
+    ///
+    /// # Distinction from SessionHandle
+    ///
+    /// `EventHandle` is distinct from `SessionHandle` (IPC sessions):
+    /// - `EventHandle`: Kernel event objects (KReadableEvent) for notification
+    /// - `SessionHandle`: IPC communication channels (IPC sessions)
+    ///
+    /// # Reset Behavior
+    ///
+    /// Events obtained from services typically have `autoclear=false`, meaning the
+    /// signal must be manually reset using `reset_signal` after waiting. Failure to
+    /// reset the signal will cause subsequent waits to return immediately without blocking.
+    pub struct EventHandle
+}
 
 /// Arbitrates a mutex lock operation in userspace
 ///
@@ -415,7 +436,9 @@ unsafe fn wait_synchronization(handles: &[Handle], timeout: u64) -> Result<usize
     };
 
     RawResult::from_raw(rc).map(idx as usize, |rc| match rc.description() {
+        desc if KError::TerminationRequested == desc => WaitSyncError::TerminationRequested,
         desc if KError::InvalidHandle == desc => WaitSyncError::InvalidHandle,
+        desc if KError::InvalidPointer == desc => WaitSyncError::InvalidPointer,
         desc if KError::TimedOut == desc => WaitSyncError::TimedOut,
         desc if KError::Cancelled == desc => WaitSyncError::Cancelled,
         desc if KError::OutOfRange == desc => WaitSyncError::OutOfRange,
@@ -423,49 +446,107 @@ unsafe fn wait_synchronization(handles: &[Handle], timeout: u64) -> Result<usize
     })
 }
 
-/// Error type returned by [`wait_synchronization_multiple`] and
-/// [`wait_synchronization_single`].
+/// Error type returned by wait synchronization functions.
 ///
-/// Horizon's `svcWaitSynchronization` (SVC ID `0x18`) can only surface **four** well-defined
-/// kernel error descriptions. They map to the variants below as follows:
+/// Based on Atmosphere kernel implementation (`kern_svc_synchronization.cpp`),
+/// these are ALL possible error codes from `svcWaitSynchronization`:
 ///
-/// | Description value | Meaning in kernel sources | Enum variant here |
-/// |-------------------|---------------------------|-------------------|
-/// | `114` (`0x72`)    | `InvalidHandle`           | [`InvalidHandle`] |
-/// | `117` (`0x75`)    | `TimedOut`                | [`TimedOut`]      |
-/// | `118` (`0x76`)    | `Cancelled`               | [`Cancelled`]     |
-/// | `119` (`0x77`)    | `OutOfRange` (*a.k.a.*
-///   `MaximumExceeded` in some homebrew tooling) | [`OutOfRange`]    |
+/// | Code | Description | Condition |
+/// |------|-------------|-----------|
+/// | 59   | TerminationRequested | Thread is being terminated |
+/// | 114  | InvalidHandle | Handle doesn't exist or wrong type |
+/// | 115  | InvalidPointer | Invalid user-space pointer (internal) |
+/// | 117  | TimedOut | Wait timed out |
+/// | 118  | Cancelled | Wait cancelled via CancelSynchronization |
+/// | 119  | OutOfRange | num_handles < 0 or > 0x40 |
 ///
 /// The `Unknown` catch-all is kept for forward-compatibility in case Nintendo extends the
 /// interface with additional error codes.
 #[derive(Debug, thiserror::Error)]
 pub enum WaitSyncError {
+    /// Thread termination was requested while waiting.
+    #[error("termination requested")]
+    TerminationRequested,
     /// One (or more) of the supplied handles is invalid.
-    #[error("Invalid handle")]
+    #[error("invalid handle")]
     InvalidHandle,
+    /// Invalid pointer to handle array (internal kernel error).
+    #[error("invalid pointer")]
+    InvalidPointer,
     /// The wait operation timed out.
-    #[error("Operation timed out")]
+    #[error("operation timed out")]
     TimedOut,
-    /// The wait was cancelled via [`__nx_svc__svc_cancel_synchronization`].
-    #[error("Wait cancelled")]
+    /// The wait was cancelled via `CancelSynchronization` SVC.
+    #[error("wait cancelled")]
     Cancelled,
-    /// The number of handles supplied is out of range (must be ≤ 0x40).
-    #[error("Out of range")]
+    /// The number of handles supplied is out of range (must be 0..=64).
+    #[error("out of range")]
     OutOfRange,
     /// An unknown error occurred.
-    #[error("Unknown error: {0}")]
+    #[error("unknown error: {0}")]
     Unknown(Error),
 }
 
 impl ToRawResultCode for WaitSyncError {
     fn to_rc(self) -> ResultCode {
         match self {
+            WaitSyncError::TerminationRequested => KError::TerminationRequested.to_rc(),
             WaitSyncError::InvalidHandle => KError::InvalidHandle.to_rc(),
+            WaitSyncError::InvalidPointer => KError::InvalidPointer.to_rc(),
             WaitSyncError::TimedOut => KError::TimedOut.to_rc(),
             WaitSyncError::Cancelled => KError::Cancelled.to_rc(),
             WaitSyncError::OutOfRange => KError::OutOfRange.to_rc(),
             WaitSyncError::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+/// Resets a signaled synchronization object.
+///
+/// This clears the signal state of an event, allowing subsequent waits
+/// to block until the object is signaled again.
+///
+/// Based on Atmosphere kernel implementation (`kern_svc_synchronization.cpp`),
+/// these are ALL possible error codes from `svcResetSignal`:
+///
+/// | Code | Description | Condition |
+/// |------|-------------|-----------|
+/// | 114  | InvalidHandle | Handle doesn't refer to resettable object |
+/// | 125  | InvalidState | Object is not currently signaled |
+///
+/// # Safety
+///
+/// The handle must be a valid synchronization object that supports reset.
+pub unsafe fn reset_signal<T: Reset>(handle: &T) -> Result<(), ResetSignalError> {
+    // SAFETY: Caller ensures handle is valid and supports reset
+    let rc = unsafe { raw::reset_signal(handle.raw_handle()) };
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidHandle == desc => ResetSignalError::InvalidHandle,
+        desc if KError::InvalidState == desc => ResetSignalError::InvalidState,
+        _ => ResetSignalError::Unknown(Error::from(rc)),
+    })
+}
+
+/// Error type returned by [`reset_signal`].
+#[derive(Debug, thiserror::Error)]
+pub enum ResetSignalError {
+    /// The handle does not refer to a resettable object.
+    #[error("invalid handle")]
+    InvalidHandle,
+    /// The object is not in a signaled state (cannot reset a non-signaled object).
+    #[error("invalid state")]
+    InvalidState,
+    /// An unknown error occurred.
+    #[error("unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToRawResultCode for ResetSignalError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            ResetSignalError::InvalidHandle => KError::InvalidHandle.to_rc(),
+            ResetSignalError::InvalidState => KError::InvalidState.to_rc(),
+            ResetSignalError::Unknown(err) => err.to_raw(),
         }
     }
 }

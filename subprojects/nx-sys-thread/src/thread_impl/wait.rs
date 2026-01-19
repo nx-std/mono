@@ -88,9 +88,15 @@ pub fn wait_thread_exit_with_timeout(
 /// Error type returned by the *wait-for-exit* helpers.
 #[derive(Debug, thiserror::Error)]
 pub enum WaitForExitError {
+    /// Thread termination was requested while waiting.
+    #[error("Termination requested")]
+    TerminationRequested,
     /// One (or more) of the supplied handles is invalid.
     #[error("Invalid handle")]
     InvalidHandle,
+    /// Invalid pointer to handle array (internal kernel error).
+    #[error("Invalid pointer")]
+    InvalidPointer,
     /// The wait was cancelled via `svcCancelSynchronization`.
     #[error("Wait cancelled")]
     Cancelled,
@@ -111,7 +117,9 @@ pub enum WaitForExitError {
 impl From<WaitSyncError> for WaitForExitError {
     fn from(value: WaitSyncError) -> Self {
         match value {
+            WaitSyncError::TerminationRequested => WaitForExitError::TerminationRequested,
             WaitSyncError::InvalidHandle => WaitForExitError::InvalidHandle,
+            WaitSyncError::InvalidPointer => WaitForExitError::InvalidPointer,
             WaitSyncError::Cancelled => WaitForExitError::Cancelled,
             WaitSyncError::TimedOut => WaitForExitError::TimedOut,
             WaitSyncError::OutOfRange => WaitForExitError::OutOfRange,
@@ -124,7 +132,9 @@ impl From<WaitSyncError> for WaitForExitError {
 impl nx_svc::error::ToRawResultCode for WaitForExitError {
     fn to_rc(self) -> nx_svc::result::ResultCode {
         match self {
+            WaitForExitError::TerminationRequested => WaitSyncError::TerminationRequested.to_rc(),
             WaitForExitError::InvalidHandle => WaitSyncError::InvalidHandle.to_rc(),
+            WaitForExitError::InvalidPointer => WaitSyncError::InvalidPointer.to_rc(),
             WaitForExitError::Cancelled => WaitSyncError::Cancelled.to_rc(),
             WaitForExitError::TimedOut => WaitSyncError::TimedOut.to_rc(),
             WaitForExitError::OutOfRange => WaitSyncError::OutOfRange.to_rc(),

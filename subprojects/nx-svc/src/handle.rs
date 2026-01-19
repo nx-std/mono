@@ -8,6 +8,16 @@ pub trait Waitable: _priv::Sealed {
     fn raw_handle(&self) -> Handle;
 }
 
+/// Marker trait for synchronization objects that support `svcResetSignal`.
+///
+/// Only these kernel object types can be reset:
+/// - `KReadableEvent` (user events)
+/// - `KInterruptEvent` (interrupt events)
+/// - `KProcess` (process handles)
+///
+/// This trait is sealed to prevent external implementations.
+pub trait Reset: Waitable + _priv::Sealed {}
+
 /// Internal macro to generate [`Handle`] newtypes with common helpers.
 ///
 /// [`Handle`]: crate::raw::Handle
@@ -95,6 +105,30 @@ macro_rules! define_waitable_handle_type {
         }
 
         impl $crate::handle::_priv::Sealed for $name {}
+    };
+}
+
+/// Helper macro that creates a new handle *type* that is both [`Waitable`] and [`Reset`].
+///
+/// The macro expands to a new-type wrapper around [`Handle`] (via [`define_waitable_handle_type!`])
+/// and automatically adds both [`Waitable`] and [`Reset`] implementations.
+///
+/// Only use this macro for handle types that represent kernel objects supporting `svcResetSignal`:
+/// - `KReadableEvent` (user events)
+/// - `KInterruptEvent` (interrupt events)
+/// - `KProcess` (process handles)
+///
+/// [`Handle`]: crate::raw::Handle
+/// [`Reset`]: crate::handle::Reset
+macro_rules! define_reset_handle_type {
+    {
+        $(#[$meta:meta])* $vis:vis struct $name:ident
+    } => {
+        define_waitable_handle_type! {
+            $(#[$meta])* $vis struct $name
+        }
+
+        impl $crate::handle::Reset for $name {}
     };
 }
 
