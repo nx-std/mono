@@ -16,6 +16,7 @@ ffi = []
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-apm = { version = "0.1.0", path = "../nx-service-apm" }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
