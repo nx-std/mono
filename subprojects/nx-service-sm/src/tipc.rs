@@ -227,6 +227,7 @@ pub enum DetachClientError {
 /// Registers the client with the Service Manager using TIPC protocol.
 ///
 /// Requires HOS 12.0.0+ or Atmosphere.
+#[expect(dead_code)]
 #[inline]
 pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
