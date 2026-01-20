@@ -1,0 +1,21 @@
+[package]
+name = "nx-service-nv"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_service_nv"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
+nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", features = ["ffi"] }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+thiserror = { version = "2", default-features = false }

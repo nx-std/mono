@@ -34,7 +34,7 @@ ffi = [
 ]
 
 # High-level features
-services = ["service-apm", "service-applet", "service-hid", "service-sm", "service-set", "service-time"]
+services = ["service-apm", "service-applet", "service-hid", "service-nv", "service-sm", "service-set", "service-time"]
 
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
@@ -43,6 +43,7 @@ rt = ["dep:nx-rt"]
 service-apm = ["dep:nx-service-apm"]
 service-applet = ["dep:nx-service-applet"]
 service-hid = ["dep:nx-service-hid"]
+service-nv = ["dep:nx-service-nv"]
 service-set = ["dep:nx-service-set"]
 service-sm = ["dep:nx-service-sm"]
 service-time = ["dep:nx-service-time"]
@@ -63,6 +64,7 @@ nx-rt = { version = "0.1.0", path = "../nx-rt", optional = true }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
+nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm", optional = true }
 nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = true }

@@ -163,14 +163,14 @@ if get_option('use_nx_service_hid').enabled()
     deps_cargo_features += ['service-hid']
 endif
 
-# nx-service-time
-if get_option('use_nx_service_time').enabled()
-    nx_service_time_proj = subproject('nx-service-time')
+# nx-service-nv
+if get_option('use_nx_service_nv').enabled()
+    nx_service_nv_proj = subproject('nx-service-nv')
 
-    deps += nx_service_time_proj.get_variable('nx_service_time_dep')
+    deps += nx_service_nv_proj.get_variable('nx_service_nv_dep')
 
-    debug('service-time feature: enabled')
-    deps_cargo_features += ['service-time']
+    debug('service-nv feature: enabled')
+    deps_cargo_features += ['service-nv']
 endif
 
 # nx-service-set
@@ -191,6 +191,16 @@ if get_option('use_nx_service_sm').enabled()
 
     debug('service-sm feature: enabled')
     deps_cargo_features += ['service-sm']
+endif
+
+# nx-service-time
+if get_option('use_nx_service_time').enabled()
+    nx_service_time_proj = subproject('nx-service-time')
+
+    deps += nx_service_time_proj.get_variable('nx_service_time_dep')
+
+    debug('service-time feature: enabled')
+    deps_cargo_features += ['service-time']
 endif
 
 #---------------------------------------------------------------------------------

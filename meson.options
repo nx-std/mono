@@ -138,3 +138,10 @@ option(
     description : 'Enable nx-service-time (Time service)',
     yield : true
 )
+
+option(
+    'use_nx_service_nv',
+    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    description : 'Enable nx-service-nv (NVIDIA Driver service)',
+    yield : true
+)

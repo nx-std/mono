@@ -282,6 +282,125 @@ pub struct CloseError {
     pub tm: TransferMemory<Unmapped>,
 }
 
+/// Backing memory information for a transfer memory object.
+///
+/// This is returned by [`close_handle_keep_backing`] when you need to close
+/// the handle early but keep the backing memory around for later cleanup.
+/// This matches libnx's pattern of calling `tmemCloseHandle()` after
+/// `Initialize()` but keeping `src_addr` for `tmemWaitForPermission()`.
+#[derive(Debug)]
+pub struct TransferMemoryBacking {
+    /// Backing memory pointer (if we allocated it).
+    pub src: Option<NonNull<c_void>>,
+    /// Size of the backing memory.
+    pub size: usize,
+    /// Original permission used during creation.
+    pub perm: Permissions,
+}
+
+/// Close the transfer-memory handle but keep the backing memory information.
+///
+/// This matches libnx's `tmemCloseHandle()` behavior: the kernel handle is
+/// closed, but the backing memory pointer is preserved for later cleanup
+/// with [`wait_for_permission_raw`] and [`free_backing`].
+///
+/// # Safety
+///
+/// Unsafe for the same reasons as other kernel-interacting functions.
+pub unsafe fn close_handle_keep_backing(
+    tm: TransferMemory<Unmapped>,
+) -> Result<TransferMemoryBacking, CloseHandleKeepBackingError> {
+    let TransferMemory(Unmapped {
+        handle,
+        size,
+        perm,
+        src,
+    }) = tm;
+
+    #[cfg(debug_assertions)]
+    if !handle.is_valid() {
+        panic!("Invalid transfer memory handle: INVALID_TMEM_HANDLE");
+    }
+
+    svc::close_handle(handle).map_err(|err| CloseHandleKeepBackingError {
+        reason: err,
+        backing: TransferMemoryBacking { src, size, perm },
+    })?;
+
+    Ok(TransferMemoryBacking { src, size, perm })
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to close transfer memory handle: {reason}")]
+pub struct CloseHandleKeepBackingError {
+    #[source]
+    pub reason: svc::CloseHandleError,
+    /// The backing memory that was not freed due to the error.
+    pub backing: TransferMemoryBacking,
+}
+
+/// Wait for memory at the given address to have the specified permission.
+///
+/// This is used after [`close_handle_keep_backing`] to wait for the service
+/// to release the transfer memory before freeing the backing memory.
+///
+/// # Safety
+///
+/// The `src_addr` must point to valid memory that was used as transfer
+/// memory backing storage.
+pub unsafe fn wait_for_permission_raw(
+    src_addr: NonNull<c_void>,
+    current_perm: Permissions,
+    target_perm: Permissions,
+) -> Result<(), WaitForPermissionRawError> {
+    // Quick-path: permissions already satisfy the requirement.
+    if (current_perm & target_perm) == target_perm {
+        return Ok(());
+    }
+
+    loop {
+        match memcore::query_memory(src_addr.as_ptr() as usize) {
+            Ok((mem_info, _page)) => {
+                if mem_info
+                    .perm
+                    .contains(memcore::MemoryPermission::from_bits_truncate(
+                        target_perm.bits(),
+                    ))
+                {
+                    break;
+                }
+            }
+            Err(err) => {
+                return Err(WaitForPermissionRawError(err));
+            }
+        }
+
+        // Sleep for 100,000 nanoseconds (0.1 ms) before polling again.
+        thread::sleep(100_000);
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to wait for permission: {0}")]
+pub struct WaitForPermissionRawError(#[source] pub memcore::QueryMemoryError);
+
+/// Free backing memory that was returned by [`close_handle_keep_backing`].
+///
+/// # Safety
+///
+/// The backing memory must have been returned by a successful call to
+/// [`close_handle_keep_backing`] and must not have been freed already.
+/// Additionally, the memory must no longer be in use by any service
+/// (use [`wait_for_permission_raw`] first).
+pub unsafe fn free_backing(backing: TransferMemoryBacking) {
+    if let Some(ptr) = backing.src {
+        let layout = Layout::from_size_align(backing.size, 0x1000).unwrap();
+        unsafe { dealloc(ptr.as_ptr() as *mut u8, layout) };
+    }
+}
+
 /// Wait for the transfer memory to have the specified permission.
 ///
 /// # Safety

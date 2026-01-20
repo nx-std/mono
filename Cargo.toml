@@ -10,6 +10,7 @@ members = [
     "subprojects/nx-service-apm",
     "subprojects/nx-service-applet",
     "subprojects/nx-service-hid",
+    "subprojects/nx-service-nv",
     "subprojects/nx-service-set",
     "subprojects/nx-service-sm",
     "subprojects/nx-service-time",
