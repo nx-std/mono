@@ -18,6 +18,7 @@ pub mod argv;
 pub mod env;
 pub mod hid_manager;
 pub mod init;
+pub mod nv_manager;
 pub mod service_manager;
 pub mod service_registry;
 pub mod thread_registry;

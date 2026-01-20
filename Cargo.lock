@@ -198,6 +198,7 @@ dependencies = [
  "nx-service-apm",
  "nx-service-applet",
  "nx-service-hid",
+ "nx-service-nv",
  "nx-service-set",
  "nx-service-sm",
  "nx-service-time",

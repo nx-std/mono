@@ -141,7 +141,7 @@ option(
 
 option(
     'use_nx_service_nv',
-    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    type : 'feature', value : 'auto',
     description : 'Enable nx-service-nv (NVIDIA Driver service)',
     yield : true
 )

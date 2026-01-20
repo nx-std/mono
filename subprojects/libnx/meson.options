@@ -123,3 +123,10 @@ option(
     description : 'Enable nx-service-sm (Service Manager protocol)',
     yield : true
 )
+
+option(
+    'use_nx_service_nv',
+    type : 'feature', value : 'auto',
+    description : 'Enable nx-service-nv (NVIDIA Driver service)',
+    yield : true
+)

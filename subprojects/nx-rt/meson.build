@@ -22,6 +22,10 @@ nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
 nx_service_time_proj = subproject('nx-service-time')
 nx_service_time_dep = nx_service_time_proj.get_variable('nx_service_time_dep')
 
+# nx-service-nv
+nx_service_nv_proj = subproject('nx-service-nv')
+nx_service_nv_dep = nx_service_nv_proj.get_variable('nx_service_nv_dep')
+
 # nx-sf
 nx_sf_proj = subproject('nx-sf')
 nx_sf_dep = nx_sf_proj.get_variable('nx_sf_dep')
@@ -54,6 +58,7 @@ nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_d
 deps = [
     nx_alloc_dep,
     nx_panic_handler_dep,
+    nx_service_nv_dep,
     nx_service_sm_dep,
     nx_service_time_dep,
     nx_sf_dep,
