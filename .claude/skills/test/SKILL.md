@@ -1,7 +1,7 @@
 ---
 name: test
 description: Run the test suite by building tests and deploying to Nintendo Switch. Use for running tests, verifying changes on hardware, or validating implementations.
-allowed-tools: Bash(just --list:*), Bash(just build-tests:*)
+allowed-tools: Bash(just --list:*), Bash(just build-tests:*), Bash(just list-options-configured:*), Bash(just reconfigure:*)
 ---
 
 # Test Skill
@@ -51,11 +51,12 @@ Do NOT assume tests passed. The test output is only visible on the Switch screen
 
 When you invoke `/test`, you should:
 
-1. First invoke `/build` skill with `just build-tests`
-2. Then invoke `/deploy` skill with the built NRO path
-3. Finally ask the user to confirm test results
+1. Verify `use_nx=enabled` prerequisite is met (reconfigure if needed)
+2. Invoke `/build` skill with `just build-tests`
+3. Invoke `/deploy` skill with the built NRO path
+4. Ask the user to confirm test results
 
-This ensures the complete test workflow is automated.
+This ensures tests properly validate the Rust implementations.
 
 ## Test Architecture
 
@@ -68,8 +69,12 @@ Tests are C code that link against Rust crates to verify FFI correctness. Locate
 
 ## Prerequisites
 
-See `/deploy` skill for:
+**Build Configuration**:
+- Tests MUST be built with `use_nx=enabled` (unless user explicitly requests otherwise)
+- Check with: `just list-options-configured | grep use_nx`
+- Reconfigure if needed: `just reconfigure -Duse_nx=enabled`
 
+**Hardware/Deployment** (see `/deploy` skill for details):
 - Nintendo Switch setup requirements
 - Network connectivity requirements
 - cargo-nx installation
