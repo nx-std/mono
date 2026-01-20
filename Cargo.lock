@@ -273,6 +273,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-time"
+version = "0.1.0"
+dependencies = [
+ "nx-cpu",
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-mem",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-sf"
 version = "0.1.0"
 dependencies = [
@@ -297,6 +311,7 @@ dependencies = [
  "nx-service-hid",
  "nx-service-set",
  "nx-service-sm",
+ "nx-service-time",
  "nx-sf",
  "nx-std-sync",
  "nx-svc",

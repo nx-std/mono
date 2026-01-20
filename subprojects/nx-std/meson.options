@@ -76,13 +76,6 @@ option(
 )
 
 option(
-    'use_nx_service_sm',
-    type : 'feature', value : 'auto',
-    description : 'Enable the `service-sm` feature',
-    yield : true
-)
-
-option(
     'use_nx_service_apm',
     type : 'feature', value : 'auto',
     description : 'Enable the `service-apm` feature',
@@ -107,5 +100,19 @@ option(
     'use_nx_service_set',
     type : 'feature', value : 'auto',
     description : 'Enable the `service-set` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_sm',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-sm` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_time',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-time` feature',
     yield : true
 )

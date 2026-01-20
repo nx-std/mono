@@ -131,3 +131,10 @@ option(
     description : 'Enable nx-service-sm (Service Manager protocol)',
     yield : true
 )
+
+option(
+    'use_nx_service_time',
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-time (Time service)',
+    yield : true
+)

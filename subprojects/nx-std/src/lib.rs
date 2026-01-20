@@ -53,6 +53,10 @@ pub mod services {
     pub mod sm {
         pub use nx_service_sm::*;
     }
+    #[cfg(feature = "service-time")]
+    pub mod time {
+        pub use nx_service_time::*;
+    }
 }
 
 #[cfg(any(
