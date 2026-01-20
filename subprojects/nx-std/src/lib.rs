@@ -41,6 +41,10 @@ pub mod services {
     pub mod applet {
         pub use nx_service_applet::*;
     }
+    #[cfg(feature = "service-hid")]
+    pub mod hid {
+        pub use nx_service_hid::*;
+    }
     #[cfg(feature = "service-set")]
     pub mod set {
         pub use nx_service_set::*;

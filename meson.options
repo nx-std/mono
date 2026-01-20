@@ -112,6 +112,13 @@ option(
 )
 
 option(
+    'use_nx_service_hid',
+    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    description : 'Enable nx-service-hid (Human Input Device service)',
+    yield : true
+)
+
+option(
     'use_nx_service_set',
     type : 'feature', value : 'auto',
     description : 'Enable nx-service-set (System Settings service)',

@@ -153,6 +153,16 @@ if get_option('use_nx_service_applet').enabled()
     deps_cargo_features += ['service-applet']
 endif
 
+# nx-service-hid
+if get_option('use_nx_service_hid').enabled()
+    nx_service_hid_proj = subproject('nx-service-hid')
+
+    deps += nx_service_hid_proj.get_variable('nx_service_hid_dep')
+
+    debug('service-hid feature: enabled')
+    deps_cargo_features += ['service-hid']
+endif
+
 # nx-service-set
 if get_option('use_nx_service_set').enabled()
     nx_service_set_proj = subproject('nx-service-set')

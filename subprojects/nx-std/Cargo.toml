@@ -34,7 +34,7 @@ ffi = [
 ]
 
 # High-level features
-services = ["service-apm", "service-applet", "service-sm", "service-set"]
+services = ["service-apm", "service-applet", "service-hid", "service-sm", "service-set"]
 
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
@@ -42,6 +42,7 @@ rand = ["dep:nx-rand"]
 rt = ["dep:nx-rt"]
 service-apm = ["dep:nx-service-apm"]
 service-applet = ["dep:nx-service-applet"]
+service-hid = ["dep:nx-service-hid"]
 service-set = ["dep:nx-service-set"]
 service-sm = ["dep:nx-service-sm"]
 sf = ["dep:nx-sf"]
@@ -60,6 +61,7 @@ nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-rt = { version = "0.1.0", path = "../nx-rt", optional = true }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm", optional = true }
 nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
