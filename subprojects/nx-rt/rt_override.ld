@@ -157,3 +157,26 @@ appletSetFocusHandlingMode = __nx_rt__applet_set_focus_handling_mode;
 appletSetOutOfFocusSuspendingEnabled = __nx_rt__applet_set_out_of_focus_suspending_enabled;
 appletGetAppletResourceUserId = __nx_rt__applet_get_applet_resource_user_id;
 appletCreateManagedDisplayLayer = __nx_rt__applet_create_managed_display_layer;
+
+/* Human Input Device (HID) API */
+EXTERN(__nx_rt__hid_initialize);
+EXTERN(__nx_rt__hid_exit);
+EXTERN(__nx_rt__hid_get_sharedmem_addr);
+EXTERN(__nx_rt__hid_initialize_npad);
+EXTERN(__nx_rt__hid_set_supported_npad_style_set);
+EXTERN(__nx_rt__hid_set_supported_npad_id_type);
+EXTERN(__nx_rt__hid_initialize_touch_screen);
+EXTERN(__nx_rt__hid_initialize_mouse);
+EXTERN(__nx_rt__hid_initialize_keyboard);
+EXTERN(__nx_rt__hid_initialize_gesture);
+
+hidInitialize = __nx_rt__hid_initialize;
+hidExit = __nx_rt__hid_exit;
+hidGetSharedmemAddr = __nx_rt__hid_get_sharedmem_addr;
+hidInitializeNpad = __nx_rt__hid_initialize_npad;
+hidSetSupportedNpadStyleSet = __nx_rt__hid_set_supported_npad_style_set;
+hidSetSupportedNpadIdType = __nx_rt__hid_set_supported_npad_id_type;
+hidInitializeTouchScreen = __nx_rt__hid_initialize_touch_screen;
+hidInitializeMouse = __nx_rt__hid_initialize_mouse;
+hidInitializeKeyboard = __nx_rt__hid_initialize_keyboard;
+hidInitializeGesture = __nx_rt__hid_initialize_gesture;

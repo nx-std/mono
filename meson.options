@@ -113,7 +113,7 @@ option(
 
 option(
     'use_nx_service_hid',
-    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    type : 'feature', value : 'auto',
     description : 'Enable nx-service-hid (Human Input Device service)',
     yield : true
 )

@@ -16,6 +16,7 @@ pub mod apm_manager;
 pub mod applet_manager;
 pub mod argv;
 pub mod env;
+pub mod hid_manager;
 pub mod init;
 pub mod service_manager;
 pub mod service_registry;
