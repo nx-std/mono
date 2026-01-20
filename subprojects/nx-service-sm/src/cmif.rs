@@ -18,24 +18,9 @@ pub fn get_service_handle(
 ) -> Result<SessionHandle, GetServiceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: proto::GET_SERVICE_HANDLE,
-        context: 0,
-        data_size: size_of::<ServiceName>(),
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(proto::GET_SERVICE_HANDLE)
+        .data_size(size_of::<ServiceName>())
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -98,24 +83,9 @@ pub fn register_service(
         max_sessions,
     };
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: proto::REGISTER_SERVICE,
-        context: 0,
-        data_size: size_of::<RegisterServiceIn>(),
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(proto::REGISTER_SERVICE)
+        .data_size(size_of::<RegisterServiceIn>())
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -164,24 +134,9 @@ pub fn unregister_service(
 ) -> Result<(), UnregisterServiceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: proto::UNREGISTER_SERVICE,
-        context: 0,
-        data_size: size_of::<ServiceName>(),
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(proto::UNREGISTER_SERVICE)
+        .data_size(size_of::<ServiceName>())
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -218,24 +173,10 @@ pub enum UnregisterServiceError {
 pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: proto::DETACH_CLIENT,
-        context: 0,
-        data_size: size_of::<u64>(),
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(proto::DETACH_CLIENT)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -272,24 +213,10 @@ pub enum DetachClientError {
 pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: proto::REGISTER_CLIENT,
-        context: 0,
-        data_size: size_of::<u64>(),
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(proto::REGISTER_CLIENT)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };

@@ -531,6 +531,119 @@ pub struct RequestFormat {
     pub send_pid: bool,
 }
 
+/// Builder for constructing [`RequestFormat`].
+#[derive(Debug, Clone, Default)]
+pub struct RequestFormatBuilder {
+    inner: RequestFormat,
+}
+
+impl RequestFormatBuilder {
+    /// Creates a new builder with the given command ID.
+    pub fn new(request_id: u32) -> Self {
+        Self {
+            inner: RequestFormat {
+                request_id,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Sets the domain object ID.
+    pub fn object_id(mut self, id: ObjectId) -> Self {
+        self.inner.object_id = Some(id);
+        self
+    }
+
+    /// Sets the context token.
+    pub fn context(mut self, context: u32) -> Self {
+        self.inner.context = context;
+        self
+    }
+
+    /// Sets the payload data size in bytes.
+    pub fn data_size(mut self, size: usize) -> Self {
+        self.inner.data_size = size;
+        self
+    }
+
+    /// Sets the server pointer buffer size.
+    pub fn server_pointer_size(mut self, size: usize) -> Self {
+        self.inner.server_pointer_size = size;
+        self
+    }
+
+    /// Sets the number of auto-select input buffers.
+    pub fn in_auto_buffers(mut self, count: u32) -> Self {
+        self.inner.num_in_auto_buffers = count;
+        self
+    }
+
+    /// Sets the number of auto-select output buffers.
+    pub fn out_auto_buffers(mut self, count: u32) -> Self {
+        self.inner.num_out_auto_buffers = count;
+        self
+    }
+
+    /// Sets the number of mapped input buffers.
+    pub fn in_buffers(mut self, count: u32) -> Self {
+        self.inner.num_in_buffers = count;
+        self
+    }
+
+    /// Sets the number of mapped output buffers.
+    pub fn out_buffers(mut self, count: u32) -> Self {
+        self.inner.num_out_buffers = count;
+        self
+    }
+
+    /// Sets the number of exchange (bidirectional) buffers.
+    pub fn inout_buffers(mut self, count: u32) -> Self {
+        self.inner.num_inout_buffers = count;
+        self
+    }
+
+    /// Sets the number of input pointer descriptors.
+    pub fn in_pointers(mut self, count: u32) -> Self {
+        self.inner.num_in_pointers = count;
+        self
+    }
+
+    /// Sets the number of output pointer descriptors.
+    pub fn out_pointers(mut self, count: u32) -> Self {
+        self.inner.num_out_pointers = count;
+        self
+    }
+
+    /// Sets the number of fixed-size output pointers.
+    pub fn out_fixed_pointers(mut self, count: u32) -> Self {
+        self.inner.num_out_fixed_pointers = count;
+        self
+    }
+
+    /// Sets the number of object IDs to pass.
+    pub fn objects(mut self, count: u32) -> Self {
+        self.inner.num_objects = count;
+        self
+    }
+
+    /// Sets the number of handles to copy.
+    pub fn handles(mut self, count: u32) -> Self {
+        self.inner.num_handles = count;
+        self
+    }
+
+    /// Enables sending the process ID.
+    pub fn send_pid(mut self) -> Self {
+        self.inner.send_pid = true;
+        self
+    }
+
+    /// Builds the [`RequestFormat`].
+    pub fn build(self) -> RequestFormat {
+        self.inner
+    }
+}
+
 /// Active CMIF request being built.
 ///
 /// Contains mutable slices to all sections of the request for populating.

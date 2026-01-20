@@ -22,24 +22,11 @@ pub fn create_applet_resource(
 ) -> Result<SessionHandle, CreateAppletResourceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::INITIALIZE_APPLET_RESOURCE,
-        context: 0x20,
-        data_size: 8, // u64 aruid
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
+        .context(0x20)
+        .data_size(8) // u64 aruid
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -75,24 +62,8 @@ pub fn get_shared_memory_handle(
 ) -> Result<ShmemHandle, GetSharedMemoryHandleError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: applet_resource_cmds::GET_SHARED_MEMORY_HANDLE,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt =
+        cmif::RequestFormatBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -126,24 +97,11 @@ pub fn activate_npad(session: SessionHandle, aruid: u64) -> Result<(), ActivateN
     // Use modern revision (0x5 for firmware 18.0.0+)
     let revision: u32 = 0x5;
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::ACTIVATE_NPAD_WITH_REVISION,
-        context: 0x20,
-        data_size: 16, // u32 revision + u32 pad + u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
+        .context(0x20)
+        .data_size(16) // u32 revision + u32 pad + u64 ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -184,24 +142,11 @@ pub fn set_supported_npad_style_set(
 ) -> Result<(), SetSupportedNpadStyleSetError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::SET_SUPPORTED_NPAD_STYLE_SET,
-        context: 0x20,
-        data_size: 16, // u32 style_set + u32 pad + u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
+        .context(0x20)
+        .data_size(16) // u32 style_set + u32 pad + u64 ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -244,24 +189,12 @@ pub fn set_supported_npad_id_type(
 
     let buffer_size = ids.len() * 4;
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::SET_SUPPORTED_NPAD_ID_TYPE,
-        context: 0x20,
-        data_size: 8, // u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 1, // HipcPointer for IDs array
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
+        .context(0x20)
+        .data_size(8) // u64 ARUID
+        .in_pointers(1) // HipcPointer for IDs array
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -293,24 +226,11 @@ pub fn activate_touch_screen(
 ) -> Result<(), ActivateTouchScreenError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::ACTIVATE_TOUCH_SCREEN,
-        context: 0x20,
-        data_size: 8, // u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
+        .context(0x20)
+        .data_size(8) // u64 ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -336,24 +256,11 @@ pub fn activate_touch_screen(
 pub fn activate_keyboard(session: SessionHandle, aruid: u64) -> Result<(), ActivateKeyboardError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::ACTIVATE_KEYBOARD,
-        context: 0x20,
-        data_size: 8, // u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_KEYBOARD)
+        .context(0x20)
+        .data_size(8) // u64 ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -379,24 +286,11 @@ pub fn activate_keyboard(session: SessionHandle, aruid: u64) -> Result<(), Activ
 pub fn activate_mouse(session: SessionHandle, aruid: u64) -> Result<(), ActivateMouseError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::ACTIVATE_MOUSE,
-        context: 0x20,
-        data_size: 8, // u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_MOUSE)
+        .context(0x20)
+        .data_size(8) // u64 ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -422,24 +316,11 @@ pub fn activate_mouse(session: SessionHandle, aruid: u64) -> Result<(), Activate
 pub fn activate_gesture(session: SessionHandle, aruid: u64) -> Result<(), ActivateGestureError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmds::ACTIVATE_GESTURE,
-        context: 0x20,
-        data_size: 16, // u32 val + u32 pad + u64 ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_GESTURE)
+        .context(0x20)
+        .data_size(16) // u32 val + u32 pad + u64 ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };

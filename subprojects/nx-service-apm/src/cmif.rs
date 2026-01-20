@@ -19,24 +19,7 @@ use crate::proto::{
 pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSessionError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: CMD_OPEN_SESSION,
-        context: 0,
-        data_size: 0, // No input data
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(CMD_OPEN_SESSION).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -66,24 +49,7 @@ pub fn get_performance_mode(
 ) -> Result<PerformanceMode, GetPerformanceModeError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: CMD_GET_PERFORMANCE_MODE,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(CMD_GET_PERFORMANCE_MODE).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -125,24 +91,9 @@ pub fn set_performance_configuration(
         config,
     };
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: CMD_SET_PERFORMANCE_CONFIGURATION,
-        context: 0,
-        data_size: 8, // Two u32 values
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
+        .data_size(8) // Two u32 values
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -172,24 +123,9 @@ pub fn get_performance_configuration(
 
     let in_data: u32 = mode as i32 as u32;
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: CMD_GET_PERFORMANCE_CONFIGURATION,
-        context: 0,
-        data_size: 4, // One u32 input
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
+        .data_size(4) // One u32 input
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };

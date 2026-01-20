@@ -20,24 +20,9 @@ use crate::proto::nv_cmds;
 pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<(u32, u32), OpenError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::OPEN,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 1, // Device path (Type A / HipcMapAlias)
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::OPEN)
+        .in_buffers(1) // Device path (Type A / HipcMapAlias)
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -78,24 +63,11 @@ pub fn ioctl(
     let num_in_auto = if in_size > 0 { 1 } else { 0 };
     let num_out_auto = if out_size > 0 { 1 } else { 0 };
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::IOCTL,
-        context: 0,
-        data_size: 8, // fd + request
-        server_pointer_size: 0,
-        num_in_auto_buffers: num_in_auto,
-        num_out_auto_buffers: num_out_auto,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::IOCTL)
+        .data_size(8) // fd + request
+        .in_auto_buffers(num_in_auto)
+        .out_auto_buffers(num_out_auto)
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -151,24 +123,11 @@ pub fn ioctl2(
     let num_in_auto = if in_size > 0 { 1 } else { 0 } + 1; // +1 for extra_in
     let num_out_auto = if out_size > 0 { 1 } else { 0 };
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::IOCTL2,
-        context: 0,
-        data_size: 8, // fd + request
-        server_pointer_size: 0,
-        num_in_auto_buffers: num_in_auto,
-        num_out_auto_buffers: num_out_auto,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::IOCTL2)
+        .data_size(8) // fd + request
+        .in_auto_buffers(num_in_auto)
+        .out_auto_buffers(num_out_auto)
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -223,24 +182,11 @@ pub fn ioctl3(
     let num_in_auto = if in_size > 0 { 1 } else { 0 };
     let num_out_auto = if out_size > 0 { 1 } else { 0 } + 1; // +1 for extra_out
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::IOCTL3,
-        context: 0,
-        data_size: 8, // fd + request
-        server_pointer_size: 0,
-        num_in_auto_buffers: num_in_auto,
-        num_out_auto_buffers: num_out_auto,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::IOCTL3)
+        .data_size(8) // fd + request
+        .in_auto_buffers(num_in_auto)
+        .out_auto_buffers(num_out_auto)
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -282,24 +228,9 @@ pub fn ioctl3(
 pub fn close(session: SessionHandle, fd: u32) -> Result<u32, CloseError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::CLOSE,
-        context: 0,
-        data_size: 4, // fd
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::CLOSE)
+        .data_size(4) // fd
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -330,24 +261,10 @@ pub fn initialize(
 ) -> Result<(), InitializeError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::INITIALIZE,
-        context: 0,
-        data_size: 4, // tmem_size
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 2, // process handle + tmem handle
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::INITIALIZE)
+        .data_size(4) // tmem_size
+        .handles(2) // process handle + tmem handle
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -380,24 +297,9 @@ pub fn query_event(
 ) -> Result<(u32, u32), QueryEventError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::QUERY_EVENT,
-        context: 0,
-        data_size: 8, // fd + event_id
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::QUERY_EVENT)
+        .data_size(8) // fd + event_id
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -437,24 +339,10 @@ pub fn query_event(
 pub fn set_client_pid(session: SessionHandle, aruid: u64) -> Result<(), SetClientPidError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: nv_cmds::SET_CLIENT_PID,
-        context: 0,
-        data_size: 8, // ARUID
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::SET_CLIENT_PID)
+        .data_size(8) // ARUID
+        .send_pid()
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };

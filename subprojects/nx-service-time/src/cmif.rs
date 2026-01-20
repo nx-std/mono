@@ -42,24 +42,8 @@ pub fn get_standard_steady_clock(
 ) -> Result<SessionHandle, GetSteadyClockError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: static_service_cmds::GET_STANDARD_STEADY_CLOCK,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt =
+        cmif::RequestFormatBuilder::new(static_service_cmds::GET_STANDARD_STEADY_CLOCK).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -89,24 +73,7 @@ pub fn get_time_zone_service(
 ) -> Result<SessionHandle, GetTimeZoneServiceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: static_service_cmds::GET_TIME_ZONE_SERVICE,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(static_service_cmds::GET_TIME_ZONE_SERVICE).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -136,24 +103,8 @@ pub fn get_shared_memory_native_handle(
 ) -> Result<nx_svc::mem::shmem::Handle, GetSharedMemoryError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE)
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -181,24 +132,7 @@ pub fn get_shared_memory_native_handle(
 pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: system_clock_cmds::GET_CURRENT_TIME,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(system_clock_cmds::GET_CURRENT_TIME).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -225,24 +159,9 @@ pub fn to_calendar_time_with_my_rule(
 ) -> Result<(TimeCalendarTime, TimeCalendarAdditionalInfo), ToCalendarTimeError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE,
-        context: 0,
-        data_size: 8, // u64 timestamp
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE)
+        .data_size(8) // u64 timestamp
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
@@ -279,24 +198,7 @@ fn get_clock_session(
 ) -> Result<SessionHandle, GetSystemClockError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: command_id,
-        context: 0,
-        data_size: 0,
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 0,
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(command_id).build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let _req = unsafe { cmif::make_request(ipc_buf, fmt) };

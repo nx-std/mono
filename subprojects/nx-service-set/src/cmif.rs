@@ -41,24 +41,9 @@ fn get_firmware_version_inner(
     // Allocate output buffer on stack
     let mut out = FirmwareVersion::new();
 
-    let fmt = cmif::RequestFormat {
-        object_id: None,
-        request_id: cmd_id,
-        context: 0,
-        data_size: 0, // No input data
-        server_pointer_size: 0,
-        num_in_auto_buffers: 0,
-        num_out_auto_buffers: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_in_pointers: 0,
-        num_out_pointers: 0,
-        num_out_fixed_pointers: 1, // One fixed-size output pointer
-        num_objects: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
+        .out_fixed_pointers(1) // One fixed-size output pointer
+        .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };

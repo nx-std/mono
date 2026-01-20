@@ -477,28 +477,30 @@ impl<'a> Dispatch<'a> {
             }
         }
 
-        let fmt = cmif::RequestFormat {
-            object_id: if is_domain {
-                ObjectId::new(self.service.object_id)
-            } else {
-                None
-            },
-            request_id: self.request_id,
-            context: self.context,
-            data_size: self.in_data_size,
-            server_pointer_size: self.service.pointer_buffer_size as usize,
-            num_in_auto_buffers: num_in_auto,
-            num_out_auto_buffers: num_out_auto,
-            num_in_buffers,
-            num_out_buffers,
-            num_inout_buffers,
-            num_in_pointers,
-            num_out_pointers,
-            num_out_fixed_pointers,
-            num_objects: self.in_object_count as u32,
-            num_handles: self.in_handle_count as u32,
-            send_pid: self.send_pid,
-        };
+        let mut builder = cmif::RequestFormatBuilder::new(self.request_id)
+            .context(self.context)
+            .data_size(self.in_data_size)
+            .server_pointer_size(self.service.pointer_buffer_size as usize)
+            .in_auto_buffers(num_in_auto)
+            .out_auto_buffers(num_out_auto)
+            .in_buffers(num_in_buffers)
+            .out_buffers(num_out_buffers)
+            .inout_buffers(num_inout_buffers)
+            .in_pointers(num_in_pointers)
+            .out_pointers(num_out_pointers)
+            .out_fixed_pointers(num_out_fixed_pointers)
+            .objects(self.in_object_count as u32)
+            .handles(self.in_handle_count as u32);
+
+        if is_domain && let Some(object_id) = ObjectId::new(self.service.object_id) {
+            builder = builder.object_id(object_id);
+        }
+
+        if self.send_pid {
+            builder = builder.send_pid();
+        }
+
+        let fmt = builder.build();
 
         // SAFETY: ipc_buf points to valid IPC buffer.
         let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
