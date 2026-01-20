@@ -12,7 +12,7 @@
 
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
-use nx_service_applet::AppletType;
+use nx_service_applet::{AppletType, aruid::Aruid};
 use nx_service_sm::SmService;
 use nx_sf::service::Service;
 use nx_svc::{
@@ -282,7 +282,7 @@ impl NvService {
 ///
 /// * `sm` - Service manager session
 /// * `applet_type` - The current applet type (used to resolve service type if `Auto`)
-/// * `aruid` - Applet resource user ID (pass 0 if not available)
+/// * `aruid` - Applet resource user ID, or `None` if not available
 /// * `config` - Configuration options for the NV service
 ///
 /// # Returns
@@ -291,7 +291,7 @@ impl NvService {
 pub fn connect(
     sm: &SmService,
     applet_type: AppletType,
-    aruid: u64,
+    aruid: Option<Aruid>,
     config: NvConfig,
 ) -> Result<NvService, ConnectError> {
     // Determine service type
@@ -365,7 +365,7 @@ pub fn connect(
     };
 
     // Try to set client PID (best effort, may not have ARUID)
-    if aruid != 0 {
+    if let Some(aruid) = aruid {
         // Ignore errors - matches libnx behavior
         let _ = cmif::set_client_pid(main_session.session, aruid);
     }

@@ -5,6 +5,7 @@
 
 use core::ptr;
 
+use nx_service_applet::aruid::Aruid;
 use nx_sf::{cmif, hipc::BufferMode};
 use nx_svc::{
     ipc::{self, Handle as SessionHandle},
@@ -336,7 +337,7 @@ pub fn query_event(
 /// Sets the client PID (ARUID).
 ///
 /// This is INvDrvServices command 8.
-pub fn set_client_pid(session: SessionHandle, aruid: u64) -> Result<(), SetClientPidError> {
+pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetClientPidError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(nv_cmds::SET_CLIENT_PID)
@@ -349,7 +350,7 @@ pub fn set_client_pid(session: SessionHandle, aruid: u64) -> Result<(), SetClien
 
     // Write ARUID
     unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
+        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid.to_raw());
     }
 
     ipc::send_sync_request(session).map_err(SetClientPidError::SendRequest)?;

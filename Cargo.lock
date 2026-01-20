@@ -242,6 +242,7 @@ name = "nx-service-hid"
 version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
+ "nx-service-applet",
  "nx-service-sm",
  "nx-sf",
  "nx-svc",

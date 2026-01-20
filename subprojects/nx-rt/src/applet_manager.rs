@@ -7,6 +7,7 @@
 use nx_service_applet::{
     AppletFocusHandlingMode, AppletFocusState, AppletMessage, AppletProxyService, AppletService,
     AppletType, ApplicationFunctions, CommonStateGetter, SelfController, WindowController,
+    aruid::Aruid,
 };
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 use nx_svc::process::Handle as ProcessHandle;
@@ -152,10 +153,9 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
     }
 
     // Fetch and cache the applet resource user ID
-    let applet_resource_user_id = window_controller
+    let aruid = window_controller
         .as_ref()
-        .and_then(|wc| wc.get_applet_resource_user_id().ok())
-        .unwrap_or(0);
+        .and_then(|wc| wc.get_applet_resource_user_id().unwrap_or(None));
 
     // Store in registry
     let applet_state = AppletState {
@@ -165,7 +165,7 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         self_controller,
         window_controller,
         application_functions,
-        applet_resource_user_id,
+        aruid,
     };
 
     let mut guard = state().write();
@@ -220,13 +220,10 @@ pub fn get_window_controller() -> Option<impl core::ops::Deref<Target = WindowCo
 
 /// Gets the cached applet resource user ID.
 ///
-/// Returns 0 if the applet is not initialized or if the ARUID was not available during init.
-pub fn get_applet_resource_user_id() -> u64 {
-    state()
-        .read()
-        .as_ref()
-        .map(|s| s.applet_resource_user_id)
-        .unwrap_or(0)
+/// Returns `None` if the applet is not initialized or if the ARUID was not
+/// available during init.
+pub fn get_applet_resource_user_id() -> Option<Aruid> {
+    state().read().as_ref().and_then(|s| s.aruid)
 }
 
 /// Exits the applet service session.
@@ -262,7 +259,7 @@ struct AppletState {
     /// IApplicationFunctions sub-interface (Application type only)
     application_functions: Option<ApplicationFunctions>,
     /// Cached applet resource user ID (fetched once during init)
-    applet_resource_user_id: u64,
+    aruid: Option<Aruid>,
 }
 
 /// Wrapper for accessing AppletProxyService through RwLockReadGuard

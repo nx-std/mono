@@ -5,6 +5,7 @@
 
 use core::ptr;
 
+use nx_service_applet::aruid::{Aruid, NO_ARUID};
 use nx_sf::cmif;
 use nx_svc::{
     ipc::{self, Handle as SessionHandle},
@@ -18,7 +19,7 @@ use crate::proto::{applet_resource_cmds, cmds};
 /// This is IHidServer command 0.
 pub fn create_applet_resource(
     session: SessionHandle,
-    aruid: u64,
+    aruid: Option<Aruid>,
 ) -> Result<SessionHandle, CreateAppletResourceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
@@ -31,7 +32,9 @@ pub fn create_applet_resource(
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
 
-    // Write ARUID
+    // Write ARUID (NO_ARUID if not available)
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
+
     // SAFETY: req.data points to valid payload area with space for u64.
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
@@ -91,7 +94,10 @@ pub fn get_shared_memory_handle(
 /// Uses revision 0x5 (for firmware 18.0.0+).
 ///
 /// For older firmware (<5.0.0), use command 103 without revision.
-pub fn activate_npad(session: SessionHandle, aruid: u64) -> Result<(), ActivateNpadError> {
+pub fn activate_npad(
+    session: SessionHandle,
+    aruid: Option<Aruid>,
+) -> Result<(), ActivateNpadError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     // Use modern revision (0x5 for firmware 18.0.0+)
@@ -108,6 +114,8 @@ pub fn activate_npad(session: SessionHandle, aruid: u64) -> Result<(), ActivateN
 
     // Write input data: u32 revision, u32 pad, u64 ARUID
     // SAFETY: req.data points to valid payload area with space for the struct.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
+
     #[repr(C)]
     struct Input {
         revision: u32,
@@ -137,7 +145,7 @@ pub fn activate_npad(session: SessionHandle, aruid: u64) -> Result<(), ActivateN
 /// This is IHidServer command 100.
 pub fn set_supported_npad_style_set(
     session: SessionHandle,
-    aruid: u64,
+    aruid: Option<Aruid>,
     style_set: u32,
 ) -> Result<(), SetSupportedNpadStyleSetError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
@@ -153,6 +161,8 @@ pub fn set_supported_npad_style_set(
 
     // Write input data: u32 style_set, u32 pad, u64 ARUID
     // SAFETY: req.data points to valid payload area with space for the struct.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
+
     #[repr(C)]
     struct Input {
         style_set: u32,
@@ -182,7 +192,7 @@ pub fn set_supported_npad_style_set(
 /// This is IHidServer command 102.
 pub fn set_supported_npad_id_type(
     session: SessionHandle,
-    aruid: u64,
+    aruid: Option<Aruid>,
     ids: &[u32],
 ) -> Result<(), SetSupportedNpadIdTypeError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
@@ -201,6 +211,7 @@ pub fn set_supported_npad_id_type(
 
     // Write ARUID to data section
     // SAFETY: req.data points to valid payload area with space for u64.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
     }
@@ -222,7 +233,7 @@ pub fn set_supported_npad_id_type(
 /// This is IHidServer command 11.
 pub fn activate_touch_screen(
     session: SessionHandle,
-    aruid: u64,
+    aruid: Option<Aruid>,
 ) -> Result<(), ActivateTouchScreenError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
@@ -237,6 +248,7 @@ pub fn activate_touch_screen(
 
     // Write ARUID
     // SAFETY: req.data points to valid payload area with space for u64.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
     }
@@ -253,7 +265,10 @@ pub fn activate_touch_screen(
 /// Activates keyboard input.
 ///
 /// This is IHidServer command 31.
-pub fn activate_keyboard(session: SessionHandle, aruid: u64) -> Result<(), ActivateKeyboardError> {
+pub fn activate_keyboard(
+    session: SessionHandle,
+    aruid: Option<Aruid>,
+) -> Result<(), ActivateKeyboardError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_KEYBOARD)
@@ -267,6 +282,7 @@ pub fn activate_keyboard(session: SessionHandle, aruid: u64) -> Result<(), Activ
 
     // Write ARUID
     // SAFETY: req.data points to valid payload area with space for u64.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
     }
@@ -283,7 +299,10 @@ pub fn activate_keyboard(session: SessionHandle, aruid: u64) -> Result<(), Activ
 /// Activates mouse input.
 ///
 /// This is IHidServer command 21.
-pub fn activate_mouse(session: SessionHandle, aruid: u64) -> Result<(), ActivateMouseError> {
+pub fn activate_mouse(
+    session: SessionHandle,
+    aruid: Option<Aruid>,
+) -> Result<(), ActivateMouseError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_MOUSE)
@@ -297,6 +316,7 @@ pub fn activate_mouse(session: SessionHandle, aruid: u64) -> Result<(), Activate
 
     // Write ARUID
     // SAFETY: req.data points to valid payload area with space for u64.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
     }
@@ -313,7 +333,10 @@ pub fn activate_mouse(session: SessionHandle, aruid: u64) -> Result<(), Activate
 /// Activates gesture recognition.
 ///
 /// This is IHidServer command 91.
-pub fn activate_gesture(session: SessionHandle, aruid: u64) -> Result<(), ActivateGestureError> {
+pub fn activate_gesture(
+    session: SessionHandle,
+    aruid: Option<Aruid>,
+) -> Result<(), ActivateGestureError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_GESTURE)
@@ -327,6 +350,8 @@ pub fn activate_gesture(session: SessionHandle, aruid: u64) -> Result<(), Activa
 
     // Write input data: u32 val = 1, u32 pad, u64 ARUID
     // SAFETY: req.data points to valid payload area with space for the struct.
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
+
     #[repr(C)]
     struct Input {
         val: u32,

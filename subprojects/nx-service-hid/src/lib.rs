@@ -18,6 +18,7 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use core::ptr::NonNull;
 
+use nx_service_applet::aruid::Aruid;
 use nx_service_sm::SmService;
 use nx_sf::service::Service;
 use nx_svc::ipc::Handle as SessionHandle;
@@ -45,7 +46,7 @@ pub struct HidService {
     applet_resource: Service,
     shmem_ptr: NonNull<HidSharedMemory>,
     _shmem: sys_shmem::SharedMemory<Mapped>,
-    aruid: u64,
+    aruid: Option<Aruid>,
 }
 
 // SAFETY: HidService is safe to send across threads because:
@@ -139,12 +140,12 @@ impl HidService {
 /// # Arguments
 ///
 /// * `sm` - Service manager session
-/// * `aruid` - Applet resource user ID (from applet service)
+/// * `aruid` - Applet resource user ID (from applet service), or `None` if not available
 ///
 /// # Returns
 ///
 /// A connected [`HidService`] instance on success.
-pub fn connect(sm: &SmService, aruid: u64) -> Result<HidService, ConnectError> {
+pub fn connect(sm: &SmService, aruid: Option<Aruid>) -> Result<HidService, ConnectError> {
     // Get HID service from service manager
     let handle = sm
         .get_service_handle_cmif(SERVICE_NAME)

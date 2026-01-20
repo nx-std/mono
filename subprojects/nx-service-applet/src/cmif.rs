@@ -9,6 +9,7 @@ use nx_svc::process::Handle as ProcessHandle;
 
 use crate::{
     AppletProxyService, ApplicationFunctions, CommonStateGetter, SelfController, WindowController,
+    aruid::Aruid,
     proto::{
         AppletAttribute, AppletFocusHandlingMode, AppletType, CMD_AF_NOTIFY_RUNNING,
         CMD_GET_APPLICATION_FUNCTIONS, CMD_GET_COMMON_STATE_GETTER, CMD_GET_SELF_CONTROLLER,
@@ -389,9 +390,11 @@ pub enum SetPerformanceModeChangedNotificationError {
 ///
 /// This ID is used by various system services (HID, audio, etc.) to identify
 /// the applet. It's obtained during applet initialization and stored globally.
+///
+/// Returns `Ok(None)` if the system returns ARUID 0 (invalid).
 pub fn get_applet_resource_user_id(
     window_controller: &Service,
-) -> Result<u64, GetAppletResourceUserIdError> {
+) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
     let result = window_controller
         .dispatch(CMD_WC_GET_APPLET_RESOURCE_USER_ID)
         .out_size(size_of::<u64>())
@@ -403,8 +406,9 @@ pub fn get_applet_resource_user_id(
     }
 
     // SAFETY: Response data contains u64 applet resource user ID.
-    let aruid = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-    Ok(aruid)
+    let raw = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
+
+    Ok(Aruid::new(raw))
 }
 
 /// Error returned by [`get_applet_resource_user_id`].
@@ -503,6 +507,7 @@ pub fn create_managed_display_layer(
 
     // SAFETY: Response data contains u64 layer ID.
     let layer_id = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
+
     Ok(layer_id)
 }
 

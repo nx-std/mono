@@ -319,6 +319,9 @@ use nx_service_sm::SmService;
 use nx_sf::service::Service;
 use nx_svc::{ipc::Handle as SessionHandle, process::Handle as ProcessHandle, sync::EventHandle};
 
+use crate::aruid::Aruid;
+
+pub mod aruid;
 mod cmif;
 mod common_state;
 mod proto;
@@ -647,9 +650,11 @@ impl WindowController {
     /// identify the applet. It's obtained during applet initialization and
     /// typically stored globally for later use.
     ///
-    /// Returns `0` on failure (matches libnx behavior).
+    /// Returns `Ok(None)` if the system returns ARUID 0 (invalid).
     #[inline]
-    pub fn get_applet_resource_user_id(&self) -> Result<u64, GetAppletResourceUserIdError> {
+    pub fn get_applet_resource_user_id(
+        &self,
+    ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
         cmif::get_applet_resource_user_id(&self.0)
     }
 

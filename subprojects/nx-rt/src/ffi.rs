@@ -6,6 +6,7 @@ use core::{
     mem::MaybeUninit,
 };
 
+use nx_service_applet::aruid::NO_ARUID;
 use nx_sf::{ServiceName, cmif, service::Service, tipc};
 use nx_svc::{
     error::ToRawResultCode, process::Handle as ProcessHandle, raw::INVALID_HANDLE,
@@ -1120,6 +1121,8 @@ pub unsafe extern "C" fn __nx_rt__applet_set_performance_mode_changed_notificati
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_applet_resource_user_id() -> u64 {
     applet_manager::get_applet_resource_user_id()
+        .map(|a| a.to_raw())
+        .unwrap_or(NO_ARUID)
 }
 
 /// Acquires foreground rights.

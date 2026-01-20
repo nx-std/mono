@@ -12,6 +12,7 @@ bench = false
 
 [dependencies]
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
