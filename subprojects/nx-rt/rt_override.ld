@@ -180,3 +180,14 @@ hidInitializeTouchScreen = __nx_rt__hid_initialize_touch_screen;
 hidInitializeMouse = __nx_rt__hid_initialize_mouse;
 hidInitializeKeyboard = __nx_rt__hid_initialize_keyboard;
 hidInitializeGesture = __nx_rt__hid_initialize_gesture;
+
+/* Time Service API */
+EXTERN(__nx_rt__time_initialize);
+EXTERN(__nx_rt__time_exit);
+EXTERN(__nx_rt__time_get_current_time);
+EXTERN(__nx_rt__time_to_calendar_time_with_my_rule);
+
+timeInitialize = __nx_rt__time_initialize;
+timeExit = __nx_rt__time_exit;
+timeGetCurrentTime = __nx_rt__time_get_current_time;
+timeToCalendarTimeWithMyRule = __nx_rt__time_to_calendar_time_with_my_rule;

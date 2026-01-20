@@ -111,6 +111,13 @@ option(
 )
 
 option(
+    'use_nx_service_time',
+    type : 'feature', value : 'auto',
+    description : 'Enable nx-service-time (Time service)',
+    yield : true
+)
+
+option(
     'use_nx_service_sm',
     type : 'feature', value : 'auto',
     description : 'Enable nx-service-sm (Service Manager protocol)',

@@ -21,6 +21,7 @@ nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid" }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-service-time = { version = "0.1.0", path = "../nx-service-time" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }

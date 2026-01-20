@@ -134,7 +134,7 @@ option(
 
 option(
     'use_nx_service_time',
-    type : 'feature', value : 'disabled',
+    type : 'feature', value : 'auto',
     description : 'Enable nx-service-time (Time service)',
     yield : true
 )
