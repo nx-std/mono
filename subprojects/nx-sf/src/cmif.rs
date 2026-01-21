@@ -60,6 +60,7 @@
 
 use core::{mem::size_of, ptr, ptr::NonNull, slice};
 
+use nx_svc::raw::Handle as RawHandle;
 use static_assertions::const_assert_eq;
 
 use crate::hipc::{self, BufferMode};
@@ -774,9 +775,9 @@ pub struct Response<'a> {
     /// Returned domain object IDs.
     pub objects: &'a [u32],
     /// Returned copy handles.
-    pub copy_handles: &'a [u32],
+    pub copy_handles: &'a [RawHandle],
     /// Returned move handles.
-    pub move_handles: &'a [u32],
+    pub move_handles: &'a [RawHandle],
 }
 
 /// A domain object identifier.
