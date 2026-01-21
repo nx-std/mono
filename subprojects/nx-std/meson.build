@@ -203,6 +203,16 @@ if get_option('use_nx_service_time').enabled()
     deps_cargo_features += ['service-time']
 endif
 
+# nx-service-vi
+if get_option('use_nx_service_vi').enabled()
+    nx_service_vi_proj = subproject('nx-service-vi')
+
+    deps += nx_service_vi_proj.get_variable('nx_service_vi_dep')
+
+    debug('service-vi feature: enabled')
+    deps_cargo_features += ['service-vi']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

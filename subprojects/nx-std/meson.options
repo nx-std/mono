@@ -123,3 +123,10 @@ option(
     description : 'Enable the `service-time` feature',
     yield : true
 )
+
+option(
+    'use_nx_service_vi',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-vi` feature',
+    yield : true
+)

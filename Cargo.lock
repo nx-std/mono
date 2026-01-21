@@ -304,6 +304,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-vi"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-applet",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-sf"
 version = "0.1.0"
 dependencies = [
@@ -330,6 +343,7 @@ dependencies = [
  "nx-service-set",
  "nx-service-sm",
  "nx-service-time",
+ "nx-service-vi",
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
