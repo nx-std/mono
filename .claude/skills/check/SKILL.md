@@ -31,6 +31,28 @@ just clippy
 just clippy-crate <crate-name>
 ```
 
+## Checking with Features
+
+Many crates have optional features (like `ffi` for FFI bindings) that should be checked.
+
+**Check with FFI feature**:
+```bash
+just check-rs --features ffi
+just clippy --features ffi
+```
+
+**Check with all features**:
+```bash
+just check-rs --all-features
+just clippy --all-features
+```
+
+**Per-crate feature checks**:
+```bash
+just check-crate <crate-name> --features ffi
+just clippy-crate <crate-name> --all-features
+```
+
 ## Workflow
 
 1. Format code → `/format`
@@ -40,6 +62,9 @@ just clippy-crate <crate-name>
 5. Check whole project → `just check-rs`
 6. Lint whole project → `just clippy`
 7. Fix any remaining warnings
+8. Check with FFI features → `just check-rs --features ffi` and `just clippy --features ffi`
+9. Check with all features → `just check-rs --all-features` and `just clippy --all-features`
+10. Fix any feature-specific warnings
 
 ## Error Handling
 
