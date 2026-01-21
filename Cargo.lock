@@ -202,6 +202,7 @@ dependencies = [
  "nx-service-set",
  "nx-service-sm",
  "nx-service-time",
+ "nx-service-vi",
  "nx-sf",
  "nx-std-sync",
  "nx-svc",

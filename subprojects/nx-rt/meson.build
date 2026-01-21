@@ -26,6 +26,10 @@ nx_service_time_dep = nx_service_time_proj.get_variable('nx_service_time_dep')
 nx_service_nv_proj = subproject('nx-service-nv')
 nx_service_nv_dep = nx_service_nv_proj.get_variable('nx_service_nv_dep')
 
+# nx-service-vi
+nx_service_vi_proj = subproject('nx-service-vi')
+nx_service_vi_dep = nx_service_vi_proj.get_variable('nx_service_vi_dep')
+
 # nx-sf
 nx_sf_proj = subproject('nx-sf')
 nx_sf_dep = nx_sf_proj.get_variable('nx_sf_dep')
@@ -61,6 +65,7 @@ deps = [
     nx_service_nv_dep,
     nx_service_sm_dep,
     nx_service_time_dep,
+    nx_service_vi_dep,
     nx_sf_dep,
     nx_std_sync_dep,
     nx_svc_dep,

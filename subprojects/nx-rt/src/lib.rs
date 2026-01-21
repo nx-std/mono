@@ -23,3 +23,4 @@ pub mod service_manager;
 pub mod service_registry;
 pub mod thread_registry;
 pub mod time_manager;
+pub mod vi_manager;

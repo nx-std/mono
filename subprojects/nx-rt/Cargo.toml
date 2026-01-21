@@ -23,6 +23,7 @@ nx-service-nv = { version = "0.1.0", path = "../nx-service-nv" }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-service-time = { version = "0.1.0", path = "../nx-service-time" }
+nx-service-vi = { version = "0.1.0", path = "../nx-service-vi" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }

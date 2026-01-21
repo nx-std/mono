@@ -130,3 +130,10 @@ option(
     description : 'Enable nx-service-nv (NVIDIA Driver service)',
     yield : true
 )
+
+option(
+    'use_nx_service_vi',
+    type : 'feature', value : 'auto',
+    description : 'Enable nx-service-vi (Visual Interface service)',
+    yield : true
+)

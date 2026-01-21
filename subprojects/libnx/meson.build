@@ -34,6 +34,7 @@ use_nx_service_set = get_option('use_nx_service_set').enable_auto_if(use_nx.enab
 use_nx_service_time = get_option('use_nx_service_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_sm = get_option('use_nx_service_sm').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_nv = get_option('use_nx_service_nv').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_service_vi = get_option('use_nx_service_vi').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 
 #---------------------------------------------------------------------------------
 # Dependencies
@@ -46,7 +47,7 @@ if (use_nx.enabled()
     or use_nx_alloc.enabled() or use_nx_rand.enabled() or use_nx_rt.enabled() or use_nx_std_sync.enabled()
     or use_nx_svc.enabled() or use_nx_sys_mem.enabled() or use_nx_sys_sync.enabled() or use_nx_sys_thread_tls.enabled()
     or use_nx_sys_thread.enabled() or use_nx_time.enabled() or use_nx_sf.enabled()
-    or use_nx_service_apm.enabled() or use_nx_service_applet.enabled() or use_nx_service_hid.enabled() or use_nx_service_nv.enabled() or use_nx_service_set.enabled() or use_nx_service_time.enabled() or use_nx_service_sm.enabled())
+    or use_nx_service_apm.enabled() or use_nx_service_applet.enabled() or use_nx_service_hid.enabled() or use_nx_service_nv.enabled() or use_nx_service_set.enabled() or use_nx_service_time.enabled() or use_nx_service_sm.enabled() or use_nx_service_vi.enabled())
 
     nx_std_proj = subproject(
         'nx-std',
@@ -69,6 +70,7 @@ if (use_nx.enabled()
             'use_nx_service_time' : '@0@'.format(use_nx_service_time),
             'use_nx_service_sm' : '@0@'.format(use_nx_service_sm),
             'use_nx_service_nv' : '@0@'.format(use_nx_service_nv),
+            'use_nx_service_vi' : '@0@'.format(use_nx_service_vi),
         },
     )
 

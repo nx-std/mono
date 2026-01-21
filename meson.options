@@ -141,7 +141,7 @@ option(
 
 option(
     'use_nx_service_vi',
-    type : 'feature', value : 'disabled', # Unstable. Disabled by default.
+    type : 'feature', value : 'auto',
     description : 'Enable nx-service-vi (Visual Interface service)',
     yield : true
 )
