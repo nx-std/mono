@@ -7,6 +7,7 @@ use core::{
 };
 
 use nx_service_applet::aruid::NO_ARUID;
+use nx_service_nv::fd::Fd;
 use nx_sf::{ServiceName, cmif, service::Service, tipc};
 use nx_svc::{
     error::ToRawResultCode, process::Handle as ProcessHandle, raw::INVALID_HANDLE,
@@ -1834,7 +1835,7 @@ pub unsafe extern "C" fn __nx_rt__nv_open(fd: *mut u32, devicepath: *const c_cha
 
     match service.open(path_str) {
         Ok(opened_fd) => {
-            unsafe { *fd = opened_fd };
+            unsafe { *fd = opened_fd.to_raw() };
             0
         }
         Err(err) => nv_open_error_to_rc(err),
@@ -1862,7 +1863,8 @@ pub unsafe extern "C" fn __nx_rt__nv_ioctl(fd: u32, request: u32, argp: *mut c_v
         &mut []
     };
 
-    match service.ioctl(fd, request, argp_slice) {
+    // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
+    match service.ioctl(unsafe { Fd::new_unchecked(fd) }, request, argp_slice) {
         Ok(()) => 0,
         Err(err) => nv_ioctl_error_to_rc(err),
     }
@@ -1904,7 +1906,13 @@ pub unsafe extern "C" fn __nx_rt__nv_ioctl2(
         &[]
     };
 
-    match service.ioctl2(fd, request, argp_slice, inbuf_slice) {
+    // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
+    match service.ioctl2(
+        unsafe { Fd::new_unchecked(fd) },
+        request,
+        argp_slice,
+        inbuf_slice,
+    ) {
         Ok(()) => 0,
         Err(err) => nv_ioctl2_error_to_rc(err),
     }
@@ -1946,7 +1954,13 @@ pub unsafe extern "C" fn __nx_rt__nv_ioctl3(
         &mut []
     };
 
-    match service.ioctl3(fd, request, argp_slice, outbuf_slice) {
+    // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
+    match service.ioctl3(
+        unsafe { Fd::new_unchecked(fd) },
+        request,
+        argp_slice,
+        outbuf_slice,
+    ) {
         Ok(()) => 0,
         Err(err) => nv_ioctl3_error_to_rc(err),
     }
@@ -1961,7 +1975,8 @@ pub unsafe extern "C" fn __nx_rt__nv_close(fd: u32) -> u32 {
         return GENERIC_ERROR;
     };
 
-    match service.close_fd(fd) {
+    // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
+    match service.close_fd(unsafe { Fd::new_unchecked(fd) }) {
         Ok(()) => 0,
         Err(err) => nv_close_error_to_rc(err),
     }
@@ -1984,7 +1999,8 @@ pub unsafe extern "C" fn __nx_rt__nv_query_event(
         return GENERIC_ERROR;
     };
 
-    match service.query_event(fd, event_id) {
+    // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
+    match service.query_event(unsafe { Fd::new_unchecked(fd) }, event_id) {
         Ok(handle) => {
             unsafe { *event_out = handle };
             0

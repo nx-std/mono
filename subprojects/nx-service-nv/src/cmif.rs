@@ -15,6 +15,7 @@ use nx_svc::{
 };
 
 use crate::{
+    fd::Fd,
     proto::nv_cmds,
     types::{CloseNvError, IoctlNvError, OpenNvError, QueryEventNvError},
 };
@@ -22,7 +23,7 @@ use crate::{
 /// Opens a device by path.
 ///
 /// This is INvDrvServices command 0.
-pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<u32, OpenError> {
+pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(nv_cmds::OPEN)
@@ -54,7 +55,8 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<u32, OpenError
         return Err(OpenError::NvError(OpenNvError::from_raw(output.error)));
     }
 
-    Ok(output.fd)
+    // SAFETY: The fd was just returned by the NV driver via IPC.
+    Ok(unsafe { Fd::new_unchecked(output.fd) })
 }
 
 /// Performs an ioctl operation.
@@ -62,7 +64,7 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<u32, OpenError
 /// This is INvDrvServices command 1.
 pub fn ioctl(
     session: SessionHandle,
-    fd: u32,
+    fd: Fd,
     request: u32,
     in_size: usize,
     out_size: usize,
@@ -89,7 +91,10 @@ pub fn ioctl(
         request: u32,
     }
 
-    let input = Input { fd, request };
+    let input = Input {
+        fd: fd.to_raw(),
+        request,
+    };
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
     }
@@ -124,7 +129,7 @@ pub fn ioctl(
 #[allow(clippy::too_many_arguments)]
 pub fn ioctl2(
     session: SessionHandle,
-    fd: u32,
+    fd: Fd,
     request: u32,
     in_size: usize,
     out_size: usize,
@@ -154,7 +159,10 @@ pub fn ioctl2(
         request: u32,
     }
 
-    let input = Input { fd, request };
+    let input = Input {
+        fd: fd.to_raw(),
+        request,
+    };
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
     }
@@ -189,7 +197,7 @@ pub fn ioctl2(
 #[allow(clippy::too_many_arguments)]
 pub fn ioctl3(
     session: SessionHandle,
-    fd: u32,
+    fd: Fd,
     request: u32,
     in_size: usize,
     out_size: usize,
@@ -218,7 +226,10 @@ pub fn ioctl3(
         request: u32,
     }
 
-    let input = Input { fd, request };
+    let input = Input {
+        fd: fd.to_raw(),
+        request,
+    };
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
     }
@@ -250,7 +261,7 @@ pub fn ioctl3(
 /// Closes a device file descriptor.
 ///
 /// This is INvDrvServices command 2.
-pub fn close(session: SessionHandle, fd: u32) -> Result<(), CloseError> {
+pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(nv_cmds::CLOSE)
@@ -262,7 +273,7 @@ pub fn close(session: SessionHandle, fd: u32) -> Result<(), CloseError> {
 
     // Write fd
     unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), fd);
+        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), fd.to_raw());
     }
 
     ipc::send_sync_request(session).map_err(CloseError::SendRequest)?;
@@ -322,7 +333,7 @@ pub fn initialize(
 /// This is INvDrvServices command 4.
 pub fn query_event(
     session: SessionHandle,
-    fd: u32,
+    fd: Fd,
     event_id: u32,
 ) -> Result<RawHandle, QueryEventError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
@@ -341,7 +352,10 @@ pub fn query_event(
         event_id: u32,
     }
 
-    let input = Input { fd, event_id };
+    let input = Input {
+        fd: fd.to_raw(),
+        event_id,
+    };
     unsafe {
         ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
     }

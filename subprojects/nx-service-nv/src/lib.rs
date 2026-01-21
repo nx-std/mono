@@ -24,8 +24,11 @@ use nx_svc::{
 use nx_sys_mem::tmem::{self, TransferMemoryBacking};
 
 mod cmif;
+pub mod fd;
 mod proto;
 pub mod types;
+
+use fd::Fd;
 
 pub use self::{
     cmif::{
@@ -110,7 +113,7 @@ impl NvService {
     /// Opens a device by path.
     ///
     /// Returns the file descriptor on success.
-    pub fn open(&self, device_path: &str) -> Result<u32, OpenError> {
+    pub fn open(&self, device_path: &str) -> Result<Fd, OpenError> {
         cmif::open(self.main_session.session, device_path.as_bytes())
     }
 
@@ -118,7 +121,7 @@ impl NvService {
     ///
     /// The `argp` buffer is used for both input and output based on the
     /// direction flags in the request code.
-    pub fn ioctl(&self, fd: u32, request: u32, argp: &mut [u8]) -> Result<(), IoctlError> {
+    pub fn ioctl(&self, fd: Fd, request: u32, argp: &mut [u8]) -> Result<(), IoctlError> {
         let bufsize = nv_ioc_size(request);
         let dir = nv_ioc_dir(request);
 
@@ -140,7 +143,7 @@ impl NvService {
     /// Available on firmware 3.0.0+.
     pub fn ioctl2(
         &self,
-        fd: u32,
+        fd: Fd,
         request: u32,
         argp: &mut [u8],
         inbuf: &[u8],
@@ -175,7 +178,7 @@ impl NvService {
     /// Available on firmware 3.0.0+.
     pub fn ioctl3(
         &self,
-        fd: u32,
+        fd: Fd,
         request: u32,
         argp: &mut [u8],
         outbuf: &mut [u8],
@@ -206,14 +209,14 @@ impl NvService {
     }
 
     /// Closes a device file descriptor.
-    pub fn close_fd(&self, fd: u32) -> Result<(), CloseError> {
+    pub fn close_fd(&self, fd: Fd) -> Result<(), CloseError> {
         cmif::close(self.main_session.session, fd)
     }
 
     /// Queries an event for a device.
     ///
     /// Returns the event handle on success.
-    pub fn query_event(&self, fd: u32, event_id: u32) -> Result<RawHandle, QueryEventError> {
+    pub fn query_event(&self, fd: Fd, event_id: u32) -> Result<RawHandle, QueryEventError> {
         cmif::query_event(self.main_session.session, fd, event_id)
     }
 
