@@ -19,10 +19,13 @@ pub const SERVICE_NAME_MANAGER: ServiceName = ServiceName::new_truncate("vi:m");
 /// - 2 = Manager (vi:m)
 pub mod root_cmds {
     /// Get IApplicationDisplayService session (vi:u).
+    #[expect(dead_code)]
     pub const GET_DISPLAY_SERVICE_APPLICATION: u32 = 0;
     /// Get IApplicationDisplayService session (vi:s).
+    #[expect(dead_code)]
     pub const GET_DISPLAY_SERVICE_SYSTEM: u32 = 1;
     /// Get IApplicationDisplayService session (vi:m).
+    #[expect(dead_code)]
     pub const GET_DISPLAY_SERVICE_MANAGER: u32 = 2;
 
     /// Prepare fatal display (16.0.0+).
@@ -96,6 +99,7 @@ pub mod system_cmds {
     pub const SET_LAYER_VISIBILITY: u32 = 2207;
 
     /// Create stray layer (System, before 7.0.0).
+    #[expect(dead_code)]
     pub const CREATE_STRAY_LAYER: u32 = 2312;
 }
 
@@ -125,6 +129,7 @@ pub mod manager_cmds {
 /// IHOSBinderDriverRelay command IDs.
 pub mod binder_cmds {
     /// Transact parcel (before 3.0.0).
+    #[expect(dead_code)]
     pub const TRANSACT_PARCEL: u32 = 0;
     /// Adjust reference count.
     pub const ADJUST_REFCOUNT: u32 = 1;

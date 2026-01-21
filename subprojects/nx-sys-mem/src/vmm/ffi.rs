@@ -14,6 +14,12 @@ pub type VirtmemReservation = sys::VirtmemReservation;
 
 /// Locks the virtual memory manager mutex
 ///
+/// # Safety
+///
+/// This function intentionally leaks the mutex guard to keep the mutex locked.
+/// The caller must ensure `__nx_sys_mem__virtmem_unlock()` is called to release
+/// the lock before the thread terminates.
+///
 /// See: virtmem.h's `virtmemLock()`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_mem__virtmem_lock() {
@@ -38,6 +44,12 @@ pub unsafe extern "C" fn __nx_sys_mem__virtmem_unlock() {
 
 /// Sets up the virtual memory manager state
 ///
+/// # Safety
+///
+/// This must be called during early initialization before any concurrent access
+/// to the virtual memory manager. The caller must ensure no other threads are
+/// accessing the VMM during initialization.
+///
 /// This is called by the libnx runtime during early initialization.
 /// It initializes internal state but does **not** keep the mutex locked.
 #[unsafe(no_mangle)]
@@ -47,6 +59,11 @@ pub unsafe extern "C" fn __nx_sys_mem__virtmem_setup() {
 }
 
 /// Finds a random slice of free general purpose address space
+///
+/// # Safety
+///
+/// The caller must hold the VMM lock (via `__nx_sys_mem__virtmem_lock()`) before
+/// calling this function. Returns null if the lock is not held by the current thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_aslr(
     size: usize,
@@ -63,6 +80,11 @@ pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_aslr(
 }
 
 /// Finds a random slice of free stack address space
+///
+/// # Safety
+///
+/// The caller must hold the VMM lock (via `__nx_sys_mem__virtmem_lock()`) before
+/// calling this function. Returns null if the lock is not held by the current thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_stack(
     size: usize,
@@ -78,6 +100,11 @@ pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_stack(
 }
 
 /// Finds a random slice of free code memory address space
+///
+/// # Safety
+///
+/// The caller must hold the VMM lock (via `__nx_sys_mem__virtmem_lock()`) before
+/// calling this function. Returns null if the lock is not held by the current thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_code_memory(
     size: usize,
@@ -93,6 +120,11 @@ pub unsafe extern "C" fn __nx_sys_mem__virtmem_find_code_memory(
 }
 
 /// Reserves a range of memory address space
+///
+/// # Safety
+///
+/// The caller must hold the VMM lock (via `__nx_sys_mem__virtmem_lock()`) before
+/// calling this function. Returns null if the lock is not held by the current thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_mem__virtmem_add_reservation(
     mem: *mut c_void,
@@ -103,10 +135,15 @@ pub unsafe extern "C" fn __nx_sys_mem__virtmem_add_reservation(
     }
 
     let vmm: &mut sys::VirtmemManager = unsafe { &mut *sys::VMM.data_ptr() };
-    vmm.add_reservation(mem, size).unwrap_or(ptr::null_mut())
+    vmm.add_reservation(mem, size).unwrap_or_default()
 }
 
 /// Releases a memory address space reservation
+///
+/// # Safety
+///
+/// The caller must hold the VMM lock (via `__nx_sys_mem__virtmem_lock()`) before
+/// calling this function. Does nothing if the lock is not held by the current thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_mem__virtmem_remove_reservation(rv: *mut VirtmemReservation) {
     if !sys::VMM.is_locked_by_current_thread() {

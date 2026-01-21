@@ -90,6 +90,7 @@ pub fn destroy_managed_layer(
 }
 
 /// Creates a stray layer (Manager, 7.0.0+).
+#[expect(dead_code)]
 pub fn create_stray_layer(
     session: SessionHandle,
     layer_flags: u32,
@@ -275,6 +276,7 @@ pub fn set_display_power_state(
 }
 
 /// Adds a layer to a stack.
+#[expect(dead_code)]
 pub fn add_to_layer_stack(
     session: SessionHandle,
     layer_stack: ViLayerStack,
