@@ -19,6 +19,7 @@ use nx_svc::{
     ipc::Handle as SessionHandle,
     mem::tmem::{Handle as TmemHandle, MemoryPermission},
     process::Handle as ProcessHandle,
+    raw::Handle as RawHandle,
 };
 use nx_sys_mem::tmem::{self, TransferMemoryBacking};
 
@@ -35,8 +36,9 @@ pub use self::{
         SERVICE_NAME_APPLET, SERVICE_NAME_APPLICATION, SERVICE_NAME_FACTORY, SERVICE_NAME_SYSTEM,
     },
     types::{
-        NV_IOC_NONE, NV_IOC_READ, NV_IOC_WRITE, NvConfig, NvError, NvEventId, NvServiceType,
-        nv_event_id_ctrl_syncpt, nv_ioc_dir, nv_ioc_size,
+        CloseNvError, IoctlNvError, NV_IOC_NONE, NV_IOC_READ, NV_IOC_WRITE, NvConfig, NvEventId,
+        NvServiceType, OpenNvError, QueryEventNvError, nv_event_id_ctrl_syncpt, nv_ioc_dir,
+        nv_ioc_size,
     },
 };
 
@@ -108,23 +110,15 @@ impl NvService {
     /// Opens a device by path.
     ///
     /// Returns the file descriptor on success.
-    pub fn open(&self, device_path: &str) -> Result<u32, NvOpenError> {
-        let path_bytes = device_path.as_bytes();
-        let (fd, error) =
-            cmif::open(self.main_session.session, path_bytes).map_err(NvOpenError::Ipc)?;
-
-        if error != 0 {
-            return Err(NvOpenError::NvError(NvError::from_raw(error as i32)));
-        }
-
-        Ok(fd)
+    pub fn open(&self, device_path: &str) -> Result<u32, OpenError> {
+        cmif::open(self.main_session.session, device_path.as_bytes())
     }
 
     /// Performs an ioctl operation.
     ///
     /// The `argp` buffer is used for both input and output based on the
     /// direction flags in the request code.
-    pub fn ioctl(&self, fd: u32, request: u32, argp: &mut [u8]) -> Result<(), NvIoctlError> {
+    pub fn ioctl(&self, fd: u32, request: u32, argp: &mut [u8]) -> Result<(), IoctlError> {
         let bufsize = nv_ioc_size(request);
         let dir = nv_ioc_dir(request);
 
@@ -137,14 +131,8 @@ impl NvService {
         let out_size = if (dir & NV_IOC_READ) != 0 { bufsize } else { 0 };
 
         let session = self.session_for_request(request);
-        let error = cmif::ioctl(session, fd, request, in_size, out_size, argp.as_mut_ptr())
-            .map_err(NvIoctlError::Ipc)?;
 
-        if error != 0 {
-            return Err(NvIoctlError::NvError(NvError::from_raw(error as i32)));
-        }
-
-        Ok(())
+        cmif::ioctl(session, fd, request, in_size, out_size, argp.as_mut_ptr())
     }
 
     /// Performs an ioctl2 operation with an extra input buffer.
@@ -156,7 +144,7 @@ impl NvService {
         request: u32,
         argp: &mut [u8],
         inbuf: &[u8],
-    ) -> Result<(), NvIoctl2Error> {
+    ) -> Result<(), Ioctl2Error> {
         let bufsize = nv_ioc_size(request);
         let dir = nv_ioc_dir(request);
 
@@ -169,7 +157,8 @@ impl NvService {
         let out_size = if (dir & NV_IOC_READ) != 0 { bufsize } else { 0 };
 
         let session = self.session_for_request(request);
-        let error = cmif::ioctl2(
+
+        cmif::ioctl2(
             session,
             fd,
             request,
@@ -179,13 +168,6 @@ impl NvService {
             inbuf.as_ptr(),
             inbuf.len(),
         )
-        .map_err(NvIoctl2Error::Ipc)?;
-
-        if error != 0 {
-            return Err(NvIoctl2Error::NvError(NvError::from_raw(error as i32)));
-        }
-
-        Ok(())
     }
 
     /// Performs an ioctl3 operation with an extra output buffer.
@@ -197,7 +179,7 @@ impl NvService {
         request: u32,
         argp: &mut [u8],
         outbuf: &mut [u8],
-    ) -> Result<(), NvIoctl3Error> {
+    ) -> Result<(), Ioctl3Error> {
         let bufsize = nv_ioc_size(request);
         let dir = nv_ioc_dir(request);
 
@@ -210,7 +192,8 @@ impl NvService {
         let out_size = if (dir & NV_IOC_READ) != 0 { bufsize } else { 0 };
 
         let session = self.session_for_request(request);
-        let error = cmif::ioctl3(
+
+        cmif::ioctl3(
             session,
             fd,
             request,
@@ -220,38 +203,18 @@ impl NvService {
             outbuf.as_mut_ptr(),
             outbuf.len(),
         )
-        .map_err(NvIoctl3Error::Ipc)?;
-
-        if error != 0 {
-            return Err(NvIoctl3Error::NvError(NvError::from_raw(error as i32)));
-        }
-
-        Ok(())
     }
 
     /// Closes a device file descriptor.
-    pub fn close_fd(&self, fd: u32) -> Result<(), NvCloseError> {
-        let error = cmif::close(self.main_session.session, fd).map_err(NvCloseError::Ipc)?;
-
-        if error != 0 {
-            return Err(NvCloseError::NvError(NvError::from_raw(error as i32)));
-        }
-
-        Ok(())
+    pub fn close_fd(&self, fd: u32) -> Result<(), CloseError> {
+        cmif::close(self.main_session.session, fd)
     }
 
     /// Queries an event for a device.
     ///
     /// Returns the event handle on success.
-    pub fn query_event(&self, fd: u32, event_id: u32) -> Result<u32, NvQueryEventError> {
-        let (event_handle, error) = cmif::query_event(self.main_session.session, fd, event_id)
-            .map_err(NvQueryEventError::Ipc)?;
-
-        if error != 0 {
-            return Err(NvQueryEventError::NvError(NvError::from_raw(error as i32)));
-        }
-
-        Ok(event_handle)
+    pub fn query_event(&self, fd: u32, event_id: u32) -> Result<RawHandle, QueryEventError> {
+        cmif::query_event(self.main_session.session, fd, event_id)
     }
 
     /// Consumes and closes the NV service session.
@@ -272,6 +235,7 @@ impl NvService {
                 )
             };
         }
+
         unsafe { tmem::free_backing(self.transfer_mem_backing) };
     }
 }
@@ -390,14 +354,6 @@ fn resolve_service_type(applet_type: AppletType) -> NvServiceType {
     }
 }
 
-/// Converts a raw NV error code to a libnx-compatible result code.
-pub fn convert_error(rc: i32) -> u32 {
-    if rc == 0 {
-        return 0;
-    }
-    NvError::from_raw(rc).to_result_code()
-}
-
 /// Error returned by [`connect`].
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
@@ -416,70 +372,4 @@ pub enum ConnectError {
     /// Failed to clone session.
     #[error("failed to clone session")]
     CloneSession(#[source] nx_sf::service::TryCloneExError),
-}
-
-/// Error returned by NV open operation.
-#[derive(Debug, thiserror::Error)]
-pub enum NvOpenError {
-    /// IPC error.
-    #[error("IPC error")]
-    Ipc(#[source] OpenError),
-    /// NV driver error.
-    #[error("NV driver error: {0:?}")]
-    NvError(NvError),
-}
-
-/// Error returned by NV ioctl operation.
-#[derive(Debug, thiserror::Error)]
-pub enum NvIoctlError {
-    /// IPC error.
-    #[error("IPC error")]
-    Ipc(#[source] IoctlError),
-    /// NV driver error.
-    #[error("NV driver error: {0:?}")]
-    NvError(NvError),
-}
-
-/// Error returned by NV ioctl2 operation.
-#[derive(Debug, thiserror::Error)]
-pub enum NvIoctl2Error {
-    /// IPC error.
-    #[error("IPC error")]
-    Ipc(#[source] Ioctl2Error),
-    /// NV driver error.
-    #[error("NV driver error: {0:?}")]
-    NvError(NvError),
-}
-
-/// Error returned by NV ioctl3 operation.
-#[derive(Debug, thiserror::Error)]
-pub enum NvIoctl3Error {
-    /// IPC error.
-    #[error("IPC error")]
-    Ipc(#[source] Ioctl3Error),
-    /// NV driver error.
-    #[error("NV driver error: {0:?}")]
-    NvError(NvError),
-}
-
-/// Error returned by NV close operation.
-#[derive(Debug, thiserror::Error)]
-pub enum NvCloseError {
-    /// IPC error.
-    #[error("IPC error")]
-    Ipc(#[source] CloseError),
-    /// NV driver error.
-    #[error("NV driver error: {0:?}")]
-    NvError(NvError),
-}
-
-/// Error returned by NV query_event operation.
-#[derive(Debug, thiserror::Error)]
-pub enum NvQueryEventError {
-    /// IPC error.
-    #[error("IPC error")]
-    Ipc(#[source] QueryEventError),
-    /// NV driver error.
-    #[error("NV driver error: {0:?}")]
-    NvError(NvError),
 }

@@ -1998,7 +1998,10 @@ pub unsafe extern "C" fn __nx_rt__nv_query_event(
 /// Corresponds to `nvConvertError()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__nv_convert_error(rc: i32) -> u32 {
-    nx_service_nv::convert_error(rc)
+    if rc == 0 {
+        return 0;
+    }
+    nv_error_to_result_code(rc as u32)
 }
 
 /// Gets the NV service session.
@@ -2039,82 +2042,103 @@ fn nv_connect_error_to_rc(err: crate::nv_manager::ConnectError) -> u32 {
     }
 }
 
-fn nv_open_error_to_rc(err: nx_service_nv::NvOpenError) -> u32 {
+/// Converts an NV error code to a libnx-compatible result code.
+///
+/// Uses Module_LibnxNvidia (346) as the module.
+fn nv_error_to_result_code(code: u32) -> u32 {
+    const MODULE_LIBNX_NVIDIA: u32 = 346;
+
+    // Map raw NV error codes to libnx error descriptors
+    let desc: u32 = match code {
+        0x1 => 1,      // NotImplemented
+        0x2 => 2,      // NotSupported
+        0x3 => 3,      // NotInitialized
+        0x4 => 4,      // BadParameter
+        0x5 => 5,      // Timeout
+        0x6 => 6,      // InsufficientMemory
+        0x7 => 7,      // ReadOnlyAttribute
+        0x8 => 8,      // InvalidState
+        0x9 => 9,      // InvalidAddress
+        0xA => 10,     // InvalidSize
+        0xB => 11,     // BadValue
+        0xD => 12,     // AlreadyAllocated
+        0xE => 13,     // Busy
+        0xF => 14,     // ResourceError
+        0x10 => 15,    // CountMismatch
+        0x1000 => 16,  // SharedMemoryTooSmall
+        0x30003 => 17, // FileOperationFailed
+        0x3000F => 18, // IoctlFailed
+        _ => 19,       // Unknown
+    };
+
+    // MAKERESULT(module, description) = ((module & 0x1FF) | ((description & 0x1FFF) << 9))
+    (MODULE_LIBNX_NVIDIA & 0x1FF) | ((desc & 0x1FFF) << 9)
+}
+
+fn nv_open_error_to_rc(err: nx_service_nv::OpenError) -> u32 {
     match err {
-        nx_service_nv::NvOpenError::Ipc(e) => match e {
-            nx_service_nv::OpenError::SendRequest(e) => e.to_rc(),
-            nx_service_nv::OpenError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+        nx_service_nv::OpenError::SendRequest(e) => e.to_rc(),
+        nx_service_nv::OpenError::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
         },
-        nx_service_nv::NvOpenError::NvError(nv_err) => nv_err.to_result_code(),
+        nx_service_nv::OpenError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
 
-fn nv_ioctl_error_to_rc(err: nx_service_nv::NvIoctlError) -> u32 {
+fn nv_ioctl_error_to_rc(err: nx_service_nv::IoctlError) -> u32 {
     match err {
-        nx_service_nv::NvIoctlError::Ipc(e) => match e {
-            nx_service_nv::IoctlError::SendRequest(e) => e.to_rc(),
-            nx_service_nv::IoctlError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+        nx_service_nv::IoctlError::SendRequest(e) => e.to_rc(),
+        nx_service_nv::IoctlError::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
         },
-        nx_service_nv::NvIoctlError::NvError(nv_err) => nv_err.to_result_code(),
+        nx_service_nv::IoctlError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
 
-fn nv_ioctl2_error_to_rc(err: nx_service_nv::NvIoctl2Error) -> u32 {
+fn nv_ioctl2_error_to_rc(err: nx_service_nv::Ioctl2Error) -> u32 {
     match err {
-        nx_service_nv::NvIoctl2Error::Ipc(e) => match e {
-            nx_service_nv::Ioctl2Error::SendRequest(e) => e.to_rc(),
-            nx_service_nv::Ioctl2Error::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+        nx_service_nv::Ioctl2Error::SendRequest(e) => e.to_rc(),
+        nx_service_nv::Ioctl2Error::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
         },
-        nx_service_nv::NvIoctl2Error::NvError(nv_err) => nv_err.to_result_code(),
+        nx_service_nv::Ioctl2Error::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
 
-fn nv_ioctl3_error_to_rc(err: nx_service_nv::NvIoctl3Error) -> u32 {
+fn nv_ioctl3_error_to_rc(err: nx_service_nv::Ioctl3Error) -> u32 {
     match err {
-        nx_service_nv::NvIoctl3Error::Ipc(e) => match e {
-            nx_service_nv::Ioctl3Error::SendRequest(e) => e.to_rc(),
-            nx_service_nv::Ioctl3Error::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+        nx_service_nv::Ioctl3Error::SendRequest(e) => e.to_rc(),
+        nx_service_nv::Ioctl3Error::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
         },
-        nx_service_nv::NvIoctl3Error::NvError(nv_err) => nv_err.to_result_code(),
+        nx_service_nv::Ioctl3Error::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
 
-fn nv_close_error_to_rc(err: nx_service_nv::NvCloseError) -> u32 {
+fn nv_close_error_to_rc(err: nx_service_nv::CloseError) -> u32 {
     match err {
-        nx_service_nv::NvCloseError::Ipc(e) => match e {
-            nx_service_nv::CloseError::SendRequest(e) => e.to_rc(),
-            nx_service_nv::CloseError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+        nx_service_nv::CloseError::SendRequest(e) => e.to_rc(),
+        nx_service_nv::CloseError::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
         },
-        nx_service_nv::NvCloseError::NvError(nv_err) => nv_err.to_result_code(),
+        nx_service_nv::CloseError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
 
-fn nv_query_event_error_to_rc(err: nx_service_nv::NvQueryEventError) -> u32 {
+fn nv_query_event_error_to_rc(err: nx_service_nv::QueryEventError) -> u32 {
     match err {
-        nx_service_nv::NvQueryEventError::Ipc(e) => match e {
-            nx_service_nv::QueryEventError::SendRequest(e) => e.to_rc(),
-            nx_service_nv::QueryEventError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
-            nx_service_nv::QueryEventError::MissingHandle => GENERIC_ERROR,
+        nx_service_nv::QueryEventError::SendRequest(e) => e.to_rc(),
+        nx_service_nv::QueryEventError::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
         },
-        nx_service_nv::NvQueryEventError::NvError(nv_err) => nv_err.to_result_code(),
+        nx_service_nv::QueryEventError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
+        nx_service_nv::QueryEventError::MissingHandle => GENERIC_ERROR,
     }
 }
 

@@ -31,110 +31,202 @@ impl NvServiceType {
     }
 }
 
-/// NV driver error codes.
+/// Error codes returned by NV Open command.
 ///
-/// These map to libnx's LibnxNvidiaError_* constants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
-pub enum NvError {
-    /// Operation not implemented.
-    NotImplemented = 1,
-    /// Operation not supported.
-    NotSupported = 2,
+/// The Open command can return a limited set of error codes based on
+/// whether the device exists and the service is ready.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum OpenNvError {
+    /// Device not supported or doesn't exist.
+    #[error("device not supported")]
+    NotSupported,
     /// Service not initialized.
-    NotInitialized = 3,
-    /// Bad parameter provided.
-    BadParameter = 4,
-    /// Operation timed out.
-    Timeout = 5,
-    /// Insufficient memory available.
-    InsufficientMemory = 6,
-    /// Attribute is read-only.
-    ReadOnlyAttribute = 7,
-    /// Invalid state for operation.
-    InvalidState = 8,
-    /// Invalid memory address.
-    InvalidAddress = 9,
-    /// Invalid size specified.
-    InvalidSize = 10,
-    /// Bad value provided.
-    BadValue = 11,
-    /// Resource already allocated.
-    AlreadyAllocated = 13,
-    /// Resource is busy.
-    Busy = 14,
-    /// Resource error.
-    ResourceError = 15,
-    /// Count mismatch.
-    CountMismatch = 16,
-    /// Shared memory too small.
-    SharedMemoryTooSmall = 0x1000,
-    /// File operation failed.
-    FileOperationFailed = 0x30003,
-    /// Ioctl operation failed.
-    IoctlFailed = 0x3000F,
-    /// Unknown error.
-    Unknown = -1,
+    #[error("service not initialized")]
+    NotInitialized,
+    /// File operation failed (device couldn't be opened).
+    #[error("file operation failed")]
+    FileOperationFailed,
+    /// Unknown or undocumented error code.
+    #[error("unknown error code: {0:#x}")]
+    Unknown(u32),
 }
 
-impl NvError {
-    /// Converts a raw NV error code to an NvError variant.
-    pub fn from_raw(rc: i32) -> Self {
-        match rc {
-            0 => unreachable!("0 is success, not an error"),
-            1 => Self::NotImplemented,
-            2 => Self::NotSupported,
-            3 => Self::NotInitialized,
-            4 => Self::BadParameter,
-            5 => Self::Timeout,
-            6 => Self::InsufficientMemory,
-            7 => Self::ReadOnlyAttribute,
-            8 => Self::InvalidState,
-            9 => Self::InvalidAddress,
-            10 => Self::InvalidSize,
-            11 => Self::BadValue,
-            13 => Self::AlreadyAllocated,
-            14 => Self::Busy,
-            15 => Self::ResourceError,
-            16 => Self::CountMismatch,
-            0x1000 => Self::SharedMemoryTooSmall,
+impl OpenNvError {
+    /// Converts a raw NV error code to an `OpenNvError`.
+    pub fn from_raw(code: u32) -> Self {
+        match code {
+            0x2 => Self::NotSupported,
+            0x3 => Self::NotInitialized,
             0x30003 => Self::FileOperationFailed,
-            0x3000F => Self::IoctlFailed,
-            _ => Self::Unknown,
+            other => Self::Unknown(other),
         }
     }
 
-    /// Converts this NvError to a libnx-compatible result code.
-    ///
-    /// Uses Module_LibnxNvidia (346) as the module.
-    pub fn to_result_code(self) -> u32 {
-        const MODULE_LIBNX_NVIDIA: u32 = 346;
+    /// Returns the raw NV error code.
+    pub fn to_raw(self) -> u32 {
+        match self {
+            Self::NotSupported => 0x2,
+            Self::NotInitialized => 0x3,
+            Self::FileOperationFailed => 0x30003,
+            Self::Unknown(code) => code,
+        }
+    }
+}
 
-        // libnx error descriptor mapping
-        let desc: u32 = match self {
-            Self::NotImplemented => 1,
-            Self::NotSupported => 2,
-            Self::NotInitialized => 3,
-            Self::BadParameter => 4,
-            Self::Timeout => 5,
-            Self::InsufficientMemory => 6,
-            Self::ReadOnlyAttribute => 7,
-            Self::InvalidState => 8,
-            Self::InvalidAddress => 9,
-            Self::InvalidSize => 10,
-            Self::BadValue => 11,
-            Self::AlreadyAllocated => 12,
-            Self::Busy => 13,
-            Self::ResourceError => 14,
-            Self::CountMismatch => 15,
-            Self::SharedMemoryTooSmall => 16,
-            Self::FileOperationFailed => 17,
-            Self::IoctlFailed => 18,
-            Self::Unknown => 19,
-        };
+/// Error codes returned by NV Close command.
+///
+/// The Close command can return errors related to service state and
+/// whether the operation is implemented for the device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CloseNvError {
+    /// Operation not implemented for this device.
+    #[error("not implemented")]
+    NotImplemented,
+    /// Service not initialized.
+    #[error("service not initialized")]
+    NotInitialized,
+    /// Invalid state for operation.
+    #[error("invalid state")]
+    InvalidState,
+    /// Unknown or undocumented error code.
+    #[error("unknown error code: {0:#x}")]
+    Unknown(u32),
+}
 
-        // MAKERESULT(module, description) = ((module & 0x1FF) | ((description & 0x1FFF) << 9))
-        (MODULE_LIBNX_NVIDIA & 0x1FF) | ((desc & 0x1FFF) << 9)
+impl CloseNvError {
+    /// Converts a raw NV error code to a `CloseNvError`.
+    pub fn from_raw(code: u32) -> Self {
+        match code {
+            0x1 => Self::NotImplemented,
+            0x3 => Self::NotInitialized,
+            0x8 => Self::InvalidState,
+            other => Self::Unknown(other),
+        }
+    }
+
+    /// Returns the raw NV error code.
+    pub fn to_raw(self) -> u32 {
+        match self {
+            Self::NotImplemented => 0x1,
+            Self::NotInitialized => 0x3,
+            Self::InvalidState => 0x8,
+            Self::Unknown(code) => code,
+        }
+    }
+}
+
+/// Error codes returned by NV QueryEvent command.
+///
+/// The QueryEvent command can fail due to service state, invalid parameters,
+/// or if the event query is not implemented.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum QueryEventNvError {
+    /// Operation not implemented for this device/event.
+    #[error("not implemented")]
+    NotImplemented,
+    /// Service not initialized.
+    #[error("service not initialized")]
+    NotInitialized,
+    /// Bad parameter (invalid event ID or fd).
+    #[error("bad parameter")]
+    BadParameter,
+    /// Invalid state for operation.
+    #[error("invalid state")]
+    InvalidState,
+    /// Unknown or undocumented error code.
+    #[error("unknown error code: {0:#x}")]
+    Unknown(u32),
+}
+
+impl QueryEventNvError {
+    /// Converts a raw NV error code to a `QueryEventNvError`.
+    pub fn from_raw(code: u32) -> Self {
+        match code {
+            0x1 => Self::NotImplemented,
+            0x3 => Self::NotInitialized,
+            0x4 => Self::BadParameter,
+            0x8 => Self::InvalidState,
+            other => Self::Unknown(other),
+        }
+    }
+
+    /// Returns the raw NV error code.
+    pub fn to_raw(self) -> u32 {
+        match self {
+            Self::NotImplemented => 0x1,
+            Self::NotInitialized => 0x3,
+            Self::BadParameter => 0x4,
+            Self::InvalidState => 0x8,
+            Self::Unknown(code) => code,
+        }
+    }
+}
+
+/// Error codes returned by NV Ioctl commands (Ioctl, Ioctl2, Ioctl3).
+///
+/// Ioctl commands delegate to device drivers which can return various
+/// error codes. This enum covers the common cases with an `Unknown` variant
+/// for device-specific or rare error codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum IoctlNvError {
+    /// Operation not implemented.
+    #[error("not implemented")]
+    NotImplemented,
+    /// Service not initialized.
+    #[error("service not initialized")]
+    NotInitialized,
+    /// Bad parameter provided.
+    #[error("bad parameter")]
+    BadParameter,
+    /// Operation timed out.
+    #[error("timeout")]
+    Timeout,
+    /// Insufficient memory available.
+    #[error("insufficient memory")]
+    InsufficientMemory,
+    /// Invalid state for operation.
+    #[error("invalid state")]
+    InvalidState,
+    /// Bad value provided.
+    #[error("bad value")]
+    BadValue,
+    /// Resource is busy.
+    #[error("busy")]
+    Busy,
+    /// Unknown or device-specific error code.
+    #[error("unknown error code: {0:#x}")]
+    Unknown(u32),
+}
+
+impl IoctlNvError {
+    /// Converts a raw NV error code to an `IoctlNvError`.
+    pub fn from_raw(code: u32) -> Self {
+        match code {
+            0x1 => Self::NotImplemented,
+            0x3 => Self::NotInitialized,
+            0x4 => Self::BadParameter,
+            0x5 => Self::Timeout,
+            0x6 => Self::InsufficientMemory,
+            0x8 => Self::InvalidState,
+            0xB => Self::BadValue,
+            0xE => Self::Busy,
+            other => Self::Unknown(other),
+        }
+    }
+
+    /// Returns the raw NV error code.
+    pub fn to_raw(self) -> u32 {
+        match self {
+            Self::NotImplemented => 0x1,
+            Self::NotInitialized => 0x3,
+            Self::BadParameter => 0x4,
+            Self::Timeout => 0x5,
+            Self::InsufficientMemory => 0x6,
+            Self::InvalidState => 0x8,
+            Self::BadValue => 0xB,
+            Self::Busy => 0xE,
+            Self::Unknown(code) => code,
+        }
     }
 }
 

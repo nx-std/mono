@@ -11,14 +11,18 @@ use nx_svc::{
     ipc::{self, Handle as SessionHandle},
     mem::tmem::Handle as TmemHandle,
     process::Handle as ProcessHandle,
+    raw::Handle as RawHandle,
 };
 
-use crate::proto::nv_cmds;
+use crate::{
+    proto::nv_cmds,
+    types::{CloseNvError, IoctlNvError, OpenNvError, QueryEventNvError},
+};
 
 /// Opens a device by path.
 ///
 /// This is INvDrvServices command 0.
-pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<(u32, u32), OpenError> {
+pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<u32, OpenError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(nv_cmds::OPEN)
@@ -45,7 +49,12 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<(u32, u32), Op
     }
 
     let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
-    Ok((output.fd, output.error))
+
+    if output.error != 0 {
+        return Err(OpenError::NvError(OpenNvError::from_raw(output.error)));
+    }
+
+    Ok(output.fd)
 }
 
 /// Performs an ioctl operation.
@@ -58,7 +67,7 @@ pub fn ioctl(
     in_size: usize,
     out_size: usize,
     argp: *mut u8,
-) -> Result<u32, IoctlError> {
+) -> Result<(), IoctlError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let num_in_auto = if in_size > 0 { 1 } else { 0 };
@@ -101,7 +110,12 @@ pub fn ioctl(
 
     // Response contains error code
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-    Ok(error)
+
+    if error != 0 {
+        return Err(IoctlError::NvError(IoctlNvError::from_raw(error)));
+    }
+
+    Ok(())
 }
 
 /// Performs an ioctl2 operation (with extra input buffer).
@@ -117,7 +131,7 @@ pub fn ioctl2(
     argp: *mut u8,
     extra_in: *const u8,
     extra_in_size: usize,
-) -> Result<u32, Ioctl2Error> {
+) -> Result<(), Ioctl2Error> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     // Auto buffers: argp in (if dir & write), inbuf, argp out (if dir & read)
@@ -161,7 +175,12 @@ pub fn ioctl2(
         unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(Ioctl2Error::ParseResponse)?;
 
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-    Ok(error)
+
+    if error != 0 {
+        return Err(Ioctl2Error::NvError(IoctlNvError::from_raw(error)));
+    }
+
+    Ok(())
 }
 
 /// Performs an ioctl3 operation (with extra output buffer).
@@ -177,7 +196,7 @@ pub fn ioctl3(
     argp: *mut u8,
     extra_out: *mut u8,
     extra_out_size: usize,
-) -> Result<u32, Ioctl3Error> {
+) -> Result<(), Ioctl3Error> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let num_in_auto = if in_size > 0 { 1 } else { 0 };
@@ -220,13 +239,18 @@ pub fn ioctl3(
         unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(Ioctl3Error::ParseResponse)?;
 
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-    Ok(error)
+
+    if error != 0 {
+        return Err(Ioctl3Error::NvError(IoctlNvError::from_raw(error)));
+    }
+
+    Ok(())
 }
 
 /// Closes a device file descriptor.
 ///
 /// This is INvDrvServices command 2.
-pub fn close(session: SessionHandle, fd: u32) -> Result<u32, CloseError> {
+pub fn close(session: SessionHandle, fd: u32) -> Result<(), CloseError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(nv_cmds::CLOSE)
@@ -248,7 +272,12 @@ pub fn close(session: SessionHandle, fd: u32) -> Result<u32, CloseError> {
         unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(CloseError::ParseResponse)?;
 
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-    Ok(error)
+
+    if error != 0 {
+        return Err(CloseError::NvError(CloseNvError::from_raw(error)));
+    }
+
+    Ok(())
 }
 
 /// Initializes the NV service with transfer memory.
@@ -295,7 +324,7 @@ pub fn query_event(
     session: SessionHandle,
     fd: u32,
     event_id: u32,
-) -> Result<(u32, u32), QueryEventError> {
+) -> Result<RawHandle, QueryEventError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(nv_cmds::QUERY_EVENT)
@@ -325,13 +354,18 @@ pub fn query_event(
 
     // Response contains error code, and a copy handle for the event
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+
+    if error != 0 {
+        return Err(QueryEventError::NvError(QueryEventNvError::from_raw(error)));
+    }
+
     let event_handle = resp
         .copy_handles
         .first()
         .copied()
         .ok_or(QueryEventError::MissingHandle)?;
 
-    Ok((event_handle, error))
+    Ok(event_handle)
 }
 
 /// Sets the client PID (ARUID).
@@ -371,6 +405,9 @@ pub enum OpenError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseResponseError),
+    /// NV driver returned an error.
+    #[error("NV driver error")]
+    NvError(#[source] OpenNvError),
 }
 
 /// Error returned by ioctl operation.
@@ -382,6 +419,9 @@ pub enum IoctlError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseResponseError),
+    /// NV driver returned an error.
+    #[error("NV driver error")]
+    NvError(#[source] IoctlNvError),
 }
 
 /// Error returned by ioctl2 operation.
@@ -393,6 +433,9 @@ pub enum Ioctl2Error {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseResponseError),
+    /// NV driver returned an error.
+    #[error("NV driver error")]
+    NvError(#[source] IoctlNvError),
 }
 
 /// Error returned by ioctl3 operation.
@@ -404,6 +447,9 @@ pub enum Ioctl3Error {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseResponseError),
+    /// NV driver returned an error.
+    #[error("NV driver error")]
+    NvError(#[source] IoctlNvError),
 }
 
 /// Error returned by close operation.
@@ -415,6 +461,9 @@ pub enum CloseError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseResponseError),
+    /// NV driver returned an error.
+    #[error("NV driver error")]
+    NvError(#[source] CloseNvError),
 }
 
 /// Error returned by initialize operation.
@@ -437,6 +486,9 @@ pub enum QueryEventError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseResponseError),
+    /// NV driver returned an error.
+    #[error("NV driver error")]
+    NvError(#[source] QueryEventNvError),
     /// Missing event handle in response.
     #[error("missing event handle in response")]
     MissingHandle,
