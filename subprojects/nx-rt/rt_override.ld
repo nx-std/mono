@@ -1,10 +1,26 @@
-/* Linker script to override libnx runtime functions */
+/* Linker script to override libnx runtime functions
+ *
+ * This script redirects libnx C function symbols to Rust FFI implementations
+ * in the nx-rt crate, enabling gradual replacement of libnx with Rust code.
+ *
+ * Organization:
+ *   - Rust FFI:  subprojects/nx-rt/src/ffi/*.rs
+ *   - libnx C:   subprojects/libnx/src/nx/source/{runtime,services}/*.c
+ */
 
-/* Heap initialization */
+/*
+ * Heap Initialization
+ * Rust: ffi/env.rs
+ * libnx: runtime/init.c
+ */
 EXTERN(__nx_rt__initheap);
 __libnx_initheap = __nx_rt__initheap;
 
-/* Argv and nxlink symbols */
+/*
+ * Argument Vector (argv)
+ * Rust: ffi/argv.rs
+ * libnx: runtime/argv.c
+ */
 EXTERN(__nx_rt__argv_setup);
 argvSetup = __nx_rt__argv_setup;
 
@@ -13,10 +29,19 @@ EXTERN(__nx_rt__system_argv);
 __system_argc = __nx_rt__system_argc;
 __system_argv = __nx_rt__system_argv;
 
+/*
+ * nxlink Host Address
+ * Rust: ffi/env.rs
+ * libnx: runtime/nxlink.c
+ */
 EXTERN(__nx_rt__nxlink_host);
 __nxlink_host = __nx_rt__nxlink_host;
 
-/* Environment symbols */
+/*
+ * Environment / Loader Configuration
+ * Rust: ffi/env.rs
+ * libnx: runtime/env.c, runtime/newlib.c, runtime/hosversion.c
+ */
 EXTERN(__nx_rt__env_setup);
 EXTERN(__nx_rt__setup_main_thread_tls);
 EXTERN(__nx_rt__env_get_loader_info);
@@ -61,7 +86,11 @@ envHasRandomSeed = __nx_rt__env_has_random_seed;
 envGetRandomSeed = __nx_rt__env_get_random_seed;
 envGetUserIdStorage = __nx_rt__env_get_user_id_storage;
 
-/* hosversion API */
+/*
+ * HOS Version API
+ * Rust: ffi/env.rs
+ * libnx: runtime/hosversion.c
+ */
 EXTERN(__nx_rt__hosversion_get);
 EXTERN(__nx_rt__hosversion_set);
 EXTERN(__nx_rt__hosversion_is_atmosphere);
@@ -70,7 +99,11 @@ hosversionGet = __nx_rt__hosversion_get;
 hosversionSet = __nx_rt__hosversion_set;
 hosversionIsAtmosphere = __nx_rt__hosversion_is_atmosphere;
 
-/* Service Manager API */
+/*
+ * Service Manager (sm) API
+ * Rust: ffi/sm.rs
+ * libnx: services/sm.c
+ */
 EXTERN(__nx_rt__sm_initialize);
 EXTERN(__nx_rt__sm_exit);
 EXTERN(__nx_rt__sm_get_service_wrapper);
@@ -105,7 +138,11 @@ smDetachClientCmif = __nx_rt__sm_detach_client_cmif;
 smDetachClientTipc = __nx_rt__sm_detach_client_tipc;
 smGetServiceSession = __nx_rt__sm_get_service_session;
 
-/* System Settings (set:sys) API */
+/*
+ * System Settings (set:sys) API
+ * Rust: ffi/setsys.rs
+ * libnx: services/set.c
+ */
 EXTERN(__nx_rt__setsys_initialize);
 EXTERN(__nx_rt__setsys_exit);
 EXTERN(__nx_rt__setsys_get_service_session);
@@ -116,7 +153,11 @@ setsysExit = __nx_rt__setsys_exit;
 setsysGetServiceSession = __nx_rt__setsys_get_service_session;
 setsysGetFirmwareVersion = __nx_rt__setsys_get_firmware_version;
 
-/* Application Performance Management (APM) API */
+/*
+ * Application Performance Management (APM) API
+ * Rust: ffi/apm.rs
+ * libnx: services/apm.c
+ */
 EXTERN(__nx_rt__apm_initialize);
 EXTERN(__nx_rt__apm_exit);
 EXTERN(__nx_rt__apm_get_performance_mode);
@@ -133,7 +174,14 @@ apmGetPerformanceConfiguration = __nx_rt__apm_get_performance_configuration;
 apmGetServiceSession = __nx_rt__apm_get_service_session;
 apmGetServiceSession_Session = __nx_rt__apm_get_service_session_session;
 
-/* Applet Service API */
+/*
+ * Applet Service API
+ * Rust: ffi/applet.rs (functions), ffi/env.rs (global variable)
+ * libnx: services/applet.c
+ */
+EXTERN(__nx_rt__applet_type);
+__nx_applet_type = __nx_rt__applet_type;
+
 EXTERN(__nx_rt__applet_initialize);
 EXTERN(__nx_rt__applet_exit);
 EXTERN(__nx_rt__applet_get_applet_type);
@@ -158,7 +206,11 @@ appletSetOutOfFocusSuspendingEnabled = __nx_rt__applet_set_out_of_focus_suspendi
 appletGetAppletResourceUserId = __nx_rt__applet_get_applet_resource_user_id;
 appletCreateManagedDisplayLayer = __nx_rt__applet_create_managed_display_layer;
 
-/* Human Input Device (HID) API */
+/*
+ * Human Input Device (HID) API
+ * Rust: ffi/hid.rs
+ * libnx: services/hid.c
+ */
 EXTERN(__nx_rt__hid_initialize);
 EXTERN(__nx_rt__hid_exit);
 EXTERN(__nx_rt__hid_get_sharedmem_addr);
@@ -181,7 +233,11 @@ hidInitializeMouse = __nx_rt__hid_initialize_mouse;
 hidInitializeKeyboard = __nx_rt__hid_initialize_keyboard;
 hidInitializeGesture = __nx_rt__hid_initialize_gesture;
 
-/* Time Service API */
+/*
+ * Time Service API
+ * Rust: ffi/time.rs
+ * libnx: services/time.c
+ */
 EXTERN(__nx_rt__time_initialize);
 EXTERN(__nx_rt__time_exit);
 EXTERN(__nx_rt__time_get_current_time);
@@ -192,7 +248,11 @@ timeExit = __nx_rt__time_exit;
 timeGetCurrentTime = __nx_rt__time_get_current_time;
 timeToCalendarTimeWithMyRule = __nx_rt__time_to_calendar_time_with_my_rule;
 
-/* NV (NVIDIA Driver) Service API */
+/*
+ * NV (NVIDIA Driver) Service API
+ * Rust: ffi/nv.rs
+ * libnx: services/nv.c
+ */
 EXTERN(__nx_rt__nv_initialize);
 EXTERN(__nx_rt__nv_exit);
 EXTERN(__nx_rt__nv_open);
@@ -215,7 +275,11 @@ nvQueryEvent = __nx_rt__nv_query_event;
 nvConvertError = __nx_rt__nv_convert_error;
 nvGetServiceSession = __nx_rt__nv_get_service_session;
 
-/* VI (Visual Interface) Service API */
+/*
+ * Visual Interface (VI) Service API
+ * Rust: ffi/vi.rs
+ * libnx: services/vi.c
+ */
 EXTERN(__nx_rt__vi_initialize);
 EXTERN(__nx_rt__vi_exit);
 EXTERN(__nx_rt__vi_get_session_application_display);
