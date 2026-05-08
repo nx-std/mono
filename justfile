@@ -83,6 +83,13 @@ clippy *EXTRA_FLAGS:
 clippy-crate CRATE *EXTRA_FLAGS:
     cargo clippy --target {{target}} --target-dir {{cargo_target_dir}} --package {{CRATE}} --no-deps {{EXTRA_FLAGS}}
 
+alias check-deps := check-unused-deps
+
+# Check for unused Rust dependencies (cargo machete)
+[group: 'check']
+check-unused-deps:
+    cargo machete
+
 
 ## Build (Meson)
 
@@ -229,3 +236,8 @@ remove-git-hooks HOOKS=PRECOMMIT_DEFAULT_HOOKS:
 
     # Remove all Git hooks (see PRECOMMIT_DEFAULT_HOOKS for default hooks)
     pre-commit uninstall --config {{PRECOMMIT_CONFIG}} {{replace_regex(HOOKS, "\\s*([a-z-]+)\\s*", "--hook-type $1 ")}}
+
+# Install cargo-machete (unused dependency checker)
+[group: 'misc']
+install-cargo-machete:
+    cargo install --locked cargo-machete
