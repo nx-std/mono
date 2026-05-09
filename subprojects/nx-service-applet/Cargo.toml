@@ -18,3 +18,7 @@ nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
+
+# Linked at the FFI boundary for symbol re-export; not referenced from Rust source.
+[package.metadata.cargo-machete]
+ignored = ["nx-sys-thread-tls"]

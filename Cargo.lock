@@ -75,7 +75,6 @@ name = "nx-cpu"
 version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
- "nx-svc",
 ]
 
 [[package]]
@@ -90,7 +89,6 @@ dependencies = [
  "nx-svc",
  "rand",
  "rand_chacha",
- "static_assertions",
 ]
 
 [[package]]
@@ -305,14 +303,12 @@ dependencies = [
 name = "nx-sys-thread"
 version = "0.1.0"
 dependencies = [
- "intrusive-collections",
  "nx-alloc",
  "nx-panic-handler",
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-thread-tls",
  "nx-time",
- "static_assertions",
  "thiserror",
 ]
 

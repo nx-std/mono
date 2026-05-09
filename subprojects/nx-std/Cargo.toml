@@ -78,3 +78,7 @@ nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
+
+# Feature-gated, linked via meson for FFI symbol re-export; not `use`d in Rust source.
+[package.metadata.cargo-machete]
+ignored = ["nx-service-nv", "nx-service-vi"]
