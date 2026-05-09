@@ -76,6 +76,24 @@ bundle_base = [bundle_sh,
                '--icon',    files(default_ico),
                '--version', '1.0.0']
 
+## Embedded data files: bin2s converts data/<name>.<ext> → <name>_<ext>.s + <name>_<ext>.h.
+## Meson's @BASENAME@ strips the extension, so we need one generator per extension to
+## reproduce the devkitPro `<stem>_<ext>` naming the C sources `#include`.
+bin2s = find_program('bin2s', required : true)
+
+bin2s_bin_gen = generator(bin2s,
+                          output    : ['@BASENAME@_bin.s', '@BASENAME@_bin.h'],
+                          arguments : ['-a', '8', '-H', '@BUILD_DIR@/@BASENAME@_bin.h', '@INPUT@'],
+                          capture   : true)
+bin2s_opus_gen = generator(bin2s,
+                           output    : ['@BASENAME@_opus.s', '@BASENAME@_opus.h'],
+                           arguments : ['-a', '8', '-H', '@BUILD_DIR@/@BASENAME@_opus.h', '@INPUT@'],
+                           capture   : true)
+bin2s_png_gen = generator(bin2s,
+                          output    : ['@BASENAME@_png.s', '@BASENAME@_png.h'],
+                          arguments : ['-a', '8', '-H', '@BUILD_DIR@/@BASENAME@_png.h', '@INPUT@'],
+                          capture   : true)
+
 #---------------------------------------------------------------------------------
 # Examples
 #---------------------------------------------------------------------------------
@@ -224,7 +242,9 @@ custom_target(name + '.nro',
 
 # ── audio/audren-simple ───────────────────────────────────────────────────
 name = 'audio-audren_simple'
-elf = executable(name + '.elf', files(src / 'audio/audren-simple/source/main.c'),
+sample_bin_src = bin2s_bin_gen.process(src / 'audio/audren-simple/data/sample.bin')
+elf = executable(name + '.elf',
+                 [files(src / 'audio/audren-simple/source/main.c'), sample_bin_src],
                  dependencies : nx_dep,
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_args, pie : true)
@@ -246,7 +266,9 @@ custom_target(name + '.nro',
 
 # ── audio/hwopus-decoder ──────────────────────────────────────────────────
 name = 'audio-hwopus_decoder'
-elf = executable(name + '.elf', files(src / 'audio/hwopus-decoder/source/main.c'),
+sample_opus_src = bin2s_opus_gen.process(src / 'audio/hwopus-decoder/data/sample.opus')
+elf = executable(name + '.elf',
+                 [files(src / 'audio/hwopus-decoder/source/main.c'), sample_opus_src],
                  dependencies : [nx_dep, opusfile_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_args, pie : true)
@@ -526,7 +548,8 @@ sources = files(
   src / 'graphics/opengl/textured_cube/source/main.cpp',
   src / 'graphics/opengl/textured_cube/source/stb_image.cpp',
 )
-elf = executable(name + '.elf', sources,
+devkitlenny_png_src = bin2s_png_gen.process(src / 'graphics/opengl/textured_cube/data/devkitlenny.png')
+elf = executable(name + '.elf', [sources, devkitlenny_png_src],
                  dependencies : [nx_dep, egl_dep, glapi_dep, drm_nouveau_dep, glad_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_args, pie : true)
