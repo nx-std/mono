@@ -235,11 +235,15 @@ remove-git-hooks HOOKS=PRECOMMIT_DEFAULT_HOOKS:
 install-cargo-machete:
     cargo install --locked cargo-machete
 
+# Pinned cargo-nx revision from nx-std/tools (main @ 2026-05-09)
+CARGO_NX_REV := "28bd4fa21d70afede7cb25aaf3e271d920a43e44"
+
 # Install cargo-nx from the nx-std/tools repository
 [group: 'misc']
 install-cargo-nx:
     cargo +stable install \
         --git https://github.com/nx-std/tools.git \
+        --rev {{CARGO_NX_REV}} \
         --locked \
         --target host-tuple \
         cargo-nx

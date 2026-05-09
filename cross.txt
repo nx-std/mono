@@ -7,7 +7,3 @@ system = 'horizon'
 cpu_family = 'aarch64'
 cpu = 'cortex-a57'
 endian = 'little'
-
-[binaries]
-# Project scripts
-bundle = '@GLOBAL_SOURCE_ROOT@/scripts/bundle.sh'
