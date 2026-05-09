@@ -11,6 +11,8 @@ project('nx-hbmenu', 'c',
 name = 'hbmenu'
 author = 'switchbrew'
 version = meson.project_version()
+# NACP `version` field is fixed at 16 bytes; keep a separate short string for it.
+nacp_version = version
 
 # If this is not a release build, use the git tag as the version
 if get_option('buildtype') != 'release'
@@ -238,7 +240,7 @@ elif 'NRO' == bundle_type
         bundle_opts += [
             '--name', name,
             '--author', author,
-            '--version', version,
+            '--version', nacp_version,
         ]
     else
         bundle_opts += ['--no-nacp']
