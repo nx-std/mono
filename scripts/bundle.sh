@@ -68,26 +68,26 @@ cd "$TMP_DIR"
 STEM=$(basename "$INPUT" .${INPUT##*.})
 
 if [[ -n "$NPDM_JSON" ]]; then
-    npdmtool "$NPDM_JSON" "$STEM.npdm"
-    elf2nso "$INPUT" "$STEM.nso"
+    cargo nx tool npdmtool "$NPDM_JSON" "$STEM.npdm"
+    cargo nx tool elf2nso "$INPUT" "$STEM.nso"
 
     EXEFS_DIR="$TMP_DIR/exefs"
     mkdir -p "$EXEFS_DIR"
     cp "$STEM.nso" "$EXEFS_DIR/main"
     cp "$STEM.npdm" "$EXEFS_DIR/main.npdm"
 
-    build_pfs0 "$EXEFS_DIR" "$OUTPUT"
+    cargo nx tool build_pfs0 "$EXEFS_DIR" "$OUTPUT"
 
     rm -rf "$EXEFS_DIR"
 else
-    CMD="elf2nro \"$INPUT\" \"$OUTPUT\""
+    CMD="cargo nx tool elf2nro \"$INPUT\" \"$OUTPUT\""
 
     if [[ -n "$ICON" ]]; then
         CMD+=" --icon=\"$ICON\""
     fi
 
     if [[ "$NO_NACP" != true ]]; then
-        nacptool --create "$NAME" "$AUTHOR" "$VERSION" "$STEM.nacp"
+        cargo nx tool nacptool --create "$NAME" "$AUTHOR" "$VERSION" "$STEM.nacp"
         CMD+=" --nacp=\"$STEM.nacp\""
     fi
 
