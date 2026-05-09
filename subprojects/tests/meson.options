@@ -4,3 +4,11 @@ option(
     description : 'Use pre-built devkitPro libnx',
     yield : true
 )
+
+option(
+    'use_nx_std_sync',
+    type : 'feature', value : 'auto',
+    description : 'Required: tests link against nx-std-sync FFI exports',
+    yield : true
+)
+

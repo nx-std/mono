@@ -32,6 +32,14 @@ nx_switch_specs = nx_proj.get_variable('nx_switch_specs')
 nx_default_icon = nx_proj.get_variable('nx_default_icon')
 
 # nx-std-sync
+# Tests link against the Rust oneshot FFI exported by nx-std-sync. That FFI is
+# only emitted when `use_nx_std_sync` is explicitly enabled — `auto` resolves to
+# off here because libnx itself does not pull the symbols in. Fail configuration
+# early instead of letting the linker report missing `__nx_std_sync__*` symbols.
+if not get_option('use_nx_std_sync').enabled()
+    error('nx-tests requires -Duse_nx_std_sync=enabled (currently @0@)'.format(get_option('use_nx_std_sync')))
+endif
+
 nx_std_sync_proj = subproject('nx-std-sync')
 nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
 
