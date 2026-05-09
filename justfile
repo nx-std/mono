@@ -151,13 +151,6 @@ list-options-configured: _ensure-configured
 
 ## Deploy
 
-# Install cargo-nx from the submodule (override workspace config to build for host)
-[group: 'deploy']
-install-cargo-nx:
-    #!/usr/bin/env bash
-    host_target=$(rustc +stable -vV | sed -n 's|host: ||p')
-    cargo +stable install --path subprojects/cargo-nx --target "$host_target"
-
 # Deploy an NRO file to the Nintendo Switch via cargo nx link
 [group: 'deploy']
 deploy NRO_FILE *EXTRA_FLAGS:
@@ -241,3 +234,12 @@ remove-git-hooks HOOKS=PRECOMMIT_DEFAULT_HOOKS:
 [group: 'misc']
 install-cargo-machete:
     cargo install --locked cargo-machete
+
+# Install cargo-nx from the nx-std/tools repository
+[group: 'misc']
+install-cargo-nx:
+    cargo +stable install \
+        --git https://github.com/nx-std/tools.git \
+        --locked \
+        --target host-tuple \
+        cargo-nx
