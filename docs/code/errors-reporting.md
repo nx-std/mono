@@ -26,6 +26,7 @@ scope: "global"
    - [11. No Unused Error Variants](#11-no-unused-error-variants)
    - [12. Error Documentation Template](#12-error-documentation-template)
    - [13. Avoid `BoxError` and `Box<dyn Error>`](#13-avoid-boxerror-and-boxdyn-error)
+   - [14. Unknown Error Variants for Kernel/SVC Operations](#14-unknown-error-variants-for-kernelsvc-operations)
 3. [Complete Example](#-complete-example)
 4. [Checklist](#-checklist)
 5. [Rationale](#-rationale)
@@ -567,6 +568,36 @@ pub enum PrototypeError {
 }
 ```
 
+### 14. Unknown Error Variants for Kernel/SVC Operations
+
+For kernel/SVC operations, include an `Unknown` variant that captures unforeseen error codes so callers can inspect the raw result.
+
+```rust
+#[derive(Debug, thiserror::Error)]
+pub enum StartThreadError {
+    /// The supplied handle is not a valid thread handle.
+    #[error("invalid handle")]
+    InvalidHandle,
+    /// Any unforeseen kernel error. Contains the original [`Error`] so callers
+    /// can inspect the raw result (`Error::to_raw`).
+    #[error("unknown error: {0}")]
+    Unknown(Error),
+}
+```
+
+Implement `ToRawResultCode` to convert error types back to raw result codes when needed:
+
+```rust
+impl ToRawResultCode for StartThreadError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+```
+
 ## 📋 COMPLETE EXAMPLE
 
 Putting it all together - a complete, production-grade error handling example:
@@ -686,6 +717,7 @@ Before committing error handling code, verify:
 - [ ] No unused error variants exist
 - [ ] All error variants are fully documented following the template
 - [ ] No `BoxError` or `Box<dyn Error>` in production code
+- [ ] Kernel/SVC error enums include an `Unknown(Error)` variant for unforeseen result codes
 
 ## 🎓 RATIONALE
 

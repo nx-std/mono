@@ -63,7 +63,7 @@ Use `/code-guidelines principles` to load these on demand when relevant to your 
 
 ## 2. Code Guidelines
 
-Code guideline documentation lives in `docs/code/` with YAML frontmatter for dynamic discovery. Coding patterns live in `docs/patterns/`.
+Code guideline documentation lives in `docs/code/` with YAML frontmatter for dynamic discovery.
 
 **Guideline docs are authoritative**: Guideline docs define how code should be written. All implementations MUST follow the patterns. If code doesn't follow a pattern, either fix the code or update the pattern (with team approval).
 
@@ -90,7 +90,7 @@ Code guideline documentation lives in `docs/code/` with YAML frontmatter for dyn
 **Navigation:**
 
 - Need to understand patterns? → `/code-guidelines`
-- All guidelines located in `docs/code/`; design patterns in `docs/patterns/`
+- All guidelines located in `docs/code/`
 - Documentation format specs in `docs/__meta__/`
 
 ### Code Style
@@ -447,6 +447,5 @@ For more detailed information about the project:
 - **Build system**: See [`docs/build_system.md`](docs/build_system.md)
 - **libnx symbol overrides**: See [`docs/libnx_overrides.md`](docs/libnx_overrides.md)
 - **Code guidelines**: Browse `docs/code/` (load via `/code-guidelines`)
-- **Design patterns**: Browse `docs/patterns/`
 - **Documentation format specs**: See `docs/__meta__/`
 - **Tests**: C tests in `subprojects/tests/` link against Rust crates to verify FFI correctness

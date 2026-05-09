@@ -90,8 +90,6 @@ Examples of current groups:
 - `logging` — logging, logging-errors
 - `crate-<crate-name>` — all `crate-<crate-name>*` files for that crate (only include when the diff modifies files inside that crate's directory)
 
-Also consider patterns under `docs/patterns/*.md` (FFI-specific conventions for this project) — group them under `pattern-fs` and include when the diff touches FFI / `unsafe` / linker-script code.
-
 #### Step 2: Spawn one Task agent per group — in parallel
 
 For **every** applicable group from Step 1, spawn a `general-purpose` Task agent. Send **all** Task tool calls in a single message so they run concurrently.
@@ -203,5 +201,5 @@ Sections are ordered by priority — review from top to bottom:
 After completing the code review:
 1. Provide clear, prioritized feedback
 2. Distinguish between blocking issues (bugs, soundness, FFI/ABI breaks) and suggestions (style, performance)
-3. Reference specific patterns from `docs/code/` and `docs/patterns/` when flagging violations
+3. Reference specific patterns from `docs/code/` when flagging violations
 4. Suggest using `/code-format`, `/code-check`, and `/code-test` skills to validate fixes

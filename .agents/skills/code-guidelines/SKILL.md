@@ -6,7 +6,7 @@ allowed-tools: Bash(awk *)
 
 # Code Guideline Discovery Skill
 
-Lazy-loads nx-std code guideline docs from `docs/code/` (and patterns from `docs/patterns/`) based on user query or work context, via YAML frontmatter matching.
+Lazy-loads nx-std code guideline docs from `docs/code/` based on user query or work context, via YAML frontmatter matching.
 
 ## When to Use
 
@@ -18,14 +18,14 @@ Lazy-loads nx-std code guideline docs from `docs/code/` (and patterns from `docs
 
 The frontmatter of all guideline docs (loaded at skill-start):
 
-!`awk '/^---$/{p=!p; print FILENAME": "$0; next} p{print FILENAME": "$0}' docs/code/*.md docs/patterns/*.md 2>/dev/null`
+!`awk '/^---$/{p=!p; print FILENAME": "$0; next} p{print FILENAME": "$0}' docs/code/*.md 2>/dev/null`
 
 > **Fallback**: if the block above appears as literal text (runtime does not auto-execute dynamic context), run it yourself with the Bash tool before proceeding.
 
 ## Workflow
 
 1. **Match** the user's query or work context against the prefetched catalog using the fields below.
-2. **Load** matched docs with the Read tool: `docs/code/<name>.md` or `docs/patterns/<name>.md`.
+2. **Load** matched docs with the Read tool: `docs/code/<name>.md`.
 
 ## Query Matching
 
@@ -50,7 +50,7 @@ Compare query/context against frontmatter fields:
 - defining error types → `errors-handling`, `errors-reporting`
 - writing tests → `test-functions`, `test-files`, `test-organization`
 - creating crates → `rust-workspace`, `rust-crate`
-- FFI work → patterns under `docs/patterns/` plus relevant core guidelines
+- FFI work → `rust-documentation` (FFI section), `errors-reporting`, plus relevant crate guidelines
 - crate-specific work (e.g. `subprojects/nx-svc`) → matching `crate-*` guidelines + relevant core
 
 ### Design Principles (special case)

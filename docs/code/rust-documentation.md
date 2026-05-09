@@ -28,15 +28,19 @@ This document establishes consistent, succinct documentation standards across th
    - [1. Brief Description Required](#1-brief-description-required)
    - [2. Document Key Behaviors](#2-document-key-behaviors)
 3. [Safety Documentation (Mandatory)](#-safety-documentation-mandatory)
-   - [1. Safety Section in `_unchecked` Functions](#1-safety-section-in-_unchecked-functions)
-   - [2. Safety Comments at Callsites](#2-safety-comments-at-callsites)
+   - [1. Safety Section in `unsafe fn`](#1-safety-section-in-unsafe-fn)
+   - [2. Safety Section in `_unchecked` Functions](#2-safety-section-in-_unchecked-functions)
+   - [3. Safety Comments at Callsites](#3-safety-comments-at-callsites)
 4. [Panics Documentation](#-panics-documentation)
-5. [Error Documentation Requirements](#-error-documentation-requirements)
+5. [FFI Documentation](#-ffi-documentation)
+   - [1. FFI Function Documentation](#1-ffi-function-documentation)
+   - [2. C Type Documentation](#2-c-type-documentation)
+6. [Error Documentation Requirements](#-error-documentation-requirements)
    - [1. Error Enum Documentation Template](#1-error-enum-documentation-template)
    - [2. Error Variant Documentation](#2-error-variant-documentation)
-6. [Cargo.toml Feature Documentation](#-cargotoml-feature-documentation)
-7. [Complete Examples](#-complete-examples)
-8. [Checklist](#-checklist)
+7. [Cargo.toml Feature Documentation](#-cargotoml-feature-documentation)
+8. [Complete Examples](#-complete-examples)
+9. [Checklist](#-checklist)
 
 ## 📐 CORE PRINCIPLES
 
@@ -153,7 +157,26 @@ pub fn get_config() -> Config {
 }
 ```
 
-### 4. No Examples Section
+### 4. No Arguments Section
+
+**FORBIDDEN**: Do not include `# Arguments` sections. Parameter names and types are self-documenting; put non-obvious constraints in the description.
+
+```rust
+// ❌ WRONG - Unnecessary arguments section
+/// Creates a thread with the given parameters.
+///
+/// # Arguments
+/// * `entry` - The thread entry point function
+/// * `priority` - Thread priority (0-63)
+/// * `core_id` - Preferred CPU core
+pub fn create_thread(entry: ThreadFunc, priority: i32, core_id: i32) -> Result<ThreadHandle, CreateThreadError> { /* ... */ }
+
+// ✅ CORRECT - Key info in description, no arguments section
+/// Creates a thread. Priority must be 0-63; core_id of -2 uses default affinity.
+pub fn create_thread(entry: ThreadFunc, priority: i32, core_id: i32) -> Result<ThreadHandle, CreateThreadError> { /* ... */ }
+```
+
+### 5. No Examples Section
 
 **FORBIDDEN**: Do not include `# Examples` or usage examples sections in documentation. Tests serve as examples.
 
@@ -179,7 +202,25 @@ pub fn validate_name(name: &str) -> Result<()> {
 
 ## 🔒 SAFETY DOCUMENTATION (MANDATORY)
 
-### 1. Safety Section in `_unchecked` Functions
+### 1. Safety Section in `unsafe fn`
+
+**MANDATORY**: All `unsafe fn` declarations MUST include a `# Safety` section enumerating the caller's responsibilities.
+
+```rust
+// ✅ CORRECT - Safety section in unsafe function
+/// Reads a value from the given memory address.
+///
+/// # Safety
+/// - `addr` must be properly aligned for type `T`
+/// - `addr` must point to a valid, initialized value of type `T`
+/// - The memory must not be concurrently modified
+pub unsafe fn read_volatile<T>(addr: *const T) -> T { /* ... */ }
+
+// ❌ WRONG - Missing safety section
+pub unsafe fn read_volatile<T>(addr: *const T) -> T { /* ... */ }
+```
+
+### 2. Safety Section in `_unchecked` Functions
 
 **MANDATORY**: All functions with `_unchecked` suffix MUST include a `# Safety` section explaining the caller's responsibilities.
 
@@ -214,9 +255,23 @@ pub fn from_str_unchecked(name: &str) -> DatasetName {
 /// [Optional: Detailed explanation of consequences if invariants violated]
 ```
 
-### 2. Safety Comments at Callsites
+### 3. Safety Comments at Callsites
 
-**MANDATORY**: All callsites of `_unchecked` functions (except in test code) MUST be preceded by a `// SAFETY:` comment explaining why the call is safe.
+**MANDATORY**: All `unsafe { }` blocks and callsites of `_unchecked` functions (except in test code) MUST be preceded by a `// SAFETY:` comment explaining why the call upholds the documented invariants.
+
+```rust
+// ✅ CORRECT - SAFETY comment at unsafe block
+let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+// SAFETY: ipc_buf points to the thread-local IPC buffer which is always
+// valid and properly aligned for IPC operations.
+unsafe { cmif::make_request(ipc_buf, cmd_id, 0) };
+
+// ❌ WRONG - Missing SAFETY comment
+let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+unsafe { cmif::make_request(ipc_buf, cmd_id, 0) };
+```
+
+The same applies to `_unchecked` callsites:
 
 ```rust
 // ✅ CORRECT - SAFETY comment at callsite
@@ -260,6 +315,51 @@ pub fn max_block_number(ranges: &[BlockRange]) -> u64 {
 ```rust
 /// # Panics
 /// Panics if [condition that causes panic]
+```
+
+## 🔌 FFI DOCUMENTATION
+
+### 1. FFI Function Documentation
+
+**REQUIRED**: All `pub extern "C"` functions in `ffi` modules must document:
+
+- What the function does
+- Safety requirements (always unsafe from the C perspective)
+- Return value / error code conventions
+
+```rust
+// ✅ CORRECT - FFI function with full documentation
+/// Creates a new thread.
+///
+/// # Safety
+/// - `entry` must be a valid function pointer
+/// - `stack_top` must point to a valid stack with sufficient size
+/// - `out_handle` must be a valid pointer to write the result
+///
+/// Returns 0 on success, or a raw result code on failure.
+/// On success, the new thread handle is written to `out_handle`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_thread_create(
+    out_handle: *mut u32,
+    entry: ThreadFunc,
+    arg: usize,
+    stack_top: *mut c_void,
+    priority: i32,
+    core_id: i32,
+) -> u32 { /* ... */ }
+```
+
+### 2. C Type Documentation
+
+**REQUIRED**: Document C-compatible types with their intended usage and any invariants.
+
+```rust
+// ✅ CORRECT - C type with documentation
+/// Thread entry function signature for C callers.
+///
+/// The function receives a single `usize` argument and should not return
+/// (call `__nx_thread_exit` instead).
+pub type ThreadFunc = unsafe extern "C" fn(arg: usize);
 ```
 
 ## 💥 ERROR DOCUMENTATION REQUIREMENTS
@@ -435,14 +535,21 @@ Before committing code, verify:
 
 - [ ] All public functions have succinct documentation (1-2 sentences max)
 - [ ] Documentation includes key behaviors and edge cases
-- [ ] Avoid verbose parameter/return documentation (keep it in the description)
+- [ ] No `# Arguments`, `# Returns`, or `# Examples` sections
 - [ ] Documentation adds value beyond what the signature conveys
 
 ### Safety Documentation
 
+- [ ] All `unsafe fn` have `# Safety` section in rustdocs
 - [ ] All `_unchecked` functions have `# Safety` section in rustdocs
-- [ ] All callsites of `_unchecked` functions (except tests) have `// SAFETY:` comments
-- [ ] Safety comments explain why the call is safe
+- [ ] All `unsafe { }` blocks and `_unchecked` callsites (except tests) have `// SAFETY:` comments
+- [ ] Safety comments explain why the operation is safe
+
+### FFI Documentation
+
+- [ ] All `pub extern "C"` functions are documented
+- [ ] FFI safety requirements are documented
+- [ ] Return value / error code conventions are documented
 
 ### Panics Documentation
 
