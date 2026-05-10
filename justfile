@@ -157,6 +157,56 @@ deploy NRO_FILE *EXTRA_FLAGS:
     cargo nx link {{NRO_FILE}} {{EXTRA_FLAGS}}
 
 
+## devkitPro toolchain (aarch64-none-elf-*)
+##
+## Thin passthroughs for inspecting Switch homebrew artifacts (NRO/ELF) and
+## connecting to Atmosphère's dmnt.gen2 GDB stub. Override the prefix path with
+## `just dkp_prefix=/some/path/aarch64-none-elf <task>` if devkitPro lives
+## elsewhere.
+
+dkp_prefix := "/opt/devkitpro/devkitA64/bin/aarch64-none-elf"
+
+# GDB for aarch64-none-elf (use against Atmosphère dmnt.gen2 on TCP 22225)
+[group: 'devkitpro']
+gdb *ARGS:
+    {{dkp_prefix}}-gdb {{ARGS}}
+
+# addr2line: resolve runtime addresses to source locations in an ELF
+[group: 'devkitpro']
+addr2line *ARGS:
+    {{dkp_prefix}}-addr2line {{ARGS}}
+
+# objdump: disassemble / dump section info from an ELF
+[group: 'devkitpro']
+objdump *ARGS:
+    {{dkp_prefix}}-objdump {{ARGS}}
+
+# nm: list symbols (sorted by address with -n) in an ELF
+[group: 'devkitpro']
+nm *ARGS:
+    {{dkp_prefix}}-nm {{ARGS}}
+
+# readelf: ELF header / section / segment / dynamic info
+[group: 'devkitpro']
+readelf *ARGS:
+    {{dkp_prefix}}-readelf {{ARGS}}
+
+# c++filt: demangle C++/Itanium symbols (Rust v0 names already readable)
+[group: 'devkitpro']
+cxxfilt *ARGS:
+    {{dkp_prefix}}-c++filt {{ARGS}}
+
+# strip: strip symbols from an ELF/NRO
+[group: 'devkitpro']
+strip *ARGS:
+    {{dkp_prefix}}-strip {{ARGS}}
+
+# size: section sizes summary for an ELF
+[group: 'devkitpro']
+size *ARGS:
+    {{dkp_prefix}}-size {{ARGS}}
+
+
 ## Clean
 
 # Clean both meson build directory and cargo workspace
