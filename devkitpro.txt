@@ -1,5 +1,6 @@
 [constants]
 dkp = '/opt/devkitpro'
+src_root = '@GLOBAL_SOURCE_ROOT@'
 
 [properties]
 # Directory containing 'bin', 'lib', etc for the toolchain and system libraries
@@ -23,3 +24,6 @@ elf2nso = dkp + '/tools/bin/elf2nso'
 nacptool = dkp + '/tools/bin/nacptool'
 npdmtool = dkp + '/tools/bin/npdmtool'
 uam = dkp + '/tools/bin/uam'
+
+# Scripts
+bundle = src_root + '/scripts/devkitpro-bundle.sh'

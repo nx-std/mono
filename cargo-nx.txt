@@ -2,13 +2,13 @@
 src_root = '@GLOBAL_SOURCE_ROOT@'
 
 [binaries]
-# Switch packaging tools provided by `cargo nx tool`
-bin2c      = src_root + '/scripts/bin2c.sh'
-bin2s      = src_root + '/scripts/bin2s.sh'
-build_pfs0 = src_root + '/scripts/build_pfs0.sh'
-bundle     = src_root + '/scripts/bundle.sh'
-elf2nro    = src_root + '/scripts/elf2nro.sh'
-elf2nso    = src_root + '/scripts/elf2nso.sh'
-nacptool   = src_root + '/scripts/nacptool.sh'
-npdmtool   = src_root + '/scripts/npdmtool.sh'
-raw2c      = src_root + '/scripts/raw2c.sh'
+# Switch packaging tools provided by `cargo nx tool` / `cargo nx bundle`
+bin2c      = src_root + '/scripts/cargo-nx-tool-bin2c.sh'
+bin2s      = src_root + '/scripts/cargo-nx-tool-bin2s.sh'
+build_pfs0 = src_root + '/scripts/cargo-nx-tool-build_pfs0.sh'
+bundle     = src_root + '/scripts/cargo-nx-bundle.sh'
+elf2nro    = src_root + '/scripts/cargo-nx-tool-elf2nro.sh'
+elf2nso    = src_root + '/scripts/cargo-nx-tool-elf2nso.sh'
+nacptool   = src_root + '/scripts/cargo-nx-tool-nacptool.sh'
+npdmtool   = src_root + '/scripts/cargo-nx-tool-npdmtool.sh'
+raw2c      = src_root + '/scripts/cargo-nx-tool-raw2c.sh'
