@@ -10,14 +10,34 @@ cargo = find_program('cargo', required : true)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
+# nx-alloc
+nx_alloc_proj = subproject('nx-alloc')
+nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
+
+# nx-svc
+nx_svc_proj = subproject('nx-svc')
+nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
+
+# nx-sys-mem
+nx_sys_mem_proj = subproject('nx-sys-mem')
+nx_sys_mem_dep = nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
+
 # nx-sys-thread-tls
 nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
 nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
 
+# nx-time
+nx_time_proj = subproject('nx-time')
+nx_time_dep = nx_time_proj.get_variable('nx_time_dep')
+
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
+    nx_alloc_dep,
+    nx_svc_dep,
+    nx_sys_mem_dep,
     nx_sys_thread_tls_dep,
+    nx_time_dep,
 ]
 
 #---------------------------------------------------------------------------------

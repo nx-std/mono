@@ -10,6 +10,10 @@ cargo = find_program('cargo', required : true)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
+# nx-service-applet
+nx_service_applet_proj = subproject('nx-service-applet')
+nx_service_applet_dep = nx_service_applet_proj.get_variable('nx_service_applet_dep')
+
 # nx-service-sm
 nx_service_sm_proj = subproject('nx-service-sm')
 nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
@@ -26,10 +30,6 @@ nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 nx_sys_mem_proj = subproject('nx-sys-mem')
 nx_sys_mem_dep = nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
 
-# nx-std-sync
-nx_std_sync_proj = subproject('nx-std-sync')
-nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
-
 # nx-sys-thread-tls
 nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
 nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
@@ -37,11 +37,11 @@ nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_d
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
+    nx_service_applet_dep,
     nx_service_sm_dep,
     nx_sf_dep,
     nx_svc_dep,
     nx_sys_mem_dep,
-    nx_std_sync_dep,
     nx_sys_thread_tls_dep,
 ]
 
