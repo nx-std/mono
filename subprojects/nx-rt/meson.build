@@ -14,6 +14,26 @@ nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
+# nx-service-apm
+nx_service_apm_proj = subproject('nx-service-apm')
+nx_service_apm_dep = nx_service_apm_proj.get_variable('nx_service_apm_dep')
+
+# nx-service-applet
+# nx_service_applet_proj = subproject('nx-service-applet')
+# nx_service_applet_dep = nx_service_applet_proj.get_variable('nx_service_applet_dep')
+
+# nx-service-hid
+nx_service_hid_proj = subproject('nx-service-hid')
+nx_service_hid_dep = nx_service_hid_proj.get_variable('nx_service_hid_dep')
+
+# nx-service-nv
+# nx_service_nv_proj = subproject('nx-service-nv')
+# nx_service_nv_dep = nx_service_nv_proj.get_variable('nx_service_nv_dep')
+
+# nx-service-set
+nx_service_set_proj = subproject('nx-service-set')
+nx_service_set_dep = nx_service_set_proj.get_variable('nx_service_set_dep')
+
 # nx-service-sm
 nx_service_sm_proj = subproject('nx-service-sm')
 nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
@@ -22,13 +42,9 @@ nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
 nx_service_time_proj = subproject('nx-service-time')
 nx_service_time_dep = nx_service_time_proj.get_variable('nx_service_time_dep')
 
-# nx-service-nv
-nx_service_nv_proj = subproject('nx-service-nv')
-nx_service_nv_dep = nx_service_nv_proj.get_variable('nx_service_nv_dep')
-
 # nx-service-vi
-nx_service_vi_proj = subproject('nx-service-vi')
-nx_service_vi_dep = nx_service_vi_proj.get_variable('nx_service_vi_dep')
+# nx_service_vi_proj = subproject('nx-service-vi')
+# nx_service_vi_dep = nx_service_vi_proj.get_variable('nx_service_vi_dep')
 
 # nx-sf
 nx_sf_proj = subproject('nx-sf')
@@ -62,10 +78,14 @@ nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_d
 deps = [
     nx_alloc_dep,
     nx_panic_handler_dep,
-    nx_service_nv_dep,
+    nx_service_apm_dep,
+    # nx_service_applet_dep,
+    nx_service_hid_dep,
+    # nx_service_nv_dep,
+    nx_service_set_dep,
     nx_service_sm_dep,
     nx_service_time_dep,
-    nx_service_vi_dep,
+    # nx_service_vi_dep,
     nx_sf_dep,
     nx_std_sync_dep,
     nx_svc_dep,

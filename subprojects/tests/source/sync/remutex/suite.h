@@ -88,27 +88,27 @@ static void sync_remutex_suite(void)
 {
     TEST_SUITE("sync/remutex");
 
-    TEST_CASE(
+    XTEST_CASE(
         "Test 0001: remutex_lock_unlock_single_thread",
         test_0001_remutex_lock_unlock_single_thread
     );
-    TEST_CASE(
+    XTEST_CASE(
         "Test 0002: remutex_two_threads_no_lock_overlap",
         test_0002_remutex_two_threads_no_lock_overlap
     );
-    TEST_CASE(
+    XTEST_CASE(
         "Test 0003: remutex_two_threads_with_lock_overlap",
         test_0003_remutex_two_threads_with_lock_overlap
     );
-    TEST_CASE(
+    XTEST_CASE(
         "Test 0004: remutex_multiple_threads_same_priority",
         test_0004_remutex_multiple_threads_same_priority
     );
-    TEST_CASE(
+    XTEST_CASE(
         "Test 0005: remutex_multiple_threads_different_priority",
         test_0005_remutex_multiple_threads_different_priority
     );
-    TEST_CASE(
+    XTEST_CASE(
         "Test 0006: remutex_reentrancy_single_thread", 
         test_0006_remutex_reentrancy_single_thread
     );

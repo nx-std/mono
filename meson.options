@@ -106,7 +106,7 @@ option(
 
 option(
     'use_nx_service_applet',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-applet (Applet Manager service)',
     yield : true
 )
@@ -141,14 +141,14 @@ option(
 
 option(
     'use_nx_service_vi',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-vi (Visual Interface service)',
     yield : true
 )
 
 option(
     'use_nx_service_nv',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-nv (NVIDIA Driver service)',
     yield : true
 )
