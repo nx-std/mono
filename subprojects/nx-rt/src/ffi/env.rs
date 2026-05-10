@@ -50,6 +50,7 @@ pub(crate) fn set_applet_type(applet_type: u32) {
 }
 
 /// Get the applet type
+#[cfg(feature = "service-applet")]
 pub(crate) fn get_applet_type() -> u32 {
     unsafe { __nx_rt__applet_type }
 }

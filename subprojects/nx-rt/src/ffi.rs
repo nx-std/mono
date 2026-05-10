@@ -1,15 +1,23 @@
 //! FFI exports for libnx runtime functions
 
-mod apm;
-mod applet;
 mod argv;
 mod common;
 mod env;
-mod hid;
-mod nv;
-mod setsys;
 mod sm;
+
+#[cfg(feature = "service-apm")]
+mod apm;
+#[cfg(feature = "service-applet")]
+mod applet;
+#[cfg(feature = "service-hid")]
+mod hid;
+#[cfg(feature = "service-nv")]
+mod nv;
+#[cfg(feature = "service-set")]
+mod setsys;
+#[cfg(feature = "service-time")]
 mod time;
+#[cfg(feature = "service-vi")]
 mod vi;
 
 // Called by argv::setup() after parsing argv from loader config

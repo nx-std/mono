@@ -2,12 +2,14 @@
 
 use core::cell::UnsafeCell;
 
+#[cfg(feature = "service-applet")]
 use nx_sf::cmif;
 
 /// Generic error code for FFI when no specific result code is available.
 pub const GENERIC_ERROR: u32 = 0xFFFF;
 
 /// libnx error enumeration for MAKERESULT(Module_Libnx, error).
+#[cfg(feature = "service-vi")]
 #[repr(u32)]
 pub enum LibnxError {
     NotInitialized = 2,
@@ -15,6 +17,7 @@ pub enum LibnxError {
 }
 
 /// Constructs a libnx result code.
+#[cfg(feature = "service-vi")]
 pub const fn libnx_error(err: LibnxError) -> u32 {
     const MODULE_LIBNX: u32 = 345;
     (MODULE_LIBNX & 0x1FF) | ((err as u32 & 0x1FFF) << 9)
@@ -38,6 +41,7 @@ impl<T> SyncUnsafeCell<T> {
 }
 
 /// Converts a `DispatchError` to a raw result code.
+#[cfg(feature = "service-applet")]
 pub fn dispatch_error_to_rc(err: nx_sf::service::DispatchError) -> u32 {
     use nx_svc::error::ToRawResultCode;
 
@@ -51,6 +55,7 @@ pub fn dispatch_error_to_rc(err: nx_sf::service::DispatchError) -> u32 {
 }
 
 /// Converts a `ConvertToDomainError` to a raw result code.
+#[cfg(feature = "service-applet")]
 pub fn convert_to_domain_error_to_rc(err: nx_sf::service::ConvertToDomainError) -> u32 {
     use nx_svc::error::ToRawResultCode;
 

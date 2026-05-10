@@ -116,7 +116,9 @@ if get_option('use_nx_rt').enabled()
     nx_rt_proj = subproject('nx-rt')
 
     deps += nx_rt_proj.get_variable('nx_rt_dep')
-    deps_override_link_args += ['-T', nx_rt_proj.get_variable('nx_rt_ld_override')]
+    foreach script : nx_rt_proj.get_variable('nx_rt_ld_overrides')
+        deps_override_link_args += ['-T', script]
+    endforeach
 
     debug('rt feature: enabled')
     deps_cargo_features += ['rt']
