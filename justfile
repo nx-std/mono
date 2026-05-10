@@ -101,12 +101,12 @@ alias build := meson-compile
 # Configure meson build directory (meson setup)
 [group: 'build']
 meson-configure *EXTRA_FLAGS:
-    meson setup --cross-file devkitpro.txt --cross-file cargo-nx.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
+    meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
 
 # Reconfigure meson build directory (meson setup --reconfigure)
 [group: 'build']
 meson-reconfigure *EXTRA_FLAGS:
-    meson setup --cross-file devkitpro.txt --cross-file cargo-nx.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}} --reconfigure
+    meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}} --reconfigure
 
 # Ensure build directory is configured (idempotent)
 [group: 'build']
