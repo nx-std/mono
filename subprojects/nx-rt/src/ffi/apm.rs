@@ -5,7 +5,7 @@ use nx_sf::{cmif, service::Service};
 use nx_svc::error::ToRawResultCode;
 
 use super::common::GENERIC_ERROR;
-use crate::apm_manager;
+use crate::services::apm;
 
 /// Initializes the APM service. Returns 0 on success, error code on failure.
 ///
@@ -16,7 +16,7 @@ use crate::apm_manager;
 /// SM must be initialized before calling this function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_initialize() -> u32 {
-    if let Err(err) = apm_manager::init() {
+    if let Err(err) = apm::init() {
         return apm_connect_error_to_rc(err);
     }
     0
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn __nx_rt__apm_initialize() -> u32 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_exit() {
-    apm_manager::exit();
+    apm::exit();
 }
 
 /// Gets the current performance mode.
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn __nx_rt__apm_get_performance_mode(out: *mut i32) -> u32
         return GENERIC_ERROR;
     }
 
-    let Some(service) = apm_manager::get_service() else {
+    let Some(service) = apm::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn __nx_rt__apm_set_performance_configuration(mode: i32, c
         return GENERIC_ERROR;
     };
 
-    let Some(session) = apm_manager::get_session() else {
+    let Some(session) = apm::get_session() else {
         return GENERIC_ERROR;
     };
 
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn __nx_rt__apm_get_performance_configuration(
         return GENERIC_ERROR;
     };
 
-    let Some(session) = apm_manager::get_session() else {
+    let Some(session) = apm::get_session() else {
         return GENERIC_ERROR;
     };
 
@@ -127,7 +127,7 @@ pub unsafe extern "C" fn __nx_rt__apm_get_performance_configuration(
 /// Returns a pointer to the service session or null if not initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_get_service_session() -> *mut Service {
-    let Some(service) = apm_manager::get_service() else {
+    let Some(service) = apm::get_service() else {
         return core::ptr::null_mut();
     };
 
@@ -147,7 +147,7 @@ pub unsafe extern "C" fn __nx_rt__apm_get_service_session() -> *mut Service {
 /// Returns a pointer to the session or null if not initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_get_service_session_session() -> *mut Service {
-    let Some(session) = apm_manager::get_session() else {
+    let Some(session) = apm::get_session() else {
         return core::ptr::null_mut();
     };
 
@@ -158,9 +158,9 @@ pub unsafe extern "C" fn __nx_rt__apm_get_service_session_session() -> *mut Serv
         .cast_mut()
 }
 
-fn apm_connect_error_to_rc(err: apm_manager::ConnectError) -> u32 {
+fn apm_connect_error_to_rc(err: apm::ConnectError) -> u32 {
     match err {
-        apm_manager::ConnectError::Connect(e) => match e {
+        apm::ConnectError::Connect(e) => match e {
             nx_service_apm::ConnectError::GetService(e) => match e {
                 nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
                 nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
@@ -170,7 +170,7 @@ fn apm_connect_error_to_rc(err: apm_manager::ConnectError) -> u32 {
                 nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
             },
         },
-        apm_manager::ConnectError::OpenSession(e) => match e {
+        apm::ConnectError::OpenSession(e) => match e {
             nx_service_apm::OpenSessionError::SendRequest(e) => e.to_rc(),
             nx_service_apm::OpenSessionError::ParseResponse(e) => match e {
                 cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,

@@ -6,7 +6,7 @@
 use nx_service_hid::HidService;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
-use crate::{applet_manager, service_manager};
+use crate::services::{applet, sm};
 
 /// Global HID state, lazily initialized.
 static HID_STATE: OnceLock<RwLock<Option<HidState>>> = OnceLock::new();
@@ -25,14 +25,14 @@ fn state() -> &'static RwLock<Option<HidState>> {
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
-    let sm_guard = service_manager::sm_session();
+    let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Get applet resource user ID from applet manager
-    let aruid = applet_manager::get_applet_resource_user_id();
+    let aruid = applet::get_applet_resource_user_id();
 
     // Connect to HID service
-    let service = nx_service_hid::connect(sm, aruid).map_err(ConnectError::Connect)?;
+    let service = nx_service_hid::connect(sm, aruid).map_err(ConnectError)?;
 
     let mut guard = state().write();
     *guard = Some(HidState { service });
@@ -76,10 +76,7 @@ impl core::ops::Deref for HidServiceRef {
     }
 }
 
-/// Error returned by [`init`].
+/// Error returned by [`init`] when connecting to the HID service fails.
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Failed to connect to HID service.
-    #[error("failed to connect to HID service")]
-    Connect(#[source] nx_service_hid::ConnectError),
-}
+#[error("failed to connect to HID service")]
+pub struct ConnectError(#[source] pub nx_service_hid::ConnectError);

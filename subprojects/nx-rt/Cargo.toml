@@ -13,19 +13,19 @@ bench = false
 [features]
 # Master switch for the C-FFI surface (`__nx_rt__*` symbols). Required for any libnx override.
 ffi = []
-# Application Performance Management — gates `apm_manager` + `ffi::apm`.
+# Application Performance Management — gates `services::apm` + `ffi::apm`.
 service-apm = ["dep:nx-service-apm"]
-# Applet (am) service — gates `applet_manager` + `ffi::applet`.
+# Applet (am) service — gates `services::applet` + `ffi::applet`.
 service-applet = ["dep:nx-service-applet"]
-# Human Input Device service — gates `hid_manager` + `ffi::hid`. Pulls `service-applet` (aruid lookup).
+# Human Input Device service — gates `services::hid` + `ffi::hid`. Pulls `service-applet` (aruid lookup).
 service-hid = ["dep:nx-service-hid", "service-applet"]
-# NVIDIA driver service — gates `nv_manager` + `ffi::nv`. Pulls `service-applet` (aruid lookup).
+# NVIDIA driver service — gates `services::nv` + `ffi::nv`. Pulls `service-applet` (aruid lookup).
 service-nv = ["dep:nx-service-nv", "service-applet"]
-# System Settings (set:sys) service — gates `service_registry` + `ffi::setsys`.
+# System Settings (set:sys) service — gates `services::set` + `ffi::setsys`.
 service-set = ["dep:nx-service-set"]
-# Time service — gates `time_manager` + `ffi::time`.
+# Time service — gates `services::time` + `ffi::time`.
 service-time = ["dep:nx-service-time"]
-# Visual Interface (display/layer) service — gates `vi_manager` + `ffi::vi`.
+# Visual Interface (display/layer) service — gates `services::vi` + `ffi::vi`.
 service-vi = ["dep:nx-service-vi"]
 
 [dependencies]

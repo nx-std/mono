@@ -18,7 +18,7 @@
 //! ## Always compiled
 //!
 //! - **Runtime core:** `argv`, `env`, `init`
-//! - **Service Manager:** `service_manager` (depends on `nx-service-sm` —
+//! - **Service Manager:** `services::sm` (depends on `nx-service-sm` —
 //!   non-optional; `sm` is the foundation every other service builds on)
 //!
 //! ## Master switches
@@ -29,22 +29,21 @@
 //!
 //! ## Per-service features
 //!
-//! Each gates a manager module under `crate::*_manager` (or
-//! `crate::service_registry` for `set:sys`) and, when `ffi` is also on, the
-//! matching `crate::ffi::*` submodule.
+//! Each gates a manager module under `crate::services::*` and, when `ffi`
+//! is also on, the matching `crate::ffi::*` submodule.
 //!
-//! | Feature           | Manager module      | FFI submodule       | Implicit feature deps     |
-//! |-------------------|---------------------|---------------------|---------------------------|
-//! | `service-apm`     | `apm_manager`       | `ffi::apm`          | —                         |
-//! | `service-applet`  | `applet_manager`    | `ffi::applet`       | —                         |
-//! | `service-hid`     | `hid_manager`       | `ffi::hid`          | `service-applet`          |
-//! | `service-nv`      | `nv_manager`        | `ffi::nv`           | `service-applet`          |
-//! | `service-set`     | `service_registry`  | `ffi::setsys`       | —                         |
-//! | `service-time`    | `time_manager`      | `ffi::time`         | —                         |
-//! | `service-vi`      | `vi_manager`        | `ffi::vi`           | —                         |
+//! | Feature           | Manager module       | FFI submodule       | Implicit feature deps     |
+//! |-------------------|----------------------|---------------------|---------------------------|
+//! | `service-apm`     | `services::apm`      | `ffi::apm`          | —                         |
+//! | `service-applet`  | `services::applet`   | `ffi::applet`       | —                         |
+//! | `service-hid`     | `services::hid`      | `ffi::hid`          | `service-applet`          |
+//! | `service-nv`      | `services::nv`       | `ffi::nv`           | `service-applet`          |
+//! | `service-set`     | `services::set`      | `ffi::setsys`       | —                         |
+//! | `service-time`    | `services::time`     | `ffi::time`         | —                         |
+//! | `service-vi`      | `services::vi`       | `ffi::vi`           | —                         |
 //!
 //! `service-hid` and `service-nv` pull in `service-applet` because their
-//! managers call `applet_manager::get_applet_resource_user_id()`. Cargo
+//! managers call `services::applet::get_applet_resource_user_id()`. Cargo
 //! closes over those deps automatically; the matching `rt_service_*.ld`
 //! fragments are still gated independently in Meson and are linked in only
 //! when their option is explicitly enabled.
@@ -61,19 +60,4 @@ pub mod ffi;
 pub mod argv;
 pub mod env;
 pub mod init;
-pub mod service_manager;
-
-#[cfg(feature = "service-apm")]
-pub mod apm_manager;
-#[cfg(feature = "service-applet")]
-pub mod applet_manager;
-#[cfg(feature = "service-hid")]
-pub mod hid_manager;
-#[cfg(feature = "service-nv")]
-pub mod nv_manager;
-#[cfg(feature = "service-set")]
-pub mod service_registry;
-#[cfg(feature = "service-time")]
-pub mod time_manager;
-#[cfg(feature = "service-vi")]
-pub mod vi_manager;
+pub mod services;

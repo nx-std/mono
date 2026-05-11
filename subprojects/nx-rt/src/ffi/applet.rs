@@ -7,7 +7,7 @@ use super::{
     common::{GENERIC_ERROR, convert_to_domain_error_to_rc, dispatch_error_to_rc},
     env::get_applet_type,
 };
-use crate::{applet_manager, env};
+use crate::{env, services::applet};
 
 /// Initializes the applet service. Returns 0 on success, error code on failure.
 ///
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn __nx_rt__applet_initialize() -> u32 {
         })
         .unwrap_or_else(ProcessHandle::current_process);
 
-    if let Err(err) = applet_manager::init(applet_type, process_handle) {
+    if let Err(err) = applet::init(applet_type, process_handle) {
         return applet_connect_error_to_rc(err);
     }
 
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn __nx_rt__applet_initialize() -> u32 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_exit() {
-    applet_manager::exit();
+    applet::exit();
 }
 
 /// Gets the current applet type.
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_applet_type() -> i32 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_operation_mode() -> u8 {
-    let Some(csg) = applet_manager::get_common_state_getter() else {
+    let Some(csg) = applet::get_common_state_getter() else {
         return nx_service_applet::AppletOperationMode::Handheld as u8;
     };
 
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_operation_mode() -> u8 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_performance_mode() -> u32 {
-    let Some(csg) = applet_manager::get_common_state_getter() else {
+    let Some(csg) = applet::get_common_state_getter() else {
         return 0;
     };
 
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_performance_mode() -> u32 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_focus_state() -> u8 {
-    let Some(csg) = applet_manager::get_common_state_getter() else {
+    let Some(csg) = applet::get_common_state_getter() else {
         return nx_service_applet::AppletFocusState::InFocus as u8;
     };
 
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_focus_state() -> u8 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_message_event_handle() -> u32 {
-    let Some(csg) = applet_manager::get_common_state_getter() else {
+    let Some(csg) = applet::get_common_state_getter() else {
         return INVALID_HANDLE;
     };
 
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_message_event_handle() -> u32 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_set_focus_handling_mode(mode: u32) -> u32 {
-    let Some(sc) = applet_manager::get_self_controller() else {
+    let Some(sc) = applet::get_self_controller() else {
         return GENERIC_ERROR;
     };
 
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn __nx_rt__applet_set_focus_handling_mode(mode: u32) -> u
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_set_out_of_focus_suspending_enabled(enabled: bool) -> u32 {
-    let Some(sc) = applet_manager::get_self_controller() else {
+    let Some(sc) = applet::get_self_controller() else {
         return GENERIC_ERROR;
     };
 
@@ -212,7 +212,7 @@ pub unsafe extern "C" fn __nx_rt__applet_receive_message(msg: *mut u32) -> u32 {
         return GENERIC_ERROR;
     }
 
-    let Some(csg) = applet_manager::get_common_state_getter() else {
+    let Some(csg) = applet::get_common_state_getter() else {
         return GENERIC_ERROR;
     };
 
@@ -243,7 +243,7 @@ pub unsafe extern "C" fn __nx_rt__applet_receive_message(msg: *mut u32) -> u32 {
 pub unsafe extern "C" fn __nx_rt__applet_set_operation_mode_changed_notification(
     enabled: bool,
 ) -> u32 {
-    let Some(sc) = applet_manager::get_self_controller() else {
+    let Some(sc) = applet::get_self_controller() else {
         return GENERIC_ERROR;
     };
 
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn __nx_rt__applet_set_operation_mode_changed_notification
 pub unsafe extern "C" fn __nx_rt__applet_set_performance_mode_changed_notification(
     enabled: bool,
 ) -> u32 {
-    let Some(sc) = applet_manager::get_self_controller() else {
+    let Some(sc) = applet::get_self_controller() else {
         return GENERIC_ERROR;
     };
 
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn __nx_rt__applet_set_performance_mode_changed_notificati
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_applet_resource_user_id() -> u64 {
-    applet_manager::get_applet_resource_user_id()
+    applet::get_applet_resource_user_id()
         .map(|a| a.to_raw())
         .unwrap_or(nx_service_applet::aruid::NO_ARUID)
 }
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_applet_resource_user_id() -> u64 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_acquire_foreground_rights() -> u32 {
-    let Some(wc) = applet_manager::get_window_controller() else {
+    let Some(wc) = applet::get_window_controller() else {
         return GENERIC_ERROR;
     };
 
@@ -325,7 +325,7 @@ pub unsafe extern "C" fn __nx_rt__applet_acquire_foreground_rights() -> u32 {
 /// `out` must be a valid pointer to write the layer ID.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_create_managed_display_layer(out: *mut u64) -> u32 {
-    let Some(sc) = applet_manager::get_self_controller() else {
+    let Some(sc) = applet::get_self_controller() else {
         return GENERIC_ERROR;
     };
 
@@ -340,11 +340,11 @@ pub unsafe extern "C" fn __nx_rt__applet_create_managed_display_layer(out: *mut 
     }
 }
 
-fn applet_connect_error_to_rc(err: applet_manager::ConnectError) -> u32 {
+fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
     use nx_svc::error::ToRawResultCode;
 
     match err {
-        applet_manager::ConnectError::Connect(e) => match e {
+        applet::ConnectError::Connect(e) => match e {
             nx_service_applet::ConnectError::GetService(e) => match e {
                 nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
                 nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
@@ -357,53 +357,53 @@ fn applet_connect_error_to_rc(err: applet_manager::ConnectError) -> u32 {
                 convert_to_domain_error_to_rc(e.0)
             }
         },
-        applet_manager::ConnectError::OpenProxy(e) => match e {
+        applet::ConnectError::OpenProxy(e) => match e {
             nx_service_applet::OpenProxyError::InvalidAppletType => GENERIC_ERROR,
             nx_service_applet::OpenProxyError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::OpenProxyError::MissingObject => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::GetCommonStateGetter(e) => match e {
+        applet::ConnectError::GetCommonStateGetter(e) => match e {
             nx_service_applet::GetCommonStateGetterError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetCommonStateGetterError::MissingObject => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::GetSelfController(e) => match e {
+        applet::ConnectError::GetSelfController(e) => match e {
             nx_service_applet::GetSelfControllerError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetSelfControllerError::MissingObject => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::GetWindowController(e) => match e {
+        applet::ConnectError::GetWindowController(e) => match e {
             nx_service_applet::GetWindowControllerError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetWindowControllerError::MissingObject => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::GetApplicationFunctions(e) => match e {
+        applet::ConnectError::GetApplicationFunctions(e) => match e {
             nx_service_applet::GetApplicationFunctionsError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetApplicationFunctionsError::MissingObject => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::GetEventHandle(e) => match e {
+        applet::ConnectError::GetEventHandle(e) => match e {
             nx_service_applet::GetEventHandleError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetEventHandleError::MissingHandle => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::GetFocusState(e) => match e {
+        applet::ConnectError::GetFocusState(e) => match e {
             nx_service_applet::GetCurrentFocusStateError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetCurrentFocusStateError::InvalidResponse => GENERIC_ERROR,
             nx_service_applet::GetCurrentFocusStateError::InvalidValue(_) => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::WaitSynchronization(e) => e.to_rc(),
-        applet_manager::ConnectError::AcquireForegroundRights(e) => match e {
+        applet::ConnectError::WaitSynchronization(e) => e.to_rc(),
+        applet::ConnectError::AcquireForegroundRights(e) => match e {
             nx_service_applet::AcquireForegroundRightsError::Dispatch(e) => dispatch_error_to_rc(e),
         },
-        applet_manager::ConnectError::SetFocusHandlingMode(e) => match e {
+        applet::ConnectError::SetFocusHandlingMode(e) => match e {
             nx_service_applet::SetFocusHandlingModeError::Dispatch(e) => dispatch_error_to_rc(e),
         },
-        applet_manager::ConnectError::NotifyRunning(e) => match e {
+        applet::ConnectError::NotifyRunning(e) => match e {
             nx_service_applet::NotifyRunningError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::NotifyRunningError::InvalidResponse => GENERIC_ERROR,
         },
-        applet_manager::ConnectError::SetOperationModeNotification(e) => match e {
+        applet::ConnectError::SetOperationModeNotification(e) => match e {
             nx_service_applet::SetOperationModeChangedNotificationError::Dispatch(e) => {
                 dispatch_error_to_rc(e)
             }
         },
-        applet_manager::ConnectError::SetPerformanceModeNotification(e) => match e {
+        applet::ConnectError::SetPerformanceModeNotification(e) => match e {
             nx_service_applet::SetPerformanceModeChangedNotificationError::Dispatch(e) => {
                 dispatch_error_to_rc(e)
             }

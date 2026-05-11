@@ -11,41 +11,39 @@ use super::common::GENERIC_ERROR;
 /// Corresponds to `timeInitialize()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__time_initialize() -> u32 {
-    match crate::time_manager::init() {
+    match crate::services::time::init() {
         Ok(()) => 0,
         Err(err) => {
             // Convert error to result code
-            match err {
-                crate::time_manager::ConnectError::Connect(conn_err) => match conn_err {
-                    nx_service_time::ConnectError::GetService(sm_err) => match sm_err {
-                        nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                        _ => GENERIC_ERROR,
+            let crate::services::time::ConnectError(conn_err) = err;
+            match conn_err {
+                nx_service_time::ConnectError::GetService(sm_err) => match sm_err {
+                    nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+                    _ => GENERIC_ERROR,
+                },
+                nx_service_time::ConnectError::GetUserSystemClock(clock_err) => match clock_err {
+                    nx_service_time::GetSystemClockError::SendRequest(e) => e.to_rc(),
+                    nx_service_time::GetSystemClockError::ParseResponse(e) => match e {
+                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+                        cmif::ParseResponseError::ServiceError(code) => code,
                     },
-                    nx_service_time::ConnectError::GetUserSystemClock(clock_err) => match clock_err
-                    {
-                        nx_service_time::GetSystemClockError::SendRequest(e) => e.to_rc(),
-                        nx_service_time::GetSystemClockError::ParseResponse(e) => match e {
-                            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                            cmif::ParseResponseError::ServiceError(code) => code,
-                        },
-                        nx_service_time::GetSystemClockError::MissingHandle => GENERIC_ERROR,
+                    nx_service_time::GetSystemClockError::MissingHandle => GENERIC_ERROR,
+                },
+                nx_service_time::ConnectError::GetSteadyClock(steady_err) => match steady_err {
+                    nx_service_time::GetSteadyClockError::SendRequest(e) => e.to_rc(),
+                    nx_service_time::GetSteadyClockError::ParseResponse(e) => match e {
+                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+                        cmif::ParseResponseError::ServiceError(code) => code,
                     },
-                    nx_service_time::ConnectError::GetSteadyClock(steady_err) => match steady_err {
-                        nx_service_time::GetSteadyClockError::SendRequest(e) => e.to_rc(),
-                        nx_service_time::GetSteadyClockError::ParseResponse(e) => match e {
-                            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                            cmif::ParseResponseError::ServiceError(code) => code,
-                        },
-                        nx_service_time::GetSteadyClockError::MissingHandle => GENERIC_ERROR,
+                    nx_service_time::GetSteadyClockError::MissingHandle => GENERIC_ERROR,
+                },
+                nx_service_time::ConnectError::GetTimeZoneService(tz_err) => match tz_err {
+                    nx_service_time::GetTimeZoneServiceError::SendRequest(e) => e.to_rc(),
+                    nx_service_time::GetTimeZoneServiceError::ParseResponse(e) => match e {
+                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+                        cmif::ParseResponseError::ServiceError(code) => code,
                     },
-                    nx_service_time::ConnectError::GetTimeZoneService(tz_err) => match tz_err {
-                        nx_service_time::GetTimeZoneServiceError::SendRequest(e) => e.to_rc(),
-                        nx_service_time::GetTimeZoneServiceError::ParseResponse(e) => match e {
-                            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                            cmif::ParseResponseError::ServiceError(code) => code,
-                        },
-                        nx_service_time::GetTimeZoneServiceError::MissingHandle => GENERIC_ERROR,
-                    },
+                    nx_service_time::GetTimeZoneServiceError::MissingHandle => GENERIC_ERROR,
                 },
             }
         }
@@ -57,7 +55,7 @@ pub unsafe extern "C" fn __nx_rt__time_initialize() -> u32 {
 /// Corresponds to `timeExit()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__time_exit() {
-    crate::time_manager::exit();
+    crate::services::time::exit();
 }
 
 /// Gets the current time from the specified clock type.
@@ -79,7 +77,7 @@ pub unsafe extern "C" fn __nx_rt__time_get_current_time(
         _ => return GENERIC_ERROR,
     };
 
-    match crate::time_manager::get_service() {
+    match crate::services::time::get_service() {
         Some(service) => match service.get_current_time(time_type) {
             Ok(time) => {
                 unsafe { *timestamp = time };
@@ -113,7 +111,7 @@ pub unsafe extern "C" fn __nx_rt__time_to_calendar_time_with_my_rule(
         return GENERIC_ERROR;
     }
 
-    match crate::time_manager::get_service() {
+    match crate::services::time::get_service() {
         Some(service) => match service.to_calendar_time_with_my_rule(timestamp) {
             Ok((cal, inf)) => {
                 unsafe {

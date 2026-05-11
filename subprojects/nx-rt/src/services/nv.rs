@@ -6,7 +6,10 @@
 use nx_service_nv::{NvConfig, NvService, NvServiceType};
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
-use crate::{applet_manager, env, service_manager};
+use crate::{
+    env,
+    services::{applet, sm},
+};
 
 /// Global NV state, lazily initialized.
 static NV_STATE: OnceLock<RwLock<Option<NvState>>> = OnceLock::new();
@@ -34,17 +37,16 @@ pub fn init(config: NvConfig) -> Result<(), ConnectError> {
         return Ok(());
     }
 
-    let sm_guard = service_manager::sm_session();
+    let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Get applet info for service connection via Rust APIs
     let applet_type = nx_service_applet::AppletType::from_raw(env::applet_type().as_raw() as i32)
         .unwrap_or(nx_service_applet::AppletType::None);
-    let aruid = applet_manager::get_applet_resource_user_id();
+    let aruid = applet::get_applet_resource_user_id();
 
     // Connect to NV service
-    let service =
-        nx_service_nv::connect(sm, applet_type, aruid, config).map_err(ConnectError::Connect)?;
+    let service = nx_service_nv::connect(sm, applet_type, aruid, config).map_err(ConnectError)?;
 
     *guard = Some(NvState {
         service,
@@ -113,13 +115,10 @@ impl core::ops::Deref for NvServiceRef {
     }
 }
 
-/// Error returned by [`init`].
+/// Error returned by [`init`] when connecting to the NV service fails.
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Failed to connect to NV service.
-    #[error("failed to connect to NV service")]
-    Connect(#[source] nx_service_nv::ConnectError),
-}
+#[error("failed to connect to NV service")]
+pub struct ConnectError(#[source] pub nx_service_nv::ConnectError);
 
 /// Global configuration storage.
 ///

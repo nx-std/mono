@@ -12,7 +12,7 @@ use nx_service_applet::{
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 use nx_svc::process::Handle as ProcessHandle;
 
-use crate::service_manager;
+use crate::services::sm;
 
 /// Global applet state, lazily initialized.
 static APPLET_STATE: OnceLock<RwLock<Option<AppletState>>> = OnceLock::new();
@@ -36,7 +36,7 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         return Ok(());
     }
 
-    let sm_guard = service_manager::sm_session();
+    let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Connect to appletOE or appletAE

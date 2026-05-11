@@ -6,7 +6,7 @@
 use nx_service_apm::{ApmService, ApmSession};
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
-use crate::service_manager;
+use crate::services::sm;
 
 /// Global APM state, lazily initialized.
 static APM_STATE: OnceLock<RwLock<Option<ApmState>>> = OnceLock::new();
@@ -25,7 +25,7 @@ fn state() -> &'static RwLock<Option<ApmState>> {
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
-    let sm_guard = service_manager::sm_session();
+    let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Connect to APM service

@@ -4,7 +4,7 @@ use nx_sf::{cmif, service::Service, tipc};
 use nx_svc::error::ToRawResultCode;
 
 use super::common::GENERIC_ERROR;
-use crate::service_registry;
+use crate::services::set;
 
 /// Initializes set:sys connection. Returns 0 on success, error code on failure.
 ///
@@ -15,7 +15,7 @@ use crate::service_registry;
 /// SM must be initialized before calling this function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__setsys_initialize() -> u32 {
-    if let Err(err) = service_registry::setsys_init() {
+    if let Err(err) = set::init() {
         return setsys_connect_error_to_rc(err);
     }
     0
@@ -30,7 +30,7 @@ pub unsafe extern "C" fn __nx_rt__setsys_initialize() -> u32 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__setsys_exit() {
-    service_registry::setsys_exit();
+    set::exit();
 }
 
 /// Gets the set:sys service session pointer.
@@ -39,16 +39,19 @@ pub unsafe extern "C" fn __nx_rt__setsys_exit() {
 ///
 /// # Safety
 ///
-/// set:sys must be initialized. The returned pointer points to the Arc-stored
-/// session and remains valid as long as the service session is alive.
+/// Returns a pointer to the service session or null if not initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__setsys_get_service_session() -> *mut Service {
-    let Some(setsys) = service_registry::setsys_get() else {
+    let Some(setsys) = set::get_service() else {
         return core::ptr::null_mut();
     };
 
-    // Cast Arc<SetSysService> to *mut Service (SetSysService is repr(transparent))
-    alloc::sync::Arc::as_ptr(&setsys) as *mut Service
+    // SAFETY: SetSysService is repr(transparent) over Service, and the session
+    // is valid while set:sys is initialized. Lifetime safety guaranteed by
+    // singleton management.
+    (&*setsys as *const _ as *mut Service)
+        .cast_const()
+        .cast_mut()
 }
 
 /// Gets the system firmware version. Returns 0 on success, error code on failure.
@@ -66,7 +69,7 @@ pub unsafe extern "C" fn __nx_rt__setsys_get_firmware_version(
         return GENERIC_ERROR;
     }
 
-    let Some(setsys) = service_registry::setsys_get() else {
+    let Some(setsys) = set::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -80,9 +83,9 @@ pub unsafe extern "C" fn __nx_rt__setsys_get_firmware_version(
     0
 }
 
-fn setsys_connect_error_to_rc(err: service_registry::SetsysConnectError) -> u32 {
+fn setsys_connect_error_to_rc(err: set::ConnectError) -> u32 {
     match err {
-        service_registry::SetsysConnectError::Cmif(e) => match e.0 {
+        set::ConnectError::Cmif(e) => match e.0 {
             nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
             nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
                 cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
@@ -90,7 +93,7 @@ fn setsys_connect_error_to_rc(err: service_registry::SetsysConnectError) -> u32 
             },
             nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
-        service_registry::SetsysConnectError::Tipc(e) => match e.0 {
+        set::ConnectError::Tipc(e) => match e.0 {
             nx_service_sm::GetServiceTipcError::SendRequest(e) => e.to_rc(),
             nx_service_sm::GetServiceTipcError::ParseResponse(e) => match e {
                 tipc::ParseResponseError::EmptyResponse => GENERIC_ERROR,

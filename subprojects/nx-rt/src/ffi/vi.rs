@@ -5,7 +5,7 @@ use core::{ffi::c_void, mem::MaybeUninit};
 use nx_sf::{cmif, service::Service};
 
 use super::common::{GENERIC_ERROR, LibnxError, SyncUnsafeCell, libnx_error};
-use crate::{applet_manager, vi_manager};
+use crate::services::{applet, vi};
 
 /// Static buffer for VI IApplicationDisplayService FFI session access.
 static VI_FFI_APPLICATION_DISPLAY: SyncUnsafeCell<MaybeUninit<Service>> =
@@ -74,9 +74,9 @@ pub unsafe extern "C" fn __nx_rt__vi_initialize(service_type: i32) -> u32 {
     };
 
     // Check if this is the first initialization
-    let was_initialized = vi_manager::is_initialized();
+    let was_initialized = vi::is_initialized();
 
-    match vi_manager::init(vi_service_type) {
+    match vi::init(vi_service_type) {
         Ok(()) => {
             // Only update FFI session buffers on first actual initialization
             if !was_initialized {
@@ -93,9 +93,9 @@ pub unsafe extern "C" fn __nx_rt__vi_initialize(service_type: i32) -> u32 {
 /// Corresponds to `viExit()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_exit() {
-    let was_initialized = vi_manager::is_initialized();
-    vi_manager::exit();
-    let still_initialized = vi_manager::is_initialized();
+    let was_initialized = vi::is_initialized();
+    vi::exit();
+    let still_initialized = vi::is_initialized();
 
     // Only clear FFI session buffers if the service was actually closed
     if was_initialized && !still_initialized {
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn __nx_rt__vi_open_display(
         return GENERIC_ERROR;
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -198,7 +198,7 @@ pub unsafe extern "C" fn __nx_rt__vi_close_display(display: *mut ViDisplay) -> u
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -233,7 +233,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_display_resolution(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -272,7 +272,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_display_logical_resolution(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_display_magnification(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -343,7 +343,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_display_vsync_event(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -376,7 +376,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_display_power_state(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -413,7 +413,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_display_alpha(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -443,7 +443,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_z_order_count_min(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -478,7 +478,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_z_order_count_max(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -513,7 +513,7 @@ pub unsafe extern "C" fn __nx_rt__vi_create_layer(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -557,7 +557,7 @@ pub unsafe extern "C" fn __nx_rt__vi_create_managed_layer(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -586,7 +586,7 @@ pub unsafe extern "C" fn __nx_rt__vi_destroy_managed_layer(layer: *mut ViLayer) 
 
     let layer_ref = unsafe { &*layer };
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -617,7 +617,7 @@ pub unsafe extern "C" fn __nx_rt__vi_close_layer(layer: *mut ViLayer) -> u32 {
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -661,7 +661,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_layer_size(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -688,7 +688,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_layer_z(layer: *const ViLayer, z: i32) 
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -719,7 +719,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_layer_position(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -749,7 +749,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_layer_scaling_mode(
         return libnx_error(LibnxError::NotInitialized);
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -785,12 +785,12 @@ pub unsafe extern "C" fn __nx_rt__vi_get_indirect_layer_image_map(
         return GENERIC_ERROR;
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
     // Get ARUID from applet manager
-    let aruid = applet_manager::get_applet_resource_user_id()
+    let aruid = applet::get_applet_resource_user_id()
         .map(|a| a.to_raw())
         .unwrap_or(0);
 
@@ -826,7 +826,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_indirect_layer_image_required_memory_in
     out_size: *mut u64,
     out_alignment: *mut u64,
 ) -> u32 {
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -849,7 +849,7 @@ pub unsafe extern "C" fn __nx_rt__vi_get_indirect_layer_image_required_memory_in
 /// Corresponds to `viSetContentVisibility()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_set_content_visibility(visible: bool) -> u32 {
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -864,7 +864,7 @@ pub unsafe extern "C" fn __nx_rt__vi_set_content_visibility(visible: bool) -> u3
 /// Corresponds to `viManagerPrepareFatal()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_manager_prepare_fatal() -> u32 {
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
 
@@ -879,7 +879,7 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_prepare_fatal() -> u32 {
 /// Corresponds to `viManagerShowFatal()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_manager_show_fatal() -> u32 {
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
 
@@ -900,7 +900,7 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_draw_fatal_rectangle(
     end_y: i32,
     color: u16,
 ) -> u32 {
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
 
@@ -931,7 +931,7 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_draw_fatal_text32(
         return GENERIC_ERROR;
     }
 
-    let Some(service) = vi_manager::get_service() else {
+    let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
 
@@ -958,7 +958,7 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_draw_fatal_text32(
 
 /// Sets VI FFI session buffers from the active service.
 fn set_vi_ffi_sessions() {
-    let Some(service_ref) = vi_manager::get_service() else {
+    let Some(service_ref) = vi::get_service() else {
         return;
     };
 
@@ -1104,10 +1104,9 @@ fn parse_native_window_binder_id(
     Some(binder_id)
 }
 
-fn vi_connect_error_to_rc(err: vi_manager::ConnectError) -> u32 {
-    match err {
-        vi_manager::ConnectError::Connect(e) => vi_service_connect_error_to_rc(e),
-    }
+fn vi_connect_error_to_rc(err: vi::ConnectError) -> u32 {
+    let vi::ConnectError(e) = err;
+    vi_service_connect_error_to_rc(e)
 }
 
 fn vi_service_connect_error_to_rc(err: nx_service_vi::ConnectError) -> u32 {

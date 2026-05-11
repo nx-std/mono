@@ -6,7 +6,7 @@
 use nx_service_vi::{ViService, types::ViServiceType};
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
-use crate::service_manager;
+use crate::services::sm;
 
 /// Global VI state, lazily initialized.
 static VI_STATE: OnceLock<RwLock<Option<ViState>>> = OnceLock::new();
@@ -34,11 +34,11 @@ pub fn init(service_type: ViServiceType) -> Result<(), ConnectError> {
         return Ok(());
     }
 
-    let sm_guard = service_manager::sm_session();
+    let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Connect to VI service
-    let service = nx_service_vi::connect(sm, service_type).map_err(ConnectError::Connect)?;
+    let service = nx_service_vi::connect(sm, service_type).map_err(ConnectError)?;
 
     *guard = Some(ViState {
         service,
@@ -105,13 +105,10 @@ impl core::ops::Deref for ViServiceRef {
     }
 }
 
-/// Error returned by [`init`].
+/// Error returned by [`init`] when connecting to the VI service fails.
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Failed to connect to VI service.
-    #[error("failed to connect to VI service")]
-    Connect(#[source] nx_service_vi::ConnectError),
-}
+#[error("failed to connect to VI service")]
+pub struct ConnectError(#[source] pub nx_service_vi::ConnectError);
 
 /// Global configuration storage for VI service type.
 ///

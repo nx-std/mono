@@ -20,15 +20,15 @@ static NV_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__nv_initialize() -> u32 {
     // Build config from global settings
-    let config = crate::nv_manager::make_config();
+    let config = crate::services::nv::make_config();
 
     // Check if this is the first initialization
-    let was_initialized = crate::nv_manager::is_initialized();
+    let was_initialized = crate::services::nv::is_initialized();
 
-    match crate::nv_manager::init(config) {
+    match crate::services::nv::init(config) {
         Ok(()) => {
             // Only update FFI session buffer on first actual initialization
-            if !was_initialized && let Some(service_ref) = crate::nv_manager::get_service() {
+            if !was_initialized && let Some(service_ref) = crate::services::nv::get_service() {
                 let service = Service {
                     session: service_ref.session(),
                     own_handle: 1,
@@ -51,9 +51,9 @@ pub unsafe extern "C" fn __nx_rt__nv_initialize() -> u32 {
 pub unsafe extern "C" fn __nx_rt__nv_exit() {
     // Check if this exit will actually close the service (ref_count will become 0)
     // We need to clear the FFI session AFTER the service is closed, not before
-    let was_initialized = crate::nv_manager::is_initialized();
-    crate::nv_manager::exit();
-    let still_initialized = crate::nv_manager::is_initialized();
+    let was_initialized = crate::services::nv::is_initialized();
+    crate::services::nv::exit();
+    let still_initialized = crate::services::nv::is_initialized();
 
     // Only clear the FFI session buffer if the service was actually closed
     if was_initialized && !still_initialized {
@@ -71,7 +71,7 @@ pub unsafe extern "C" fn __nx_rt__nv_open(fd: *mut u32, devicepath: *const c_cha
         return GENERIC_ERROR;
     }
 
-    let Some(service) = crate::nv_manager::get_service() else {
+    let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn __nx_rt__nv_open(fd: *mut u32, devicepath: *const c_cha
 /// Corresponds to `nvIoctl()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__nv_ioctl(fd: u32, request: u32, argp: *mut c_void) -> u32 {
-    let Some(service) = crate::nv_manager::get_service() else {
+    let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -130,7 +130,7 @@ pub unsafe extern "C" fn __nx_rt__nv_ioctl2(
     inbuf: *const c_void,
     inbuf_size: usize,
 ) -> u32 {
-    let Some(service) = crate::nv_manager::get_service() else {
+    let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -178,7 +178,7 @@ pub unsafe extern "C" fn __nx_rt__nv_ioctl3(
     outbuf: *mut c_void,
     outbuf_size: usize,
 ) -> u32 {
-    let Some(service) = crate::nv_manager::get_service() else {
+    let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -220,7 +220,7 @@ pub unsafe extern "C" fn __nx_rt__nv_ioctl3(
 /// Corresponds to `nvClose()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__nv_close(fd: u32) -> u32 {
-    let Some(service) = crate::nv_manager::get_service() else {
+    let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn __nx_rt__nv_query_event(
         return GENERIC_ERROR;
     }
 
-    let Some(service) = crate::nv_manager::get_service() else {
+    let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;
     };
 
@@ -282,30 +282,29 @@ pub unsafe extern "C" fn __nx_rt__nv_get_service_session() -> *mut Service {
     NV_FFI_SESSION.get().cast::<Service>()
 }
 
-fn nv_connect_error_to_rc(err: crate::nv_manager::ConnectError) -> u32 {
+fn nv_connect_error_to_rc(err: crate::services::nv::ConnectError) -> u32 {
     use nx_svc::error::ToRawResultCode;
 
-    match err {
-        crate::nv_manager::ConnectError::Connect(e) => match e {
-            nx_service_nv::ConnectError::GetService(sm_err) => match sm_err {
-                nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
-                nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
+    let crate::services::nv::ConnectError(e) = err;
+    match e {
+        nx_service_nv::ConnectError::GetService(sm_err) => match sm_err {
+            nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
+                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+                cmif::ParseResponseError::ServiceError(code) => code,
             },
-            nx_service_nv::ConnectError::CreateTransferMemory(_) => GENERIC_ERROR,
-            nx_service_nv::ConnectError::Initialize(e) => match e {
-                nx_service_nv::InitializeError::SendRequest(e) => e.to_rc(),
-                nx_service_nv::InitializeError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
-            },
-            nx_service_nv::ConnectError::CloseTransferMemHandle(_) => GENERIC_ERROR,
-            nx_service_nv::ConnectError::CloneSession(_) => GENERIC_ERROR,
+            nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
+        nx_service_nv::ConnectError::CreateTransferMemory(_) => GENERIC_ERROR,
+        nx_service_nv::ConnectError::Initialize(e) => match e {
+            nx_service_nv::InitializeError::SendRequest(e) => e.to_rc(),
+            nx_service_nv::InitializeError::ParseResponse(e) => match e {
+                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+                cmif::ParseResponseError::ServiceError(code) => code,
+            },
+        },
+        nx_service_nv::ConnectError::CloseTransferMemHandle(_) => GENERIC_ERROR,
+        nx_service_nv::ConnectError::CloneSession(_) => GENERIC_ERROR,
     }
 }
 

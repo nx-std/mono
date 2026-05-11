@@ -6,7 +6,7 @@
 use nx_service_time::{TimeService, TimeServiceType};
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
-use crate::service_manager;
+use crate::services::sm;
 
 /// Global Time state, lazily initialized.
 static TIME_STATE: OnceLock<RwLock<Option<TimeState>>> = OnceLock::new();
@@ -25,12 +25,11 @@ fn state() -> &'static RwLock<Option<TimeState>> {
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
-    let sm_guard = service_manager::sm_session();
+    let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Connect to Time service (time:u by default)
-    let service =
-        nx_service_time::connect(sm, TimeServiceType::User).map_err(ConnectError::Connect)?;
+    let service = nx_service_time::connect(sm, TimeServiceType::User).map_err(ConnectError)?;
 
     let mut guard = state().write();
     *guard = Some(TimeState { service });
@@ -74,10 +73,7 @@ impl core::ops::Deref for TimeServiceRef {
     }
 }
 
-/// Error returned by [`init`].
+/// Error returned by [`init`] when connecting to the Time service fails.
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Failed to connect to Time service.
-    #[error("failed to connect to Time service")]
-    Connect(#[source] nx_service_time::ConnectError),
-}
+#[error("failed to connect to Time service")]
+pub struct ConnectError(#[source] pub nx_service_time::ConnectError);

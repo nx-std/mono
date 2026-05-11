@@ -6,7 +6,8 @@ use nx_svc::{raw::INVALID_HANDLE, thread::Handle as ThreadHandle};
 
 use crate::{
     env::{self, AccountUid, ConfigEntry, LoaderReturnFn},
-    init, service_manager,
+    init,
+    services::sm,
 };
 
 // ============================================================================
@@ -75,7 +76,7 @@ pub unsafe extern "C" fn __nx_rt__env_setup(
 
     // Register service overrides with the Rust service manager
     for ovr in env::service_overrides().iter().flatten() {
-        let _ = service_manager::add_override(ovr.name, ovr.handle);
+        let _ = sm::add_override(ovr.name, ovr.handle);
     }
 
     // Set global applet type from env config
