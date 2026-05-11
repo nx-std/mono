@@ -10,14 +10,22 @@ use nx_sf::service::{DispatchError, OutHandleAttr, Service};
 use nx_svc::sync::EventHandle;
 
 use crate::proto::{
-    AppletFocusState, AppletMessage, AppletOperationMode, CMD_CSG_GET_CURRENT_FOCUS_STATE,
-    CMD_CSG_GET_EVENT_HANDLE, CMD_CSG_GET_OPERATION_MODE, CMD_CSG_GET_PERFORMANCE_MODE,
-    CMD_CSG_RECEIVE_MESSAGE,
+    AppletFocusState, AppletMessage, AppletOperationMode, AppletPerformanceMode,
+    CMD_CSG_GET_CURRENT_FOCUS_STATE, CMD_CSG_GET_EVENT_HANDLE, CMD_CSG_GET_OPERATION_MODE,
+    CMD_CSG_GET_PERFORMANCE_MODE, CMD_CSG_RECEIVE_MESSAGE,
 };
 
 /// Gets the message event handle from ICommonStateGetter.
 ///
 /// This handle is signaled when the applet receives a message.
+///
+/// # Autoclear semantics
+///
+/// The kernel event backing this handle is configured with `autoclear = false`
+/// (matching libnx's `_appletCmdGetEvent(..., autoclear=false, ...)`). After
+/// the handle is signaled and a message has been received, callers MUST reset
+/// the signal manually (e.g. via [`nx_svc::sync::reset_signal`]) or subsequent
+/// waits will return immediately and busy-loop.
 pub fn get_event_handle(csg: &Service) -> Result<EventHandle, GetEventHandleError> {
     let result = csg
         .dispatch(CMD_CSG_GET_EVENT_HANDLE)
@@ -121,7 +129,9 @@ pub enum GetOperationModeError {
 }
 
 /// Gets the current performance mode from ICommonStateGetter.
-pub fn get_performance_mode(csg: &Service) -> Result<u32, GetPerformanceModeError> {
+pub fn get_performance_mode(
+    csg: &Service,
+) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
     let result = csg
         .dispatch(CMD_CSG_GET_PERFORMANCE_MODE)
         .out_size(size_of::<u32>())
@@ -133,8 +143,8 @@ pub fn get_performance_mode(csg: &Service) -> Result<u32, GetPerformanceModeErro
     }
 
     // SAFETY: Response data contains u32 performance mode.
-    let mode = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-    Ok(mode)
+    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
+    AppletPerformanceMode::from_raw(raw).ok_or(GetPerformanceModeError::InvalidValue(raw))
 }
 
 /// Error returned by [`get_performance_mode`].
@@ -146,6 +156,9 @@ pub enum GetPerformanceModeError {
     /// Response data was invalid.
     #[error("invalid response data")]
     InvalidResponse,
+    /// Performance mode value was unknown.
+    #[error("unknown performance mode value: {0}")]
+    InvalidValue(u32),
 }
 
 /// Gets the current focus state from ICommonStateGetter.

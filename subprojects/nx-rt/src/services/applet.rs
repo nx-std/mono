@@ -4,13 +4,19 @@
 //! Since applet has multiple sub-interfaces that aren't identified by ServiceName,
 //! they are stored in a dedicated structure rather than the generic service registry.
 
+use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
+
 use nx_service_applet::{
-    AppletFocusHandlingMode, AppletFocusState, AppletMessage, AppletProxyService, AppletService,
-    AppletType, ApplicationFunctions, CommonStateGetter, SelfController, WindowController,
-    aruid::Aruid,
+    AppletFocusHandlingMode, AppletFocusState, AppletMessage, AppletOperationMode,
+    AppletPerformanceMode, AppletProxyService, AppletService, AppletType, ApplicationFunctions,
+    CommonStateGetter, SelfController, WindowController, aruid::Aruid,
 };
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 use nx_svc::process::Handle as ProcessHandle;
+
+/// Sentinel for "focus state not yet known". `AppletFocusState` discriminants start
+/// at 1 (InFocus) so 0 is safe as a tombstone.
+const FOCUS_STATE_UNKNOWN: u8 = 0;
 
 use crate::services::sm;
 
@@ -26,6 +32,13 @@ fn state() -> &'static RwLock<Option<AppletState>> {
 ///
 /// Connects to appletOE or appletAE based on applet type,
 /// and gets the required sub-interfaces.
+///
+/// Mirrors libnx `_appletInitialize`:
+/// - For [`AppletType::Application`], performs the InFocus wait loop, acquires
+///   foreground rights, sets focus handling mode, calls NotifyRunning.
+/// - For **all** non-None applet types, fetches initial operation/performance/focus
+///   state and enables operation/performance mode change notifications so the
+///   cached state stays current via [`process_message`].
 ///
 /// # Panics
 ///
@@ -85,7 +98,10 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         None
     };
 
-    // Application-specific initialization handshake
+    // Application-specific initialization handshake (InFocus wait, foreground rights,
+    // focus handling mode, NotifyRunning). For non-Application types, libnx fetches
+    // focus state and enables mode notifications unconditionally; that's handled
+    // after this block.
     if is_application {
         // SAFETY: For Application type, we ensured window_controller and application_functions are Some
         let wc = window_controller.as_ref().unwrap();
@@ -132,7 +148,7 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         wc.acquire_foreground_rights()
             .map_err(ConnectError::AcquireForegroundRights)?;
 
-        // 5. Set focus handling mode
+        // 5. Set focus handling mode (dispatches both cmd 13 and cmd 16)
         self_controller
             .set_focus_handling_mode(AppletFocusHandlingMode::SuspendHomeSleep)
             .map_err(ConnectError::SetFocusHandlingMode)?;
@@ -141,16 +157,29 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         app_funcs
             .notify_running()
             .map_err(ConnectError::NotifyRunning)?;
-
-        // 7. Enable mode change notifications
-        self_controller
-            .set_operation_mode_changed_notification(true)
-            .map_err(ConnectError::SetOperationModeNotification)?;
-
-        self_controller
-            .set_performance_mode_changed_notification(true)
-            .map_err(ConnectError::SetPerformanceModeNotification)?;
     }
+
+    // Fetch initial operation/performance/focus state for all applet types.
+    // libnx applet.c:313-318 does this unconditionally, then enables mode-change
+    // notifications. The non-Application path skipped this before, leaving the
+    // cached state effectively zeroed.
+    let operation_mode = common_state_getter
+        .get_operation_mode()
+        .map_err(ConnectError::GetOperationMode)?;
+    let performance_mode = common_state_getter
+        .get_performance_mode()
+        .map_err(ConnectError::GetPerformanceMode)?;
+    let initial_focus_state = common_state_getter
+        .get_current_focus_state()
+        .map_err(ConnectError::GetFocusState)?;
+
+    // Enable mode-change notifications for all applet types (libnx applet.c:320-323).
+    self_controller
+        .set_operation_mode_changed_notification(true)
+        .map_err(ConnectError::SetOperationModeNotification)?;
+    self_controller
+        .set_performance_mode_changed_notification(true)
+        .map_err(ConnectError::SetPerformanceModeNotification)?;
 
     // Fetch and cache the applet resource user ID
     let aruid = window_controller
@@ -166,6 +195,10 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         window_controller,
         application_functions,
         aruid,
+        is_application,
+        focus_state: AtomicU8::new(initial_focus_state as u8),
+        operation_mode: AtomicU8::new(operation_mode as u8),
+        performance_mode: AtomicU32::new(performance_mode as u32),
     };
 
     let mut guard = state().write();
@@ -226,10 +259,86 @@ pub fn get_applet_resource_user_id() -> Option<Aruid> {
     state().read().as_ref().and_then(|s| s.aruid)
 }
 
+/// Returns the cached focus state, or `None` if the applet is not initialized
+/// or the cached value is unknown.
+pub fn cached_focus_state() -> Option<AppletFocusState> {
+    let guard = state().read();
+    let raw = guard.as_ref()?.focus_state.load(Ordering::Acquire);
+    if raw == FOCUS_STATE_UNKNOWN {
+        return None;
+    }
+    AppletFocusState::from_raw(raw)
+}
+
+/// Returns the cached operation mode. Falls back to `Handheld` when the applet
+/// is not initialized, matching libnx's default-initialized global.
+pub fn cached_operation_mode() -> AppletOperationMode {
+    let guard = state().read();
+    guard
+        .as_ref()
+        .and_then(|s| AppletOperationMode::from_raw(s.operation_mode.load(Ordering::Acquire)))
+        .unwrap_or_default()
+}
+
+/// Returns the cached performance mode. Falls back to `Normal` when the applet
+/// is not initialized, matching libnx's default-initialized global.
+pub fn cached_performance_mode() -> AppletPerformanceMode {
+    let guard = state().read();
+    guard
+        .as_ref()
+        .and_then(|s| AppletPerformanceMode::from_raw(s.performance_mode.load(Ordering::Acquire)))
+        .unwrap_or_default()
+}
+
+/// Updates cached applet state in response to a received [`AppletMessage`].
+///
+/// Mirrors libnx `appletProcessMessage` for the cache-refresh paths: when the
+/// system signals that focus/operation/performance mode changed, re-query the
+/// authoritative value and update the cache. Hook callbacks are out of scope.
+///
+/// Safe to call from FFI shims after a successful `receive_message`.
+pub fn process_message(msg: AppletMessage) {
+    let guard = state().read();
+    let Some(s) = guard.as_ref() else {
+        return;
+    };
+
+    match msg {
+        AppletMessage::FocusStateChanged => {
+            if let Ok(value) = s.common_state_getter.get_current_focus_state() {
+                s.focus_state.store(value as u8, Ordering::Release);
+            }
+        }
+        AppletMessage::OperationModeChanged => {
+            if let Ok(value) = s.common_state_getter.get_operation_mode() {
+                s.operation_mode.store(value as u8, Ordering::Release);
+            }
+        }
+        AppletMessage::PerformanceModeChanged => {
+            if let Ok(value) = s.common_state_getter.get_performance_mode() {
+                s.performance_mode.store(value as u32, Ordering::Release);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Exits the applet service session.
+///
+/// For Application-type applets, libnx `_appletCleanup` resets the focus handling
+/// mode to [`AppletFocusHandlingMode::NoSuspend`] before closing the sessions so
+/// the OS does not force-suspend the process mid-teardown. We mirror that here.
 pub fn exit() {
     let mut guard = state().write();
     if let Some(applet_state) = guard.take() {
+        // Reset focus handling mode before teardown, mirroring libnx _appletCleanup.
+        // We ignore errors here — teardown should proceed regardless.
+        if applet_state.is_application {
+            let _ = applet_state
+                .self_controller
+                .set_focus_handling_mode(AppletFocusHandlingMode::NoSuspend);
+        }
+
         // Close sub-interfaces and sessions in reverse order
         if let Some(application_functions) = applet_state.application_functions {
             application_functions.close();
@@ -260,6 +369,14 @@ struct AppletState {
     application_functions: Option<ApplicationFunctions>,
     /// Cached applet resource user ID (fetched once during init)
     aruid: Option<Aruid>,
+    /// Whether this is an Application-type applet (controls cleanup behavior).
+    is_application: bool,
+    /// Cached focus state, updated on `FocusStateChanged` messages.
+    focus_state: AtomicU8,
+    /// Cached operation mode, updated on `OperationModeChanged` messages.
+    operation_mode: AtomicU8,
+    /// Cached performance mode, updated on `PerformanceModeChanged` messages.
+    performance_mode: AtomicU32,
 }
 
 /// Wrapper for accessing AppletProxyService through RwLockReadGuard
@@ -341,6 +458,12 @@ pub enum ConnectError {
     /// Failed to get current focus state.
     #[error("failed to get current focus state")]
     GetFocusState(#[source] nx_service_applet::GetCurrentFocusStateError),
+    /// Failed to get current operation mode.
+    #[error("failed to get current operation mode")]
+    GetOperationMode(#[source] nx_service_applet::GetOperationModeError),
+    /// Failed to get current performance mode.
+    #[error("failed to get current performance mode")]
+    GetPerformanceMode(#[source] nx_service_applet::GetPerformanceModeError),
     /// Failed to wait for synchronization.
     #[error("failed to wait for synchronization")]
     WaitSynchronization(#[source] nx_svc::sync::WaitSyncError),

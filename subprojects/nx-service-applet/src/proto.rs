@@ -23,13 +23,15 @@ pub const CMD_OPEN_APPLICATION_PROXY: u32 = 0;
 /// Command ID for OpenSystemAppletProxy (AppletType::SystemApplet)
 pub const CMD_OPEN_SYSTEM_APPLET_PROXY: u32 = 100;
 
-/// Command ID for OpenLibraryAppletProxy (AppletType::LibraryApplet, pre-3.0.0)
-pub const CMD_OPEN_LIBRARY_APPLET_PROXY: u32 = 200;
-
-/// Command ID for OpenLibraryAppletProxyOld (AppletType::LibraryApplet, 3.0.0+)
+/// Command ID for OpenLibraryAppletProxyOld (AppletType::LibraryApplet, pre-3.0.0)
 ///
-/// This version accepts an AppletAttribute buffer.
-pub const CMD_OPEN_LIBRARY_APPLET_PROXY_OLD: u32 = 201;
+/// Legacy proxy command without an `AppletAttribute` buffer.
+pub const CMD_OPEN_LIBRARY_APPLET_PROXY_OLD: u32 = 200;
+
+/// Command ID for OpenLibraryAppletProxy (AppletType::LibraryApplet, 3.0.0+)
+///
+/// This version accepts an `AppletAttribute` buffer.
+pub const CMD_OPEN_LIBRARY_APPLET_PROXY: u32 = 201;
 
 /// Command ID for OpenOverlayAppletProxy (AppletType::OverlayApplet)
 pub const CMD_OPEN_OVERLAY_APPLET_PROXY: u32 = 300;
@@ -50,39 +52,38 @@ pub const CMD_GET_WINDOW_CONTROLLER: u32 = 2;
 // They are defined here for documentation purposes.
 
 /// Command ID for GetAudioController
-#[allow(dead_code)]
 pub const CMD_GET_AUDIO_CONTROLLER: u32 = 3;
 
 /// Command ID for GetDisplayController
-#[allow(dead_code)]
 pub const CMD_GET_DISPLAY_CONTROLLER: u32 = 4;
 
 /// Command ID for GetProcessWindingController (LibraryApplet only)
-#[allow(dead_code)]
 pub const CMD_GET_PROCESS_WINDING_CONTROLLER: u32 = 10;
 
 /// Command ID for GetLibraryAppletCreator
-#[allow(dead_code)]
 pub const CMD_GET_LIBRARY_APPLET_CREATOR: u32 = 11;
 
-/// Command ID for GetLibraryAppletSelfAccessor or IFunctions (type-dependent)
-#[allow(dead_code)]
+/// Command ID for `Get*Functions` (cmd 20) — type-dependent.
+///
+/// For Application this returns IApplicationFunctions (see [`CMD_GET_APPLICATION_FUNCTIONS`]);
+/// for SystemApplet/OverlayApplet/SystemApplication it returns the type-specific
+/// `IFunctions`; for LibraryApplet it returns ILibraryAppletSelfAccessor; on HOS 15.0.0+
+/// for LibraryApplet it returns IHomeMenuFunctions.
 pub const CMD_GET_FUNCTIONS_OR_SELF_ACCESSOR: u32 = 20;
 
-/// Command ID for GetAppletCommonFunctions (7.0.0+) or IGlobalStateController
-#[allow(dead_code)]
+/// Command ID for GetAppletCommonFunctions (7.0.0+, non-SystemApplet) or
+/// GetGlobalStateController (SystemApplet, always).
 pub const CMD_GET_APPLET_COMMON_FUNCTIONS: u32 = 21;
 
-/// Command ID for GetApplicationCreator (SystemApplet) or GetHomeMenuFunctions (15.0.0+)
-#[allow(dead_code)]
+/// Command ID for GetApplicationCreator (SystemApplet) or GetHomeMenuFunctions
+/// (LibraryApplet, 15.0.0+).
 pub const CMD_GET_APPLICATION_CREATOR: u32 = 22;
 
-/// Command ID for GetAppletCommonFunctions (SystemApplet, 7.0.0+)
-#[allow(dead_code)]
+/// Command ID for GetAppletCommonFunctions (SystemApplet, 7.0.0+) or
+/// GetGlobalStateController (LibraryApplet/OverlayApplet, 15.0.0+).
 pub const CMD_GET_APPLET_COMMON_FUNCTIONS_SYSTEM: u32 = 23;
 
 /// Command ID for GetDebugFunctions
-#[allow(dead_code)]
 pub const CMD_GET_DEBUG_FUNCTIONS: u32 = 1000;
 
 /// Command ID for GetEventHandle (ICommonStateGetter)
@@ -245,6 +246,38 @@ pub enum AppletOperationMode {
     Handheld = 0,
     /// Console mode (docked / TV-mode).
     Console = 1,
+}
+
+/// Performance mode reported by `ICommonStateGetter::GetPerformanceMode`.
+///
+/// Matches libnx `AppletPerformanceMode` (signed enum read as `u32` over IPC).
+/// The `Invalid` variant corresponds to libnx's `AppletPerformanceMode_Invalid`
+/// (`-1`), which the server may return when the mode is not yet determined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u32)]
+pub enum AppletPerformanceMode {
+    /// Performance mode has not been determined yet.
+    Invalid = u32::MAX,
+    /// Normal performance (default clocks).
+    #[default]
+    Normal = 0,
+    /// Boost performance (higher CPU/GPU clocks).
+    Boost = 1,
+}
+
+impl AppletPerformanceMode {
+    /// Creates an `AppletPerformanceMode` from a raw u32 value.
+    ///
+    /// Returns `None` if the value doesn't correspond to a known mode.
+    #[inline]
+    pub const fn from_raw(value: u32) -> Option<Self> {
+        match value {
+            u32::MAX => Some(Self::Invalid),
+            0 => Some(Self::Normal),
+            1 => Some(Self::Boost),
+            _ => None,
+        }
+    }
 }
 
 impl AppletOperationMode {

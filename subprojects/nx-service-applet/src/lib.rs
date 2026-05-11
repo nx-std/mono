@@ -170,6 +170,7 @@
 //! | 51 | `RequestToDisplay` | Another applet wants the screen |
 //! | 90 | `CaptureButtonShortPressed` | Screenshot button pressed |
 //! | 92 | `AlbumScreenShotTaken` | Screenshot was captured |
+//! | 93 | `AlbumRecordingSaved` | Album recording was saved |
 //!
 //! # Focus States and Suspension
 //!
@@ -330,8 +331,8 @@ pub use self::{
     cmif::{
         AcquireForegroundRightsError, ConnectError, CreateManagedDisplayLayerError,
         GetAppletResourceUserIdError, GetApplicationFunctionsError, GetCommonStateGetterError,
-        GetSelfControllerError, GetWindowControllerError, NotifyRunningError, OpenProxyError,
-        SetFocusHandlingModeError, SetOperationModeChangedNotificationError,
+        GetSelfControllerError, GetSubInterfaceError, GetWindowControllerError, NotifyRunningError,
+        OpenProxyError, SetFocusHandlingModeError, SetOperationModeChangedNotificationError,
         SetOutOfFocusSuspendingEnabledError, SetPerformanceModeChangedNotificationError,
     },
     common_state::{
@@ -340,9 +341,119 @@ pub use self::{
     },
     proto::{
         AppletAttribute, AppletFocusHandlingMode, AppletFocusState, AppletMessage,
-        AppletOperationMode, AppletType, SERVICE_NAME_AE, SERVICE_NAME_OE,
+        AppletOperationMode, AppletPerformanceMode, AppletType, SERVICE_NAME_AE, SERVICE_NAME_OE,
     },
 };
+
+/// Defines a sub-interface wrapper with the standard `session/object_id/close` accessors.
+///
+/// All "stub" sub-interfaces added to provide access to libnx sub-services follow the same
+/// shape — they wrap a domain subservice and expose only the standard accessors. Per-command
+/// methods can be added later as consumers need them.
+macro_rules! sub_interface_stub {
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
+        #[repr(transparent)]
+        pub struct $name(Service);
+
+        impl $name {
+            /// Returns the underlying session handle.
+            #[inline]
+            pub fn session(&self) -> SessionHandle {
+                self.0.session
+            }
+
+            /// Returns the domain object ID (0 if non-domain).
+            #[inline]
+            pub fn object_id(&self) -> u32 {
+                self.0.object_id
+            }
+
+            /// Consumes and closes the interface.
+            #[inline]
+            pub fn close(self) {
+                self.0.close();
+            }
+        }
+    };
+}
+
+sub_interface_stub! {
+    /// IAudioController sub-interface (proxy cmd 3).
+    ///
+    /// Available for all applet types. Methods (volume control, transparent volume rate)
+    /// are added on demand; see libnx `appletSetExpectedMasterVolume`/`appletGetExpectedMasterVolume`.
+    AudioController
+}
+
+sub_interface_stub! {
+    /// IDisplayController sub-interface (proxy cmd 4).
+    ///
+    /// Capture-buffer and screenshot operations live behind this interface; see libnx
+    /// `appletTakeScreenShotOfOwnLayer`/`appletAcquireLastForegroundCaptureSharedBuffer` etc.
+    DisplayController
+}
+
+sub_interface_stub! {
+    /// IProcessWindingController sub-interface (proxy cmd 10).
+    ///
+    /// LibraryApplet only. Used by `appletPushContext`/`appletPopContext`.
+    ProcessWindingController
+}
+
+sub_interface_stub! {
+    /// ILibraryAppletCreator sub-interface (proxy cmd 11).
+    ///
+    /// Available for all applet types. Used to launch library applets (swkbd, error
+    /// dialog, …) and create IStorage objects for inter-applet data transfer.
+    LibraryAppletCreator
+}
+
+sub_interface_stub! {
+    /// ILibraryAppletSelfAccessor sub-interface (proxy cmd 20, LibraryApplet only,
+    /// pre-15.0.0).
+    ///
+    /// Provides storage exchange, identity info, and exit-to-self for library applets.
+    LibraryAppletSelfAccessor
+}
+
+sub_interface_stub! {
+    /// IAppletCommonFunctions sub-interface (proxy cmd 21 or 23, HOS 7.0.0+).
+    ///
+    /// Available for SystemApplet/LibraryApplet/OverlayApplet. The proxy command differs
+    /// by applet type — see [`AppletProxyService::get_applet_common_functions`].
+    AppletCommonFunctions
+}
+
+sub_interface_stub! {
+    /// IGlobalStateController sub-interface (proxy cmd 21 or 23).
+    ///
+    /// Available for SystemApplet (always, cmd 21) and LibraryApplet/OverlayApplet
+    /// (HOS 15.0.0+, cmd 23). Sleep/shutdown/reboot sequencing lives here.
+    GlobalStateController
+}
+
+sub_interface_stub! {
+    /// IApplicationCreator sub-interface (proxy cmd 22, SystemApplet only).
+    ///
+    /// Used by `qlaunch` and similar system applets to spawn/launch applications.
+    ApplicationCreator
+}
+
+sub_interface_stub! {
+    /// IHomeMenuFunctions sub-interface (proxy cmd 22, LibraryApplet on HOS 15.0.0+).
+    ///
+    /// Replaces `IFunctions` for LibraryApplet starting in 15.0.0.
+    HomeMenuFunctions
+}
+
+sub_interface_stub! {
+    /// IDebugFunctions sub-interface (proxy cmd 1000).
+    ///
+    /// Available for all applet types. Debug-only commands (system-button injection,
+    /// general-storage probing, etc.).
+    DebugFunctions
+}
 
 /// Applet main service session (appletOE or appletAE).
 ///
@@ -463,6 +574,84 @@ impl AppletProxyService {
     ) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
         cmif::get_application_functions(&self.0)
     }
+
+    /// Gets the IAudioController sub-interface (cmd 3, all applet types).
+    #[inline]
+    pub fn get_audio_controller(&self) -> Result<AudioController, GetSubInterfaceError> {
+        cmif::get_audio_controller(&self.0)
+    }
+
+    /// Gets the IDisplayController sub-interface (cmd 4, all applet types).
+    #[inline]
+    pub fn get_display_controller(&self) -> Result<DisplayController, GetSubInterfaceError> {
+        cmif::get_display_controller(&self.0)
+    }
+
+    /// Gets the IProcessWindingController sub-interface (cmd 10, LibraryApplet only).
+    #[inline]
+    pub fn get_process_winding_controller(
+        &self,
+    ) -> Result<ProcessWindingController, GetSubInterfaceError> {
+        cmif::get_process_winding_controller(&self.0)
+    }
+
+    /// Gets the ILibraryAppletCreator sub-interface (cmd 11, all applet types).
+    #[inline]
+    pub fn get_library_applet_creator(&self) -> Result<LibraryAppletCreator, GetSubInterfaceError> {
+        cmif::get_library_applet_creator(&self.0)
+    }
+
+    /// Gets the ILibraryAppletSelfAccessor sub-interface (cmd 20, LibraryApplet only,
+    /// pre-15.0.0).
+    #[inline]
+    pub fn get_library_applet_self_accessor(
+        &self,
+    ) -> Result<LibraryAppletSelfAccessor, GetSubInterfaceError> {
+        cmif::get_library_applet_self_accessor(&self.0)
+    }
+
+    /// Gets the IAppletCommonFunctions sub-interface (HOS 7.0.0+, non-Application).
+    ///
+    /// `applet_type` selects the right proxy command: SystemApplet uses cmd 23,
+    /// other types use cmd 21. Returns [`GetSubInterfaceError::Dispatch`] if the
+    /// HOS is older than 7.0.0 or the applet type is not supported.
+    #[inline]
+    pub fn get_applet_common_functions(
+        &self,
+        applet_type: AppletType,
+    ) -> Result<AppletCommonFunctions, GetSubInterfaceError> {
+        cmif::get_applet_common_functions(&self.0, applet_type)
+    }
+
+    /// Gets the IGlobalStateController sub-interface.
+    ///
+    /// `applet_type` selects the proxy command: SystemApplet uses cmd 21,
+    /// LibraryApplet/OverlayApplet use cmd 23 (HOS 15.0.0+).
+    #[inline]
+    pub fn get_global_state_controller(
+        &self,
+        applet_type: AppletType,
+    ) -> Result<GlobalStateController, GetSubInterfaceError> {
+        cmif::get_global_state_controller(&self.0, applet_type)
+    }
+
+    /// Gets the IApplicationCreator sub-interface (cmd 22, SystemApplet only).
+    #[inline]
+    pub fn get_application_creator(&self) -> Result<ApplicationCreator, GetSubInterfaceError> {
+        cmif::get_application_creator(&self.0)
+    }
+
+    /// Gets the IHomeMenuFunctions sub-interface (cmd 22, LibraryApplet on 15.0.0+).
+    #[inline]
+    pub fn get_home_menu_functions(&self) -> Result<HomeMenuFunctions, GetSubInterfaceError> {
+        cmif::get_home_menu_functions(&self.0)
+    }
+
+    /// Gets the IDebugFunctions sub-interface (cmd 1000, all applet types).
+    #[inline]
+    pub fn get_debug_functions(&self) -> Result<DebugFunctions, GetSubInterfaceError> {
+        cmif::get_debug_functions(&self.0)
+    }
 }
 
 /// ICommonStateGetter sub-interface.
@@ -519,7 +708,7 @@ impl CommonStateGetter {
 
     /// Gets the current performance mode.
     #[inline]
-    pub fn get_performance_mode(&self) -> Result<u32, GetPerformanceModeError> {
+    pub fn get_performance_mode(&self) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
         common_state::get_performance_mode(&self.0)
     }
 
@@ -562,7 +751,17 @@ impl SelfController {
     /// Sets the focus handling mode.
     ///
     /// This controls when the applet suspends based on focus state.
-    /// Only valid for Application applet type.
+    ///
+    /// # Applet-type contract
+    ///
+    /// libnx rejects this call for any applet type other than `Application`
+    /// (`appletSetFocusHandlingMode` returns `LibnxError_NotInitialized`).
+    /// `nx-service-applet` does not enforce that here; callers must
+    /// gate this on `AppletType::Application` (the `nx-rt` wrapper does so).
+    ///
+    /// Internally issues two IPC dispatches (cmd 13 and, on HOS 2.0.0+,
+    /// cmd 16 via the companion `SetOutOfFocusSuspendingEnabled`), mirroring
+    /// libnx `appletSetFocusHandlingMode`.
     #[inline]
     pub fn set_focus_handling_mode(
         &self,
@@ -571,9 +770,17 @@ impl SelfController {
         cmif::set_focus_handling_mode(&self.0, mode)
     }
 
-    /// Sets whether to suspend when out of focus (2.0.0+).
+    /// Sets whether to suspend when out of focus (HOS 2.0.0+).
     ///
-    /// Only valid for Application applet type.
+    /// # Version contract
+    ///
+    /// The underlying command (cmd 16) was introduced in HOS 2.0.0. Callers are
+    /// responsible for HOS version-gating; this primitive does not check.
+    ///
+    /// # Applet-type contract
+    ///
+    /// Only valid for `AppletType::Application`. `nx-service-applet` does not
+    /// enforce that here; the `nx-rt` wrapper does.
     #[inline]
     pub fn set_out_of_focus_suspending_enabled(
         &self,
@@ -697,7 +904,7 @@ impl ApplicationFunctions {
     /// and is ready to run.
     ///
     /// This should be called after waiting for InFocus, acquiring foreground rights,
-    /// and setting up focus handling mode.
+    /// and setting up focus handling mode. Only valid for `AppletType::Application`.
     #[inline]
     pub fn notify_running(&self) -> Result<bool, NotifyRunningError> {
         cmif::notify_running(&self.0)
@@ -708,6 +915,9 @@ impl ApplicationFunctions {
 ///
 /// The service is automatically converted to domain mode for efficient
 /// sub-object management.
+///
+/// `AppletType::Default` is coerced to `AppletType::Application`, matching
+/// libnx's `_appletInitialize` behavior.
 ///
 /// # Arguments
 ///
@@ -724,6 +934,13 @@ pub fn connect(
     if matches!(applet_type, AppletType::None) {
         return Ok(None);
     }
+
+    // Coerce Default → Application, matching libnx _appletInitialize behavior.
+    let applet_type = if matches!(applet_type, AppletType::Default) {
+        AppletType::Application
+    } else {
+        applet_type
+    };
 
     // Determine which service to connect to
     let service_name = if applet_type.uses_applet_oe() {

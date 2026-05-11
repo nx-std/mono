@@ -79,53 +79,44 @@ pub unsafe extern "C" fn __nx_rt__applet_get_applet_type() -> i32 {
 
 /// Gets the current operation mode (handheld/docked).
 ///
-/// Corresponds to `appletGetOperationMode()` in `applet.h`.
+/// Corresponds to `appletGetOperationMode()` in `applet.h`. Returns the cached
+/// value populated during init and refreshed by [`applet::process_message`]; no
+/// IPC is issued per call.
 ///
 /// # Safety
 ///
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_operation_mode() -> u8 {
-    let Some(csg) = applet::get_common_state_getter() else {
-        return nx_service_applet::AppletOperationMode::Handheld as u8;
-    };
-
-    csg.get_operation_mode()
-        .unwrap_or(nx_service_applet::AppletOperationMode::Handheld) as u8
+    applet::cached_operation_mode() as u8
 }
 
 /// Gets the current performance mode.
 ///
-/// Corresponds to `appletGetPerformanceMode()` in `applet.h`.
+/// Corresponds to `appletGetPerformanceMode()` in `applet.h`. Returns the cached
+/// value populated during init and refreshed by [`applet::process_message`].
 ///
 /// # Safety
 ///
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_performance_mode() -> u32 {
-    let Some(csg) = applet::get_common_state_getter() else {
-        return 0;
-    };
-
-    csg.get_performance_mode().unwrap_or(0)
+    applet::cached_performance_mode() as u32
 }
 
 /// Gets the current focus state.
 ///
-/// Corresponds to `appletGetFocusState()` in `applet.h`.
+/// Corresponds to `appletGetFocusState()` in `applet.h`. Returns the cached
+/// value populated during init and refreshed by [`applet::process_message`].
+/// Falls back to `InFocus` when uninitialized to match libnx's
+/// default-initialized global.
 ///
 /// # Safety
 ///
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_get_focus_state() -> u8 {
-    let Some(csg) = applet::get_common_state_getter() else {
-        return nx_service_applet::AppletFocusState::InFocus as u8;
-    };
-
-    csg.get_current_focus_state()
-        .map(|s| s as u8)
-        .unwrap_or(nx_service_applet::AppletFocusState::InFocus as u8)
+    applet::cached_focus_state().unwrap_or(nx_service_applet::AppletFocusState::InFocus) as u8
 }
 
 /// Gets the message event handle.
@@ -144,6 +135,57 @@ pub unsafe extern "C" fn __nx_rt__applet_get_message_event_handle() -> u32 {
     match csg.get_event_handle() {
         Ok(handle) => handle.to_raw(),
         Err(_) => INVALID_HANDLE,
+    }
+}
+
+/// libnx `Event` struct layout, used by `appletGetMessageEvent`.
+///
+/// Matches `Event` in `libnx/include/switch/kernel/event.h`:
+/// ```c
+/// typedef struct {
+///     Handle revent;     // u32
+///     Handle wevent;     // u32
+///     bool   autoclear;  // u8
+/// } Event;
+/// ```
+#[repr(C)]
+struct LibnxEvent {
+    revent: u32,
+    wevent: u32,
+    autoclear: bool,
+}
+
+/// Fills a libnx-compatible `Event` struct with the applet message event.
+///
+/// Corresponds to `appletGetMessageEvent()` in `applet.h`. libnx initialises
+/// this event with `autoclear = false`; callers that wait on it must reset the
+/// signal manually.
+///
+/// # Safety
+///
+/// `out` must point to writable memory at least the size of libnx's `Event`
+/// struct (`sizeof(Handle)*2 + sizeof(bool)` ≈ 12 bytes with C padding).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt__applet_get_message_event(out: *mut LibnxEvent) -> u32 {
+    if out.is_null() {
+        return GENERIC_ERROR;
+    }
+
+    let Some(csg) = applet::get_common_state_getter() else {
+        return GENERIC_ERROR;
+    };
+
+    match csg.get_event_handle() {
+        Ok(handle) => {
+            // SAFETY: caller guarantees `out` is writable.
+            unsafe {
+                (*out).revent = handle.to_raw();
+                (*out).wevent = INVALID_HANDLE;
+                (*out).autoclear = false;
+            }
+            0
+        }
+        Err(_) => GENERIC_ERROR,
     }
 }
 
@@ -168,13 +210,13 @@ pub unsafe extern "C" fn __nx_rt__applet_set_focus_handling_mode(mode: u32) -> u
         _ => return GENERIC_ERROR,
     };
 
-    if let Err(nx_service_applet::SetFocusHandlingModeError::Dispatch(e)) =
-        sc.set_focus_handling_mode(mode)
-    {
-        return dispatch_error_to_rc(e);
+    match sc.set_focus_handling_mode(mode) {
+        Ok(()) => 0,
+        Err(nx_service_applet::SetFocusHandlingModeError::Dispatch(e)) => dispatch_error_to_rc(e),
+        Err(nx_service_applet::SetFocusHandlingModeError::SetOutOfFocusSuspending(
+            nx_service_applet::SetOutOfFocusSuspendingEnabledError::Dispatch(e),
+        )) => dispatch_error_to_rc(e),
     }
-
-    0
 }
 
 /// Sets whether to suspend when out of focus.
@@ -216,17 +258,24 @@ pub unsafe extern "C" fn __nx_rt__applet_receive_message(msg: *mut u32) -> u32 {
         return GENERIC_ERROR;
     };
 
-    match csg.receive_message() {
+    let result = csg.receive_message();
+    // Drop the borrow before invoking process_message (which re-acquires the
+    // read lock to refresh the cache).
+    drop(csg);
+
+    match result {
         Ok(Some(message)) => {
             // SAFETY: Caller guarantees msg points to valid memory.
             unsafe { *msg = message as u32 };
+            // Refresh cached state for messages that signal a state change
+            // (libnx's `appletProcessMessage` equivalent).
+            applet::process_message(message);
             0
         }
-        Ok(None) => {
-            // No message available - return 0 with no message written
-            // This matches libnx behavior where the queue may be empty
-            0
-        }
+        // No message available — propagate libnx's "queue empty" result code so
+        // callers (e.g. `appletReceiveMessage` consumers) can distinguish empty
+        // from success the same way they would against libnx.
+        Ok(None) => 0x680,
         Err(nx_service_applet::ReceiveMessageError::Dispatch(e)) => dispatch_error_to_rc(e),
         Err(nx_service_applet::ReceiveMessageError::InvalidResponse) => GENERIC_ERROR,
     }
@@ -361,6 +410,7 @@ fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
             nx_service_applet::OpenProxyError::InvalidAppletType => GENERIC_ERROR,
             nx_service_applet::OpenProxyError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::OpenProxyError::MissingObject => GENERIC_ERROR,
+            nx_service_applet::OpenProxyError::Timeout => GENERIC_ERROR,
         },
         applet::ConnectError::GetCommonStateGetter(e) => match e {
             nx_service_applet::GetCommonStateGetterError::Dispatch(e) => dispatch_error_to_rc(e),
@@ -387,12 +437,25 @@ fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
             nx_service_applet::GetCurrentFocusStateError::InvalidResponse => GENERIC_ERROR,
             nx_service_applet::GetCurrentFocusStateError::InvalidValue(_) => GENERIC_ERROR,
         },
+        applet::ConnectError::GetOperationMode(e) => match e {
+            nx_service_applet::GetOperationModeError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::GetOperationModeError::InvalidResponse => GENERIC_ERROR,
+            nx_service_applet::GetOperationModeError::InvalidValue(_) => GENERIC_ERROR,
+        },
+        applet::ConnectError::GetPerformanceMode(e) => match e {
+            nx_service_applet::GetPerformanceModeError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::GetPerformanceModeError::InvalidResponse => GENERIC_ERROR,
+            nx_service_applet::GetPerformanceModeError::InvalidValue(_) => GENERIC_ERROR,
+        },
         applet::ConnectError::WaitSynchronization(e) => e.to_rc(),
         applet::ConnectError::AcquireForegroundRights(e) => match e {
             nx_service_applet::AcquireForegroundRightsError::Dispatch(e) => dispatch_error_to_rc(e),
         },
         applet::ConnectError::SetFocusHandlingMode(e) => match e {
             nx_service_applet::SetFocusHandlingModeError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::SetFocusHandlingModeError::SetOutOfFocusSuspending(
+                nx_service_applet::SetOutOfFocusSuspendingEnabledError::Dispatch(e),
+            ) => dispatch_error_to_rc(e),
         },
         applet::ConnectError::NotifyRunning(e) => match e {
             nx_service_applet::NotifyRunningError::Dispatch(e) => dispatch_error_to_rc(e),
