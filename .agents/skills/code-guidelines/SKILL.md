@@ -18,7 +18,7 @@ Lazy-loads nx-std code guideline docs from `docs/code/` based on user query or w
 
 The frontmatter of all guideline docs (loaded at skill-start):
 
-!`awk '/^---$/{p=!p; print FILENAME": "$0; next} p{print FILENAME": "$0}' docs/code/*.md 2>/dev/null`
+!`awk '/^---$/{p=!p; printf "%s: ", FILENAME; print; next} p{printf "%s: ", FILENAME; print}' docs/code/*.md 2>/dev/null`
 
 > **Fallback**: if the block above appears as literal text (runtime does not auto-execute dynamic context), run it yourself with the Bash tool before proceeding.
 
