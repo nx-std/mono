@@ -191,14 +191,17 @@ pub unsafe extern "C" fn __nx_rt__applet_get_message_event(out: *mut LibnxEvent)
 
 /// Sets the focus handling mode.
 ///
-/// Corresponds to `appletSetFocusHandlingMode()` in `applet.h`.
+/// Corresponds to `appletSetFocusHandlingMode()` in `applet.h`. AM rejects
+/// this command for any role other than `Application`
+/// (`LibnxError_NotInitialized` in libnx); the typestate routes it through
+/// [`applet::as_application`] so the gate is enforced before the IPC call.
 ///
 /// # Safety
 ///
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_set_focus_handling_mode(mode: u32) -> u32 {
-    let Some(sc) = applet::get_self_controller() else {
+    let Some(app) = applet::as_application() else {
         return GENERIC_ERROR;
     };
 
@@ -210,7 +213,7 @@ pub unsafe extern "C" fn __nx_rt__applet_set_focus_handling_mode(mode: u32) -> u
         _ => return GENERIC_ERROR,
     };
 
-    match sc.set_focus_handling_mode(mode) {
+    match app.set_focus_handling_mode(mode) {
         Ok(()) => 0,
         Err(nx_service_applet::SetFocusHandlingModeError::Dispatch(e)) => dispatch_error_to_rc(e),
         Err(nx_service_applet::SetFocusHandlingModeError::SetOutOfFocusSuspending(
@@ -221,19 +224,22 @@ pub unsafe extern "C" fn __nx_rt__applet_set_focus_handling_mode(mode: u32) -> u
 
 /// Sets whether to suspend when out of focus.
 ///
-/// Corresponds to `appletSetOutOfFocusSuspendingEnabled()` in `applet.h`.
+/// Corresponds to `appletSetOutOfFocusSuspendingEnabled()` in `applet.h`. AM
+/// rejects this command for any role other than `Application` (HOS 2.0.0+
+/// only); the typestate routes it through [`applet::as_application`] so the
+/// gate is enforced before the IPC call.
 ///
 /// # Safety
 ///
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__applet_set_out_of_focus_suspending_enabled(enabled: bool) -> u32 {
-    let Some(sc) = applet::get_self_controller() else {
+    let Some(app) = applet::as_application() else {
         return GENERIC_ERROR;
     };
 
     if let Err(nx_service_applet::SetOutOfFocusSuspendingEnabledError::Dispatch(e)) =
-        sc.set_out_of_focus_suspending_enabled(enabled)
+        app.set_out_of_focus_suspending_enabled(enabled)
     {
         return dispatch_error_to_rc(e);
     }
@@ -393,41 +399,7 @@ fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
     use nx_svc::error::ToRawResultCode;
 
     match err {
-        applet::ConnectError::Connect(e) => match e {
-            nx_service_applet::ConnectError::GetService(e) => match e {
-                nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
-                nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-            },
-            nx_service_applet::ConnectError::ConvertToDomain(e) => {
-                convert_to_domain_error_to_rc(e.0)
-            }
-        },
-        applet::ConnectError::OpenProxy(e) => match e {
-            nx_service_applet::OpenProxyError::InvalidAppletType => GENERIC_ERROR,
-            nx_service_applet::OpenProxyError::Dispatch(e) => dispatch_error_to_rc(e),
-            nx_service_applet::OpenProxyError::MissingObject => GENERIC_ERROR,
-            nx_service_applet::OpenProxyError::Timeout => GENERIC_ERROR,
-        },
-        applet::ConnectError::GetCommonStateGetter(e) => match e {
-            nx_service_applet::GetCommonStateGetterError::Dispatch(e) => dispatch_error_to_rc(e),
-            nx_service_applet::GetCommonStateGetterError::MissingObject => GENERIC_ERROR,
-        },
-        applet::ConnectError::GetSelfController(e) => match e {
-            nx_service_applet::GetSelfControllerError::Dispatch(e) => dispatch_error_to_rc(e),
-            nx_service_applet::GetSelfControllerError::MissingObject => GENERIC_ERROR,
-        },
-        applet::ConnectError::GetWindowController(e) => match e {
-            nx_service_applet::GetWindowControllerError::Dispatch(e) => dispatch_error_to_rc(e),
-            nx_service_applet::GetWindowControllerError::MissingObject => GENERIC_ERROR,
-        },
-        applet::ConnectError::GetApplicationFunctions(e) => match e {
-            nx_service_applet::GetApplicationFunctionsError::Dispatch(e) => dispatch_error_to_rc(e),
-            nx_service_applet::GetApplicationFunctionsError::MissingObject => GENERIC_ERROR,
-        },
+        applet::ConnectError::Open(e) => open_error_to_rc(e),
         applet::ConnectError::GetEventHandle(e) => match e {
             nx_service_applet::GetEventHandleError::Dispatch(e) => dispatch_error_to_rc(e),
             nx_service_applet::GetEventHandleError::MissingHandle => GENERIC_ERROR,
@@ -470,6 +442,62 @@ fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
             nx_service_applet::SetPerformanceModeChangedNotificationError::Dispatch(e) => {
                 dispatch_error_to_rc(e)
             }
+        },
+    }
+}
+
+fn open_error_to_rc(err: nx_service_applet::proxy::OpenError) -> u32 {
+    use nx_service_applet::proxy::OpenError;
+    use nx_svc::error::ToRawResultCode;
+
+    match err {
+        OpenError::Connect(e) => match e {
+            nx_service_applet::ConnectError::GetService(e) => match e {
+                nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+                nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
+                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+                    cmif::ParseResponseError::ServiceError(code) => code,
+                },
+                nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
+            },
+            nx_service_applet::ConnectError::ConvertToDomain(e) => {
+                convert_to_domain_error_to_rc(e.0)
+            }
+        },
+        OpenError::NoneAppletType => GENERIC_ERROR,
+        OpenError::OpenProxy(e) => match e {
+            nx_service_applet::OpenProxyError::InvalidAppletType => GENERIC_ERROR,
+            nx_service_applet::OpenProxyError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::OpenProxyError::MissingObject => GENERIC_ERROR,
+            nx_service_applet::OpenProxyError::Timeout => GENERIC_ERROR,
+        },
+        OpenError::GetCommonStateGetter(e) => match e {
+            nx_service_applet::GetCommonStateGetterError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::GetCommonStateGetterError::MissingObject => GENERIC_ERROR,
+        },
+        OpenError::GetSelfController(e) => match e {
+            nx_service_applet::GetSelfControllerError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::GetSelfControllerError::MissingObject => GENERIC_ERROR,
+        },
+        OpenError::GetWindowController(e) => match e {
+            nx_service_applet::GetWindowControllerError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::GetWindowControllerError::MissingObject => GENERIC_ERROR,
+        },
+        OpenError::GetSubInterface(e) => match e {
+            nx_service_applet::GetSubInterfaceError::Dispatch(e) => dispatch_error_to_rc(e),
+            nx_service_applet::GetSubInterfaceError::MissingObject => GENERIC_ERROR,
+        },
+        OpenError::DrainExtras(e) => match e {
+            nx_service_applet::role::DrainExtrasError::GetApplicationFunctions(e) => match e {
+                nx_service_applet::GetApplicationFunctionsError::Dispatch(e) => {
+                    dispatch_error_to_rc(e)
+                }
+                nx_service_applet::GetApplicationFunctionsError::MissingObject => GENERIC_ERROR,
+            },
+            nx_service_applet::role::DrainExtrasError::GetSubInterface(e) => match e {
+                nx_service_applet::GetSubInterfaceError::Dispatch(e) => dispatch_error_to_rc(e),
+                nx_service_applet::GetSubInterfaceError::MissingObject => GENERIC_ERROR,
+            },
         },
     }
 }

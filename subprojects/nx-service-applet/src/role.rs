@@ -1,0 +1,277 @@
+//! Applet role taxonomy.
+//!
+//! The Applet Manager admits clients in one of five roles. Each role is
+//! reachable via a different proxy command (and through either `appletOE` or
+//! `appletAE`), and each receives a different set of sub-interfaces. This
+//! module models the taxonomy at the type level:
+//!
+//! * Five zero-sized marker types — [`Application`], [`LibraryApplet`],
+//!   [`SystemApplet`], [`OverlayApplet`], [`SystemApplication`] — implement
+//!   the sealed [`Role`] trait.
+//! * Each role's `Extras` associated type lists the sub-interfaces that exist
+//!   *only* for that role.
+//! * `Role::drain_extras` performs the role-specific IPC choreography to open
+//!   those sub-interfaces from a freshly-opened [`AppletProxyService`].
+//!
+//! Combined with the typed [`Proxy<R>`](crate::Proxy) wrapper, this lets
+//! callers obtain a value whose method set reflects exactly the sub-interface
+//! menu and convenience operations AM admits for the role — illegal
+//! cross-role calls become compile errors instead of runtime
+//! `LibnxError_NotInitialized` results.
+//!
+//! HOS-version-gated sub-interfaces are stored as `Option<T>`; role-mandatory
+//! ones are non-optional, so the type system guarantees they exist whenever a
+//! [`Proxy<R>`](crate::Proxy) is held.
+
+use crate::{
+    AppletCommonFunctions, AppletProxyService, AppletType, ApplicationCreator,
+    ApplicationFunctions, GetApplicationFunctionsError, GetSubInterfaceError,
+    GlobalStateController, HomeMenuFunctions, LibraryAppletSelfAccessor, ProcessWindingController,
+};
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// Sealed marker trait identifying an AM applet role.
+///
+/// Each implementor is a zero-sized type whose `Extras` associated type lists
+/// the sub-interfaces unique to that role. The trait is sealed: only the
+/// markers in this module may implement it.
+pub trait Role: sealed::Sealed + 'static {
+    /// The [`AppletType`] discriminant this role corresponds to.
+    const APPLET_TYPE: AppletType;
+
+    /// Role-specific sub-interfaces stored alongside the core seven.
+    type Extras;
+
+    /// Performs the IPC choreography to open the role's sub-interfaces from a
+    /// freshly-opened proxy.
+    ///
+    /// Mandatory extras propagate IPC failures; HOS-version-gated extras
+    /// swallow `Err` into `None` (firmware that doesn't expose the
+    /// sub-interface is not an error).
+    fn drain_extras(proxy: &AppletProxyService) -> Result<Self::Extras, DrainExtrasError>;
+}
+
+/// Application role (appletOE, proxy cmd 0, single session).
+pub struct Application;
+/// LibraryApplet role (appletAE, proxy cmd 200 pre-3.0.0 / cmd 201 since
+/// 3.0.0).
+pub struct LibraryApplet;
+/// SystemApplet role (appletAE, proxy cmd 100).
+pub struct SystemApplet;
+/// OverlayApplet role (appletAE, proxy cmd 300).
+pub struct OverlayApplet;
+/// SystemApplication role (appletAE, proxy cmd 350). Receives an
+/// `IApplicationProxy` — identical sub-interface menu to [`Application`],
+/// distinct AM-side gating.
+pub struct SystemApplication;
+
+impl sealed::Sealed for Application {}
+impl sealed::Sealed for LibraryApplet {}
+impl sealed::Sealed for SystemApplet {}
+impl sealed::Sealed for OverlayApplet {}
+impl sealed::Sealed for SystemApplication {}
+
+// =====================================================================
+// Extras structs
+// =====================================================================
+
+/// Sub-interfaces unique to [`Application`] / [`SystemApplication`]
+/// (`IApplicationProxy` class).
+pub struct ApplicationExtras {
+    pub application_functions: ApplicationFunctions,
+}
+
+impl ApplicationExtras {
+    /// Closes the application-specific sub-interface sessions.
+    pub fn close(self) {
+        self.application_functions.close();
+    }
+}
+
+/// Sub-interfaces unique to [`LibraryApplet`].
+pub struct LibraryAppletExtras {
+    pub process_winding_controller: ProcessWindingController,
+    /// `ILibraryAppletSelfAccessor` (proxy cmd 20). Absent on HOS 15.0.0+
+    /// where the equivalent surface moves to [`Self::home_menu_functions`].
+    pub library_applet_self_accessor: Option<LibraryAppletSelfAccessor>,
+    /// `IHomeMenuFunctions` (proxy cmd 22, HOS 15.0.0+) replaces
+    /// `IFunctions`/`ILibraryAppletSelfAccessor`.
+    pub home_menu_functions: Option<HomeMenuFunctions>,
+    /// `IAppletCommonFunctions` (proxy cmd 21, HOS 7.0.0+).
+    pub applet_common_functions: Option<AppletCommonFunctions>,
+    /// `IGlobalStateController` (proxy cmd 23, HOS 15.0.0+).
+    pub global_state_controller: Option<GlobalStateController>,
+}
+
+impl LibraryAppletExtras {
+    pub fn close(self) {
+        self.process_winding_controller.close();
+        if let Some(s) = self.library_applet_self_accessor {
+            s.close();
+        }
+        if let Some(s) = self.home_menu_functions {
+            s.close();
+        }
+        if let Some(s) = self.applet_common_functions {
+            s.close();
+        }
+        if let Some(s) = self.global_state_controller {
+            s.close();
+        }
+    }
+}
+
+/// Sub-interfaces unique to [`SystemApplet`].
+pub struct SystemAppletExtras {
+    pub global_state_controller: GlobalStateController,
+    pub application_creator: ApplicationCreator,
+    /// `IAppletCommonFunctions` (proxy cmd 23 for SystemApplet, HOS 7.0.0+).
+    pub applet_common_functions: Option<AppletCommonFunctions>,
+}
+
+impl SystemAppletExtras {
+    pub fn close(self) {
+        self.global_state_controller.close();
+        self.application_creator.close();
+        if let Some(s) = self.applet_common_functions {
+            s.close();
+        }
+    }
+}
+
+/// Sub-interfaces unique to [`OverlayApplet`].
+pub struct OverlayAppletExtras {
+    /// `IAppletCommonFunctions` (proxy cmd 21, HOS 7.0.0+).
+    pub applet_common_functions: Option<AppletCommonFunctions>,
+    /// `IGlobalStateController` (proxy cmd 23, HOS 15.0.0+).
+    pub global_state_controller: Option<GlobalStateController>,
+}
+
+impl OverlayAppletExtras {
+    pub fn close(self) {
+        if let Some(s) = self.applet_common_functions {
+            s.close();
+        }
+        if let Some(s) = self.global_state_controller {
+            s.close();
+        }
+    }
+}
+
+// =====================================================================
+// Role impls
+// =====================================================================
+
+impl Role for Application {
+    const APPLET_TYPE: AppletType = AppletType::Application;
+    type Extras = ApplicationExtras;
+
+    fn drain_extras(proxy: &AppletProxyService) -> Result<Self::Extras, DrainExtrasError> {
+        let application_functions = proxy
+            .get_application_functions()
+            .map_err(DrainExtrasError::GetApplicationFunctions)?;
+        Ok(ApplicationExtras {
+            application_functions,
+        })
+    }
+}
+
+impl Role for SystemApplication {
+    const APPLET_TYPE: AppletType = AppletType::SystemApplication;
+    // Same proxy class as Application.
+    type Extras = ApplicationExtras;
+
+    fn drain_extras(proxy: &AppletProxyService) -> Result<Self::Extras, DrainExtrasError> {
+        let application_functions = proxy
+            .get_application_functions()
+            .map_err(DrainExtrasError::GetApplicationFunctions)?;
+        Ok(ApplicationExtras {
+            application_functions,
+        })
+    }
+}
+
+impl Role for LibraryApplet {
+    const APPLET_TYPE: AppletType = AppletType::LibraryApplet;
+    type Extras = LibraryAppletExtras;
+
+    fn drain_extras(proxy: &AppletProxyService) -> Result<Self::Extras, DrainExtrasError> {
+        let process_winding_controller = proxy
+            .get_process_winding_controller()
+            .map_err(DrainExtrasError::GetSubInterface)?;
+        // Version-gated: accept whichever the firmware admits.
+        let library_applet_self_accessor = proxy.get_library_applet_self_accessor().ok();
+        let home_menu_functions = proxy.get_home_menu_functions().ok();
+        let applet_common_functions = proxy
+            .get_applet_common_functions(AppletType::LibraryApplet)
+            .ok();
+        let global_state_controller = proxy
+            .get_global_state_controller(AppletType::LibraryApplet)
+            .ok();
+        Ok(LibraryAppletExtras {
+            process_winding_controller,
+            library_applet_self_accessor,
+            home_menu_functions,
+            applet_common_functions,
+            global_state_controller,
+        })
+    }
+}
+
+impl Role for SystemApplet {
+    const APPLET_TYPE: AppletType = AppletType::SystemApplet;
+    type Extras = SystemAppletExtras;
+
+    fn drain_extras(proxy: &AppletProxyService) -> Result<Self::Extras, DrainExtrasError> {
+        let global_state_controller = proxy
+            .get_global_state_controller(AppletType::SystemApplet)
+            .map_err(DrainExtrasError::GetSubInterface)?;
+        let application_creator = proxy
+            .get_application_creator()
+            .map_err(DrainExtrasError::GetSubInterface)?;
+        let applet_common_functions = proxy
+            .get_applet_common_functions(AppletType::SystemApplet)
+            .ok();
+        Ok(SystemAppletExtras {
+            global_state_controller,
+            application_creator,
+            applet_common_functions,
+        })
+    }
+}
+
+impl Role for OverlayApplet {
+    const APPLET_TYPE: AppletType = AppletType::OverlayApplet;
+    type Extras = OverlayAppletExtras;
+
+    fn drain_extras(proxy: &AppletProxyService) -> Result<Self::Extras, DrainExtrasError> {
+        let applet_common_functions = proxy
+            .get_applet_common_functions(AppletType::OverlayApplet)
+            .ok();
+        let global_state_controller = proxy
+            .get_global_state_controller(AppletType::OverlayApplet)
+            .ok();
+        Ok(OverlayAppletExtras {
+            applet_common_functions,
+            global_state_controller,
+        })
+    }
+}
+
+// =====================================================================
+// Error type
+// =====================================================================
+
+/// Error returned by [`Role::drain_extras`].
+#[derive(Debug, thiserror::Error)]
+pub enum DrainExtrasError {
+    /// Failed to obtain `IApplicationFunctions`.
+    #[error("failed to get IApplicationFunctions")]
+    GetApplicationFunctions(#[source] GetApplicationFunctionsError),
+    /// Failed to obtain a role-specific sub-interface.
+    #[error("failed to get sub-interface")]
+    GetSubInterface(#[source] GetSubInterfaceError),
+}

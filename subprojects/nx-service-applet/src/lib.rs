@@ -326,6 +326,8 @@ pub mod aruid;
 mod cmif;
 mod common_state;
 mod proto;
+pub mod proxy;
+pub mod role;
 
 pub use self::{
     cmif::{
