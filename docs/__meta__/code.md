@@ -119,10 +119,12 @@ Fundamental coding standards applicable across the entire codebase.
 High-level organizational and structural guidelines.
 
 **Examples:**
-- `services` - Service crate structure
-- `rust-workspace` - Workspace organization
+- `meson-subproject` - Generic Meson subproject conventions
+- `meson-subproject-crate` - Rust-crate specialization of the Meson subproject layout
+- `meson-linker-script` - `*_override.ld` linker scripts
 - `rust-crate` - Crate manifest conventions
-- `extractors` - Data extraction patterns
+- `rust-ffi` - `ffi` Cargo feature contract
+- `rust-no-std` - `no_std` crate anatomy
 
 #### `crate` - Crate-Specific Guidelines
 
@@ -212,9 +214,15 @@ errors-*                            # Error guidelines (core)
 rust-*                              # Rust language guidelines (core/arch)
 ├── rust-crate                      # Crate manifest conventions (arch)
 ├── rust-documentation              # Rustdoc patterns (core)
+├── rust-ffi                        # `ffi` Cargo feature contract (arch)
 ├── rust-modules                    # Module organization (core)
 │   └── rust-modules-members        # Module member ordering (core)
-└── rust-workspace                  # Workspace organization (arch)
+└── rust-no-std                     # `no_std` crate anatomy: panic_handler, global_allocator, alloc (arch)
+
+meson-*                             # Meson-side architectural guidelines (arch)
+├── meson-subproject                # Generic Meson subproject conventions
+├── meson-subproject-crate          # Rust-crate specialization of the Meson subproject layout
+└── meson-linker-script             # `*_override.ld` linker scripts
 
 pattern-*                           # Design pattern guidelines (core) — see code-pattern.md for template
 ├── pattern-builder                 # Builder pattern for required fields

@@ -7,7 +7,7 @@ scope: "global"
 
 # Rust Crate Manifest Patterns
 
-**MANDATORY for ALL `Cargo.toml` files in the this workspace**
+**MANDATORY for ALL `Cargo.toml` files in the workspace**
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ The cargo manifest (`Cargo.toml`) for each crate MUST follow this exact section 
 [package]
 name = "crate-name"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 # ... other package metadata
 
 [features]  # OPTIONAL - only include if crate needs features
@@ -154,7 +154,7 @@ db = ["dep:sqlx"]                 # Too abbreviated, unclear what it enables
 
 ## References
 
-- [rust-workspace](rust-workspace.md) - Related: Workspace organization
+- [../workspace](../workspace.md) - See also: Workspace-level organization (Cargo + Meson root)
 
 ## Checklist
 
