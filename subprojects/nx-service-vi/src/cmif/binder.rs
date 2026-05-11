@@ -25,8 +25,11 @@ pub fn transact_parcel(
 ) -> Result<(), TransactParcelError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    // Always use auto mode (3.0.0+) for simplicity
-    // If supporting older firmware is needed, add version check
+    // Always use the auto-buffer transact (cmd 3) introduced in HOS 3.0.0.
+    // The pre-3.0.0 fallback (cmd 0 over HipcMapAlias buffers) is unimplemented;
+    // production targets are 3.0.0+ and the runtime makes no attempt to gate
+    // on older firmware. If pre-3.0.0 support is ever required, dispatch a
+    // separate branch keyed off the caller-supplied HOS version.
     let cmd_id = binder_cmds::TRANSACT_PARCEL_AUTO;
 
     let fmt = cmif::RequestFormatBuilder::new(cmd_id)

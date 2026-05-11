@@ -204,6 +204,20 @@ if get_option('use_nx_service_vi').enabled()
     deps_cargo_features += ['service-vi']
 endif
 
+# nx-display
+# The `display` cargo feature pulls in `service-vi`, so enabling
+# `use_nx_display` implicitly enables `service-vi` via Cargo's feature graph.
+# `nx-display`'s own meson.build already calls `subproject('nx-service-vi')`,
+# so meson's build ordering also picks it up.
+if get_option('use_nx_display').enabled()
+    nx_display_proj = subproject('nx-display')
+
+    deps += nx_display_proj.get_variable('nx_display_dep')
+
+    debug('display feature: enabled')
+    deps_cargo_features += ['display']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

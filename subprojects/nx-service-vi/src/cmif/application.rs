@@ -295,15 +295,40 @@ pub struct CreateStrayLayerOutput {
     pub native_window: [u8; NATIVE_WINDOW_SIZE],
 }
 
-/// Creates a stray layer.
+/// Creates a stray layer on IApplicationDisplayService (cmd 2030).
 pub fn create_stray_layer(
     session: SessionHandle,
     layer_flags: u32,
     display_id: DisplayId,
 ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
+    create_stray_layer_dispatch(
+        session,
+        application_cmds::CREATE_STRAY_LAYER,
+        layer_flags,
+        display_id,
+    )
+}
+
+/// Wire-format helper for `_viCreateStrayLayer`.
+///
+/// Libnx (`vi.c:_viCreateStrayLayer`) dispatches the same payload to three
+/// different sub-services depending on `service_type` + `hosversion`:
+/// - `IApplicationDisplayService` cmd 2030 (any service type),
+/// - `ISystemDisplayService` cmd 2312 (System/Manager, pre-7.0.0),
+/// - `IManagerDisplayService` cmd 2012 (Manager, 7.0.0+).
+///
+/// The wire format is identical across all three, so the only thing that
+/// varies is the (session, cmd_id) pair. The runtime layer chooses which
+/// pair to pass in based on hosversion.
+pub(crate) fn create_stray_layer_dispatch(
+    session: SessionHandle,
+    cmd_id: u32,
+    layer_flags: u32,
+    display_id: DisplayId,
+) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormatBuilder::new(application_cmds::CREATE_STRAY_LAYER)
+    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
         .data_size(16) // layer_flags(4) + pad(4) + display_id(8)
         .out_buffers(1) // native_window
         .build();

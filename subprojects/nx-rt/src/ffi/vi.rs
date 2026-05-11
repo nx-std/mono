@@ -313,6 +313,11 @@ pub unsafe extern "C" fn __nx_rt__vi_set_display_magnification(
         return libnx_error(LibnxError::NotInitialized);
     }
 
+    // libnx `viSetDisplayMagnification` requires HOS ≥ 3.0.0.
+    if crate::env::hos_version::get() < crate::env::hos_version::HosVersion::new(3, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
     let Some(service) = vi::get_service() else {
         return GENERIC_ERROR;
     };
@@ -495,9 +500,20 @@ pub unsafe extern "C" fn __nx_rt__vi_get_z_order_count_max(
     }
 }
 
-/// Creates a layer (uses stray layer or managed layer depending on context).
+/// Creates a layer (managed via applet ARUID if possible, otherwise stray).
 ///
-/// Corresponds to `viCreateLayer()` in libnx.
+/// Mirrors libnx `viCreateLayer()` (`services/vi.c:viCreateLayer`):
+/// 1. Read the `__nx_vi_layer_id` weak override.
+/// 2. If unset and the applet ARUID is non-zero, ask the applet to allocate
+///    a managed layer (`appletCreateManagedDisplayLayer`).
+/// 3. If a layer id is known, dispatch `_viOpenLayer` (cmd 2020).
+/// 4. Otherwise, dispatch `_viCreateStrayLayer` using `__nx_vi_stray_layer_flags`
+///    to the right sub-service for the current service-type + HOS version:
+///    Application -> IApplicationDisplayService (cmd 2030),
+///    System/Manager < 7.0.0 -> ISystemDisplayService (cmd 2312),
+///    Manager >= 7.0.0 -> IManagerDisplayService (cmd 2012).
+/// 5. Parse the returned native_window parcel for the IGBP binder id; on a
+///    malformed parcel, close the layer and return `LibnxError_BadInput`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_create_layer(
     display: *const ViDisplay,
@@ -517,23 +533,132 @@ pub unsafe extern "C" fn __nx_rt__vi_create_layer(
         return GENERIC_ERROR;
     };
 
-    // Zero-initialize the layer struct
+    // Zero-initialize the layer struct.
     unsafe { core::ptr::write_bytes(layer, 0, 1) };
     let layer_ref = unsafe { &mut *layer };
 
     let display_id = nx_service_vi::DisplayId::new(display_ref.display_id);
+    let display_name = nx_service_vi::DisplayName::from_array(display_ref.display_name);
+    let aruid = applet::get_applet_resource_user_id()
+        .map(|a| a.to_raw())
+        .unwrap_or(0);
 
-    // Create stray layer (simplified - libnx has more complex logic)
-    match service.create_stray_layer(nx_service_vi::ViLayerFlags::Default, display_id) {
-        Ok(output) => {
-            layer_ref.layer_id = output.layer_id.to_raw();
-            // Parse parcel to get binder object ID
-            layer_ref.igbp_binder_obj_id =
-                parse_native_window_binder_id(&output.native_window).unwrap_or(0);
-            layer_ref.flags = 0x03; // initialized (0x01) | stray_layer (0x02)
-            0
+    // libnx: `layer->layer_id = __nx_vi_layer_id;` (weak override default 0).
+    let mut layer_id = vi::get_layer_id_override();
+
+    // libnx: when no override and we have an applet ARUID, attempt to allocate
+    // a managed display layer; propagate any error verbatim.
+    if layer_id == 0 && aruid != 0 {
+        let Some(self_controller) = applet::get_self_controller() else {
+            return GENERIC_ERROR;
+        };
+        match self_controller.create_managed_display_layer() {
+            Ok(id) => layer_id = id,
+            Err(_) => return GENERIC_ERROR,
         }
-        Err(err) => vi_create_stray_layer_error_to_rc(err),
+    }
+
+    let native_window: [u8; nx_service_vi::NATIVE_WINDOW_SIZE];
+    let is_stray = layer_id == 0;
+
+    if !is_stray {
+        // Managed-layer path: open the pre-allocated layer (cmd 2020).
+        match service.open_layer(&display_name, nx_service_vi::LayerId::new(layer_id), aruid) {
+            Ok(output) => {
+                native_window = output.native_window;
+            }
+            Err(err) => return vi_open_layer_error_to_rc(err),
+        }
+    } else {
+        // Stray-layer path: dispatch to the right sub-service.
+        let flags = vi::get_stray_layer_flags_override();
+        let rc = create_stray_layer_for_service(&service, flags, display_id);
+        match rc {
+            Ok((id, nw)) => {
+                layer_id = id;
+                native_window = nw;
+            }
+            Err(code) => return code,
+        }
+    }
+
+    // Parse the returned parcel to locate the IGBP binder object id.
+    let binder_id = match parse_native_window_binder_id(&native_window) {
+        Some(id) => id,
+        None => {
+            // libnx: close the layer and return BadInput.
+            let close_layer = ViLayer {
+                layer_id,
+                igbp_binder_obj_id: 0,
+                flags: if is_stray { 0x03 } else { 0x01 },
+            };
+            let _ = close_layer_internal(&service, &close_layer);
+            return libnx_error(LibnxError::BadInput);
+        }
+    };
+
+    layer_ref.layer_id = layer_id;
+    layer_ref.igbp_binder_obj_id = binder_id;
+    // initialized (0x01) | stray_layer (0x02) iff this is a stray layer.
+    layer_ref.flags = if is_stray { 0x03 } else { 0x01 };
+    0
+}
+
+/// Dispatches `_viCreateStrayLayer` to the correct sub-service for the
+/// current VI service-type and HOS version.
+fn create_stray_layer_for_service(
+    service: &nx_service_vi::ViService,
+    flags: nx_service_vi::ViLayerFlags,
+    display_id: nx_service_vi::DisplayId,
+) -> Result<(u64, [u8; nx_service_vi::NATIVE_WINDOW_SIZE]), u32> {
+    use nx_service_vi::types::ViServiceType;
+
+    match service.service_type() {
+        ViServiceType::Default | ViServiceType::Application => service
+            .create_stray_layer(flags, display_id)
+            .map(|out| (out.layer_id.to_raw(), out.native_window))
+            .map_err(vi_create_stray_layer_error_to_rc),
+        ViServiceType::System | ViServiceType::Manager => {
+            // libnx: pre-7.0.0 goes to ISystemDisplayService (cmd 2312),
+            // 7.0.0+ goes to IManagerDisplayService (cmd 2012).
+            let use_system =
+                crate::env::hos_version::get() < crate::env::hos_version::HosVersion::new(7, 0, 0);
+            let result = if use_system {
+                service.create_stray_layer_system(flags, display_id)
+            } else {
+                service.create_stray_layer_manager(flags, display_id)
+            };
+            result
+                .map(|out| (out.layer_id.to_raw(), out.native_window))
+                .map_err(vi_create_stray_layer_wrapper_error_to_rc)
+        }
+    }
+}
+
+/// Internal `viCloseLayer` for use in error-recovery paths (e.g. bad parcel).
+fn close_layer_internal(service: &nx_service_vi::ViService, layer: &ViLayer) -> Result<(), u32> {
+    let layer_id = nx_service_vi::LayerId::new(layer.layer_id);
+    if layer.is_stray_layer() {
+        service
+            .destroy_stray_layer(layer_id)
+            .map_err(vi_destroy_stray_layer_error_to_rc)
+    } else {
+        service
+            .close_layer(layer_id)
+            .map_err(vi_close_layer_error_to_rc)
+    }
+}
+
+fn vi_create_stray_layer_wrapper_error_to_rc(
+    err: nx_service_vi::CreateStrayLayerWrapperError,
+) -> u32 {
+    match err {
+        nx_service_vi::CreateStrayLayerWrapperError::NotAvailable => {
+            libnx_error(LibnxError::NotInitialized)
+        }
+        nx_service_vi::CreateStrayLayerWrapperError::Cmif(e) => {
+            vi_create_stray_layer_error_to_rc(e)
+        }
     }
 }
 
@@ -859,11 +984,26 @@ pub unsafe extern "C" fn __nx_rt__vi_set_content_visibility(visible: bool) -> u3
     }
 }
 
+/// Returns `Some(LibnxError::IncompatSysVer)` if the active HOS version is
+/// older than 16.0.0, which is when libnx made the fatal-display commands
+/// available. The caller propagates the resulting result code.
+#[inline]
+fn require_fatal_display_supported() -> Option<u32> {
+    if crate::env::hos_version::get() < crate::env::hos_version::HosVersion::new(16, 0, 0) {
+        Some(libnx_error(LibnxError::IncompatSysVer))
+    } else {
+        None
+    }
+}
+
 /// Prepares the fatal display (16.0.0+).
 ///
 /// Corresponds to `viManagerPrepareFatal()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_manager_prepare_fatal() -> u32 {
+    if let Some(rc) = require_fatal_display_supported() {
+        return rc;
+    }
     let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
@@ -879,6 +1019,9 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_prepare_fatal() -> u32 {
 /// Corresponds to `viManagerShowFatal()` in libnx.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__vi_manager_show_fatal() -> u32 {
+    if let Some(rc) = require_fatal_display_supported() {
+        return rc;
+    }
     let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
@@ -900,6 +1043,9 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_draw_fatal_rectangle(
     end_y: i32,
     color: u16,
 ) -> u32 {
+    if let Some(rc) = require_fatal_display_supported() {
+        return rc;
+    }
     let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
@@ -931,6 +1077,9 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_draw_fatal_text32(
         return GENERIC_ERROR;
     }
 
+    if let Some(rc) = require_fatal_display_supported() {
+        return rc;
+    }
     let Some(service) = vi::get_service() else {
         return libnx_error(LibnxError::NotInitialized);
     };
@@ -957,6 +1106,12 @@ pub unsafe extern "C" fn __nx_rt__vi_manager_draw_fatal_text32(
 }
 
 /// Sets VI FFI session buffers from the active service.
+///
+/// The FFI snapshots are **non-owning views** of the inner [`ViService`]'s
+/// sub-service handles: `own_handle = 0`. The inner [`ViService`] retains
+/// exclusive ownership and is responsible for closing the underlying kernel
+/// handles on `vi::exit`. C consumers must treat these `Service*` as borrowed
+/// for the lifetime of the active VI session.
 fn set_vi_ffi_sessions() {
     let Some(service_ref) = vi::get_service() else {
         return;
@@ -965,7 +1120,7 @@ fn set_vi_ffi_sessions() {
     // IApplicationDisplayService
     let app_display = Service {
         session: service_ref.application_display_session(),
-        own_handle: 1,
+        own_handle: 0,
         object_id: 0,
         pointer_buffer_size: 0,
     };
@@ -980,7 +1135,7 @@ fn set_vi_ffi_sessions() {
     // IHOSBinderDriverRelay
     let binder_relay = Service {
         session: service_ref.binder_relay().session,
-        own_handle: 1,
+        own_handle: 0,
         object_id: 0,
         pointer_buffer_size: 0,
     };
@@ -996,7 +1151,7 @@ fn set_vi_ffi_sessions() {
     if let Some(session) = service_ref.system_display_session() {
         let sys_display = Service {
             session,
-            own_handle: 1,
+            own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,
         };
@@ -1013,7 +1168,7 @@ fn set_vi_ffi_sessions() {
     if let Some(session) = service_ref.manager_display_session() {
         let mgr_display = Service {
             session,
-            own_handle: 1,
+            own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,
         };
@@ -1030,7 +1185,7 @@ fn set_vi_ffi_sessions() {
     if let Some(session) = service_ref.binder_indirect_session() {
         let binder_indirect = Service {
             session,
-            own_handle: 1,
+            own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,
         };
@@ -1059,19 +1214,16 @@ fn clear_vi_ffi_sessions() {
 }
 
 /// Parses native window data to extract binder object ID.
+///
+/// Mirrors libnx `viCreateLayer` parcel parsing: read the parcel header at the
+/// start of the buffer, validate payload bounds, then read the third `u32` of
+/// the payload (the IGBP binder object ID).
 fn parse_native_window_binder_id(
     native_window: &[u8; nx_service_vi::NATIVE_WINDOW_SIZE],
 ) -> Option<u32> {
-    // Parcel header structure
-    #[repr(C)]
-    struct ParcelHeader {
-        payload_off: u32,
-        payload_size: u32,
-        objects_off: u32,
-        objects_size: u32,
-    }
+    use nx_service_vi::ParcelHeader;
 
-    if native_window.len() < core::mem::size_of::<ParcelHeader>() {
+    if native_window.len() < ParcelHeader::SIZE {
         return None;
     }
 
@@ -1364,6 +1516,18 @@ fn vi_close_layer_error_to_rc(err: nx_service_vi::CloseLayerError) -> u32 {
     match err {
         nx_service_vi::CloseLayerError::SendRequest(e) => e.to_rc(),
         nx_service_vi::CloseLayerError::ParseResponse(e) => match e {
+            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
+            cmif::ParseResponseError::ServiceError(code) => code,
+        },
+    }
+}
+
+fn vi_open_layer_error_to_rc(err: nx_service_vi::OpenLayerError) -> u32 {
+    use nx_svc::error::ToRawResultCode;
+
+    match err {
+        nx_service_vi::OpenLayerError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::OpenLayerError::ParseResponse(e) => match e {
             cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
             cmif::ParseResponseError::ServiceError(code) => code,
         },

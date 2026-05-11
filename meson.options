@@ -140,6 +140,13 @@ option(
 )
 
 option(
+    'use_nx_display',
+    type : 'feature', value : 'disabled', # Disable by default, WIP (framebuffer port pending)
+    description : 'Enable nx-display (NativeWindow + Framebuffer; implies use_nx_service_vi)',
+    yield : true
+)
+
+option(
     'use_nx_service_nv',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-nv (NVIDIA Driver service)',

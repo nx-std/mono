@@ -144,10 +144,7 @@ fn fetch_initial_cache<R: Role>(proxy: &Proxy<R>) -> Result<AppletCache, Connect
     // ARUID failures are non-fatal — non-Application roles legitimately
     // receive ARUID=0/IPC errors here. Mirror the prior FFI behavior of
     // treating any failure as "no aruid available".
-    let aruid = match proxy.get_applet_resource_user_id() {
-        Ok(value) => value,
-        Err(_) => None,
-    };
+    let aruid = proxy.get_applet_resource_user_id().unwrap_or_default();
 
     Ok(AppletCache {
         aruid,

@@ -100,6 +100,12 @@ impl DisplayName {
         Self(data)
     }
 
+    /// Creates a `DisplayName` from a raw 64-byte array.
+    #[inline]
+    pub const fn from_array(data: [u8; 0x40]) -> Self {
+        Self(data)
+    }
+
     /// Returns the display name as a byte slice.
     #[inline]
     pub const fn as_bytes(&self) -> &[u8; 0x40] {

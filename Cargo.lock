@@ -78,6 +78,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-display"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-vi",
+ "nx-sf",
+ "nx-svc",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-panic-handler"
 version = "0.1.0"
 
@@ -235,6 +246,7 @@ name = "nx-std"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
+ "nx-display",
  "nx-panic-handler",
  "nx-rand",
  "nx-rt",

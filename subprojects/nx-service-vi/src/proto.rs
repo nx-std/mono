@@ -99,7 +99,6 @@ pub mod system_cmds {
     pub const SET_LAYER_VISIBILITY: u32 = 2207;
 
     /// Create stray layer (System, before 7.0.0).
-    #[expect(dead_code)]
     pub const CREATE_STRAY_LAYER: u32 = 2312;
 }
 

@@ -8,9 +8,24 @@ use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
 use crate::{
+    cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
     proto::system_cmds,
     types::{DisplayId, LayerId},
 };
+
+/// Creates a stray layer on ISystemDisplayService (cmd 2312, pre-7.0.0).
+pub fn create_stray_layer(
+    session: SessionHandle,
+    layer_flags: u32,
+    display_id: DisplayId,
+) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
+    crate::cmif::application::create_stray_layer_dispatch(
+        session,
+        system_cmds::CREATE_STRAY_LAYER,
+        layer_flags,
+        display_id,
+    )
+}
 
 /// Gets Z-order count minimum.
 pub fn get_z_order_count_min(

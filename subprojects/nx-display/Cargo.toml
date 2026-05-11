@@ -1,0 +1,18 @@
+[package]
+name = "nx-display"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_display"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-vi = { version = "0.1.0", path = "../nx-service-vi" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+thiserror = { version = "2", default-features = false }

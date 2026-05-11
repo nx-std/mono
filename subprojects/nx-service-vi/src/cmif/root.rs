@@ -115,16 +115,16 @@ pub fn draw_fatal_rectangle(
 ) -> Result<(), DrawFatalRectangleError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
+    // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` — naturally
+    // aligned, total 20 bytes (u16 + 2 bytes padding + 4 * s32).
     let fmt = cmif::RequestFormatBuilder::new(root_cmds::DRAW_FATAL_RECTANGLE)
-        .data_size(18) // color(2) + x(4) + y(4) + end_x(4) + end_y(4)
+        .data_size(20)
         .build();
 
     // SAFETY: ipc_buf points to valid TLS IPC buffer.
     let req = unsafe { cmif::make_request(ipc_buf, fmt) };
 
-    // Input struct layout: color(u16), x(i32), y(i32), end_x(i32), end_y(i32)
-    // Note: libnx packs this as { u16 color, s32 x, y, end_x, end_y } with alignment
-    #[repr(C, packed)]
+    #[repr(C)]
     struct Input {
         color: u16,
         x: i32,

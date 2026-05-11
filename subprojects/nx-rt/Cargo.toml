@@ -26,7 +26,10 @@ service-set = ["dep:nx-service-set"]
 # Time service — gates `services::time` + `ffi::time`.
 service-time = ["dep:nx-service-time"]
 # Visual Interface (display/layer) service — gates `services::vi` + `ffi::vi`.
-service-vi = ["dep:nx-service-vi"]
+# Pulls `service-applet` (the managed-display-layer fallback in `viCreateLayer`
+# and ARUID lookup in `viGetIndirectLayerImageMap` both reach into the applet
+# service).
+service-vi = ["dep:nx-service-vi", "service-applet"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
@@ -46,3 +49,7 @@ nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 thiserror = { version = "2", default-features = false }
+
+# Linked via meson for FFI symbol re-export; not `use`d in Rust source.
+[package.metadata.cargo-machete]
+ignored = ["nx-sys-mem"]

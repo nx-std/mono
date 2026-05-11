@@ -9,11 +9,16 @@ use nx_sf::cmif;
 pub const GENERIC_ERROR: u32 = 0xFFFF;
 
 /// libnx error enumeration for MAKERESULT(Module_Libnx, error).
+///
+/// Values mirror the sequential enum in libnx `include/switch/result.h`
+/// (`LibnxError_BadReloc = 1`, ...) so the result codes produced by
+/// [`libnx_error`] match what libnx callers expect.
 #[cfg(feature = "service-vi")]
 #[repr(u32)]
 pub enum LibnxError {
-    NotInitialized = 2,
-    IncompatSysVer = 100,
+    NotInitialized = 8,
+    BadInput = 11,
+    IncompatSysVer = 37,
 }
 
 /// Constructs a libnx result code.

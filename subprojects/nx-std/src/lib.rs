@@ -30,6 +30,10 @@ pub mod time {
 pub mod rt {
     pub use nx_rt::*;
 }
+#[cfg(feature = "display")]
+pub mod display {
+    pub use nx_display::*;
+}
 
 #[cfg(feature = "services")]
 pub mod services {
@@ -56,6 +60,10 @@ pub mod services {
     #[cfg(feature = "service-time")]
     pub mod time {
         pub use nx_service_time::*;
+    }
+    #[cfg(feature = "service-vi")]
+    pub mod vi {
+        pub use nx_service_vi::*;
     }
 }
 

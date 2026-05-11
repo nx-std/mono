@@ -123,3 +123,10 @@ option(
     description : 'Enable the `service-vi` feature',
     yield : true
 )
+
+option(
+    'use_nx_display',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `display` feature (NativeWindow / Framebuffer; pulls `service-vi`)',
+    yield : true
+)

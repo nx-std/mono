@@ -4,11 +4,11 @@
 
 use core::ptr;
 
-use nx_sf::{cmif, hipc::BufferMode};
+use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
 use crate::{
-    cmif::application::{CreateStrayLayerOutput, NATIVE_WINDOW_SIZE},
+    cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
     proto::manager_cmds,
     types::{DisplayId, LayerId, ViLayerStack, ViPowerState},
 };
@@ -89,67 +89,18 @@ pub fn destroy_managed_layer(
     Ok(())
 }
 
-/// Creates a stray layer (Manager, 7.0.0+).
-#[expect(dead_code)]
+/// Creates a stray layer on IManagerDisplayService (cmd 2012, 7.0.0+).
 pub fn create_stray_layer(
     session: SessionHandle,
     layer_flags: u32,
     display_id: DisplayId,
 ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(manager_cmds::CREATE_STRAY_LAYER)
-        .data_size(16) // layer_flags(4) + pad(4) + display_id(8)
-        .out_buffers(1) // native_window
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    #[repr(C)]
-    struct Input {
-        layer_flags: u32,
-        pad: u32,
-        display_id: u64,
-    }
-
-    let input = Input {
+    crate::cmif::application::create_stray_layer_dispatch(
+        session,
+        manager_cmds::CREATE_STRAY_LAYER,
         layer_flags,
-        pad: 0,
-        display_id: display_id.to_raw(),
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
-    }
-
-    // Add output buffer for native window
-    let mut native_window = [0u8; NATIVE_WINDOW_SIZE];
-    req.add_out_buffer(
-        native_window.as_mut_ptr(),
-        NATIVE_WINDOW_SIZE,
-        BufferMode::Normal,
-    );
-
-    ipc::send_sync_request(session).map_err(CreateStrayLayerError::SendRequest)?;
-
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(CreateStrayLayerError::ParseResponse)?;
-
-    #[repr(C)]
-    struct Output {
-        layer_id: u64,
-        native_window_size: u64,
-    }
-
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
-
-    Ok(CreateStrayLayerOutput {
-        layer_id: LayerId::new(output.layer_id),
-        native_window_size: output.native_window_size,
-        native_window,
-    })
+        display_id,
+    )
 }
 
 /// Sets display alpha.
@@ -360,17 +311,6 @@ pub enum CreateManagedLayerError {
 /// Error from [`destroy_managed_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum DestroyManagedLayerError {
-    /// Failed to send IPC request.
-    #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
-    /// Failed to parse CMIF response.
-    #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
-}
-
-/// Error from [`create_stray_layer`] (Manager).
-#[derive(Debug, thiserror::Error)]
-pub enum CreateStrayLayerError {
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),

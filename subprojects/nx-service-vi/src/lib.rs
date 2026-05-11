@@ -17,6 +17,7 @@ use nx_svc::ipc::Handle as SessionHandle;
 
 pub mod binder;
 mod cmif;
+pub mod igbp;
 pub mod parcel;
 mod proto;
 pub mod types;
@@ -189,7 +190,13 @@ impl ViService {
         cmif::application::close_layer(self.application_display.session, layer_id)
     }
 
-    /// Creates a stray layer.
+    /// Creates a stray layer on IApplicationDisplayService (cmd 2030).
+    ///
+    /// Mirrors libnx `_viCreateStrayLayer` for the Application service-type
+    /// path. The runtime layer is responsible for selecting between this
+    /// and [`create_stray_layer_system`](Self::create_stray_layer_system) /
+    /// [`create_stray_layer_manager`](Self::create_stray_layer_manager)
+    /// based on the active service type and HOS version.
     pub fn create_stray_layer(
         &self,
         layer_flags: ViLayerFlags,
@@ -200,6 +207,46 @@ impl ViService {
             layer_flags as u32,
             display_id,
         )
+    }
+
+    /// Creates a stray layer on ISystemDisplayService (cmd 2312, pre-7.0.0).
+    ///
+    /// Requires System or Manager service type. Returns
+    /// `CreateStrayLayerWrapperError::NotAvailable` if the ISystemDisplayService
+    /// session is not active.
+    pub fn create_stray_layer_system(
+        &self,
+        layer_flags: ViLayerFlags,
+        display_id: DisplayId,
+    ) -> Result<CreateStrayLayerOutput, CreateStrayLayerWrapperError> {
+        let session = self
+            .system_display
+            .as_ref()
+            .ok_or(CreateStrayLayerWrapperError::NotAvailable)?
+            .session;
+
+        cmif::system::create_stray_layer(session, layer_flags as u32, display_id)
+            .map_err(CreateStrayLayerWrapperError::Cmif)
+    }
+
+    /// Creates a stray layer on IManagerDisplayService (cmd 2012, 7.0.0+).
+    ///
+    /// Requires Manager service type. Returns
+    /// `CreateStrayLayerWrapperError::NotAvailable` if the IManagerDisplayService
+    /// session is not active.
+    pub fn create_stray_layer_manager(
+        &self,
+        layer_flags: ViLayerFlags,
+        display_id: DisplayId,
+    ) -> Result<CreateStrayLayerOutput, CreateStrayLayerWrapperError> {
+        let session = self
+            .manager_display
+            .as_ref()
+            .ok_or(CreateStrayLayerWrapperError::NotAvailable)?
+            .session;
+
+        cmif::manager::create_stray_layer(session, layer_flags as u32, display_id)
+            .map_err(CreateStrayLayerWrapperError::Cmif)
     }
 
     /// Destroys a stray layer.
@@ -644,7 +691,53 @@ impl ViService {
 /// # Returns
 ///
 /// A connected [`ViService`] instance on success.
+///
+/// Uses default [`ConnectOptions`], which assume "modern" HOS (≥16.0.0): keep
+/// the root service for Manager, request the indirect binder for System+Manager.
+/// Callers that need version-specific behavior (e.g. runtime crates that know
+/// the active HOS version) should use [`connect_with_options`].
 pub fn connect(sm: &SmService, service_type: ViServiceType) -> Result<ViService, ConnectError> {
+    connect_with_options(sm, service_type, ConnectOptions::default())
+}
+
+/// Options that gate sub-service acquisition during [`connect_with_options`].
+///
+/// The service crate is intentionally unaware of `hosversion`; the caller
+/// (typically the runtime crate) decides which sub-services to request based
+/// on the active HOS version.
+#[derive(Debug, Clone, Copy)]
+pub struct ConnectOptions {
+    /// Retain the `vi:m` root service after sub-service discovery.
+    ///
+    /// libnx keeps this open only on HOS ≥ 16.0.0 (used by the fatal-display
+    /// commands). When `false`, the root handle is closed once sub-services
+    /// are obtained.
+    pub keep_root_service: bool,
+
+    /// Request `IHOSBinderDriverIndirect` (cmd 103) on System/Manager.
+    ///
+    /// libnx only requests this on HOS ≥ 2.0.0.
+    pub request_indirect_binder: bool,
+}
+
+impl Default for ConnectOptions {
+    fn default() -> Self {
+        Self {
+            keep_root_service: true,
+            request_indirect_binder: true,
+        }
+    }
+}
+
+/// Connects to the VI service with explicit options.
+///
+/// See [`connect`] for the default-options entry point and
+/// [`ConnectOptions`] for what each flag controls.
+pub fn connect_with_options(
+    sm: &SmService,
+    service_type: ViServiceType,
+    options: ConnectOptions,
+) -> Result<ViService, ConnectError> {
     let mut actual_type = service_type;
     let mut root_service_handle = None;
 
@@ -701,10 +794,9 @@ pub fn connect(sm: &SmService, service_type: ViServiceType) -> Result<ViService,
     let application_display = cmif::root::get_display_service(root_handle, actual_type)
         .map_err(ConnectError::GetDisplayService)?;
 
-    // Decide whether to keep root service (Manager 16.0.0+ only)
-    // For now, we'll keep it for Manager and close it for others
-    // TODO: Check HOS version for 16.0.0+ detection
-    let keep_root = actual_type == ViServiceType::Manager;
+    // Keep root service only for Manager when the caller signals we are on
+    // HOS ≥ 16.0.0 (the version that introduced the fatal-display commands).
+    let keep_root = actual_type == ViServiceType::Manager && options.keep_root_service;
     if keep_root {
         root_service_handle = Some(Service {
             session: root_handle,
@@ -764,9 +856,11 @@ pub fn connect(sm: &SmService, service_type: ViServiceType) -> Result<ViService,
         None
     };
 
-    // Get IHOSBinderDriverIndirect (System/Manager, 2.0.0+)
-    // TODO: Check HOS version for 2.0.0+ detection
-    let binder_indirect = if actual_type >= ViServiceType::System {
+    // IHOSBinderDriverIndirect is only available on HOS ≥ 2.0.0; the caller
+    // gates this via `options.request_indirect_binder` (libnx skips this on
+    // older firmware via `hosversionAtLeast(2,0,0)`).
+    let binder_indirect = if actual_type >= ViServiceType::System && options.request_indirect_binder
+    {
         cmif::application::get_indirect_display_transaction_service(application_display.session)
             .ok()
     } else {
@@ -808,6 +902,21 @@ pub enum GetZOrderCountMaxError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] GetZOrderCountError),
+}
+
+/// Error for `create_stray_layer_system` / `create_stray_layer_manager`.
+///
+/// Returned when the wrapper requires a sub-service session that the active
+/// service-type doesn't have (e.g. trying the Manager path with an Application
+/// service-type), or when the underlying CMIF operation fails.
+#[derive(Debug, thiserror::Error)]
+pub enum CreateStrayLayerWrapperError {
+    /// Required display sub-service (System or Manager) not available.
+    #[error("required display sub-service not available")]
+    NotAvailable,
+    /// CMIF operation failed.
+    #[error("CMIF operation failed")]
+    Cmif(#[source] CreateStrayLayerError),
 }
 
 /// Error for get_display_logical_resolution wrapper.

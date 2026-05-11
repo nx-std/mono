@@ -37,6 +37,7 @@ services = ["service-apm", "service-applet", "service-hid", "service-nv", "servi
 
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
+display = ["dep:nx-display", "service-vi"]
 rand = ["dep:nx-rand"]
 rt = ["dep:nx-rt"]
 service-apm = ["dep:nx-service-apm", "nx-rt?/service-apm"]
@@ -57,6 +58,7 @@ time = ["dep:nx-time"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
+nx-display = { version = "0.1.0", path = "../nx-display", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-rt = { version = "0.1.0", path = "../nx-rt", optional = true }
