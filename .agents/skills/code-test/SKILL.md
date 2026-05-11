@@ -26,7 +26,7 @@ This project has **one** test target: the `nx-tests` NRO. There are no per-crate
 **Signals that require running the NRO test suite:**
 - Changed any `__nx_*` FFI function signature, return value, or behavior.
 - Edited `nx-std/src/ffi.rs` re-exports.
-- Edited foundation crates (`nx-svc`, `nx-sys-mem`, `nx-sys-sync`, `nx-sys-thread`).
+- Edited foundation crates (`nx-svc`, `nx-sys-mem`, `nx-sys-sync`).
 - Changed linker scripts (`*_override.ld`) or Meson `use_nx*` wiring.
 - Changed test code under `subprojects/tests/`.
 

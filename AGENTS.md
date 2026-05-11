@@ -114,8 +114,7 @@ nx-std (umbrella crate)
     ├── nx-svc        - Supervisor calls (SVC) interface to Horizon OS
     ├── nx-cpu        - CPU utilities
     ├── nx-sys-mem    - Low-level memory management
-    ├── nx-sys-sync   - Low-level synchronization primitives
-    └── nx-sys-thread - Thread management
+    └── nx-sys-sync   - Low-level synchronization primitives
 ```
 
 ### Dependency Flow
@@ -124,7 +123,6 @@ nx-std (umbrella crate)
 
 - `nx-alloc` depends on `nx-svc`, `nx-sys-sync`
 - `nx-sys-mem` depends on `nx-alloc`, `nx-svc`, `nx-rand`, `nx-std-sync`
-- `nx-sys-thread` depends on most other crates
 
 ### FFI Integration
 

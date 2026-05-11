@@ -207,7 +207,7 @@ it the crate compiles as a plain allocator implementation without claiming the g
 
 ### When NOT to Add
 
-- **Pure `sys/*` crates** (`nx-cpu`, `nx-svc`, `nx-sys-sync`, `nx-sys-thread`, `nx-sys-thread-tls`) — these neither
+- **Pure `sys/*` crates** (`nx-cpu`, `nx-svc`, `nx-sys-sync`, `nx-sys-thread-tls`) — these neither
   allocate nor sit at a link boundary. Adding `extern crate nx_alloc as _;` would force every consumer to inherit an
   unwanted allocator dependency.
 - **Pure Rust IPC service crates** (`nx-service-*`) — they expose a Rust API and let the final binary choose its

@@ -17,7 +17,7 @@
 //!
 //! ## Always compiled
 //!
-//! - **Runtime core:** `argv`, `env`, `init`, `thread_registry`
+//! - **Runtime core:** `argv`, `env`, `init`
 //! - **Service Manager:** `service_manager` (depends on `nx-service-sm` —
 //!   non-optional; `sm` is the foundation every other service builds on)
 //!
@@ -62,7 +62,6 @@ pub mod argv;
 pub mod env;
 pub mod init;
 pub mod service_manager;
-pub mod thread_registry;
 
 #[cfg(feature = "service-apm")]
 pub mod apm_manager;

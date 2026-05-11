@@ -56,13 +56,6 @@ option(
 )
 
 option(
-    'use_nx_sys_thread',
-    type : 'feature', value : 'disabled',
-    description : 'Override all libnx functions with nx-sys-thread functions',
-    yield : true
-)
-
-option(
     'use_nx_time',
     type : 'feature', value : 'disabled',
     description : 'Override all libnx functions with nx-time functions',

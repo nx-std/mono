@@ -79,7 +79,6 @@ If a crate has no override script, omit both the `.ld` file and the `<crate>_ld_
 | `nx-time`              | `time_override.ld`           |
 | `nx-sys-mem`           | `sys_mem_override.ld`        |
 | `nx-sys-sync`          | `sys_sync_override.ld`       |
-| `nx-sys-thread`        | `sys_thread_override.ld`     |
 | `nx-sys-thread-tls`    | `thread_tls_override.ld`     |
 | `nx-std-sync`          | `std_sync_override.ld`       |
 | `nx-sf`                | `sf_override.ld`             |

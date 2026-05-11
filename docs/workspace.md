@@ -71,7 +71,7 @@ Cargo workspace members live under `subprojects/<crate>/` and are split into the
 - **`nx-cpu`**: CPU-level utilities (cache, registers).
 - **`nx-sys-mem`**: Low-level memory management on top of `nx-svc`.
 - **`nx-sys-sync`**: Low-level synchronization primitives on top of `nx-svc`.
-- **`nx-sys-thread`**, **`nx-sys-thread-tls`**: Thread management.
+- **`nx-sys-thread-tls`**: Thread-local storage region access.
 
 ### Higher-level Crates — Standard-library-style abstractions
 

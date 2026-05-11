@@ -110,7 +110,6 @@ dependencies = [
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-sync",
- "nx-sys-thread",
  "nx-sys-thread-tls",
  "thiserror",
 ]
@@ -252,7 +251,6 @@ dependencies = [
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-sync",
- "nx-sys-thread",
  "nx-sys-thread-tls",
  "nx-time",
 ]
@@ -297,19 +295,6 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "static_assertions",
-]
-
-[[package]]
-name = "nx-sys-thread"
-version = "0.1.0"
-dependencies = [
- "nx-alloc",
- "nx-panic-handler",
- "nx-svc",
- "nx-sys-mem",
- "nx-sys-thread-tls",
- "nx-time",
- "thiserror",
 ]
 
 [[package]]

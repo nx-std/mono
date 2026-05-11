@@ -55,13 +55,6 @@ option(
 )
 
 option(
-    'use_nx_sys_thread',
-    type : 'feature', value : 'auto',
-    description : 'Enable the `sys-thread` feature',
-    yield : true
-)
-
-option(
     'use_nx_time',
     type : 'feature', value : 'auto',
     description : 'Enable the `time` feature',

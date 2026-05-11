@@ -89,17 +89,6 @@ if get_option('use_nx_sys_mem').enabled()
     deps_cargo_features += ['sys-mem']
 endif
 
-# nx-sys-thread
-if get_option('use_nx_sys_thread').enabled()
-    nx_sys_thread_proj = subproject('nx-sys-thread')
-
-    deps += nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
-    deps_override_link_args += ['-T', nx_sys_thread_proj.get_variable('nx_sys_thread_ld_override')]
-
-    debug('sys-thread feature: enabled')
-    deps_cargo_features += ['sys-thread']
-endif
-
 # nx-time
 if get_option('use_nx_time').enabled()
     nx_time_proj = subproject('nx-time')

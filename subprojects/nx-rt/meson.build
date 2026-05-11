@@ -42,10 +42,6 @@ deps += nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
 nx_sys_sync_proj = subproject('nx-sys-sync')
 deps += nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 
-# nx-sys-thread (always required)
-nx_sys_thread_proj = subproject('nx-sys-thread')
-deps += nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
-
 # nx-sys-thread-tls (always required)
 nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
 deps += nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
