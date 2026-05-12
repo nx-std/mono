@@ -18,6 +18,7 @@ members = [
     "subprojects/nx-service-smm",
     "subprojects/nx-service-time",
     "subprojects/nx-service-vi",
+    "subprojects/nx-service-wlaninf",
     "subprojects/nx-sf",
     "subprojects/nx-std",
     "subprojects/nx-std-sync",
