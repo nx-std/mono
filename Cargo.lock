@@ -231,6 +231,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-smm"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-time"
 version = "0.1.0"
 dependencies = [

@@ -15,6 +15,7 @@ members = [
     "subprojects/nx-service-set",
     "subprojects/nx-service-sfdnsres",
     "subprojects/nx-service-sm",
+    "subprojects/nx-service-smm",
     "subprojects/nx-service-time",
     "subprojects/nx-service-vi",
     "subprojects/nx-sf",
