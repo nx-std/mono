@@ -104,6 +104,13 @@ option(
 )
 
 option(
+    'use_nx_service_sfdnsres',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `service-sfdnsres` feature',
+    yield : true
+)
+
+option(
     'use_nx_service_sm',
     type : 'feature', value : 'auto',
     description : 'Enable the `service-sm` feature',

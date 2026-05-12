@@ -53,6 +53,10 @@ pub mod services {
     pub mod set {
         pub use nx_service_set::*;
     }
+    #[cfg(feature = "service-sfdnsres")]
+    pub mod sfdnsres {
+        pub use nx_service_sfdnsres::*;
+    }
     #[cfg(feature = "service-sm")]
     pub mod sm {
         pub use nx_service_sm::*;

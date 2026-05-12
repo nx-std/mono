@@ -174,6 +174,16 @@ if get_option('use_nx_service_set').enabled()
     deps_cargo_features += ['service-set']
 endif
 
+# nx-service-sfdnsres
+if get_option('use_nx_service_sfdnsres').enabled()
+    nx_service_sfdnsres_proj = subproject('nx-service-sfdnsres')
+
+    deps += nx_service_sfdnsres_proj.get_variable('nx_service_sfdnsres_dep')
+
+    debug('service-sfdnsres feature: enabled')
+    deps_cargo_features += ['service-sfdnsres']
+endif
+
 # nx-service-sm
 if get_option('use_nx_service_sm').enabled()
     nx_service_sm_proj = subproject('nx-service-sm')
