@@ -11,6 +11,7 @@ members = [
     "subprojects/nx-service-applet",
     "subprojects/nx-service-bsd",
     "subprojects/nx-service-csrng",
+    "subprojects/nx-service-fan",
     "subprojects/nx-service-hid",
     "subprojects/nx-service-idlesys",
     "subprojects/nx-service-ldn",
