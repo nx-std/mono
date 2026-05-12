@@ -151,6 +151,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-async"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-auddev"
 version = "0.1.0"
 dependencies = [
