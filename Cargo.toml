@@ -16,6 +16,7 @@ members = [
     "subprojects/nx-service-csrng",
     "subprojects/nx-service-ectx",
     "subprojects/nx-service-fan",
+    "subprojects/nx-service-fspr",
     "subprojects/nx-service-hid",
     "subprojects/nx-service-idlesys",
     "subprojects/nx-service-ldn",
