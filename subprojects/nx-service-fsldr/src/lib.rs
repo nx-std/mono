@@ -69,10 +69,7 @@ impl FsldrService {
         tid: u64,
         path: &[u8; FS_MAX_PATH],
     ) -> Result<DomainObject<'_>, OpenCodeFileSystemError> {
-        let raw_object_id = cmif::open_code_filesystem_legacy(&self.domain, tid, path)?;
-        self.domain
-            .open_object_raw(raw_object_id)
-            .ok_or(OpenCodeFileSystemError::MissingObject)
+        cmif::open_code_filesystem_legacy(&self.domain, tid, path)
     }
 
     /// Opens a code filesystem (10.0.0–15.x).
@@ -86,10 +83,7 @@ impl FsldrService {
         path: &[u8; FS_MAX_PATH],
         out_code_info: &mut FsCodeInfo,
     ) -> Result<DomainObject<'_>, OpenCodeFileSystemError> {
-        let raw_object_id = cmif::open_code_filesystem_v10(&self.domain, tid, path, out_code_info)?;
-        self.domain
-            .open_object_raw(raw_object_id)
-            .ok_or(OpenCodeFileSystemError::MissingObject)
+        cmif::open_code_filesystem_v10(&self.domain, tid, path, out_code_info)
     }
 
     /// Opens a code filesystem (16.0.0–16.x).
@@ -104,16 +98,7 @@ impl FsldrService {
         path: &[u8; FS_MAX_PATH],
         out_code_info: &mut FsCodeInfo,
     ) -> Result<DomainObject<'_>, OpenCodeFileSystemError> {
-        let raw_object_id = cmif::open_code_filesystem_v16(
-            &self.domain,
-            content_attributes,
-            tid,
-            path,
-            out_code_info,
-        )?;
-        self.domain
-            .open_object_raw(raw_object_id)
-            .ok_or(OpenCodeFileSystemError::MissingObject)
+        cmif::open_code_filesystem_v16(&self.domain, content_attributes, tid, path, out_code_info)
     }
 
     /// Opens a code filesystem (17.0.0–19.x).
@@ -128,16 +113,7 @@ impl FsldrService {
         path: &[u8; FS_MAX_PATH],
         out_code_info: &mut FsCodeInfo,
     ) -> Result<DomainObject<'_>, OpenCodeFileSystemError> {
-        let raw_object_id = cmif::open_code_filesystem_v17(
-            &self.domain,
-            content_attributes,
-            tid,
-            path,
-            out_code_info,
-        )?;
-        self.domain
-            .open_object_raw(raw_object_id)
-            .ok_or(OpenCodeFileSystemError::MissingObject)
+        cmif::open_code_filesystem_v17(&self.domain, content_attributes, tid, path, out_code_info)
     }
 
     /// Opens a code filesystem (20.0.0+).
@@ -152,16 +128,13 @@ impl FsldrService {
         tid: u64,
         out_code_info: &mut FsCodeInfo,
     ) -> Result<DomainObject<'_>, OpenCodeFileSystemError> {
-        let raw_object_id = cmif::open_code_filesystem_v20(
+        cmif::open_code_filesystem_v20(
             &self.domain,
             content_attributes,
             storage_id,
             tid,
             out_code_info,
-        )?;
-        self.domain
-            .open_object_raw(raw_object_id)
-            .ok_or(OpenCodeFileSystemError::MissingObject)
+        )
     }
 
     /// Checks whether a program (by PID) is archived.

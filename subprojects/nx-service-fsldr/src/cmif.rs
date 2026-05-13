@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain};
+use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject};
 
 use crate::{
     dispatch::dispatch_in_out,
@@ -16,16 +16,15 @@ use crate::{
 /// Opens a code filesystem (pre-10.0.0).
 ///
 /// Takes a title ID and a path buffer. Does not return code info.
-/// Returns the domain sub-object ID for the opened filesystem.
-pub(crate) fn open_code_filesystem_legacy(
-    domain: &Domain,
+pub(crate) fn open_code_filesystem_legacy<'d>(
+    domain: &'d Domain,
     tid: u64,
     path: &[u8; FS_MAX_PATH],
-) -> Result<u32, OpenCodeFileSystemError> {
+) -> Result<DomainObject<'d>, OpenCodeFileSystemError> {
     let input = OpenCodeFileSystemTidIn { tid };
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
             .in_raw(
@@ -44,26 +43,24 @@ pub(crate) fn open_code_filesystem_legacy(
             .map_err(OpenCodeFileSystemError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(OpenCodeFileSystemError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result
+        .take_object(0)
+        .ok_or(OpenCodeFileSystemError::MissingObject)
 }
 
 /// Opens a code filesystem (10.0.0–15.x).
 ///
-/// Takes a title ID and a path buffer. Returns code info and the domain
-/// sub-object ID for the opened filesystem.
-pub(crate) fn open_code_filesystem_v10(
-    domain: &Domain,
+/// Takes a title ID and a path buffer. Returns code info via HIPC pointer.
+pub(crate) fn open_code_filesystem_v10<'d>(
+    domain: &'d Domain,
     tid: u64,
     path: &[u8; FS_MAX_PATH],
     out_code_info: &mut FsCodeInfo,
-) -> Result<u32, OpenCodeFileSystemError> {
+) -> Result<DomainObject<'d>, OpenCodeFileSystemError> {
     let input = OpenCodeFileSystemTidIn { tid };
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
             .in_raw(
@@ -89,27 +86,26 @@ pub(crate) fn open_code_filesystem_v10(
             .map_err(OpenCodeFileSystemError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(OpenCodeFileSystemError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result
+        .take_object(0)
+        .ok_or(OpenCodeFileSystemError::MissingObject)
 }
 
 /// Opens a code filesystem (16.0.0–16.x).
 ///
 /// Takes content attributes, title ID, and a path buffer. Returns code info
 /// via HIPC pointer and the domain sub-object ID.
-pub(crate) fn open_code_filesystem_v16(
-    domain: &Domain,
+pub(crate) fn open_code_filesystem_v16<'d>(
+    domain: &'d Domain,
     content_attributes: u8,
     tid: u64,
     path: &[u8; FS_MAX_PATH],
     out_code_info: &mut FsCodeInfo,
-) -> Result<u32, OpenCodeFileSystemError> {
+) -> Result<DomainObject<'d>, OpenCodeFileSystemError> {
     let input = OpenCodeFileSystemAttrIn::new(content_attributes, tid);
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
             .in_raw(
@@ -135,27 +131,26 @@ pub(crate) fn open_code_filesystem_v16(
             .map_err(OpenCodeFileSystemError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(OpenCodeFileSystemError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result
+        .take_object(0)
+        .ok_or(OpenCodeFileSystemError::MissingObject)
 }
 
 /// Opens a code filesystem (17.0.0–19.x).
 ///
 /// Takes content attributes, title ID, and a path buffer. Returns code info
 /// via HIPC map-alias and the domain sub-object ID.
-pub(crate) fn open_code_filesystem_v17(
-    domain: &Domain,
+pub(crate) fn open_code_filesystem_v17<'d>(
+    domain: &'d Domain,
     content_attributes: u8,
     tid: u64,
     path: &[u8; FS_MAX_PATH],
     out_code_info: &mut FsCodeInfo,
-) -> Result<u32, OpenCodeFileSystemError> {
+) -> Result<DomainObject<'d>, OpenCodeFileSystemError> {
     let input = OpenCodeFileSystemAttrIn::new(content_attributes, tid);
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
             .in_raw(
@@ -179,27 +174,26 @@ pub(crate) fn open_code_filesystem_v17(
             .map_err(OpenCodeFileSystemError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(OpenCodeFileSystemError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result
+        .take_object(0)
+        .ok_or(OpenCodeFileSystemError::MissingObject)
 }
 
 /// Opens a code filesystem (20.0.0+).
 ///
 /// Takes content attributes, storage ID, and title ID. No path buffer.
 /// Returns code info via HIPC map-alias and the domain sub-object ID.
-pub(crate) fn open_code_filesystem_v20(
-    domain: &Domain,
+pub(crate) fn open_code_filesystem_v20<'d>(
+    domain: &'d Domain,
     content_attributes: u8,
     storage_id: u8,
     tid: u64,
     out_code_info: &mut FsCodeInfo,
-) -> Result<u32, OpenCodeFileSystemError> {
+) -> Result<DomainObject<'d>, OpenCodeFileSystemError> {
     let input = OpenCodeFileSystemV20In::new(content_attributes, storage_id, tid);
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
             .in_raw(
@@ -216,10 +210,9 @@ pub(crate) fn open_code_filesystem_v20(
             .map_err(OpenCodeFileSystemError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(OpenCodeFileSystemError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result
+        .take_object(0)
+        .ok_or(OpenCodeFileSystemError::MissingObject)
 }
 
 /// Checks whether a program (by PID) is archived.
