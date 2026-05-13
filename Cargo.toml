@@ -49,6 +49,7 @@ members = [
     "subprojects/nx-service-lbl",
     "subprojects/nx-service-ldn",
     "subprojects/nx-service-ldr",
+    "subprojects/nx-service-lp2p",
     "subprojects/nx-service-lr",
     "subprojects/nx-service-mii",
     "subprojects/nx-service-miiimg",
