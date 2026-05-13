@@ -127,7 +127,6 @@ pub(crate) fn trimmer_set_thumbnail_rgba(
 pub(crate) fn maker_create_video_proxy(service: &Session) -> Result<u32, CreateVideoProxyError> {
     let result = service
         .dispatch(proto::MAKER_CREATE_VIDEO_PROXY)
-        .out_objects(1)
         .send()
         .map_err(CreateVideoProxyError::Dispatch)?;
 
