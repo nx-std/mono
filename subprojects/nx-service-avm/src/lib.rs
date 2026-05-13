@@ -77,11 +77,7 @@ impl AvmService {
     pub fn get_version_list_importer(
         &self,
     ) -> Result<AvmVersionListImporter<'_>, GetVersionListImporterError> {
-        let raw_object_id = cmif::get_version_list_importer(&self.domain)?;
-        let object = self
-            .domain
-            .open_object_raw(raw_object_id)
-            .ok_or(GetVersionListImporterError::MissingObject)?;
+        let object = cmif::get_version_list_importer(&self.domain)?;
         Ok(AvmVersionListImporter { object })
     }
 

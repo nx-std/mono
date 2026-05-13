@@ -66,21 +66,18 @@ pub(crate) fn get_version_list_entry(
 }
 
 /// Gets a version list importer sub-object.
-///
-/// Returns the raw sub-object ID for the new importer domain object.
-pub(crate) fn get_version_list_importer(
-    domain: &Domain,
-) -> Result<u32, GetVersionListImporterError> {
-    let result = domain
+pub(crate) fn get_version_list_importer<'d>(
+    domain: &'d Domain,
+) -> Result<DomainObject<'d>, GetVersionListImporterError> {
+    let mut result = domain
         .dispatch(proto::GET_VERSION_LIST_IMPORTER)
         .out_objects(1)
         .send()
         .map_err(GetVersionListImporterError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetVersionListImporterError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result
+        .take_object(0)
+        .ok_or(GetVersionListImporterError::MissingObject)
 }
 
 /// Gets the launch-required version for an application.
