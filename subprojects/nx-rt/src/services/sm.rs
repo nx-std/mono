@@ -6,7 +6,7 @@
 
 pub use nx_service_sm::ConnectError;
 use nx_service_sm::SmService;
-use nx_sf::{ServiceName, service::Service};
+use nx_sf::{ServiceName, ffi::Service};
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 use nx_svc::ipc::Handle as SessionHandle;
 
@@ -82,9 +82,8 @@ pub struct InitializeError(#[source] pub ConnectError);
 /// will fail until [`initialize`] is called again.
 pub fn exit() {
     let mut session = SM_SESSION.write();
-    if let Some(sm) = session.take() {
-        sm.close();
-    }
+    // `SmService` is RAII: drop closes the underlying session.
+    let _ = session.take();
 }
 
 /// Gets a service by name, checking overrides first.
@@ -104,9 +103,16 @@ pub fn get_service(name: ServiceName) -> Result<Service, GetServiceError> {
         });
     }
 
-    // No override, get from SM
+    // No override, get from SM. Construct an owned-mode FFI service:
+    // own_handle = 1, object_id = 0, pointer_buffer_size = 0 (queried later
+    // by the C caller if needed).
     let handle = get_service_handle(name)?;
-    Ok(Service::new(handle))
+    Ok(Service {
+        session: handle,
+        own_handle: 1,
+        object_id: 0,
+        pointer_buffer_size: 0,
+    })
 }
 
 /// Gets a service directly from SM (ignoring overrides).

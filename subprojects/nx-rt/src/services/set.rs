@@ -53,9 +53,8 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = SetSysService> + '
 /// Exits the `set:sys` service.
 pub fn exit() {
     let mut guard = state().write();
-    if let Some(set_state) = guard.take() {
-        set_state.service.close();
-    }
+    // SetSysService is RAII; dropping it closes the session.
+    let _ = guard.take();
 }
 
 /// Internal storage for `set:sys` service.

@@ -110,7 +110,9 @@ pub fn exit() {
                 .proxy
                 .set_focus_handling_mode(AppletFocusHandlingMode::NoSuspend);
         }
-        singleton.close();
+        // `Proxy<R>` is RAII; dropping `singleton` closes every IPC handle in
+        // reverse acquisition order via `Drop`.
+        drop(singleton);
     }
 }
 

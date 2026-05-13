@@ -91,16 +91,4 @@ impl AppletSingleton {
     // DebugFunctions projections are not yet exposed at the runtime layer —
     // no top-level accessor or FFI shim consumes them. Add them here when a
     // consumer materialises rather than carrying dead infrastructure.
-
-    /// Tears down the singleton, closing every IPC handle in reverse
-    /// acquisition order.
-    pub fn close(self) {
-        match self {
-            Self::Application(s) => s.proxy.close(),
-            Self::LibraryApplet(s) => s.proxy.close(),
-            Self::SystemApplet(s) => s.proxy.close(),
-            Self::OverlayApplet(s) => s.proxy.close(),
-            Self::SystemApplication(s) => s.proxy.close(),
-        }
-    }
 }

@@ -1,11 +1,23 @@
 //! Application Performance Management (APM) service FFI
 
+use core::mem::MaybeUninit;
+
 use nx_service_apm;
-use nx_sf::{cmif, service::Service};
+use nx_sf::{cmif, ffi::Service};
 use nx_svc::error::ToRawResultCode;
 
-use super::common::GENERIC_ERROR;
+use super::common::{GENERIC_ERROR, SyncUnsafeCell};
 use crate::services::apm;
+
+/// Static buffer for APM IManager FFI session access. Written on
+/// `apm_initialize()` and zeroed on `apm_exit()`.
+static APM_FFI_SERVICE: SyncUnsafeCell<MaybeUninit<Service>> =
+    SyncUnsafeCell::new(MaybeUninit::uninit());
+
+/// Static buffer for APM ISession FFI session access. Written on
+/// `apm_initialize()` and zeroed on `apm_exit()`.
+static APM_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
+    SyncUnsafeCell::new(MaybeUninit::uninit());
 
 /// Initializes the APM service. Returns 0 on success, error code on failure.
 ///
@@ -18,6 +30,36 @@ use crate::services::apm;
 pub unsafe extern "C" fn __nx_rt__apm_initialize() -> u32 {
     if let Err(err) = apm::init() {
         return apm_connect_error_to_rc(err);
+    }
+
+    // Populate FFI service buffers from the owned Session wrappers as
+    // non-owning views (`own_handle = 0`, `object_id = 0` — libnx's
+    // "override" mode): Rust's `ApmService`/`ApmSession` retain exclusive
+    // ownership of the kernel handles and close them on `Drop` via
+    // `apm::exit`. A `own_handle = 1` snapshot here would risk a
+    // double-close if libnx ever invoked `serviceClose` on the cached
+    // pointer. APM does not use pointer buffers, so size 0 is correct.
+    if let Some(service) = apm::get_service() {
+        let svc = Service {
+            session: service.session(),
+            own_handle: 0,
+            object_id: 0,
+            pointer_buffer_size: 0,
+        };
+        // SAFETY: Called only during initialization; no other code reads the
+        // buffer concurrently.
+        unsafe { APM_FFI_SERVICE.get().cast::<Service>().write(svc) };
+    }
+    if let Some(session) = apm::get_session() {
+        let svc = Service {
+            session: session.session(),
+            own_handle: 0,
+            object_id: 0,
+            pointer_buffer_size: 0,
+        };
+        // SAFETY: Called only during initialization; no other code reads the
+        // buffer concurrently.
+        unsafe { APM_FFI_SESSION.get().cast::<Service>().write(svc) };
     }
     0
 }
@@ -32,6 +74,11 @@ pub unsafe extern "C" fn __nx_rt__apm_initialize() -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_exit() {
     apm::exit();
+    // SAFETY: Called only during exit, after the service is closed.
+    unsafe {
+        APM_FFI_SERVICE.get().write(MaybeUninit::zeroed());
+        APM_FFI_SESSION.get().write(MaybeUninit::zeroed());
+    }
 }
 
 /// Gets the current performance mode.
@@ -127,15 +174,7 @@ pub unsafe extern "C" fn __nx_rt__apm_get_performance_configuration(
 /// Returns a pointer to the service session or null if not initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_get_service_session() -> *mut Service {
-    let Some(service) = apm::get_service() else {
-        return core::ptr::null_mut();
-    };
-
-    // SAFETY: Session handle is valid while service is initialized.
-    // Lifetime safety guaranteed by singleton management.
-    (&*service as *const _ as *mut Service)
-        .cast_const()
-        .cast_mut()
+    APM_FFI_SERVICE.get().cast::<Service>()
 }
 
 /// Gets the APM ISession for C interop.
@@ -147,15 +186,7 @@ pub unsafe extern "C" fn __nx_rt__apm_get_service_session() -> *mut Service {
 /// Returns a pointer to the session or null if not initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__apm_get_service_session_session() -> *mut Service {
-    let Some(session) = apm::get_session() else {
-        return core::ptr::null_mut();
-    };
-
-    // SAFETY: Session handle is valid while APM is initialized.
-    // Lifetime safety guaranteed by singleton management.
-    (&*session as *const _ as *mut Service)
-        .cast_const()
-        .cast_mut()
+    APM_FFI_SESSION.get().cast::<Service>()
 }
 
 fn apm_connect_error_to_rc(err: apm::ConnectError) -> u32 {

@@ -6,7 +6,7 @@ use core::{
 };
 
 use nx_service_nv::fd::Fd;
-use nx_sf::{cmif, service::Service};
+use nx_sf::{cmif, ffi::Service};
 
 use super::common::{GENERIC_ERROR, SyncUnsafeCell};
 
@@ -27,11 +27,17 @@ pub unsafe extern "C" fn __nx_rt__nv_initialize() -> u32 {
 
     match crate::services::nv::init(config) {
         Ok(()) => {
-            // Only update FFI session buffer on first actual initialization
+            // Only update FFI session buffer on first actual initialization.
+            // Non-owning view (`own_handle = 0`, `object_id = 0` — libnx's
+            // "override" mode): the Rust `NvService` retains exclusive
+            // ownership and closes the kernel handle on `Drop` via
+            // `nv::exit`. A `own_handle = 1` snapshot would risk a
+            // double-close if libnx ever invoked `serviceClose` on the
+            // cached pointer.
             if !was_initialized && let Some(service_ref) = crate::services::nv::get_service() {
                 let service = Service {
                     session: service_ref.session(),
-                    own_handle: 1,
+                    own_handle: 0,
                     object_id: 0,
                     pointer_buffer_size: 0,
                 };

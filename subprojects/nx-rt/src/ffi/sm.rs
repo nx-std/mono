@@ -2,7 +2,7 @@
 
 use core::mem::MaybeUninit;
 
-use nx_sf::{ServiceName, cmif, service::Service, tipc};
+use nx_sf::{ServiceName, cmif, ffi::Service, tipc};
 
 use super::common::{GENERIC_ERROR, SyncUnsafeCell};
 use crate::services::sm;
@@ -281,12 +281,16 @@ pub unsafe extern "C" fn __nx_rt__sm_get_service_session() -> *mut Service {
 fn set_sm_ffi_session() {
     let guard = sm::sm_session();
     if let Some(sm) = guard.as_ref() {
-        // Copy the underlying Service to FFI buffer
+        // Non-owning FFI view (`own_handle = 0`, `object_id = 0` — libnx's
+        // "override" mode): the Rust `SmService` retains exclusive ownership
+        // of the kernel handle and closes it on `Drop` via `sm::exit`. A
+        // `own_handle = 1` snapshot here would risk a double-close if libnx
+        // ever invoked `serviceClose` on the cached pointer.
         // SAFETY: Called only during initialization, single-threaded access.
         unsafe {
             let service = Service {
                 session: sm.session(),
-                own_handle: 1,
+                own_handle: 0,
                 object_id: 0,
                 pointer_buffer_size: 0,
             };

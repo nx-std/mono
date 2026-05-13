@@ -85,9 +85,8 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = ViService> + 'stat
 ///
 /// Decrements the reference count. Actual cleanup only happens when the
 /// reference count reaches 0. When the last reference is released the inner
-/// [`ViService`] is consumed via [`ViService::close`] so all sub-service
-/// session handles are returned to the kernel — `Service` has no `Drop`
-/// impl, so simply dropping the state would leak every handle.
+/// [`ViService`] is dropped; its `Session` fields are RAII-owned and the
+/// kernel handles are closed automatically by `Drop`.
 pub fn exit() {
     let mut guard = state().write();
     let should_close = {
@@ -97,8 +96,9 @@ pub fn exit() {
         vi_state.ref_count = vi_state.ref_count.saturating_sub(1);
         vi_state.ref_count == 0
     };
-    if should_close && let Some(vi_state) = guard.take() {
-        vi_state.service.close();
+    if should_close {
+        // Dropping `ViState` releases all owned sub-service sessions via RAII.
+        let _ = guard.take();
     }
 }
 

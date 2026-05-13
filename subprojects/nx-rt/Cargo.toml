@@ -12,7 +12,7 @@ bench = false
 
 [features]
 # Master switch for the C-FFI surface (`__nx_rt__*` symbols). Required for any libnx override.
-ffi = []
+ffi = ["nx-sf/ffi"]
 # Application Performance Management — gates `services::apm` + `ffi::apm`.
 service-apm = ["dep:nx-service-apm"]
 # Applet (am) service — gates `services::applet` + `ffi::applet`.

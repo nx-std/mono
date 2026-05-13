@@ -1,10 +1,16 @@
 //! System Settings (set:sys) service FFI
 
-use nx_sf::{cmif, service::Service, tipc};
+use core::mem::MaybeUninit;
+
+use nx_sf::{cmif, ffi::Service, tipc};
 use nx_svc::error::ToRawResultCode;
 
-use super::common::GENERIC_ERROR;
+use super::common::{GENERIC_ERROR, SyncUnsafeCell};
 use crate::services::set;
+
+/// Static buffer for set:sys FFI session access. Updated on `initialize()` and `exit()`.
+static SETSYS_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
+    SyncUnsafeCell::new(MaybeUninit::uninit());
 
 /// Initializes set:sys connection. Returns 0 on success, error code on failure.
 ///
@@ -17,6 +23,21 @@ use crate::services::set;
 pub unsafe extern "C" fn __nx_rt__setsys_initialize() -> u32 {
     if let Err(err) = set::init() {
         return setsys_connect_error_to_rc(err);
+    }
+    if let Some(setsys) = set::get_service() {
+        // Non-owning FFI view (`own_handle = 0`, `object_id = 0` — libnx's
+        // "override" mode): the Rust `SetSysService` retains exclusive
+        // ownership and closes the kernel handle on `Drop` via `set::exit`.
+        // A `own_handle = 1` snapshot would risk a double-close if libnx
+        // ever invoked `serviceClose` on the cached pointer.
+        let service = Service {
+            session: setsys.session(),
+            own_handle: 0,
+            object_id: 0,
+            pointer_buffer_size: 0,
+        };
+        // SAFETY: Called only during initialization; no concurrent readers.
+        unsafe { SETSYS_FFI_SESSION.get().cast::<Service>().write(service) };
     }
     0
 }
@@ -31,6 +52,8 @@ pub unsafe extern "C" fn __nx_rt__setsys_initialize() -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__setsys_exit() {
     set::exit();
+    // SAFETY: Called only during exit, after the service has been closed.
+    unsafe { SETSYS_FFI_SESSION.get().write(MaybeUninit::zeroed()) };
 }
 
 /// Gets the set:sys service session pointer.
@@ -42,16 +65,7 @@ pub unsafe extern "C" fn __nx_rt__setsys_exit() {
 /// Returns a pointer to the service session or null if not initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt__setsys_get_service_session() -> *mut Service {
-    let Some(setsys) = set::get_service() else {
-        return core::ptr::null_mut();
-    };
-
-    // SAFETY: SetSysService is repr(transparent) over Service, and the session
-    // is valid while set:sys is initialized. Lifetime safety guaranteed by
-    // singleton management.
-    (&*setsys as *const _ as *mut Service)
-        .cast_const()
-        .cast_mut()
+    SETSYS_FFI_SESSION.get().cast::<Service>()
 }
 
 /// Gets the system firmware version. Returns 0 on success, error code on failure.

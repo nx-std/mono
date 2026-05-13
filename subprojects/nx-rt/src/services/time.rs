@@ -50,9 +50,8 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = TimeService> + 'st
 /// Exits the Time service.
 pub fn exit() {
     let mut guard = state().write();
-    if let Some(time_state) = guard.take() {
-        time_state.service.close();
-    }
+    // `TimeService` is RAII; dropping the taken state closes the kernel handle.
+    let _ = guard.take();
 }
 
 /// Internal storage for Time service.

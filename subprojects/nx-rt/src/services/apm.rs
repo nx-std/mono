@@ -63,11 +63,10 @@ pub fn get_session() -> Option<impl core::ops::Deref<Target = ApmSession> + 'sta
 /// Exits the APM service session.
 pub fn exit() {
     let mut guard = state().write();
-    if let Some(apm_state) = guard.take() {
-        // Close in reverse order: session then service
-        apm_state.session.close();
-        apm_state.service.close();
-    }
+    // RAII: dropping `ApmState` closes the session and the service in field
+    // declaration order (session first, then service), matching the previous
+    // explicit close order.
+    let _ = guard.take();
 }
 
 /// Internal storage for APM service and session.

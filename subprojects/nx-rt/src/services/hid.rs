@@ -53,9 +53,9 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = HidService> + 'sta
 /// Exits the HID service.
 pub fn exit() {
     let mut guard = state().write();
-    if let Some(hid_state) = guard.take() {
-        hid_state.service.close();
-    }
+    // `HidService` is RAII; dropping the taken state closes both kernel handles
+    // (main session + IAppletResource) and unmaps the shared memory.
+    let _ = guard.take();
 }
 
 /// Internal storage for HID service.

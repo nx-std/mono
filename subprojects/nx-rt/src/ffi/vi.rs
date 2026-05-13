@@ -2,7 +2,7 @@
 
 use core::{ffi::c_void, mem::MaybeUninit};
 
-use nx_sf::{cmif, service::Service};
+use nx_sf::{cmif, ffi::Service};
 
 use super::common::{GENERIC_ERROR, LibnxError, SyncUnsafeCell, libnx_error};
 use crate::services::{applet, vi};
@@ -1133,11 +1133,12 @@ fn set_vi_ffi_sessions() {
     };
 
     // IHOSBinderDriverRelay
+    let binder_relay_session = service_ref.binder_relay();
     let binder_relay = Service {
-        session: service_ref.binder_relay().session,
+        session: binder_relay_session.handle(),
         own_handle: 0,
         object_id: 0,
-        pointer_buffer_size: 0,
+        pointer_buffer_size: binder_relay_session.pointer_buffer_size(),
     };
     // SAFETY: Called only during first initialization.
     unsafe {
