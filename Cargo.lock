@@ -255,6 +255,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-caps"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "nx-panic-handler",
+ "static_assertions",
+]
+
+[[package]]
 name = "nx-service-capsdc"
 version = "0.1.0"
 dependencies = [
@@ -275,6 +284,19 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-service-vi",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-capssu"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
  "nx-sf",
  "nx-svc",
  "nx-sys-thread-tls",
@@ -338,6 +360,20 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-friends"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-std-sync",
  "nx-svc",
  "nx-sys-thread-tls",
  "static_assertions",
@@ -434,6 +470,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-lbl"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-ldn"
 version = "0.1.0"
 dependencies = [
@@ -441,6 +489,19 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-ldr"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
  "nx-svc",
  "nx-sys-thread-tls",
  "static_assertions",
