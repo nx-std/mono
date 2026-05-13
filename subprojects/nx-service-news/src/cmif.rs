@@ -28,7 +28,6 @@ pub(crate) fn create_sub_object(
 ) -> Result<u32, CreateSubObjectError> {
     let result = service
         .dispatch(cmd_id)
-        .out_objects(1)
         .send()
         .map_err(CreateSubObjectError::Dispatch)?;
 
