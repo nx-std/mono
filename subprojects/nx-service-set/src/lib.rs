@@ -17,7 +17,7 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -34,19 +34,13 @@ pub use self::{
 ///
 /// Provides type safety to distinguish set:sys sessions from other services.
 #[repr(transparent)]
-pub struct SetSysService(Service);
+pub struct SetSysService(Session);
 
 impl SetSysService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the set:sys session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 }
 
@@ -59,7 +53,7 @@ impl SetSysService {
     pub fn get_firmware_version_cmif(
         &self,
     ) -> Result<FirmwareVersion, GetFirmwareVersionCmifError> {
-        cmif::get_firmware_version(self.0.session)
+        cmif::get_firmware_version(self.0.handle())
     }
 
     /// Gets the system firmware version using CMIF protocol (legacy command).
@@ -70,7 +64,7 @@ impl SetSysService {
     pub fn get_firmware_version_legacy_cmif(
         &self,
     ) -> Result<FirmwareVersion, GetFirmwareVersionCmifError> {
-        cmif::get_firmware_version_legacy(self.0.session)
+        cmif::get_firmware_version_legacy(self.0.handle())
     }
 }
 
@@ -86,7 +80,7 @@ impl SetSysService {
     pub fn get_firmware_version_tipc(
         &self,
     ) -> Result<FirmwareVersion, GetFirmwareVersionTipcError> {
-        tipc::get_firmware_version(self.0.session)
+        tipc::get_firmware_version(self.0.handle())
     }
 
     /// Gets the system firmware version using TIPC protocol (legacy command).
@@ -97,7 +91,7 @@ impl SetSysService {
     pub fn get_firmware_version_legacy_tipc(
         &self,
     ) -> Result<FirmwareVersion, GetFirmwareVersionTipcError> {
-        tipc::get_firmware_version_legacy(self.0.session)
+        tipc::get_firmware_version_legacy(self.0.handle())
     }
 }
 
@@ -110,12 +104,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<SetSysService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(SetSysService(service))
 }
@@ -134,12 +123,7 @@ pub fn connect_tipc(sm: &SmService) -> Result<SetSysService, ConnectTipcError> {
         .get_service_handle_tipc(SERVICE_NAME)
         .map_err(ConnectTipcError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(SetSysService(service))
 }
