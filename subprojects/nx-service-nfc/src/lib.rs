@@ -751,8 +751,9 @@ pub fn connect_nfp_cmif(
     let raw_object_id =
         cmif::nfp::create_interface(&domain).map_err(ConnectNfpCmifError::CreateInterface)?;
 
-    let interface = domain
-        .open_object_raw(raw_object_id)
+    // SAFETY: `raw_object_id` was just returned by `cmif::nfp::create_interface`
+    // on this same domain; no other `DomainObject` references it.
+    let interface = unsafe { domain.open_object_raw(raw_object_id) }
         .ok_or(ConnectNfpCmifError::MissingInterface)?;
 
     // SAFETY: the `DomainObject` borrows from `domain` which is stored alongside
@@ -810,8 +811,9 @@ pub fn connect_nfc_cmif(
     let raw_object_id =
         cmif::nfc::create_interface(&domain).map_err(ConnectNfcCmifError::CreateInterface)?;
 
-    let interface = domain
-        .open_object_raw(raw_object_id)
+    // SAFETY: `raw_object_id` was just returned by `cmif::nfc::create_interface`
+    // on this same domain; no other `DomainObject` references it.
+    let interface = unsafe { domain.open_object_raw(raw_object_id) }
         .ok_or(ConnectNfcCmifError::MissingInterface)?;
 
     // SAFETY: same justification as NfpService above.
@@ -864,8 +866,9 @@ pub fn connect_mifare_cmif(
     let raw_object_id =
         cmif::mifare::create_interface(&domain).map_err(ConnectMifareCmifError::CreateInterface)?;
 
-    let interface = domain
-        .open_object_raw(raw_object_id)
+    // SAFETY: `raw_object_id` was just returned by `cmif::mifare::create_interface`
+    // on this same domain; no other `DomainObject` references it.
+    let interface = unsafe { domain.open_object_raw(raw_object_id) }
         .ok_or(ConnectMifareCmifError::MissingInterface)?;
 
     // SAFETY: same justification as NfpService above.

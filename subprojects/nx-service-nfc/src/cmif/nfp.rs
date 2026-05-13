@@ -14,22 +14,20 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Root domain commands
-// ---------------------------------------------------------------------------
-
-/// CreateInterface — returns a domain sub-object ID.
+/// CreateInterface — returns a domain sub-object ID. The freshly minted
+/// `DomainObject` is wrapped in `ManuallyDrop` so the server-side object
+/// outlives this call; the service wrapper re-opens it per request.
 pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
-    let result = domain
+    let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
         .out_objects(1)
         .send()
         .map_err(CreateInterfaceError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(CreateInterfaceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateInterfaceError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Error returned by [`create_interface`].
@@ -40,10 +38,6 @@ pub enum CreateInterfaceError {
     #[error("CreateInterface response did not include the expected sub-object")]
     MissingObject,
 }
-
-// ---------------------------------------------------------------------------
-// Interface initialization / finalization
-// ---------------------------------------------------------------------------
 
 /// Initialize — sends PID + ARUID + MCU version buffer.
 pub(crate) fn initialize(
@@ -72,10 +66,6 @@ pub(crate) fn initialize(
 pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::NFP_FINALIZE)
 }
-
-// ---------------------------------------------------------------------------
-// Device management
-// ---------------------------------------------------------------------------
 
 /// ListDevices — writes device handles to buffer, returns count.
 pub(crate) fn list_devices(
@@ -138,10 +128,6 @@ pub(crate) fn unmount(
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_UNMOUNT, *handle)
 }
-
-// ---------------------------------------------------------------------------
-// Application area
-// ---------------------------------------------------------------------------
 
 /// OpenApplicationArea.
 pub(crate) fn open_application_area(
@@ -293,10 +279,6 @@ pub(crate) fn get_application_area_size(
     dispatch_in_out(object, proto::NFP_GET_APPLICATION_AREA_SIZE, *handle)
 }
 
-// ---------------------------------------------------------------------------
-// Tag / info queries
-// ---------------------------------------------------------------------------
-
 /// GetTagInfo — writes fixed-size buffer output.
 pub(crate) fn get_tag_info(
     object: &DomainObject<'_>,
@@ -401,10 +383,6 @@ pub(crate) fn get_model_info(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Events
-// ---------------------------------------------------------------------------
-
 /// AttachActivateEvent — returns a copy handle.
 pub(crate) fn attach_activate_event(
     object: &DomainObject<'_>,
@@ -454,10 +432,6 @@ pub(crate) fn attach_availability_change_event(
     Ok(result.copy_handles[0])
 }
 
-// ---------------------------------------------------------------------------
-// State queries
-// ---------------------------------------------------------------------------
-
 /// GetState.
 pub(crate) fn get_state(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::NFP_GET_STATE)
@@ -478,10 +452,6 @@ pub(crate) fn get_npad_id(
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::NFP_GET_NPAD_ID, *handle)
 }
-
-// ---------------------------------------------------------------------------
-// System/debug-only commands
-// ---------------------------------------------------------------------------
 
 /// Format (not for User).
 pub(crate) fn format(
@@ -593,10 +563,6 @@ pub(crate) fn exists_application_area(
     let val: u32 = dispatch_in_out(object, proto::NFP_EXISTS_APPLICATION_AREA, *handle)?;
     Ok(val != 0)
 }
-
-// ---------------------------------------------------------------------------
-// Debug-only commands
-// ---------------------------------------------------------------------------
 
 /// GetAll (debug only).
 pub(crate) fn get_all(

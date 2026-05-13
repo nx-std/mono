@@ -14,22 +14,20 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Root domain commands
-// ---------------------------------------------------------------------------
-
-/// CreateInterface — returns a domain sub-object ID.
+/// CreateInterface — returns a domain sub-object ID. The freshly minted
+/// `DomainObject` is wrapped in `ManuallyDrop` so the server-side object
+/// outlives this call; the service wrapper re-opens it per request.
 pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
-    let result = domain
+    let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
         .out_objects(1)
         .send()
         .map_err(CreateInterfaceError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(CreateInterfaceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateInterfaceError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Error returned by [`create_interface`].
@@ -40,10 +38,6 @@ pub enum CreateInterfaceError {
     #[error("CreateInterface response did not include the expected sub-object")]
     MissingObject,
 }
-
-// ---------------------------------------------------------------------------
-// Interface initialization / finalization
-// ---------------------------------------------------------------------------
 
 /// Initialize — pre-4.0.0 command ID layout.
 pub(crate) fn initialize_legacy(
@@ -99,10 +93,6 @@ pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
     object.dispatch(proto::NFC_FINALIZE).send().map(|_| ())
 }
 
-// ---------------------------------------------------------------------------
-// State queries — pre-4.0.0
-// ---------------------------------------------------------------------------
-
 /// GetState (pre-4.0.0).
 pub(crate) fn get_state_legacy(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::NFC_GET_STATE_LEGACY)
@@ -114,10 +104,6 @@ pub(crate) fn is_nfc_enabled_legacy(object: &DomainObject<'_>) -> Result<bool, D
     Ok(val & 1 != 0)
 }
 
-// ---------------------------------------------------------------------------
-// State queries — 4.0.0+
-// ---------------------------------------------------------------------------
-
 /// GetState (4.0.0+).
 pub(crate) fn get_state(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::NFC_GET_STATE)
@@ -128,10 +114,6 @@ pub(crate) fn is_nfc_enabled(object: &DomainObject<'_>) -> Result<bool, Dispatch
     let val: u8 = dispatch_out(object, proto::NFC_IS_NFC_ENABLED)?;
     Ok(val & 1 != 0)
 }
-
-// ---------------------------------------------------------------------------
-// Device management — 4.0.0+
-// ---------------------------------------------------------------------------
 
 /// ListDevices (4.0.0+).
 pub(crate) fn list_devices(
@@ -219,10 +201,6 @@ pub(crate) fn get_tag_info(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Events — 4.0.0+
-// ---------------------------------------------------------------------------
-
 /// AttachActivateEvent (4.0.0+).
 pub(crate) fn attach_activate_event(
     object: &DomainObject<'_>,
@@ -271,10 +249,6 @@ pub(crate) fn attach_availability_change_event(
         .send()?;
     Ok(result.copy_handles[0])
 }
-
-// ---------------------------------------------------------------------------
-// Mifare commands — 4.0.0+
-// ---------------------------------------------------------------------------
 
 /// ReadMifare (4.0.0+).
 pub(crate) fn read_mifare(
@@ -329,10 +303,6 @@ pub(crate) fn write_mifare(
             .map(|_| ())
     }
 }
-
-// ---------------------------------------------------------------------------
-// Pass-through commands — 4.0.0+
-// ---------------------------------------------------------------------------
 
 /// SendCommandByPassThrough (4.0.0+).
 pub(crate) fn send_command_by_pass_through(
