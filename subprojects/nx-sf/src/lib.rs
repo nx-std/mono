@@ -43,7 +43,10 @@ pub mod service;
 mod service_name;
 pub mod tipc;
 
-pub use service_name::ServiceName;
+pub use self::{
+    service::{Domain, DomainObject, OverrideService, Session},
+    service_name::ServiceName,
+};
 
 #[cfg(feature = "ffi")]
 pub mod ffi;

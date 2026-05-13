@@ -1,32 +1,73 @@
 //! FFI bindings for nx-sf service functionality.
 //!
-//! Provides C-compatible exports for service operations. Since libnx's service
-//! functions are inline, these exports are primarily useful for:
-//! - C code that wants to use the Rust implementation directly
-//! - Testing and debugging
+//! Provides C-compatible exports for service operations. libnx's service
+//! functions are inline, so these exports primarily exist for C callers that
+//! want to use the Rust implementation directly and for tests. The actual
+//! link-time override of libnx happens at the SVC layer in nx-svc.
 //!
-//! The actual link-time override of libnx happens at the SVC layer (nx-svc).
+//! # Layout
+//!
+//! The exported [`Service`] struct is byte-compatible with libnx's `Service`
+//! (16 bytes; `const_assert_eq` enforces this). It is private to this module:
+//! safe Rust code uses [`Session`](crate::service::Session) / [`Domain`](crate::service::Domain)
+//! / [`DomainObject`](crate::service::DomainObject) / [`OverrideService`](crate::service::OverrideService)
+//! instead, and the FFI symbols translate between the two at the boundary.
 //!
 //! # Naming Convention
 //!
-//! FFI exports follow the pattern: `__nx_sf__<fn_name>`
-//! See `docs/libnx_overrides.md` for details.
+//! FFI exports follow the pattern `__nx_sf__<fn_name>` (see
+//! `docs/libnx_overrides.md`).
 
-use core::mem;
+use core::mem::{self, size_of};
 
 use nx_svc::{error::ToRawResultCode, ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
+use static_assertions::const_assert_eq;
 
 use crate::{
-    cmif,
-    cmif::ObjectId,
-    service::{
-        self, CloneObjectError, CloneObjectExError, Service, ServiceConvertToDomainError,
-        TryCloneError, TryCloneExError,
-    },
+    cmif::{self, ObjectId},
+    service::{self, CloneObjectError, CloneObjectExError, ConvertToDomainError},
 };
 
 /// Generic error code for FFI when no specific result code is available.
 const GENERIC_ERROR: u32 = 0xFFFF;
+
+/// libnx-compatible `Service` struct.
+///
+/// Mode is determined by the (`own_handle`, `object_id`) tuple, matching the
+/// libnx encoding:
+///
+/// | Mode              | own_handle | object_id |
+/// |-------------------|------------|-----------|
+/// | Override          | 0          | 0         |
+/// | Non-domain        | 1          | 0         |
+/// | Domain root       | 1          | != 0      |
+/// | Domain subservice | 0          | != 0      |
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Service {
+    pub session: SessionHandle,
+    pub own_handle: u32,
+    pub object_id: u32,
+    pub pointer_buffer_size: u16,
+}
+const_assert_eq!(size_of::<Service>(), 16);
+
+impl Service {
+    #[inline]
+    fn is_override(&self) -> bool {
+        self.own_handle == 0 && self.object_id == 0
+    }
+
+    #[inline]
+    fn is_domain(&self) -> bool {
+        self.own_handle != 0 && self.object_id != 0
+    }
+
+    #[inline]
+    fn is_domain_subservice(&self) -> bool {
+        self.own_handle == 0 && self.object_id != 0
+    }
+}
 
 /// Creates a service object from an IPC session handle.
 ///
@@ -38,9 +79,17 @@ const GENERIC_ERROR: u32 = 0xFFFF;
 pub unsafe extern "C" fn __nx_sf__service_create(s: *mut Service, h: u32) {
     // SAFETY: h is a valid handle per caller contract.
     let handle = unsafe { SessionHandle::from_raw(h) };
+    let pointer_buffer_size = service::query_pointer_buffer_size(handle).unwrap_or(0);
 
     // SAFETY: Caller guarantees s points to valid memory.
-    unsafe { *s = Service::new(handle) };
+    unsafe {
+        *s = Service {
+            session: handle,
+            own_handle: 1,
+            object_id: 0,
+            pointer_buffer_size,
+        };
+    }
 }
 
 /// Creates a non-domain subservice from a parent service.
@@ -62,7 +111,14 @@ pub unsafe extern "C" fn __nx_sf__service_create_non_domain_subservice(
         // SAFETY: h is a valid handle per caller contract.
         let handle = unsafe { SessionHandle::from_raw(h) };
         // SAFETY: s points to valid memory.
-        unsafe { *s = Service::new_subservice(parent, handle) };
+        unsafe {
+            *s = Service {
+                session: handle,
+                own_handle: 1,
+                object_id: 0,
+                pointer_buffer_size: parent.pointer_buffer_size,
+            };
+        }
     } else {
         // SAFETY: Service is repr(C) and can be zero-initialized for FFI.
         unsafe { *s = mem::zeroed() };
@@ -83,9 +139,16 @@ pub unsafe extern "C" fn __nx_sf__service_create_domain_subservice(
     // SAFETY: Caller guarantees pointers are valid.
     let parent = unsafe { &*parent };
 
-    if let Some(object_id) = ObjectId::new(object_id) {
+    if ObjectId::new(object_id).is_some() {
         // SAFETY: s points to valid memory.
-        unsafe { *s = Service::new_domain_subservice(parent, object_id) };
+        unsafe {
+            *s = Service {
+                session: parent.session,
+                own_handle: 0,
+                object_id,
+                pointer_buffer_size: parent.pointer_buffer_size,
+            };
+        }
     } else {
         // SAFETY: Service is repr(C) and can be zero-initialized for FFI.
         unsafe { *s = mem::zeroed() };
@@ -96,17 +159,22 @@ pub unsafe extern "C" fn __nx_sf__service_create_domain_subservice(
 ///
 /// # Safety
 ///
-/// `s` must point to a valid Service struct.
-/// After this call, the Service at `s` is zeroed.
+/// `s` must point to a valid Service struct. After this call, the Service at
+/// `s` is zeroed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sf__service_close(s: *mut Service) {
     // SAFETY: Caller guarantees s points to valid Service.
     let srv = unsafe { *s };
 
-    // Close consumes the service
-    srv.close();
+    // Mirror libnx semantics: domain subservices send a per-object close on
+    // the shared handle; everything else with `own_handle != 0` sends a
+    // session close and releases the handle.
+    if srv.own_handle != 0 {
+        service::control::close_session(srv.session);
+    } else if let Some(object_id) = ObjectId::new(srv.object_id) {
+        service::control::close_object(srv.session, object_id);
+    }
 
-    // Zero the memory (service is now invalid)
     // SAFETY: s points to valid writable memory.
     unsafe { *s = mem::zeroed() };
 }
@@ -122,12 +190,17 @@ pub unsafe extern "C" fn __nx_sf__service_clone(s: *const Service, out_s: *mut S
     let srv = unsafe { &*s };
     let out = unsafe { &mut *out_s };
 
-    match srv.try_clone() {
-        Ok(cloned) => {
-            *out = cloned;
+    match service::clone_current_object(srv.session) {
+        Ok(new_handle) => {
+            *out = Service {
+                session: new_handle,
+                own_handle: 1,
+                object_id: 0,
+                pointer_buffer_size: srv.pointer_buffer_size,
+            };
             0
         }
-        Err(TryCloneError(err)) => clone_error_to_rc(err),
+        Err(err) => clone_error_to_rc(err),
     }
 }
 
@@ -146,12 +219,17 @@ pub unsafe extern "C" fn __nx_sf__service_clone_ex(
     let srv = unsafe { &*s };
     let out = unsafe { &mut *out_s };
 
-    match srv.try_clone_ex(tag) {
-        Ok(cloned) => {
-            *out = cloned;
+    match service::clone_current_object_ex(srv.session, tag) {
+        Ok(new_handle) => {
+            *out = Service {
+                session: new_handle,
+                own_handle: 1,
+                object_id: 0,
+                pointer_buffer_size: srv.pointer_buffer_size,
+            };
             0
         }
-        Err(TryCloneExError(err)) => clone_object_ex_error_to_rc(err),
+        Err(err) => clone_object_ex_error_to_rc(err),
     }
 }
 
@@ -165,8 +243,8 @@ pub unsafe extern "C" fn __nx_sf__service_convert_to_domain(s: *mut Service) -> 
     // SAFETY: Caller guarantees s points to valid Service.
     let srv = unsafe { &mut *s };
 
-    // For override services, we need to clone first (matching libnx behavior)
-    // Override services have own_handle == 0 and object_id == 0
+    // For override services, clone first to obtain an owned handle, matching
+    // libnx behavior.
     if srv.is_override() {
         match service::clone_current_object_ex(srv.session, 0) {
             Ok(new_handle) => {
@@ -177,9 +255,12 @@ pub unsafe extern "C" fn __nx_sf__service_convert_to_domain(s: *mut Service) -> 
         }
     }
 
-    match srv.convert_to_domain() {
-        Ok(()) => 0,
-        Err(ServiceConvertToDomainError(err)) => convert_to_domain_error_to_rc(err),
+    match service::convert_current_object_to_domain(srv.session) {
+        Ok(object_id) => {
+            srv.object_id = object_id.to_raw();
+            0
+        }
+        Err(err) => convert_to_domain_error_to_rc(err),
     }
 }
 
@@ -280,9 +361,9 @@ fn clone_object_ex_error_to_rc(err: CloneObjectExError) -> u32 {
 }
 
 /// Converts a convert to domain error to a raw result code for FFI.
-fn convert_to_domain_error_to_rc(err: service::ConvertToDomainError) -> u32 {
+fn convert_to_domain_error_to_rc(err: ConvertToDomainError) -> u32 {
     match err {
-        service::ConvertToDomainError::SendRequest(e) => e.to_rc(),
-        service::ConvertToDomainError::ParseResponse(e) => parse_response_error_to_rc(e),
+        ConvertToDomainError::SendRequest(e) => e.to_rc(),
+        ConvertToDomainError::ParseResponse(e) => parse_response_error_to_rc(e),
     }
 }
