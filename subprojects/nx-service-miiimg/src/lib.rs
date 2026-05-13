@@ -19,7 +19,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -37,19 +37,13 @@ pub use self::{
 
 /// Mii image database service wrapper.
 #[repr(transparent)]
-pub struct MiiimgService(Service);
+pub struct MiiimgService(Session);
 
 impl MiiimgService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the mii image service session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 }
 
@@ -62,37 +56,37 @@ impl MiiimgService {
     /// uses `1`).
     #[inline]
     pub fn initialize(&self, mode: u8) -> Result<u8, InitializeError> {
-        cmif::initialize(self.0.session, mode)
+        cmif::initialize(self.0.handle(), mode)
     }
 
     /// Reloads the image database.
     #[inline]
     pub fn reload(&self) -> Result<(), ReloadError> {
-        cmif::reload(self.0.session)
+        cmif::reload(self.0.handle())
     }
 
     /// Gets the number of mii images in the database.
     #[inline]
     pub fn get_count(&self) -> Result<i32, GetCountError> {
-        cmif::get_count(self.0.session)
+        cmif::get_count(self.0.handle())
     }
 
     /// Gets whether the image database is empty.
     #[inline]
     pub fn is_empty(&self) -> Result<bool, IsEmptyError> {
-        cmif::is_empty(self.0.session)
+        cmif::is_empty(self.0.handle())
     }
 
     /// Gets whether the image database is full.
     #[inline]
     pub fn is_full(&self) -> Result<bool, IsFullError> {
-        cmif::is_full(self.0.session)
+        cmif::is_full(self.0.handle())
     }
 
     /// Gets the image attribute at the specified index.
     #[inline]
     pub fn get_attribute(&self, index: i32) -> Result<MiiimgImageAttribute, GetAttributeError> {
-        cmif::get_attribute(self.0.session, index)
+        cmif::get_attribute(self.0.handle(), index)
     }
 
     /// Loads the image data (raw RGBA8) for the specified image ID.
@@ -100,7 +94,7 @@ impl MiiimgService {
     /// The optimal buffer size is `0x40000` (256 KiB).
     #[inline]
     pub fn load_image(&self, id: MiiimgImageId, dst: &mut [u8]) -> Result<(), LoadImageError> {
-        cmif::load_image(self.0.session, id, dst)
+        cmif::load_image(self.0.handle(), id, dst)
     }
 }
 
@@ -110,12 +104,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<MiiimgService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(MiiimgService(service))
 }
