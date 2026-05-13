@@ -27,14 +27,11 @@ pub(crate) fn set_process_handle_legacy(
     service: &Session,
     proc_handle: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `proc_handle` is valid until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SET_PROCESS_HANDLE_LEGACY)
-            .in_handle(proc_handle)
-            .send()
-            .map(|_| ())
-    }
+    service
+        .dispatch(proto::SET_PROCESS_HANDLE_LEGACY)
+        .in_handle(proc_handle)
+        .send()
+        .map(|_| ())
 }
 
 /// BindDevice (11.0.0+, cmd 0). Takes complex_id and process handle inline.
@@ -79,24 +76,21 @@ pub(crate) fn get_ds_interface_legacy(
     descriptor: &[u8],
     interface_name: &[u8],
 ) -> Result<(u32, u8), GetInterfaceError> {
-    // SAFETY: buffers live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_DS_INTERFACE_LEGACY)
-            .buffer(
-                descriptor.as_ptr().cast_mut(),
-                descriptor.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                interface_name.as_ptr().cast_mut(),
-                interface_name.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(GetInterfaceError::Dispatch)?
-    };
+    let result = service
+        .dispatch(proto::GET_DS_INTERFACE_LEGACY)
+        .buffer(
+            descriptor.as_ptr().cast_mut(),
+            descriptor.len(),
+            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .buffer(
+            interface_name.as_ptr().cast_mut(),
+            interface_name.len(),
+            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(GetInterfaceError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(GetInterfaceError::MissingHandle);
@@ -130,18 +124,15 @@ pub(crate) fn register_interface(
 
 /// SetVidPidBcd (pre-5.0.0, cmd 5). Input buffer.
 pub(crate) fn set_vid_pid_bcd(service: &Session, deviceinfo: &[u8]) -> Result<(), DispatchError> {
-    // SAFETY: buffer lives until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SET_VID_PID_BCD)
-            .buffer(
-                deviceinfo.as_ptr().cast_mut(),
-                deviceinfo.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    service
+        .dispatch(proto::SET_VID_PID_BCD)
+        .buffer(
+            deviceinfo.as_ptr().cast_mut(),
+            deviceinfo.len(),
+            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// ClearDeviceData (5.0.0+).
@@ -155,20 +146,17 @@ pub(crate) fn add_usb_string_descriptor(
     cmd_id: u32,
     descriptor: &UsbStringDescriptor,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `descriptor` lives until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .buffer(
-                (descriptor as *const UsbStringDescriptor)
-                    .cast::<u8>()
-                    .cast_mut(),
-                size_of::<UsbStringDescriptor>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u8>())
-            .send()?
-    };
+    let result = service
+        .dispatch(cmd_id)
+        .buffer(
+            (descriptor as *const UsbStringDescriptor)
+                .cast::<u8>()
+                .cast_mut(),
+            size_of::<UsbStringDescriptor>(),
+            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .out_size(size_of::<u8>())
+        .send()?;
 
     Ok(result.data[0])
 }
@@ -210,18 +198,15 @@ pub(crate) fn set_binary_object_store(
     cmd_id: u32,
     bos: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: buffer lives until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .buffer(
-                bos.as_ptr().cast_mut(),
-                bos.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    service
+        .dispatch(cmd_id)
+        .buffer(
+            bos.as_ptr().cast_mut(),
+            bos.len(),
+            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// Enable.
@@ -253,18 +238,15 @@ pub(crate) fn intf_get_setup_packet(
     service: &Session,
     buffer: &mut [u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: buffer lives until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::INTF_GET_SETUP_PACKET)
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    service
+        .dispatch(proto::INTF_GET_SETUP_PACKET)
+        .buffer(
+            buffer.as_mut_ptr(),
+            buffer.len(),
+            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// EnableInterface (pre-11.0.0).
@@ -310,19 +292,16 @@ pub(crate) fn intf_get_ds_endpoint(
     service: &Session,
     descriptor: &[u8],
 ) -> Result<u32, RegisterEndpointError> {
-    // SAFETY: buffer lives until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::INTF_REGISTER_ENDPOINT)
-            .buffer(
-                descriptor.as_ptr().cast_mut(),
-                descriptor.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(RegisterEndpointError::Dispatch)?
-    };
+    let result = service
+        .dispatch(proto::INTF_REGISTER_ENDPOINT)
+        .buffer(
+            descriptor.as_ptr().cast_mut(),
+            descriptor.len(),
+            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(RegisterEndpointError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(RegisterEndpointError::MissingHandle);
