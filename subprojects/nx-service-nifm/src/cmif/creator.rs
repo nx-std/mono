@@ -1,7 +1,7 @@
 //! `nifm:u` / `nifm:s` / `nifm:a` static-service commands — used to spawn the
 //! `IGeneralService` sub-object on the converted-to-domain creator session.
 
-use core::mem::size_of;
+use core::mem::{ManuallyDrop, size_of};
 
 use nx_sf::service::{DispatchError, Domain};
 
@@ -9,29 +9,33 @@ use crate::proto::{CMD_CREATE_GENERAL_SERVICE, CMD_CREATE_GENERAL_SERVICE_OLD};
 
 /// `CreateGeneralServiceOld` (cmd 4, pre-`[3.0.0]`): no `send_pid`, no payload.
 ///
-/// Returns the raw domain sub-object id assigned by the server.
+/// Returns the raw domain sub-object id assigned by the server. The freshly
+/// minted `DomainObject` is kept alive via [`ManuallyDrop`] so the pool can
+/// re-open it per request.
 pub(crate) fn create_general_service_old(
     creator: &Domain,
 ) -> Result<u32, CreateGeneralServiceError> {
-    let result = creator
+    let mut result = creator
         .dispatch(CMD_CREATE_GENERAL_SERVICE_OLD)
         .out_objects(1)
         .send()
         .map_err(CreateGeneralServiceError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(CreateGeneralServiceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateGeneralServiceError::MissingObject)?;
+    Ok(ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// `CreateGeneralService` (cmd 5, `[3.0.0+]`): `send_pid` + `u64 reserved = 0`.
 ///
-/// Returns the raw domain sub-object id assigned by the server.
+/// Returns the raw domain sub-object id assigned by the server. The freshly
+/// minted `DomainObject` is kept alive via [`ManuallyDrop`] so the pool can
+/// re-open it per request.
 pub(crate) fn create_general_service(creator: &Domain) -> Result<u32, CreateGeneralServiceError> {
     let reserved: u64 = 0;
     // SAFETY: `reserved` lives on the stack until `send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         creator
             .dispatch(CMD_CREATE_GENERAL_SERVICE)
             .send_pid()
@@ -41,10 +45,10 @@ pub(crate) fn create_general_service(creator: &Domain) -> Result<u32, CreateGene
             .map_err(CreateGeneralServiceError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(CreateGeneralServiceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateGeneralServiceError::MissingObject)?;
+    Ok(ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Error returned by [`create_general_service`] / [`create_general_service_old`].

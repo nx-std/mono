@@ -160,9 +160,9 @@ impl NifmService {
         // Open the new IRequest as a borrowed domain object, then fetch its
         // two events. Dropping `object` on the error path sends the per-object
         // close request so we don't leak the sub-object.
-        let object = self
-            .creator
-            .open_object_raw(raw_object_id)
+        // SAFETY: `raw_object_id` was just returned by `cmif::create_request`
+        // on this same creator domain; no other `DomainObject` references it.
+        let object = unsafe { self.creator.open_object_raw(raw_object_id) }
             .ok_or(CreateRequestSurfaceError::MissingObject)?;
         let (event_request_state, event1) = request::get_system_event_readable_handles(&object)
             .map_err(CreateRequestSurfaceError::GetEvents)?;
@@ -308,9 +308,11 @@ impl NifmService {
         E: core::fmt::Debug + core::fmt::Display,
     {
         let id = self.igs_object_id.ok_or(NotOpenedOr::NotOpened)?;
+        // SAFETY: `id` was returned by `create_general_service*` on this same
+        // creator domain; the `ManuallyDrop` wrapper is the only live
+        // `DomainObject` for this id at a time.
         let object = ManuallyDrop::new(
-            self.creator
-                .open_object_raw(id)
+            unsafe { self.creator.open_object_raw(id) }
                 .expect("IGS sub-object id is non-zero once stored"),
         );
         f(&object).map_err(NotOpenedOr::Inner)

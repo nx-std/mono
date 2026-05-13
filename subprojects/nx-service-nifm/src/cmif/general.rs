@@ -56,11 +56,13 @@ pub(crate) fn get_client_id(object: &DomainObject<'_>) -> Result<NifmClientId, D
 //
 
 /// `CreateRequest` (cmd 4). Server-side `s32 = 0x2` selector; returns the
-/// newly-allocated domain sub-object id for the `IRequest`.
+/// newly-allocated domain sub-object id for the `IRequest`. The freshly
+/// minted `DomainObject` is kept alive via [`ManuallyDrop`] so the pool can
+/// re-open it per request.
 pub(crate) fn create_request(object: &DomainObject<'_>) -> Result<u32, CreateRequestError> {
     let selector: i32 = 0x2;
     // SAFETY: `selector` lives on the stack until `send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         object
             .dispatch(CMD_IGS_CREATE_REQUEST)
             .in_raw((&raw const selector).cast::<u8>(), size_of::<i32>())
@@ -69,10 +71,12 @@ pub(crate) fn create_request(object: &DomainObject<'_>) -> Result<u32, CreateReq
             .map_err(CreateRequestError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(CreateRequestError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let new_object = result
+        .take_object(0)
+        .ok_or(CreateRequestError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(new_object)
+        .object_id()
+        .to_raw())
 }
 
 /// Error returned by [`create_request`].
