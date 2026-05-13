@@ -50,11 +50,7 @@ unsafe impl Sync for CapmtpService {}
 impl CapmtpService {
     /// Opens a session sub-object.
     pub fn open_session(&self) -> Result<CapmtpSession<'_>, OpenSessionError> {
-        let raw_object_id = cmif::open_session(&self.domain)?;
-        let object = self
-            .domain
-            .open_object_raw(raw_object_id)
-            .ok_or(OpenSessionError::MissingObject)?;
+        let object = cmif::open_session(&self.domain)?;
         Ok(CapmtpSession { object })
     }
 }

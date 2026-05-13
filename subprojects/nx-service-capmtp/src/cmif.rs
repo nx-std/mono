@@ -11,19 +11,14 @@ use crate::{
 };
 
 /// Opens a session sub-object on the root domain service.
-///
-/// Returns the raw sub-object ID for the new session domain object.
-pub(crate) fn open_session(domain: &Domain) -> Result<u32, OpenSessionError> {
-    let result = domain
+pub(crate) fn open_session<'d>(domain: &'d Domain) -> Result<DomainObject<'d>, OpenSessionError> {
+    let mut result = domain
         .dispatch(proto::OPEN_SESSION)
         .out_objects(1)
         .send()
         .map_err(OpenSessionError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(OpenSessionError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result.take_object(0).ok_or(OpenSessionError::MissingObject)
 }
 
 /// Opens the MTP session with transfer memory, folder/image/video limits,
