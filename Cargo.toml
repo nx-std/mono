@@ -27,6 +27,7 @@ members = [
     "subprojects/nx-service-capmtp",
     "subprojects/nx-service-caps",
     "subprojects/nx-service-capsa",
+    "subprojects/nx-service-capsc",
     "subprojects/nx-service-capsdc",
     "subprojects/nx-service-capssc",
     "subprojects/nx-service-capssu",
