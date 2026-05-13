@@ -406,6 +406,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-gpio"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-hid"
 version = "0.1.0"
 dependencies = [
@@ -522,6 +534,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-mii"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-miiimg"
 version = "0.1.0"
 dependencies = [
@@ -600,6 +626,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-ovln"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-pctl"
 version = "0.1.0"
 dependencies = [
@@ -609,6 +648,18 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-pl"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
  "thiserror",
 ]
 
