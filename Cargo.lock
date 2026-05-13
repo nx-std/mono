@@ -93,6 +93,21 @@ name = "nx-panic-handler"
 version = "0.1.0"
 
 [[package]]
+name = "nx-pm"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "nx-panic-handler",
+ "nx-service-pm",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-rand"
 version = "0.1.0"
 dependencies = [
@@ -1191,6 +1206,7 @@ dependencies = [
  "nx-alloc",
  "nx-display",
  "nx-panic-handler",
+ "nx-pm",
  "nx-rand",
  "nx-rt",
  "nx-service-apm",

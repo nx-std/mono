@@ -3,32 +3,39 @@
 use core::mem::size_of;
 
 use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use static_assertions::const_assert_eq;
 
-use crate::{
+use super::{
     dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
-    proto,
-    types::{
-        LaunchProgramIn, NcmProgramLocation, PmBootMode, PmProcessEventInfo, PmResourceLimitValues,
-    },
+    pm_bm::{BootMode, proto as bm_proto},
+    pm_dmnt::proto as dmnt_proto,
+    pm_info::{ResourceLimitValues, proto as info_proto},
+    pm_shell::{NcmProgramLocation, ProcessEventInfo, proto as shell_proto},
+    types::{ProcessId, ProgramId},
 };
 
-// ---------------------------------------------------------------------------
-// pm:bm commands
-// ---------------------------------------------------------------------------
+/// Input for `pm:shell` `LaunchProgram`.
+///
+/// Wire layout: `{ u32 launch_flags, u32 pad, NcmProgramLocation }`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct LaunchProgramIn {
+    launch_flags: u32,
+    pad: u32,
+    location: NcmProgramLocation,
+}
+
+const_assert_eq!(size_of::<LaunchProgramIn>(), 0x18);
 
 /// Gets the current boot mode.
-pub(crate) fn get_boot_mode(service: &Session) -> Result<PmBootMode, DispatchError> {
-    dispatch_out(service, proto::BM_GET_BOOT_MODE)
+pub(crate) fn get_boot_mode(service: &Session) -> Result<BootMode, DispatchError> {
+    dispatch_out(service, bm_proto::GET_BOOT_MODE)
 }
 
 /// Sets boot mode to maintenance.
 pub(crate) fn set_maintenance_boot(service: &Session) -> Result<(), DispatchError> {
-    dispatch_no_io(service, proto::BM_SET_MAINTENANCE_BOOT)
+    dispatch_no_io(service, bm_proto::SET_MAINTENANCE_BOOT)
 }
-
-// ---------------------------------------------------------------------------
-// pm:dmnt commands (5.0.0+)
-// ---------------------------------------------------------------------------
 
 /// Gets the JIT debug process ID list.
 ///
@@ -36,7 +43,7 @@ pub(crate) fn set_maintenance_boot(service: &Session) -> Result<(), DispatchErro
 pub(crate) fn get_jit_debug_process_id_list(
     service: &Session,
     cmd_id: u32,
-    out_pids: &mut [u64],
+    out_pids: &mut [ProcessId],
 ) -> Result<u32, DispatchError> {
     let result = service
         .dispatch(cmd_id)
@@ -53,7 +60,11 @@ pub(crate) fn get_jit_debug_process_id_list(
 }
 
 /// Starts a process by PID.
-pub(crate) fn start_process(service: &Session, cmd_id: u32, pid: u64) -> Result<(), DispatchError> {
+pub(crate) fn start_process(
+    service: &Session,
+    cmd_id: u32,
+    pid: ProcessId,
+) -> Result<(), DispatchError> {
     dispatch_in(service, cmd_id, pid)
 }
 
@@ -61,8 +72,8 @@ pub(crate) fn start_process(service: &Session, cmd_id: u32, pid: u64) -> Result<
 pub(crate) fn get_process_id(
     service: &Session,
     cmd_id: u32,
-    program_id: u64,
-) -> Result<u64, DispatchError> {
+    program_id: ProgramId,
+) -> Result<ProcessId, DispatchError> {
     dispatch_in_out(service, cmd_id, program_id)
 }
 
@@ -72,13 +83,13 @@ pub(crate) fn get_process_id(
 pub(crate) fn hook_to_create_process(
     service: &Session,
     cmd_id: u32,
-    program_id: u64,
+    program_id: ProgramId,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `program_id` lives on the stack until `.send()` returns.
     let result = unsafe {
         service
             .dispatch(cmd_id)
-            .in_raw((&raw const program_id).cast::<u8>(), size_of::<u64>())
+            .in_raw((&raw const program_id).cast::<u8>(), size_of::<ProgramId>())
             .out_handle(0, OutHandleAttr::Copy)
             .send()?
     };
@@ -90,7 +101,7 @@ pub(crate) fn hook_to_create_process(
 pub(crate) fn get_application_process_id(
     service: &Session,
     cmd_id: u32,
-) -> Result<u64, DispatchError> {
+) -> Result<ProcessId, DispatchError> {
     dispatch_out(service, cmd_id)
 }
 
@@ -109,45 +120,51 @@ pub(crate) fn hook_to_create_application_process(
     Ok(result.copy_handles[0])
 }
 
-/// Clears a hook (`[6.0.0+]`).
+/// Clears a hook.
+///
+/// `[6.0.0+]`
 pub(crate) fn clear_hook(service: &Session, which: u32) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::DMNT_CLEAR_HOOK, which)
+    dispatch_in(service, dmnt_proto::CLEAR_HOOK, which)
 }
-
-/// Gets a program ID from a PID (`[14.0.0+/Atmosphere]`).
-pub(crate) fn dmnt_get_program_id(service: &Session, pid: u64) -> Result<u64, DispatchError> {
-    dispatch_in_out(service, proto::DMNT_GET_PROGRAM_ID, pid)
-}
-
-// ---------------------------------------------------------------------------
-// pm:info commands
-// ---------------------------------------------------------------------------
 
 /// Gets a program ID from a PID.
-pub(crate) fn info_get_program_id(service: &Session, pid: u64) -> Result<u64, DispatchError> {
-    dispatch_in_out(service, proto::INFO_GET_PROGRAM_ID, pid)
+///
+/// `[14.0.0+/Atmosphere]`
+pub(crate) fn dmnt_get_program_id(
+    service: &Session,
+    pid: ProcessId,
+) -> Result<ProgramId, DispatchError> {
+    dispatch_in_out(service, dmnt_proto::GET_PROGRAM_ID, pid)
 }
 
-/// Gets applet current resource limit values (`[14.0.0+/Atmosphere]`).
+/// Gets a program ID from a PID.
+pub(crate) fn info_get_program_id(
+    service: &Session,
+    pid: ProcessId,
+) -> Result<ProgramId, DispatchError> {
+    dispatch_in_out(service, info_proto::GET_PROGRAM_ID, pid)
+}
+
+/// Gets applet current resource limit values.
+///
+/// `[14.0.0+/Atmosphere]`
 pub(crate) fn get_applet_current_resource_limit_values(
     service: &Session,
-) -> Result<PmResourceLimitValues, DispatchError> {
+) -> Result<ResourceLimitValues, DispatchError> {
     dispatch_out(
         service,
-        proto::INFO_GET_APPLET_CURRENT_RESOURCE_LIMIT_VALUES,
+        info_proto::GET_APPLET_CURRENT_RESOURCE_LIMIT_VALUES,
     )
 }
 
-/// Gets applet peak resource limit values (`[14.0.0+/Atmosphere]`).
+/// Gets applet peak resource limit values.
+///
+/// `[14.0.0+/Atmosphere]`
 pub(crate) fn get_applet_peak_resource_limit_values(
     service: &Session,
-) -> Result<PmResourceLimitValues, DispatchError> {
-    dispatch_out(service, proto::INFO_GET_APPLET_PEAK_RESOURCE_LIMIT_VALUES)
+) -> Result<ResourceLimitValues, DispatchError> {
+    dispatch_out(service, info_proto::GET_APPLET_PEAK_RESOURCE_LIMIT_VALUES)
 }
-
-// ---------------------------------------------------------------------------
-// pm:shell commands
-// ---------------------------------------------------------------------------
 
 /// Launches a program.
 ///
@@ -157,24 +174,27 @@ pub(crate) fn launch_program(
     service: &Session,
     launch_flags: u32,
     location: &NcmProgramLocation,
-) -> Result<u64, DispatchError> {
+) -> Result<ProcessId, DispatchError> {
     let input = LaunchProgramIn {
         launch_flags,
         pad: 0,
         location: *location,
     };
 
-    dispatch_in_out(service, proto::SHELL_LAUNCH_PROGRAM, input)
+    dispatch_in_out(service, shell_proto::LAUNCH_PROGRAM, input)
 }
 
 /// Terminates a process by PID.
-pub(crate) fn terminate_process(service: &Session, pid: u64) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::SHELL_TERMINATE_PROCESS, pid)
+pub(crate) fn terminate_process(service: &Session, pid: ProcessId) -> Result<(), DispatchError> {
+    dispatch_in(service, shell_proto::TERMINATE_PROCESS, pid)
 }
 
 /// Terminates a program by program ID.
-pub(crate) fn terminate_program(service: &Session, program_id: u64) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::SHELL_TERMINATE_PROGRAM, program_id)
+pub(crate) fn terminate_program(
+    service: &Session,
+    program_id: ProgramId,
+) -> Result<(), DispatchError> {
+    dispatch_in(service, shell_proto::TERMINATE_PROGRAM, program_id)
 }
 
 /// Gets the process event handle.
@@ -182,7 +202,7 @@ pub(crate) fn terminate_program(service: &Session, program_id: u64) -> Result<()
 /// Returns a copy-handle for the event.
 pub(crate) fn get_process_event_handle(service: &Session) -> Result<u32, DispatchError> {
     let result = service
-        .dispatch(proto::SHELL_GET_PROCESS_EVENT_HANDLE)
+        .dispatch(shell_proto::GET_PROCESS_EVENT_HANDLE)
         .out_handle(0, OutHandleAttr::Copy)
         .send()?;
 
@@ -190,20 +210,21 @@ pub(crate) fn get_process_event_handle(service: &Session) -> Result<u32, Dispatc
 }
 
 /// Gets the process event info.
-pub(crate) fn get_process_event_info(
-    service: &Session,
-) -> Result<PmProcessEventInfo, DispatchError> {
-    dispatch_out(service, proto::SHELL_GET_PROCESS_EVENT_INFO)
+pub(crate) fn get_process_event_info(service: &Session) -> Result<ProcessEventInfo, DispatchError> {
+    dispatch_out(service, shell_proto::GET_PROCESS_EVENT_INFO)
 }
 
 /// Cleans up a process (pre-5.0.0 only).
-pub(crate) fn cleanup_process(service: &Session, pid: u64) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::SHELL_CLEANUP_PROCESS_LEGACY, pid)
+pub(crate) fn cleanup_process(service: &Session, pid: ProcessId) -> Result<(), DispatchError> {
+    dispatch_in(service, shell_proto::CLEANUP_PROCESS_LEGACY, pid)
 }
 
 /// Clears JIT debug occurred flag (pre-5.0.0 only).
-pub(crate) fn clear_jit_debug_occurred(service: &Session, pid: u64) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::SHELL_CLEAR_JIT_DEBUG_OCCURRED_LEGACY, pid)
+pub(crate) fn clear_jit_debug_occurred(
+    service: &Session,
+    pid: ProcessId,
+) -> Result<(), DispatchError> {
+    dispatch_in(service, shell_proto::CLEAR_JIT_DEBUG_OCCURRED_LEGACY, pid)
 }
 
 /// Notifies the system that boot has finished.
@@ -215,11 +236,13 @@ pub(crate) fn notify_boot_finished(service: &Session, cmd_id: u32) -> Result<(),
 pub(crate) fn get_application_process_id_for_shell(
     service: &Session,
     cmd_id: u32,
-) -> Result<u64, DispatchError> {
+) -> Result<ProcessId, DispatchError> {
     dispatch_out(service, cmd_id)
 }
 
-/// Boosts system memory resource limit (`[4.0.0+]`).
+/// Boosts system memory resource limit.
+///
+/// `[4.0.0+]`
 pub(crate) fn boost_system_memory_resource_limit(
     service: &Session,
     cmd_id: u32,
@@ -228,25 +251,31 @@ pub(crate) fn boost_system_memory_resource_limit(
     dispatch_in(service, cmd_id, boost_size)
 }
 
-/// Boosts application thread resource limit (`[7.0.0+/Atmosphere]`).
+/// Boosts application thread resource limit.
+///
+/// `[7.0.0+/Atmosphere]`
 pub(crate) fn boost_application_thread_resource_limit(
     service: &Session,
 ) -> Result<(), DispatchError> {
     dispatch_no_io(
         service,
-        proto::SHELL_BOOST_APPLICATION_THREAD_RESOURCE_LIMIT,
+        shell_proto::BOOST_APPLICATION_THREAD_RESOURCE_LIMIT,
     )
 }
 
-/// Boosts system thread resource limit (`[14.0.0+/Atmosphere]`).
+/// Boosts system thread resource limit.
+///
+/// `[14.0.0+/Atmosphere]`
 pub(crate) fn boost_system_thread_resource_limit(service: &Session) -> Result<(), DispatchError> {
-    dispatch_no_io(service, proto::SHELL_BOOST_SYSTEM_THREAD_RESOURCE_LIMIT)
+    dispatch_no_io(service, shell_proto::BOOST_SYSTEM_THREAD_RESOURCE_LIMIT)
 }
 
-/// Gets a process ID from a program ID (`[19.0.0+/Atmosphere]`).
+/// Gets a process ID from a program ID.
+///
+/// `[19.0.0+/Atmosphere]`
 pub(crate) fn shell_get_process_id(
     service: &Session,
-    program_id: u64,
-) -> Result<u64, DispatchError> {
-    dispatch_in_out(service, proto::SHELL_GET_PROCESS_ID, program_id)
+    program_id: ProgramId,
+) -> Result<ProcessId, DispatchError> {
+    dispatch_in_out(service, shell_proto::GET_PROCESS_ID, program_id)
 }

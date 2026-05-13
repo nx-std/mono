@@ -137,3 +137,10 @@ option(
     description : 'Enable the `display` feature (NativeWindow / Framebuffer; pulls `service-vi`)',
     yield : true
 )
+
+option(
+    'use_nx_pm',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `pm` feature (idiomatic Process Manager API)',
+    yield : true
+)

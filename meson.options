@@ -154,6 +154,13 @@ option(
 )
 
 option(
+    'use_nx_pm',
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-pm (idiomatic Process Manager API; implies use_nx_service_pm)',
+    yield : true
+)
+
+option(
     'use_nx_service_nv',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-nv (NVIDIA Driver service)',

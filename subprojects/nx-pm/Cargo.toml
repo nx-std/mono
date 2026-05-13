@@ -1,23 +1,31 @@
 [package]
-name = "nx-service-pm"
+name = "nx-pm"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_service_pm"
+name = "nx_pm"
 crate-type = ["rlib"]
 test = false
 doctest = false
 bench = false
 
 [features]
-# Exposes session accessors on each `Pm*Service` for FFI consumers.
-ffi = []
+# C-FFI surface (`__nx_pm__*` symbols). Required for any libnx `pm.h` override.
+ffi = [
+    "nx-service-pm/ffi",
+    "nx-sf/ffi",
+    "nx-svc/ffi",
+    "nx-std-sync/ffi",
+]
 
 [dependencies]
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-pm = { version = "0.1.0", path = "../nx-service-pm" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
 bitflags = "2"
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }

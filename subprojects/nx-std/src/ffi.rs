@@ -8,6 +8,8 @@
 
 #[cfg(feature = "alloc")]
 pub use nx_alloc::ffi as alloc;
+#[cfg(feature = "pm")]
+pub use nx_pm::ffi as pm;
 #[cfg(feature = "rand")]
 pub use nx_rand::ffi as rand;
 #[cfg(feature = "rt")]

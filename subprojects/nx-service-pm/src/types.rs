@@ -1,102 +1,65 @@
-//! Wire-layout types for the process manager service.
+//! Domain newtypes used by `pm:*` service wrappers.
 
-use core::mem::size_of;
+/// Kernel process identifier (`u64`).
+///
+/// # Invariant
+///
+/// The wrapped value must be a process id assigned by the Horizon kernel —
+/// either returned by a `pm:*` service call (e.g. `LaunchProgram`,
+/// `GetApplicationProcessId`) or otherwise vouched for by the caller as
+/// referring to a live or known kernel process. Arbitrary `u64` values must
+/// not be fabricated into a `ProcessId`; doing so leads to spurious kernel
+/// errors on dispatch and silently confuses any code that pattern-matches on
+/// well-known PIDs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ProcessId(u64);
 
-use static_assertions::const_assert_eq;
+impl ProcessId {
+    /// Wraps a raw kernel-assigned process id without checking the invariant.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure `raw` is a process id returned by the Horizon
+    /// kernel (e.g. via a `pm:*` dispatch) or otherwise known to identify a
+    /// kernel process. See the [type-level invariant](ProcessId).
+    pub const unsafe fn new_unchecked(raw: u64) -> Self {
+        Self(raw)
+    }
 
-bitflags::bitflags! {
-    /// Launch flags for `pm:shell` `LaunchProgram` (`[5.0.0+]`).
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    #[repr(transparent)]
-    pub struct PmLaunchFlag: u32 {
-        const NONE = 0;
-        const SIGNAL_ON_EXIT = 1 << 0;
-        const SIGNAL_ON_START = 1 << 1;
-        const SIGNAL_ON_CRASH = 1 << 2;
-        const SIGNAL_ON_DEBUG = 1 << 3;
-        const START_SUSPENDED = 1 << 4;
-        const DISABLE_ASLR = 1 << 5;
+    /// Returns the underlying `u64`.
+    pub const fn to_u64(&self) -> u64 {
+        self.0
     }
 }
 
-bitflags::bitflags! {
-    /// Launch flags for `pm:shell` `LaunchProgram` (pre-5.0.0).
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    #[repr(transparent)]
-    pub struct PmLaunchFlagOld: u32 {
-        const NONE = 0;
-        const SIGNAL_ON_EXIT = 1 << 0;
-        const START_SUSPENDED = 1 << 1;
-        const SIGNAL_ON_CRASH = 1 << 2;
-        const DISABLE_ASLR = 1 << 3;
-        const SIGNAL_ON_DEBUG = 1 << 4;
-        /// Only available on `[2.0.0+]`.
-        const SIGNAL_ON_START = 1 << 5;
+/// Program identifier (`u64`).
+///
+/// # Invariant
+///
+/// The wrapped value must be a program id sourced from the system — typically
+/// an `NcmProgramLocation`, an NCM/NS lookup, or a `pm:*` response — and not
+/// a fabricated constant. `pm:*` commands dispatched with an invalid program
+/// id surface kernel-level errors that are easy to misdiagnose; constructing
+/// a `ProgramId` from an arbitrary `u64` defeats the type's purpose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ProgramId(u64);
+
+impl ProgramId {
+    /// Wraps a raw program id without checking the invariant.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure `raw` is a program id sourced from a Horizon
+    /// system component (NCM/NS/`pm:*` IPC) rather than fabricated. See the
+    /// [type-level invariant](ProgramId).
+    pub const unsafe fn new_unchecked(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the underlying `u64`.
+    pub const fn to_u64(&self) -> u64 {
+        self.0
     }
 }
-
-/// Process event type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum PmProcessEvent {
-    None = 0,
-    Exit = 1,
-    Start = 2,
-    Crash = 3,
-    DebugStart = 4,
-    DebugBreak = 5,
-}
-
-/// Process event info returned by `pm:shell` `GetProcessEventInfo`.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct PmProcessEventInfo {
-    pub event: PmProcessEvent,
-    pub process_id: u64,
-}
-
-const_assert_eq!(size_of::<PmProcessEventInfo>(), 0x10);
-
-/// Boot mode returned by `pm:bm` `GetBootMode`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum PmBootMode {
-    Normal = 0,
-    Maintenance = 1,
-    SafeMode = 2,
-}
-
-/// Resource limit values returned by `pm:info` `GetApplet*ResourceLimitValues`.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct PmResourceLimitValues {
-    pub physical_memory: u64,
-    pub thread_count: u32,
-    pub event_count: u32,
-    pub transfer_memory_count: u32,
-    pub session_count: u32,
-}
-
-const_assert_eq!(size_of::<PmResourceLimitValues>(), 0x18);
-
-/// Program location identifying a program by ID and storage.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct NcmProgramLocation {
-    pub program_id: u64,
-    pub storage_id: u8,
-    pub pad: [u8; 7],
-}
-
-const_assert_eq!(size_of::<NcmProgramLocation>(), 0x10);
-
-/// Input for `pm:shell` `LaunchProgram`.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(crate) struct LaunchProgramIn {
-    pub launch_flags: u32,
-    pub pad: u32,
-    pub location: NcmProgramLocation,
-}
-
-const_assert_eq!(size_of::<LaunchProgramIn>(), 0x18);

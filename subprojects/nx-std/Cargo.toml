@@ -20,6 +20,7 @@ sys = ["svc", "sys-mem", "sys-sync", "sys-thread-tls"]
 # FFI overrides for libnx functions (only if the dependency is enabled)
 ffi = [
     "nx-alloc?/ffi",
+    "nx-pm?/ffi",
     "nx-rand?/ffi",
     "nx-rt?/ffi",
     "nx-service-sm?/ffi",
@@ -38,6 +39,7 @@ services = ["service-apm", "service-applet", "service-hid", "service-nv", "servi
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 display = ["dep:nx-display", "service-vi"]
+pm = ["dep:nx-pm"]
 rand = ["dep:nx-rand"]
 rt = ["dep:nx-rt"]
 service-apm = ["dep:nx-service-apm", "nx-rt?/service-apm"]
@@ -61,6 +63,7 @@ time = ["dep:nx-time"]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
 nx-display = { version = "0.1.0", path = "../nx-display", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-pm = { version = "0.1.0", path = "../nx-pm", optional = true }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-rt = { version = "0.1.0", path = "../nx-rt", optional = true }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }

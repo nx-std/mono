@@ -228,6 +228,19 @@ if get_option('use_nx_display').enabled()
     deps_cargo_features += ['display']
 endif
 
+# nx-pm
+# `nx-pm` depends on `nx-service-pm` internally; enabling `use_nx_pm` pulls
+# the service crate in transitively via Cargo and Meson's subproject graph.
+if get_option('use_nx_pm').enabled()
+    nx_pm_proj = subproject('nx-pm')
+
+    deps += nx_pm_proj.get_variable('nx_pm_dep')
+    deps_override_link_args += ['-T', nx_pm_proj.get_variable('nx_pm_ld_override')]
+
+    debug('pm feature: enabled')
+    deps_cargo_features += ['pm']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------
