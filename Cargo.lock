@@ -815,6 +815,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-nfc"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "nx-panic-handler",
+ "nx-service-mii",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-nifm"
 version = "0.1.0"
 dependencies = [
