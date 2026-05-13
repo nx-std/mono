@@ -11,7 +11,7 @@
 //! managed by `NX_GENERATE_SERVICE_GUARD`. This crate follows the
 //! convention of the other `nx-service-*` crates: connect once via
 //! [`connect_cmif`], reuse the [`TcService`] across calls, and close
-//! the session explicitly with [`TcService::close`].
+//! the session explicitly with `Drop`.
 //!
 //! libnx gates `tcGetSkinTemperatureMilliC` behind a hosversion
 //! check (`hosversionBefore(5,0,0)`). Per IC-4 this crate is
@@ -23,7 +23,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -39,19 +39,13 @@ pub use self::{
 
 /// Temperature control (`tc`) session wrapper.
 #[repr(transparent)]
-pub struct TcService(Service);
+pub struct TcService(Session);
 
 impl TcService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the temperature control session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 }
 
@@ -60,7 +54,7 @@ impl TcService {
     /// Enables fan control.
     #[inline]
     pub fn enable_fan_control(&self) -> Result<(), EnableFanControlError> {
-        cmif::enable_fan_control(self.0.session)
+        cmif::enable_fan_control(self.0.handle())
     }
 
     /// Disables fan control.
@@ -70,13 +64,13 @@ impl TcService {
     /// Disabling the fan can damage the system.
     #[inline]
     pub fn disable_fan_control(&self) -> Result<(), DisableFanControlError> {
-        cmif::disable_fan_control(self.0.session)
+        cmif::disable_fan_control(self.0.handle())
     }
 
     /// Queries whether fan control is enabled.
     #[inline]
     pub fn is_fan_control_enabled(&self) -> Result<bool, IsFanControlEnabledError> {
-        cmif::is_fan_control_enabled(self.0.session)
+        cmif::is_fan_control_enabled(self.0.handle())
     }
 
     /// Gets the skin temperature in milli-degrees Celsius.
@@ -85,7 +79,7 @@ impl TcService {
     /// version before calling this method.
     #[inline]
     pub fn get_skin_temperature_milli_c(&self) -> Result<i32, GetSkinTemperatureMilliCError> {
-        cmif::get_skin_temperature_milli_c(self.0.session)
+        cmif::get_skin_temperature_milli_c(self.0.handle())
     }
 }
 
@@ -95,12 +89,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<TcService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(TcService(service))
 }
