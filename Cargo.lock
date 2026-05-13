@@ -163,6 +163,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-aud"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-auddev"
 version = "0.1.0"
 dependencies = [
@@ -177,6 +190,19 @@ dependencies = [
 
 [[package]]
 name = "nx-service-audrec"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-avm"
 version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
@@ -216,12 +242,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-capmtp"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-capsdc"
 version = "0.1.0"
 dependencies = [
  "bitflags",
  "nx-panic-handler",
  "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-capssc"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-service-vi",
  "nx-sf",
  "nx-svc",
  "nx-sys-thread-tls",
@@ -275,6 +328,32 @@ dependencies = [
  "nx-sf",
  "nx-svc",
  "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-fatal"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-fsldr"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
  "thiserror",
 ]
 
@@ -356,6 +435,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-lr"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-miiimg"
 version = "0.1.0"
 dependencies = [
@@ -430,6 +522,31 @@ dependencies = [
  "nx-sf",
  "nx-svc",
  "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-psc"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-ro"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
  "thiserror",
 ]
 
