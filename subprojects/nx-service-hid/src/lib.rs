@@ -20,7 +20,7 @@ use core::ptr::NonNull;
 
 use nx_service_applet::aruid::Aruid;
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 use nx_sys_mem::shmem::{self as sys_shmem, Mapped, Permissions};
 
@@ -42,8 +42,8 @@ pub use self::{
 ///
 /// Provides type safety to distinguish HID sessions from other services.
 pub struct HidService {
-    service: Service,
-    applet_resource: Service,
+    service: Session,
+    applet_resource: Session,
     shmem_ptr: NonNull<HidSharedMemory>,
     _shmem: sys_shmem::SharedMemory<Mapped>,
     aruid: Option<Aruid>,
@@ -64,13 +64,13 @@ impl HidService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.service.session
+        self.service.handle()
     }
 
     /// Returns the IAppletResource session handle.
     #[inline]
     pub fn applet_resource_session(&self) -> SessionHandle {
-        self.applet_resource.session
+        self.applet_resource.handle()
     }
 
     /// Get a reference to the shared memory structure.
@@ -79,17 +79,10 @@ impl HidService {
         unsafe { self.shmem_ptr.as_ref() }
     }
 
-    /// Consumes and closes the HID service session.
-    #[inline]
-    pub fn close(self) {
-        self.service.close();
-        self.applet_resource.close();
-    }
-
     /// Activate Npad (controller) input.
     #[inline]
     pub fn activate_npad(&self) -> Result<(), ActivateNpadError> {
-        cmif::activate_npad(self.service.session, self.aruid)
+        cmif::activate_npad(self.service.handle(), self.aruid)
     }
 
     /// Set supported Npad style set.
@@ -98,7 +91,7 @@ impl HidService {
         &self,
         style_set: u32,
     ) -> Result<(), SetSupportedNpadStyleSetError> {
-        cmif::set_supported_npad_style_set(self.service.session, self.aruid, style_set)
+        cmif::set_supported_npad_style_set(self.service.handle(), self.aruid, style_set)
     }
 
     /// Set supported Npad ID types.
@@ -107,31 +100,31 @@ impl HidService {
         &self,
         ids: &[u32],
     ) -> Result<(), SetSupportedNpadIdTypeError> {
-        cmif::set_supported_npad_id_type(self.service.session, self.aruid, ids)
+        cmif::set_supported_npad_id_type(self.service.handle(), self.aruid, ids)
     }
 
     /// Activate touch screen input.
     #[inline]
     pub fn activate_touch_screen(&self) -> Result<(), ActivateTouchScreenError> {
-        cmif::activate_touch_screen(self.service.session, self.aruid)
+        cmif::activate_touch_screen(self.service.handle(), self.aruid)
     }
 
     /// Activate keyboard input.
     #[inline]
     pub fn activate_keyboard(&self) -> Result<(), ActivateKeyboardError> {
-        cmif::activate_keyboard(self.service.session, self.aruid)
+        cmif::activate_keyboard(self.service.handle(), self.aruid)
     }
 
     /// Activate mouse input.
     #[inline]
     pub fn activate_mouse(&self) -> Result<(), ActivateMouseError> {
-        cmif::activate_mouse(self.service.session, self.aruid)
+        cmif::activate_mouse(self.service.handle(), self.aruid)
     }
 
     /// Activate gesture recognition.
     #[inline]
     pub fn activate_gesture(&self) -> Result<(), ActivateGestureError> {
-        cmif::activate_gesture(self.service.session, self.aruid)
+        cmif::activate_gesture(self.service.handle(), self.aruid)
     }
 }
 
@@ -151,26 +144,16 @@ pub fn connect(sm: &SmService, aruid: Option<Aruid>) -> Result<HidService, Conne
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectError::GetService)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     // Create IAppletResource sub-interface
-    let applet_resource_handle = cmif::create_applet_resource(service.session, aruid)
+    let applet_resource_handle = cmif::create_applet_resource(service.handle(), aruid)
         .map_err(ConnectError::CreateAppletResource)?;
 
-    let applet_resource = Service {
-        session: applet_resource_handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let applet_resource = Session::from_handle(applet_resource_handle, 0);
 
     // Get shared memory handle from IAppletResource
-    let shmem_handle = cmif::get_shared_memory_handle(applet_resource.session)
+    let shmem_handle = cmif::get_shared_memory_handle(applet_resource.handle())
         .map_err(ConnectError::GetSharedMemoryHandle)?;
 
     // Map shared memory (0x40000 bytes, read-only)
