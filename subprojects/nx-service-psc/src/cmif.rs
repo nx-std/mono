@@ -11,19 +11,14 @@ use crate::{
 };
 
 /// Gets a PM module sub-object from the root domain service.
-///
-/// Returns the raw sub-object ID for the new `IPmModule` domain object.
-pub(crate) fn get_pm_module(domain: &Domain) -> Result<u32, GetPmModuleError> {
-    let result = domain
+pub(crate) fn get_pm_module<'d>(domain: &'d Domain) -> Result<DomainObject<'d>, GetPmModuleError> {
+    let mut result = domain
         .dispatch(proto::GET_PM_MODULE)
         .out_objects(1)
         .send()
         .map_err(GetPmModuleError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetPmModuleError::MissingObject);
-    }
-    Ok(result.objects[0])
+    result.take_object(0).ok_or(GetPmModuleError::MissingObject)
 }
 
 /// Initializes a PM module sub-object.

@@ -61,11 +61,7 @@ impl PscService {
     /// The returned [`PscPmModule`] must be initialized via
     /// [`PscPmModule::initialize`] before use.
     pub fn get_pm_module(&self) -> Result<PscPmModule<'_>, GetPmModuleError> {
-        let raw_object_id = cmif::get_pm_module(&self.domain)?;
-        let object = self
-            .domain
-            .open_object_raw(raw_object_id)
-            .ok_or(GetPmModuleError::MissingObject)?;
+        let object = cmif::get_pm_module(&self.domain)?;
         Ok(PscPmModule { object })
     }
 }
