@@ -6,7 +6,9 @@
 
 pub use nx_service_sm::ConnectError;
 use nx_service_sm::SmService;
-use nx_sf::{ServiceName, ffi::Service};
+use nx_sf::ServiceName;
+#[cfg(feature = "ffi")]
+use nx_sf::ffi::Service;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 use nx_svc::ipc::Handle as SessionHandle;
 
@@ -91,6 +93,7 @@ pub fn exit() {
 /// If an override exists for this service name, returns a Service
 /// with the override handle (not owned). Otherwise, connects to SM
 /// to get the service handle.
+#[cfg(feature = "ffi")]
 pub fn get_service(name: ServiceName) -> Result<Service, GetServiceError> {
     // Check for override first
     if let Some(handle) = get_override(name) {
