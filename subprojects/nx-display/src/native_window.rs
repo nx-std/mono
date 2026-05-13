@@ -19,7 +19,7 @@ use nx_service_vi::{
         SetPreallocatedBufferError,
     },
 };
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::raw::Handle as RawHandle;
 
 /// Maximum number of slots a single IGBP queue can hold (Android-side limit).
@@ -62,7 +62,7 @@ struct Inner {
     bq: Binder,
     /// IHOSBinderDriverRelay session pointer. Borrowed for the window's
     /// lifetime; the caller owns it (typically the runtime's `ViService`).
-    relay: *const Service,
+    relay: *const Session,
     /// VSync / fence event handle returned by `binderGetNativeHandle(0x0f)`.
     /// libnx wraps this in an `Event`; we keep the raw handle here and let
     /// callers wrap it with their preferred event abstraction.
@@ -111,7 +111,7 @@ impl NativeWindow {
     /// (typically the runtime's `ViService`). It must outlive the
     /// `NativeWindow`.
     pub fn create(
-        relay: &Service,
+        relay: &Session,
         binder_id: BinderObjectId,
         producer_controlled_by_app: bool,
     ) -> Result<Self, NativeWindowError> {
@@ -125,7 +125,7 @@ impl NativeWindow {
 
         let mut inner = Inner {
             bq,
-            relay: relay as *const Service,
+            relay: relay as *const Session,
             event,
             is_connected: false,
             slots_configured: 0,
