@@ -84,6 +84,7 @@ members = [
     "subprojects/nx-service-time",
     "subprojects/nx-service-ts",
     "subprojects/nx-service-uart",
+    "subprojects/nx-service-usbds",
     "subprojects/nx-service-vi",
     "subprojects/nx-service-wlaninf",
     "subprojects/nx-sf",
