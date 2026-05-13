@@ -16,7 +16,7 @@ use nx_svc::ipc::Handle as SessionHandle;
 
 use super::{
     control::{self, CloneObjectError, CopyFromDomainError},
-    dispatch::Dispatch,
+    dispatch::DomainDispatch,
     session::Session,
 };
 use crate::cmif::ObjectId;
@@ -64,31 +64,53 @@ impl Domain {
     }
 
     /// Borrows the domain to address a named object inside it. No IPC is
-    /// issued — typical use is wrapping an [`ObjectId`] returned in a prior
-    /// dispatch response.
+    /// issued.
+    ///
+    /// Crate-internal: the only legitimate source of fresh
+    /// [`DomainObject`]s is [`DomainDispatch::send`], which calls this once
+    /// per server-emitted [`ObjectId`]. External callers that need a
+    /// [`DomainObject`] from a raw id must use the `unsafe`
+    /// [`open_object_raw`](Self::open_object_raw) escape hatch.
     #[inline]
-    pub fn open_object(&self, object_id: ObjectId) -> DomainObject<'_> {
+    pub(crate) fn open_object(&self, object_id: ObjectId) -> DomainObject<'_> {
         DomainObject {
             domain: self,
             object_id,
         }
     }
 
-    /// Like [`open_object`](Self::open_object) but takes the raw object id
-    /// returned by the server in a dispatch response. Returns `None` if the
+    /// Wraps a raw object id into a [`DomainObject`]. Returns `None` if the
     /// raw value is the sentinel zero (no object).
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `raw_object_id` corresponds to a
+    /// server-side object inside this [`Domain`] that **no other live
+    /// `DomainObject<'_>` already references**. Constructing a second
+    /// [`DomainObject`] for the same id would double-close on Drop. Passing
+    /// the id of a previously-dropped `DomainObject` is also unsound — the
+    /// server may have reused the id for a different object.
+    ///
+    /// The safe alternative is to obtain [`DomainObject`]s from
+    /// [`DomainDispatch::send`], which guarantees each server-emitted
+    /// [`ObjectId`] becomes exactly one [`DomainObject`].
     #[inline]
-    pub fn open_object_raw(&self, raw_object_id: u32) -> Option<DomainObject<'_>> {
+    pub unsafe fn open_object_raw(&self, raw_object_id: u32) -> Option<DomainObject<'_>> {
         ObjectId::new(raw_object_id).map(|object_id| self.open_object(object_id))
     }
 
     /// Extracts a domain object into a standalone non-domain [`Session`] via
     /// CMIF control request 1.
+    ///
+    /// Takes `&DomainObject` (rather than a raw [`ObjectId`]) so the caller
+    /// must hold a live, unique handle to the object — preventing a raw id
+    /// from a dropped or aliased `DomainObject` from being laundered into a
+    /// new [`Session`].
     pub fn copy_object_to_session(
         &self,
-        object_id: ObjectId,
+        object: &DomainObject<'_>,
     ) -> Result<Session, CopyFromDomainError> {
-        let new_handle = control::copy_from_current_domain(self.handle, object_id)?;
+        let new_handle = control::copy_from_current_domain(self.handle, object.object_id)?;
         Ok(Session::from_handle(new_handle, self.pointer_buffer_size))
     }
 
@@ -99,12 +121,18 @@ impl Domain {
         Ok(Session::from_handle(new_handle, self.pointer_buffer_size))
     }
 
-    /// Starts a [`Dispatch`] builder addressing the domain root itself.
-    /// Domain-object requests should go through
+    /// Starts a [`DomainDispatch`] builder addressing the domain root
+    /// itself. Domain-object requests should go through
     /// [`DomainObject::dispatch`] instead.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> Dispatch<'_> {
-        Dispatch::new(self.handle, self.pointer_buffer_size, None, request_id)
+    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'_> {
+        DomainDispatch::new(
+            self,
+            self.handle,
+            self.pointer_buffer_size,
+            None,
+            request_id,
+        )
     }
 }
 
@@ -138,10 +166,11 @@ impl<'d> DomainObject<'d> {
         self.domain
     }
 
-    /// Starts a [`Dispatch`] builder addressing this domain object.
+    /// Starts a [`DomainDispatch`] builder addressing this domain object.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> Dispatch<'_> {
-        Dispatch::new(
+    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
+        DomainDispatch::new(
+            self.domain,
             self.domain.handle,
             self.domain.pointer_buffer_size,
             Some(self.object_id),

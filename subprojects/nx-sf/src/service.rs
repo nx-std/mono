@@ -29,8 +29,9 @@ pub use self::{
         convert_current_object_to_domain, copy_from_current_domain, query_pointer_buffer_size,
     },
     dispatch::{
-        Buffer, BufferAttr, Dispatch, DispatchError, DispatchResult, MAX_BUFFERS, MAX_IN_HANDLES,
-        MAX_IN_OBJECTS, OutHandleAttr,
+        Buffer, BufferAttr, Dispatch, DispatchError, DispatchResult, DomainDispatch,
+        DomainDispatchResult, MAX_BUFFERS, MAX_IN_HANDLES, MAX_IN_OBJECTS, MAX_OUT_OBJECTS,
+        OutHandleAttr,
     },
     domain::{Domain, DomainObject},
     override_service::OverrideService,

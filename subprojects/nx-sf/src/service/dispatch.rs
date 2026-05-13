@@ -1,20 +1,34 @@
-//! Fluent builder for dispatching CMIF requests.
+//! Fluent builders for dispatching CMIF requests.
 //!
-//! [`Dispatch`] is parameterized on the three primitives a request actually
-//! needs: the session handle, the server's pointer-buffer size, and an
-//! optional domain object id. The four typed wrappers ([`Session`],
-//! [`Domain`], [`DomainObject`], [`OverrideService`]) each produce a
-//! `Dispatch` via their inherent `dispatch(...)` method.
+//! Two builder types match the operating mode of their originating wrapper:
+//!
+//! - [`Dispatch`] — produced by [`Session::dispatch`] and
+//!   [`OverrideService::dispatch`]. Non-domain mode: the response cannot carry
+//!   output domain objects, so there is no `out_objects` builder method and
+//!   [`DispatchResult`] does not carry an `objects` field.
+//! - [`DomainDispatch`] — produced by [`Domain::dispatch`] and
+//!   [`DomainObject::dispatch`]. Domain mode: exposes [`out_objects`] and the
+//!   resulting [`DomainDispatchResult`] hands back ready-to-use
+//!   [`DomainObject`] instances, each constructed exactly once per dispatch
+//!   from the server-emitted [`ObjectId`]s. This is the only safe path to
+//!   obtain a [`DomainObject`] from outside the crate, which makes duplicate
+//!   `DomainObject`s for the same id unrepresentable in safe code.
 //!
 //! [`Session`]: super::Session
 //! [`Domain`]: super::Domain
 //! [`DomainObject`]: super::DomainObject
 //! [`OverrideService`]: super::OverrideService
+//! [`Session::dispatch`]: super::Session::dispatch
+//! [`Domain::dispatch`]: super::Domain::dispatch
+//! [`DomainObject::dispatch`]: super::DomainObject::dispatch
+//! [`OverrideService::dispatch`]: super::OverrideService::dispatch
+//! [`out_objects`]: DomainDispatch::out_objects
 
 use core::ptr;
 
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
+use super::domain::{Domain, DomainObject};
 use crate::{
     cmif::{self, ObjectId},
     hipc,
@@ -28,6 +42,9 @@ pub const MAX_IN_OBJECTS: usize = 8;
 
 /// Maximum number of input handles in a single dispatch.
 pub const MAX_IN_HANDLES: usize = 8;
+
+/// Maximum number of output domain objects in a single dispatch.
+pub const MAX_OUT_OBJECTS: usize = 8;
 
 /// Buffer attribute flags for service dispatch.
 #[derive(Debug, Clone, Copy, Default)]
@@ -203,13 +220,6 @@ impl<'a> Dispatch<'a> {
         self
     }
 
-    /// Sets the number of output objects expected.
-    #[inline]
-    pub fn out_objects(mut self, count: usize) -> Self {
-        self.out_object_count = count;
-        self
-    }
-
     /// Sets an output handle attribute at the given index. Out-of-range
     /// indices are silently ignored.
     #[inline]
@@ -232,6 +242,20 @@ impl<'a> Dispatch<'a> {
     /// The returned [`DispatchResult`] borrows from the per-thread IPC TLS
     /// buffer; it is valid until the next IPC call on this thread.
     pub fn send(self) -> Result<DispatchResult<'static>, DispatchError> {
+        let resp = self.send_response()?;
+        Ok(DispatchResult {
+            data: resp.data,
+            copy_handles: resp.copy_handles,
+            move_handles: resp.move_handles,
+        })
+    }
+
+    /// Sends the dispatch request and returns the raw CMIF response.
+    ///
+    /// Crate-internal: used by [`Dispatch::send`] for the non-domain path and
+    /// by [`DomainDispatch::send`] to wrap the response's raw object ids into
+    /// [`DomainObject`] instances before exposing them to callers.
+    pub(crate) fn send_response(self) -> Result<cmif::Response<'static>, DispatchError> {
         let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
         let is_domain = self.object_id.is_some();
@@ -342,12 +366,7 @@ impl<'a> Dispatch<'a> {
         let resp = unsafe { cmif::parse_response(ipc_buf, is_domain, self.out_data_size) }
             .map_err(DispatchError::ParseResponse)?;
 
-        Ok(DispatchResult {
-            data: resp.data,
-            objects: resp.objects,
-            copy_handles: resp.copy_handles,
-            move_handles: resp.move_handles,
-        })
+        Ok(resp)
     }
 }
 
@@ -362,17 +381,208 @@ pub enum DispatchError {
     ParseResponse(#[source] cmif::ParseResponseError),
 }
 
-/// Result of a successful dispatch operation.
+/// Result of a successful non-domain dispatch operation.
+///
+/// Non-domain sessions cannot receive output domain objects, so this type
+/// carries no `objects` field. Domain dispatches use
+/// [`DomainDispatchResult`] instead.
 #[derive(Debug)]
 pub struct DispatchResult<'a> {
     /// Response payload data.
     pub data: &'a [u8],
-    /// Returned domain object IDs (domain mode only).
-    pub objects: &'a [u32],
     /// Returned copy handles.
     pub copy_handles: &'a [u32],
     /// Returned move handles.
     pub move_handles: &'a [u32],
+}
+
+/// Builder for dispatching a single CMIF request in domain mode.
+///
+/// Wraps a [`Dispatch`] together with a borrow of the parent [`Domain`].
+/// The borrow lets [`send`](Self::send) construct [`DomainObject<'d>`]
+/// instances from the server-emitted object ids in the response, so the
+/// caller never has to launder raw `u32` ids back through an unsafe
+/// constructor.
+#[derive(Debug)]
+pub struct DomainDispatch<'d> {
+    inner: Dispatch<'d>,
+    domain: &'d Domain,
+}
+
+impl<'d> DomainDispatch<'d> {
+    /// Creates a new domain-dispatch builder. Used by the typed wrappers.
+    #[inline]
+    pub(crate) fn new(
+        domain: &'d Domain,
+        session: SessionHandle,
+        pointer_buffer_size: u16,
+        object_id: Option<ObjectId>,
+        request_id: u32,
+    ) -> Self {
+        Self {
+            inner: Dispatch::new(session, pointer_buffer_size, object_id, request_id),
+            domain,
+        }
+    }
+
+    /// Sets the context token for versioning.
+    #[inline]
+    pub fn context(mut self, context: u32) -> Self {
+        self.inner = self.inner.context(context);
+        self
+    }
+
+    /// Sets the input data for the request.
+    ///
+    /// # Safety
+    ///
+    /// `data` must point to at least `size` readable bytes, and the pointed-to
+    /// memory must remain valid until [`send`](Self::send) returns.
+    #[inline]
+    pub unsafe fn in_raw(mut self, data: *const u8, size: usize) -> Self {
+        // SAFETY: Forwards the caller's contract to `Dispatch::in_raw`.
+        self.inner = unsafe { self.inner.in_raw(data, size) };
+        self
+    }
+
+    /// Sets the expected output data size.
+    #[inline]
+    pub fn out_size(mut self, size: usize) -> Self {
+        self.inner = self.inner.out_size(size);
+        self
+    }
+
+    /// Adds a buffer with the specified attributes. Silently ignored once
+    /// [`MAX_BUFFERS`] slots are full.
+    #[inline]
+    pub fn buffer(mut self, ptr: *const u8, size: usize, attr: BufferAttr) -> Self {
+        self.inner = self.inner.buffer(ptr, size, attr);
+        self
+    }
+
+    /// Adds an input domain object. Silently ignored once
+    /// [`MAX_IN_OBJECTS`] slots are full.
+    #[inline]
+    pub fn in_object(mut self, object_id: ObjectId) -> Self {
+        self.inner = self.inner.in_object(object_id);
+        self
+    }
+
+    /// Adds an input handle. Silently ignored once [`MAX_IN_HANDLES`] slots
+    /// are full.
+    #[inline]
+    pub fn in_handle(mut self, handle: u32) -> Self {
+        self.inner = self.inner.in_handle(handle);
+        self
+    }
+
+    /// Sets the number of output domain objects expected.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `count` exceeds [`MAX_OUT_OBJECTS`]. Requesting more
+    /// objects than the protocol cap is a programming error; silent
+    /// clamping would mask a server-side leak of the unwrapped extras.
+    #[inline]
+    pub fn out_objects(mut self, count: usize) -> Self {
+        assert!(
+            count <= MAX_OUT_OBJECTS,
+            "out_objects: requested count exceeds MAX_OUT_OBJECTS",
+        );
+        self.inner.out_object_count = count;
+        self
+    }
+
+    /// Sets an output handle attribute at the given index. Out-of-range
+    /// indices are silently ignored.
+    #[inline]
+    pub fn out_handle(mut self, index: usize, attr: OutHandleAttr) -> Self {
+        self.inner = self.inner.out_handle(index, attr);
+        self
+    }
+
+    /// Enables sending the process ID alongside the request.
+    #[inline]
+    pub fn send_pid(mut self) -> Self {
+        self.inner = self.inner.send_pid();
+        self
+    }
+
+    /// Sends the dispatch request and parses the response into a
+    /// [`DomainDispatchResult`] holding freshly-constructed
+    /// [`DomainObject<'d>`] instances bound to the originating
+    /// [`Domain`]. Each server-emitted [`ObjectId`] becomes exactly one
+    /// [`DomainObject`].
+    pub fn send(self) -> Result<DomainDispatchResult<'d>, DispatchError> {
+        let domain = self.domain;
+        let resp = self.inner.send_response()?;
+
+        // `resp.objects.len()` is bounded by the server's response, which
+        // honours the request's `out_object_count` (capped at
+        // `MAX_OUT_OBJECTS` by `DomainDispatch::out_objects`). The
+        // `MAX_OUT_OBJECTS` zip bound below is a defensive guard, not a
+        // silent truncation point.
+        let mut objects: [Option<DomainObject<'d>>; MAX_OUT_OBJECTS] =
+            [const { None }; MAX_OUT_OBJECTS];
+        let mut object_count = 0;
+        for (slot, &raw) in objects.iter_mut().zip(resp.objects.iter()) {
+            if let Some(id) = ObjectId::new(raw) {
+                *slot = Some(domain.open_object(id));
+                object_count += 1;
+            }
+        }
+
+        Ok(DomainDispatchResult {
+            data: resp.data,
+            copy_handles: resp.copy_handles,
+            move_handles: resp.move_handles,
+            objects,
+            object_count,
+        })
+    }
+}
+
+/// Result of a successful domain dispatch operation.
+///
+/// Holds up to [`MAX_OUT_OBJECTS`] freshly-issued [`DomainObject<'d>`]s.
+/// The lifetime `'d` ties each `DomainObject` to the parent [`Domain`].
+/// Use [`take_object`](Self::take_object) to claim a specific slot or
+/// [`into_objects`](Self::into_objects) to consume them in order;
+/// objects left in the result at drop time are closed normally.
+#[derive(Debug)]
+pub struct DomainDispatchResult<'d> {
+    /// Response payload data.
+    pub data: &'d [u8],
+    /// Returned copy handles.
+    pub copy_handles: &'d [u32],
+    /// Returned move handles.
+    pub move_handles: &'d [u32],
+    objects: [Option<DomainObject<'d>>; MAX_OUT_OBJECTS],
+    object_count: usize,
+}
+
+impl<'d> DomainDispatchResult<'d> {
+    /// Number of [`DomainObject`]s the server emitted in this response.
+    #[inline]
+    pub fn object_count(&self) -> usize {
+        self.object_count
+    }
+
+    /// Takes the [`DomainObject`] in slot `idx`, leaving `None` behind.
+    /// Returns `None` for empty or already-taken slots and for any
+    /// `idx >= MAX_OUT_OBJECTS`.
+    #[inline]
+    pub fn take_object(&mut self, idx: usize) -> Option<DomainObject<'d>> {
+        self.objects.get_mut(idx).and_then(|slot| slot.take())
+    }
+
+    /// Consumes the result and yields the populated [`DomainObject`]s
+    /// in slot order. Slots already drained via
+    /// [`take_object`](Self::take_object) are skipped.
+    #[inline]
+    pub fn into_objects(self) -> impl Iterator<Item = DomainObject<'d>> + 'd {
+        self.objects.into_iter().flatten()
+    }
 }
 
 /// Tallies the eight CMIF buffer-kind counts from a slice of attribute flags.
