@@ -137,8 +137,10 @@ impl LdnService {
     #[inline]
     fn dispatch_lcs<R>(&self, f: impl FnOnce(&DomainObject<'_>) -> R) -> R {
         let g = self.pool.acquire();
-        let obj = g
-            .open_object_raw(self.lcs_object_id)
+        // SAFETY: `lcs_object_id` was returned by the server within the pool's
+        // domain table; the pool guard makes this slot exclusive, so no other
+        // live `DomainObject` addresses the same id concurrently.
+        let obj = unsafe { g.open_object_raw(self.lcs_object_id) }
             .expect("lcs object id validated at connect_cmif");
         f(&obj)
     }
@@ -152,8 +154,9 @@ impl LdnService {
     ) -> Result<R, IcpmNotOpenedError> {
         let object_id = self.icpm_object_id.ok_or(IcpmNotOpenedError)?;
         let g = self.pool.acquire();
-        let obj = g
-            .open_object_raw(object_id)
+        // SAFETY: `object_id` was returned by the server within the pool's
+        // domain table; the pool guard makes this slot exclusive.
+        let obj = unsafe { g.open_object_raw(object_id) }
             .expect("icpm object id validated at open_client_process_monitor");
         Ok(f(&obj))
     }

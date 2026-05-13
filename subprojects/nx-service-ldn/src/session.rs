@@ -86,9 +86,18 @@ impl<'a> SessionGuard<'a> {
     }
 
     /// Opens a borrowed view onto a sub-object inside the slot's domain.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure `raw_object_id` is a live server-side object
+    /// in this pool slot's [`Domain`] and that no other live `DomainObject`
+    /// addresses the same id concurrently within this slot. The
+    /// [`SessionGuard`] free-mask makes the slot exclusive, so callers that
+    /// only mint one transient object per acquired guard uphold this.
     #[inline]
-    pub(crate) fn open_object_raw(&self, raw_object_id: u32) -> Option<DomainObject<'a>> {
-        self.domain().open_object_raw(raw_object_id)
+    pub(crate) unsafe fn open_object_raw(&self, raw_object_id: u32) -> Option<DomainObject<'a>> {
+        // SAFETY: forwarded to the caller.
+        unsafe { self.domain().open_object_raw(raw_object_id) }
     }
 }
 

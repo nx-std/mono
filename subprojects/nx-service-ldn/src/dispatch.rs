@@ -7,26 +7,82 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{DispatchError, DomainObject, Session};
 
 /// Trait abstracting over the dispatch entry points the LCS / ICPM helpers
 /// use. Implemented for `&Session` (non-domain monitor service) and
 /// `&DomainObject<'_>` (domain sub-objects).
+///
+/// Since `Session::dispatch` and `DomainObject::dispatch` return different
+/// builder types (`Dispatch` vs `DomainDispatch`), the trait exposes
+/// fully-configured CMIF operations rather than the builder itself.
 pub(crate) trait DispatchTarget {
-    fn dispatch(&self, request_id: u32) -> nx_sf::service::Dispatch<'_>;
+    /// Sends `cmd_id` with no input and no output payload.
+    fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError>;
+
+    /// Sends `cmd_id` with `size` bytes of input read from `ptr` and no output.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be valid for `size` bytes for the duration of this call.
+    unsafe fn send_in_raw(
+        &self,
+        cmd_id: u32,
+        ptr: *const u8,
+        size: usize,
+    ) -> Result<(), DispatchError>;
+
+    /// Sends `cmd_id` with no input and reads a single `Copy` output payload.
+    fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError>;
 }
 
 impl DispatchTarget for Session {
     #[inline]
-    fn dispatch(&self, request_id: u32) -> nx_sf::service::Dispatch<'_> {
-        Session::dispatch(self, request_id)
+    fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
+        self.dispatch(cmd_id).send().map(|_| ())
+    }
+
+    #[inline]
+    unsafe fn send_in_raw(
+        &self,
+        cmd_id: u32,
+        ptr: *const u8,
+        size: usize,
+    ) -> Result<(), DispatchError> {
+        // SAFETY: caller upholds the `ptr`/`size` contract.
+        unsafe { self.dispatch(cmd_id).in_raw(ptr, size).send().map(|_| ()) }
+    }
+
+    #[inline]
+    fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError> {
+        let result = self.dispatch(cmd_id).out_size(size_of::<O>()).send()?;
+        // SAFETY: response payload is at least `size_of::<O>()` bytes.
+        Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
     }
 }
 
-impl DispatchTarget for nx_sf::service::DomainObject<'_> {
+impl DispatchTarget for DomainObject<'_> {
     #[inline]
-    fn dispatch(&self, request_id: u32) -> nx_sf::service::Dispatch<'_> {
-        nx_sf::service::DomainObject::dispatch(self, request_id)
+    fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
+        self.dispatch(cmd_id).send().map(|_| ())
+    }
+
+    #[inline]
+    unsafe fn send_in_raw(
+        &self,
+        cmd_id: u32,
+        ptr: *const u8,
+        size: usize,
+    ) -> Result<(), DispatchError> {
+        // SAFETY: caller upholds the `ptr`/`size` contract.
+        unsafe { self.dispatch(cmd_id).in_raw(ptr, size).send().map(|_| ()) }
+    }
+
+    #[inline]
+    fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError> {
+        let result = self.dispatch(cmd_id).out_size(size_of::<O>()).send()?;
+        // SAFETY: response payload is at least `size_of::<O>()` bytes.
+        Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
     }
 }
 
@@ -36,7 +92,7 @@ pub(crate) fn dispatch_no_io(
     target: &(impl DispatchTarget + ?Sized),
     cmd_id: u32,
 ) -> Result<(), DispatchError> {
-    target.dispatch(cmd_id).send().map(|_| ())
+    target.send_no_io(cmd_id)
 }
 
 /// Sends a CMIF request with a single `Copy` input payload and no output.
@@ -46,16 +102,8 @@ pub(crate) fn dispatch_in<I: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` lives on the stack until the `.send()` call returns
-    // because Rust drops it at the end of this function. The dispatcher
-    // memcpys the bytes out before sending.
-    unsafe {
-        target
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` lives on the stack until `send_in_raw` returns.
+    unsafe { target.send_in_raw(cmd_id, (&raw const input).cast::<u8>(), size_of::<I>()) }
 }
 
 /// Sends a CMIF request with no input and reads a single `Copy` output payload.
@@ -64,8 +112,5 @@ pub(crate) fn dispatch_out<O: Copy>(
     target: &(impl DispatchTarget + ?Sized),
     cmd_id: u32,
 ) -> Result<O, DispatchError> {
-    let result = target.dispatch(cmd_id).out_size(size_of::<O>()).send()?;
-    // SAFETY: response payload is at least `size_of::<O>()` bytes by virtue of
-    // `out_size`; CMIF parse_response would have errored otherwise.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    target.read_out(cmd_id)
 }

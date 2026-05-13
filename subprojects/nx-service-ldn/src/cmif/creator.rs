@@ -10,18 +10,21 @@ use crate::proto::{CMD_CREATE_CLIENT_PROCESS_MONITOR, CMD_CREATE_SERVICE};
 /// Invokes `CreateUserLocalCommService` / `CreateSystemLocalCommService`
 /// (cmd 0) on the converted-to-domain `ldn:u`/`ldn:s` creator.
 ///
-/// Returns the raw domain sub-object id assigned by the server.
+/// Returns the raw domain sub-object id assigned by the server. The freshly
+/// minted [`DomainObject`] is wrapped in [`ManuallyDrop`] so the server-side
+/// object outlives this call — callers re-open the id per request via
+/// [`Domain::open_object_raw`].
 pub(crate) fn create_service_domain(creator: &Domain) -> Result<u32, CreateServiceError> {
-    let result = creator
+    let mut result = creator
         .dispatch(CMD_CREATE_SERVICE)
         .out_objects(1)
         .send()
         .map_err(CreateServiceError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(CreateServiceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateServiceError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Invokes `CreateMonitorService` (cmd 0) on the non-domain `ldn:m` creator.
@@ -54,20 +57,22 @@ pub enum CreateServiceError {
 }
 
 /// Invokes `CreateClientProcessMonitor` (cmd 1, `[18.0.0+]`) on the
-/// `ldn:u`/`ldn:s` creator domain. Returns the raw ICPM domain sub-object id.
+/// `ldn:u`/`ldn:s` creator domain. Returns the raw ICPM domain sub-object id;
+/// the [`DomainObject`] is wrapped in [`ManuallyDrop`] so the server-side
+/// object outlives this call.
 pub(crate) fn create_client_process_monitor(
     creator: &Domain,
 ) -> Result<u32, CreateClientProcessMonitorError> {
-    let result = creator
+    let mut result = creator
         .dispatch(CMD_CREATE_CLIENT_PROCESS_MONITOR)
         .out_objects(1)
         .send()
         .map_err(CreateClientProcessMonitorError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(CreateClientProcessMonitorError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateClientProcessMonitorError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Error returned by [`create_client_process_monitor`].
