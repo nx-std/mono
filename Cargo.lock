@@ -717,6 +717,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-pdm"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-pgl"
 version = "0.1.0"
 dependencies = [

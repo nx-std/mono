@@ -53,6 +53,7 @@ members = [
     "subprojects/nx-service-nv",
     "subprojects/nx-service-pctl",
     "subprojects/nx-service-pcv",
+    "subprojects/nx-service-pdm",
     "subprojects/nx-service-pgl",
     "subprojects/nx-service-pl",
     "subprojects/nx-service-pm",
