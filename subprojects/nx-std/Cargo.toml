@@ -31,6 +31,7 @@ ffi = [
     "nx-sys-sync?/ffi",
     "nx-sys-thread-tls?/ffi",
     "nx-time?/ffi",
+    "nx-wlaninf?/ffi",
 ]
 
 # High-level features
@@ -58,6 +59,7 @@ sys-mem = ["dep:nx-sys-mem", "alloc"]
 sys-sync = ["dep:nx-sys-sync"]
 sys-thread-tls = ["dep:nx-sys-thread-tls"]
 time = ["dep:nx-time"]
+wlaninf = ["dep:nx-wlaninf"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
@@ -82,6 +84,7 @@ nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
+nx-wlaninf = { version = "0.1.0", path = "../nx-wlaninf", optional = true }
 
 # Feature-gated, linked via meson for FFI symbol re-export; not `use`d in Rust source.
 [package.metadata.cargo-machete]

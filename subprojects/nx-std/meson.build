@@ -241,6 +241,20 @@ if get_option('use_nx_pm').enabled()
     deps_cargo_features += ['pm']
 endif
 
+# nx-wlaninf
+# `nx-wlaninf` depends on `nx-service-wlaninf` internally; enabling
+# `use_nx_wlaninf` pulls the service crate in transitively via Cargo and
+# Meson's subproject graph.
+if get_option('use_nx_wlaninf').enabled()
+    nx_wlaninf_proj = subproject('nx-wlaninf')
+
+    deps += nx_wlaninf_proj.get_variable('nx_wlaninf_dep')
+    deps_override_link_args += ['-T', nx_wlaninf_proj.get_variable('nx_wlaninf_ld_override')]
+
+    debug('wlaninf feature: enabled')
+    deps_cargo_features += ['wlaninf']
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

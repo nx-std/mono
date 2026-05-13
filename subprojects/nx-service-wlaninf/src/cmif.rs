@@ -26,20 +26,17 @@ pub enum GetStateError {
 
 /// Reads the current [`Rssi`] (cmd 12).
 pub fn get_rssi(session: SessionHandle) -> Result<Rssi, GetRssiError> {
-    let raw = dispatch_no_in_u32(session, CMD_GET_RSSI).map_err(GetRssiError::Dispatch)?;
+    let raw = dispatch_no_in_u32(session, CMD_GET_RSSI).map_err(GetRssiError)?;
     // libnx reinterprets the same 4-byte payload through an `s32*` cast; the
     // service does not zero/extend, so a bitwise reinterpret preserves the
     // wire value.
     Ok(Rssi::from_raw(raw as i32))
 }
 
-/// Error returned by [`get_rssi`].
+/// Error returned by [`get_rssi`]: CMIF dispatch failure.
 #[derive(Debug, thiserror::Error)]
-pub enum GetRssiError {
-    /// CMIF dispatch failed.
-    #[error("failed to dispatch GetRSSI")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch GetRSSI")]
+pub struct GetRssiError(#[source] pub DispatchError);
 
 /// Sends a CMIF request with no input payload and reads a single `u32` from
 /// the response data area.

@@ -101,4 +101,5 @@ members = [
     "subprojects/nx-sys-sync",
     "subprojects/nx-sys-thread-tls",
     "subprojects/nx-time",
+    "subprojects/nx-wlaninf",
 ]

@@ -30,3 +30,5 @@ pub use nx_sys_sync::ffi as sys_sync;
 pub use nx_sys_thread_tls::ffi as sys_thread_tls;
 #[cfg(feature = "time")]
 pub use nx_time::ffi as time;
+#[cfg(feature = "wlaninf")]
+pub use nx_wlaninf::ffi as wlaninf;

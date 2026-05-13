@@ -1,23 +1,36 @@
 [package]
-name = "nx-service-wlaninf"
+name = "nx-wlaninf"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_service_wlaninf"
+name = "nx_wlaninf"
 crate-type = ["rlib"]
 test = false
 doctest = false
 bench = false
 
 [features]
-# Exposes session accessors on `WlaninfService` for FFI consumers.
-ffi = []
+# C-FFI surface (`__nx_wlaninf__*` symbols). Required for any libnx
+# `wlaninf.h` override.
+ffi = [
+    "nx-service-wlaninf/ffi",
+    "nx-sf/ffi",
+    "nx-svc/ffi",
+    "nx-std-sync/ffi",
+]
 
 [dependencies]
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-service-wlaninf = { version = "0.1.0", path = "../nx-service-wlaninf" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
-nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 thiserror = { version = "2", default-features = false }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

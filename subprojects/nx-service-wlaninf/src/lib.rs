@@ -25,7 +25,6 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
 use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
 mod proto;
@@ -34,35 +33,6 @@ pub use self::{
     cmif::{DispatchError, GetRssiError, GetStateError},
     proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, SERVICE_NAME, WlanInfState},
 };
-
-/// WLAN InfraManager (`wlan:inf`) session wrapper.
-///
-/// Provides type safety to distinguish `wlan:inf` sessions from other services.
-#[repr(transparent)]
-pub struct WlaninfService(Session);
-
-impl WlaninfService {
-    /// Returns the underlying session handle.
-    #[inline]
-    pub fn session(&self) -> SessionHandle {
-        self.0.handle()
-    }
-}
-
-/// CMIF protocol methods.
-impl WlaninfService {
-    /// Reads the current WLAN connection state (`GetState`, cmd 10).
-    #[inline]
-    pub fn get_state(&self) -> Result<WlanInfState, GetStateError> {
-        cmif::get_state(self.0.handle())
-    }
-
-    /// Reads the current received signal strength (`GetRSSI`, cmd 12).
-    #[inline]
-    pub fn get_rssi(&self) -> Result<Rssi, GetRssiError> {
-        cmif::get_rssi(self.0.handle())
-    }
-}
 
 /// Connects to the `wlan:inf` (WLAN InfraManager) service using CMIF.
 ///
@@ -82,3 +52,38 @@ pub fn connect_cmif(sm: &SmService) -> Result<WlaninfService, ConnectCmifError> 
 #[derive(Debug, thiserror::Error)]
 #[error("failed to get wlan:inf service")]
 pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
+
+/// WLAN InfraManager (`wlan:inf`) session wrapper.
+///
+/// Provides type safety to distinguish `wlan:inf` sessions from other services.
+#[repr(transparent)]
+pub struct WlaninfService(Session);
+// SAFETY: all operations go through the kernel which serializes
+// `svcSendSyncRequest` per session handle.
+unsafe impl Send for WlaninfService {}
+
+unsafe impl Sync for WlaninfService {}
+
+/// CMIF protocol methods.
+impl WlaninfService {
+    /// Reads the current WLAN connection state (`GetState`, cmd 10).
+    #[inline]
+    pub fn get_state(&self) -> Result<WlanInfState, GetStateError> {
+        cmif::get_state(self.0.handle())
+    }
+
+    /// Reads the current received signal strength (`GetRSSI`, cmd 12).
+    #[inline]
+    pub fn get_rssi(&self) -> Result<Rssi, GetRssiError> {
+        cmif::get_rssi(self.0.handle())
+    }
+}
+
+#[cfg(feature = "ffi")]
+impl WlaninfService {
+    /// Returns the underlying session for libnx `Service*` shadow buffers.
+    #[inline]
+    pub fn session(&self) -> &Session {
+        &self.0
+    }
+}

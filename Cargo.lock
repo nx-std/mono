@@ -1225,6 +1225,7 @@ dependencies = [
  "nx-sys-sync",
  "nx-sys-thread-tls",
  "nx-time",
+ "nx-wlaninf",
 ]
 
 [[package]]
@@ -1286,6 +1287,19 @@ dependencies = [
  "nx-cpu",
  "nx-panic-handler",
  "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-wlaninf"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-service-wlaninf",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
  "thiserror",
 ]
 

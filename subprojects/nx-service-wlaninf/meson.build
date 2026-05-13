@@ -2,9 +2,6 @@ project('nx-service-wlaninf', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
-#---------------------------------------------------------------------------------
-# Dependencies
-#---------------------------------------------------------------------------------
 # Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 # nx-panic-handler
 nx_panic_handler_proj = subproject('nx-panic-handler')
@@ -35,10 +32,6 @@ deps = [
     nx_sys_thread_tls_dep,
 ]
 
-#---------------------------------------------------------------------------------
-# Static library
-#---------------------------------------------------------------------------------
-# Target
 nx_service_wlaninf_tgt = custom_target(
     'nx-service-wlaninf',
     command : [
@@ -54,9 +47,6 @@ nx_service_wlaninf_tgt = custom_target(
     build_always_stale : true,
 )
 
-#---------------------------------------------------------------------------------
-# Dependency declaration
-#---------------------------------------------------------------------------------
 nx_service_wlaninf_dep = declare_dependency(
     sources : nx_service_wlaninf_tgt,
     dependencies : deps,

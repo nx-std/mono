@@ -144,3 +144,10 @@ option(
     description : 'Enable the `pm` feature (idiomatic Process Manager API)',
     yield : true
 )
+
+option(
+    'use_nx_wlaninf',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `wlaninf` feature (idiomatic WLAN InfraManager API)',
+    yield : true
+)

@@ -166,3 +166,10 @@ option(
     description : 'Enable nx-service-nv (NVIDIA Driver service)',
     yield : true
 )
+
+option(
+    'use_nx_wlaninf',
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-wlaninf (idiomatic WLAN InfraManager API; implies use_nx_service_wlaninf)',
+    yield : true
+)
