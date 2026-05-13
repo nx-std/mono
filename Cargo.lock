@@ -333,6 +333,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-btmu"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-capmtp"
 version = "0.1.0"
 dependencies = [
@@ -523,6 +536,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-grc"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-caps",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-hid"
 version = "0.1.0"
 dependencies = [
@@ -533,6 +560,21 @@ dependencies = [
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-htcs"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
  "thiserror",
 ]
 
@@ -932,6 +974,19 @@ dependencies = [
  "nx-sf",
  "nx-svc",
  "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-spl"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
  "thiserror",
 ]
 
