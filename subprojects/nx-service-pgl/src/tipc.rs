@@ -4,7 +4,7 @@
 
 use core::ptr;
 
-use nx_sf::{hipc::BufferMode, service::Service, tipc};
+use nx_sf::{hipc::BufferMode, service::Session, tipc};
 use nx_svc::ipc::{self, Handle};
 
 use crate::{
@@ -287,7 +287,7 @@ pub fn enable_application_all_thread_dump_on_crash(
 }
 
 /// Gets an event observer sub-object (cmd 20, TIPC).
-pub fn get_event_observer(service: &Service) -> Result<Service, GetEventObserverError> {
+pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = tipc::RequestFormat {
@@ -295,10 +295,12 @@ pub fn get_event_observer(service: &Service) -> Result<Service, GetEventObserver
         ..Default::default()
     };
 
+    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
     unsafe { tipc::make_request(ipc_buf, fmt) };
 
-    ipc::send_sync_request(service.session).map_err(GetEventObserverError::SendRequest)?;
+    ipc::send_sync_request(session).map_err(GetEventObserverError::SendRequest)?;
 
+    // SAFETY: response sits in the TLS buffer after a successful send.
     let resp = unsafe { tipc::parse_response(ipc_buf, 0) }
         .map_err(GetEventObserverError::ParseResponse)?;
 
@@ -308,9 +310,11 @@ pub fn get_event_observer(service: &Service) -> Result<Service, GetEventObserver
         .copied()
         .ok_or(GetEventObserverError::MissingHandle)?;
 
+    // SAFETY: the kernel returned a valid move handle for the new observer
+    // session; ownership transfers to the new `Session`.
     let handle = unsafe { Handle::from_raw(raw_handle) };
 
-    Ok(Service::new_subservice(service, handle))
+    Ok(Session::from_handle(handle, 0))
 }
 
 #[derive(Debug, thiserror::Error)]
