@@ -18,7 +18,6 @@ use crate::{
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
     let result = service
         .dispatch(proto::GET_CORE)
-        .out_objects(1)
         .send()
         .map_err(GetCoreError::Dispatch)?;
 
