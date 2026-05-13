@@ -126,6 +126,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-acc"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-apm"
 version = "0.1.0"
 dependencies = [
@@ -653,6 +666,19 @@ dependencies = [
 
 [[package]]
 name = "nx-service-pctl"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-pcv"
 version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
