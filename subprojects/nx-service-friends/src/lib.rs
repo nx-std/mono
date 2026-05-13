@@ -107,8 +107,11 @@ impl FriendsService {
         out: &mut FriendsUserSetting,
     ) -> Result<(), DispatchError> {
         let guard = self.pool.acquire();
-        let object = guard
-            .open_object_raw(self.friend_service_object_id)
+        // SAFETY: `friend_service_object_id` was validated at `connect_cmif`
+        // and the kernel-side object stays alive for the lifetime of the
+        // pool's domain sessions. The pool guard makes this slot exclusive,
+        // so no other `DomainObject` in this `Domain` addresses the id.
+        let object = unsafe { guard.open_object_raw(self.friend_service_object_id) }
             .expect("friend_service object id validated at connect_cmif");
         cmif::get_user_setting(&object, uid, out)
     }
