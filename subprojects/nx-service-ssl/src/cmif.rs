@@ -1,0 +1,36 @@
+//! CMIF protocol operations for the SSL service.
+
+mod connection;
+mod context;
+mod service;
+
+// Error types re-exported publicly from lib.rs need `pub` visibility here.
+pub(crate) use self::{
+    connection::{
+        do_handshake, do_handshake_get_server_cert, export_keying_material, flush_session_cache,
+        get_cipher_info, get_dtls_handshake_timeout, get_host_name, get_io_mode, get_io_timeout,
+        get_needed_server_cert_buffer_size, get_next_alpn_proto, get_option,
+        get_renegotiation_mode, get_session_cache_mode, get_socket_descriptor, get_srtp_cipher,
+        get_verify_cert_error, get_verify_cert_errors, get_verify_option, peek, pending, poll,
+        read, set_dtls_socket_descriptor, set_host_name, set_io_mode, set_io_timeout,
+        set_next_alpn_proto, set_option, set_private_option, set_private_option_legacy,
+        set_renegotiation_mode, set_session_cache_mode, set_socket_descriptor, set_srtp_ciphers,
+        set_verify_option, write,
+    },
+    context::{
+        add_policy_oid, create_connection, create_connection_for_system,
+        generate_private_key_and_cert, get_connection_count, get_option as ctx_get_option,
+        import_client_cert_key_pki, import_client_pki, import_crl, import_server_pki,
+        register_internal_pki, remove_pki, set_option as ctx_set_option,
+    },
+    service::{
+        clear_tls12_fallback_flag, create_context, flush_session_cache as svc_flush_session_cache,
+        get_certificate_buf_size, get_certificates, get_certificates_legacy, get_context_count,
+        get_debug_option, get_thread_core_mask, set_debug_option, set_interface_version,
+        set_thread_core_mask,
+    },
+};
+pub use self::{
+    context::{CreateConnectionError, GenerateKeyAndCertError, RemovePkiError},
+    service::CreateContextError,
+};
