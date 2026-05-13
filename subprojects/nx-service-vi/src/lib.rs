@@ -12,7 +12,7 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 
 pub mod binder;
@@ -63,21 +63,21 @@ pub struct ViService {
     /// The actual service type we connected to.
     service_type: ViServiceType,
     /// Root service session (Manager only, 16.0.0+).
-    root_service: Option<Service>,
+    root_service: Option<Session>,
     /// IApplicationDisplayService session.
-    application_display: Service,
+    application_display: Session,
     /// IHOSBinderDriverRelay session.
-    binder_relay: Service,
+    binder_relay: Session,
     /// ISystemDisplayService session (System/Manager only).
-    system_display: Option<Service>,
+    system_display: Option<Session>,
     /// IManagerDisplayService session (Manager only).
-    manager_display: Option<Service>,
+    manager_display: Option<Session>,
     /// IHOSBinderDriverIndirect session (System/Manager, 2.0.0+).
-    binder_indirect: Option<Service>,
+    binder_indirect: Option<Session>,
 }
 
 // SAFETY: ViService is safe to send across threads because:
-// - All Service instances are just session handles (u32)
+// - All Session instances are just session handles (u32)
 // - No mutable state that requires synchronization
 unsafe impl Send for ViService {}
 
@@ -110,37 +110,37 @@ impl ViService {
     /// Returns the IApplicationDisplayService session handle.
     #[inline]
     pub fn application_display_session(&self) -> SessionHandle {
-        self.application_display.session
+        self.application_display.handle()
     }
 
     /// Returns the IHOSBinderDriverRelay session.
     #[inline]
-    pub fn binder_relay(&self) -> &Service {
+    pub fn binder_relay(&self) -> &Session {
         &self.binder_relay
     }
 
     /// Returns the ISystemDisplayService session handle, if available.
     #[inline]
     pub fn system_display_session(&self) -> Option<SessionHandle> {
-        self.system_display.as_ref().map(|s| s.session)
+        self.system_display.as_ref().map(|s| s.handle())
     }
 
     /// Returns the IManagerDisplayService session handle, if available.
     #[inline]
     pub fn manager_display_session(&self) -> Option<SessionHandle> {
-        self.manager_display.as_ref().map(|s| s.session)
+        self.manager_display.as_ref().map(|s| s.handle())
     }
 
     /// Returns the IHOSBinderDriverIndirect session handle, if available.
     #[inline]
     pub fn binder_indirect_session(&self) -> Option<SessionHandle> {
-        self.binder_indirect.as_ref().map(|s| s.session)
+        self.binder_indirect.as_ref().map(|s| s.handle())
     }
 
     /// Returns the root service session handle (Manager only, 16.0.0+).
     #[inline]
     pub fn root_service_session(&self) -> Option<SessionHandle> {
-        self.root_service.as_ref().map(|s| s.session)
+        self.root_service.as_ref().map(|s| s.handle())
     }
 
     // =========================================================================
@@ -149,7 +149,7 @@ impl ViService {
 
     /// Opens a display by name.
     pub fn open_display(&self, name: &DisplayName) -> Result<DisplayId, OpenDisplayError> {
-        cmif::application::open_display(self.application_display.session, name)
+        cmif::application::open_display(self.application_display.handle(), name)
     }
 
     /// Opens the default display.
@@ -159,7 +159,7 @@ impl ViService {
 
     /// Closes a display.
     pub fn close_display(&self, display_id: DisplayId) -> Result<(), CloseDisplayError> {
-        cmif::application::close_display(self.application_display.session, display_id)
+        cmif::application::close_display(self.application_display.handle(), display_id)
     }
 
     /// Gets display resolution.
@@ -167,7 +167,7 @@ impl ViService {
         &self,
         display_id: DisplayId,
     ) -> Result<DisplayResolution, GetDisplayResolutionError> {
-        cmif::application::get_display_resolution(self.application_display.session, display_id)
+        cmif::application::get_display_resolution(self.application_display.handle(), display_id)
     }
 
     /// Opens a layer.
@@ -178,7 +178,7 @@ impl ViService {
         aruid: u64,
     ) -> Result<OpenLayerOutput, OpenLayerError> {
         cmif::application::open_layer(
-            self.application_display.session,
+            self.application_display.handle(),
             display_name,
             layer_id,
             aruid,
@@ -187,7 +187,7 @@ impl ViService {
 
     /// Closes a layer.
     pub fn close_layer(&self, layer_id: LayerId) -> Result<(), CloseLayerError> {
-        cmif::application::close_layer(self.application_display.session, layer_id)
+        cmif::application::close_layer(self.application_display.handle(), layer_id)
     }
 
     /// Creates a stray layer on IApplicationDisplayService (cmd 2030).
@@ -203,7 +203,7 @@ impl ViService {
         display_id: DisplayId,
     ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
         cmif::application::create_stray_layer(
-            self.application_display.session,
+            self.application_display.handle(),
             layer_flags as u32,
             display_id,
         )
@@ -223,7 +223,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(CreateStrayLayerWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::create_stray_layer(session, layer_flags as u32, display_id)
             .map_err(CreateStrayLayerWrapperError::Cmif)
@@ -243,7 +243,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(CreateStrayLayerWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::create_stray_layer(session, layer_flags as u32, display_id)
             .map_err(CreateStrayLayerWrapperError::Cmif)
@@ -251,7 +251,7 @@ impl ViService {
 
     /// Destroys a stray layer.
     pub fn destroy_stray_layer(&self, layer_id: LayerId) -> Result<(), DestroyStrayLayerError> {
-        cmif::application::destroy_stray_layer(self.application_display.session, layer_id)
+        cmif::application::destroy_stray_layer(self.application_display.handle(), layer_id)
     }
 
     /// Sets layer scaling mode.
@@ -261,7 +261,7 @@ impl ViService {
         scaling_mode: ViScalingMode,
     ) -> Result<(), SetLayerScalingModeError> {
         cmif::application::set_layer_scaling_mode(
-            self.application_display.session,
+            self.application_display.handle(),
             scaling_mode,
             layer_id,
         )
@@ -278,7 +278,7 @@ impl ViService {
         buffer: &mut [u8],
     ) -> Result<IndirectLayerImageInfo, GetIndirectLayerImageMapError> {
         cmif::application::get_indirect_layer_image_map(
-            self.application_display.session,
+            self.application_display.handle(),
             width as i64,
             height as i64,
             indirect_layer_consumer_handle,
@@ -294,7 +294,7 @@ impl ViService {
         height: i32,
     ) -> Result<IndirectLayerMemoryInfo, GetIndirectLayerImageRequiredMemoryInfoError> {
         cmif::application::get_indirect_layer_image_required_memory_info(
-            self.application_display.session,
+            self.application_display.handle(),
             width as i64,
             height as i64,
         )
@@ -305,7 +305,7 @@ impl ViService {
         &self,
         display_id: DisplayId,
     ) -> Result<nx_svc::raw::Handle, GetDisplayVsyncEventError> {
-        cmif::application::get_display_vsync_event(self.application_display.session, display_id)
+        cmif::application::get_display_vsync_event(self.application_display.handle(), display_id)
     }
 
     // =========================================================================
@@ -323,7 +323,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(GetZOrderCountMinError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::get_z_order_count_min(session, display_id)
             .map(|z| z as i32)
@@ -341,7 +341,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(GetZOrderCountMaxError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::get_z_order_count_max(session, display_id)
             .map(|z| z as i32)
@@ -359,7 +359,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(GetDisplayLogicalResolutionWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::get_display_logical_resolution(session, display_id)
             .map_err(GetDisplayLogicalResolutionWrapperError::Cmif)
@@ -380,7 +380,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(SetDisplayMagnificationWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::set_display_magnification(session, display_id, x, y, width, height)
             .map_err(SetDisplayMagnificationWrapperError::Cmif)
@@ -399,7 +399,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(SetLayerPositionWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::set_layer_position(session, layer_id, x, y)
             .map_err(SetLayerPositionWrapperError::Cmif)
@@ -418,7 +418,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(SetLayerSizeWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::set_layer_size(session, layer_id, width as i64, height as i64)
             .map_err(SetLayerSizeWrapperError::Cmif)
@@ -432,7 +432,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(SetLayerZWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::set_layer_z(session, layer_id, z as i64).map_err(SetLayerZWrapperError::Cmif)
     }
@@ -449,7 +449,7 @@ impl ViService {
             .system_display
             .as_ref()
             .ok_or(SetLayerVisibilityWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::system::set_layer_visibility(session, layer_id, visible)
             .map_err(SetLayerVisibilityWrapperError::Cmif)
@@ -472,7 +472,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(CreateManagedLayerWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::create_managed_layer(session, layer_flags as u32, display_id, aruid)
             .map_err(CreateManagedLayerWrapperError::Cmif)
@@ -489,7 +489,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(DestroyManagedLayerWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::destroy_managed_layer(session, layer_id)
             .map_err(DestroyManagedLayerWrapperError::Cmif)
@@ -507,7 +507,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(SetDisplayAlphaWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::set_display_alpha(session, display_id, alpha)
             .map_err(SetDisplayAlphaWrapperError::Cmif)
@@ -525,7 +525,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(SetDisplayLayerStackWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::set_display_layer_stack(session, display_id, layer_stack)
             .map_err(SetDisplayLayerStackWrapperError::Cmif)
@@ -543,7 +543,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(SetDisplayPowerStateWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::set_display_power_state(session, display_id, power_state)
             .map_err(SetDisplayPowerStateWrapperError::Cmif)
@@ -560,7 +560,7 @@ impl ViService {
             .manager_display
             .as_ref()
             .ok_or(SetContentVisibilityWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::manager::set_content_visibility(session, visible)
             .map_err(SetContentVisibilityWrapperError::Cmif)
@@ -578,7 +578,7 @@ impl ViService {
             .root_service
             .as_ref()
             .ok_or(PrepareFatalWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::root::prepare_fatal(session).map_err(PrepareFatalWrapperError::Cmif)
     }
@@ -591,7 +591,7 @@ impl ViService {
             .root_service
             .as_ref()
             .ok_or(ShowFatalWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::root::show_fatal(session).map_err(ShowFatalWrapperError::Cmif)
     }
@@ -611,7 +611,7 @@ impl ViService {
             .root_service
             .as_ref()
             .ok_or(DrawFatalRectangleWrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::root::draw_fatal_rectangle(session, x, y, end_x, end_y, color)
             .map_err(DrawFatalRectangleWrapperError::Cmif)
@@ -637,7 +637,7 @@ impl ViService {
             .root_service
             .as_ref()
             .ok_or(DrawFatalText32WrapperError::NotAvailable)?
-            .session;
+            .handle();
 
         cmif::root::draw_fatal_text32(
             session,
@@ -652,25 +652,6 @@ impl ViService {
             initial_advance,
         )
         .map_err(DrawFatalText32WrapperError::Cmif)
-    }
-
-    /// Consumes and closes the VI service session.
-    pub fn close(self) {
-        // Close sub-services in reverse order of acquisition
-        if let Some(indirect) = self.binder_indirect {
-            indirect.close();
-        }
-        if let Some(manager) = self.manager_display {
-            manager.close();
-        }
-        if let Some(system) = self.system_display {
-            system.close();
-        }
-        self.binder_relay.close();
-        self.application_display.close();
-        if let Some(root) = self.root_service {
-            root.close();
-        }
     }
 }
 
@@ -798,60 +779,39 @@ pub fn connect_with_options(
     // HOS ≥ 16.0.0 (the version that introduced the fatal-display commands).
     let keep_root = actual_type == ViServiceType::Manager && options.keep_root_service;
     if keep_root {
-        root_service_handle = Some(Service {
-            session: root_handle,
-            own_handle: 1,
-            object_id: 0,
-            pointer_buffer_size: 0,
-        });
+        // libnx does not query the root service's pointer-buffer-size;
+        // skip the kernel round-trip and adopt the handle as-is.
+        root_service_handle = Some(Session::from_handle(root_handle, 0));
     } else {
         // Close root service handle
         let _ = nx_svc::ipc::close_handle(root_handle);
     }
 
-    // Get IHOSBinderDriverRelay
-    let binder_relay =
-        cmif::application::get_relay_service(application_display.session).map_err(|e| {
-            application_display.close();
-            if let Some(root) = &root_service_handle {
-                root.close();
-            }
-            ConnectError::GetSubService(e)
-        })?;
+    // Get IHOSBinderDriverRelay.
+    //
+    // On error, `application_display` and (if held) `root_service_handle`
+    // drop here, which closes their kernel handles via the `Session` /
+    // `Option<Session>` `Drop` impl. No manual cleanup needed.
+    let binder_relay = cmif::application::get_relay_service(application_display.handle())
+        .map_err(ConnectError::GetSubService)?;
 
-    // Get ISystemDisplayService (System/Manager only)
+    // Get ISystemDisplayService (System/Manager only). On error every
+    // already-acquired sub-service drops and closes its handle.
     let system_display = if actual_type >= ViServiceType::System {
-        match cmif::application::get_system_display_service(application_display.session) {
-            Ok(s) => Some(s),
-            Err(e) => {
-                binder_relay.close();
-                application_display.close();
-                if let Some(root) = &root_service_handle {
-                    root.close();
-                }
-                return Err(ConnectError::GetSubService(e));
-            }
-        }
+        Some(
+            cmif::application::get_system_display_service(application_display.handle())
+                .map_err(ConnectError::GetSubService)?,
+        )
     } else {
         None
     };
 
-    // Get IManagerDisplayService (Manager only)
+    // Get IManagerDisplayService (Manager only). Same cleanup story as above.
     let manager_display = if actual_type >= ViServiceType::Manager {
-        match cmif::application::get_manager_display_service(application_display.session) {
-            Ok(s) => Some(s),
-            Err(e) => {
-                if let Some(sys) = &system_display {
-                    sys.close();
-                }
-                binder_relay.close();
-                application_display.close();
-                if let Some(root) = &root_service_handle {
-                    root.close();
-                }
-                return Err(ConnectError::GetSubService(e));
-            }
-        }
+        Some(
+            cmif::application::get_manager_display_service(application_display.handle())
+                .map_err(ConnectError::GetSubService)?,
+        )
     } else {
         None
     };
@@ -861,7 +821,7 @@ pub fn connect_with_options(
     // older firmware via `hosversionAtLeast(2,0,0)`).
     let binder_indirect = if actual_type >= ViServiceType::System && options.request_indirect_binder
     {
-        cmif::application::get_indirect_display_transaction_service(application_display.session)
+        cmif::application::get_indirect_display_transaction_service(application_display.handle())
             .ok()
     } else {
         None

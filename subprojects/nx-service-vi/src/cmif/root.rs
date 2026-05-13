@@ -5,7 +5,7 @@
 
 use core::ptr;
 
-use nx_sf::{cmif, service::Service};
+use nx_sf::{cmif, service::Session};
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
 use crate::proto::root_cmds;
@@ -17,7 +17,7 @@ use crate::proto::root_cmds;
 pub fn get_display_service(
     session: SessionHandle,
     service_type: crate::types::ViServiceType,
-) -> Result<Service, GetDisplayServiceError> {
+) -> Result<Session, GetDisplayServiceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     // Command ID equals service type value
@@ -59,7 +59,9 @@ pub fn get_display_service(
     // SAFETY: handle is a valid session handle from the kernel
     let session_handle = unsafe { SessionHandle::from_raw(handle) };
 
-    Ok(Service::new(session_handle))
+    // IApplicationDisplayService is returned via move-handle; libnx does
+    // not query its pointer-buffer-size, so skip the kernel round-trip.
+    Ok(Session::from_handle(session_handle, 0))
 }
 
 /// Prepares the fatal display.

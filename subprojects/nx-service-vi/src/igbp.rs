@@ -11,13 +11,13 @@
 //! - The free functions below own only the per-command payload encoding,
 //!   reply parsing, and Android-binder error mapping (see [`BinderError`]).
 //!
-//! All functions accept a `relay: &Service` (the `IHOSBinderDriverRelay`
+//! All functions accept a `relay: &Session` (the `IHOSBinderDriverRelay`
 //! session) and a `binder: &Binder` (the IGBP-side binder object). Both come
 //! out of a `ViService` + `ViLayer` pair from the higher-level VI API. The
 //! `BinderError` returned by each operation corresponds to libnx
 //! `binderConvertErrorCode`.
 
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 
 use crate::{
     binder::{Binder, BinderError, TransactError},
@@ -142,7 +142,7 @@ pub struct BqBufferOutput {
 /// extract typed reply data and convert the rc.
 fn igbp_transact<E, D, R, Err>(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     code: u32,
     encode: E,
     decode: D,
@@ -169,7 +169,7 @@ where
 /// parsed buffer).
 pub fn request_buffer(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     buffer_idx: i32,
 ) -> Result<bool, RequestBufferError> {
     igbp_transact(
@@ -199,7 +199,7 @@ pub fn request_buffer(
 /// `bqSetBufferCount` — request the server allocate `count` buffers.
 pub fn set_buffer_count(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     count: i32,
 ) -> Result<(), SetBufferCountError> {
     igbp_transact(
@@ -221,7 +221,7 @@ pub fn set_buffer_count(
 /// Returns the slot index and the producer-side fence (if any).
 pub fn dequeue_buffer(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     async_mode: bool,
     width: u32,
     height: u32,
@@ -267,7 +267,7 @@ pub fn dequeue_buffer(
 }
 
 /// `bqDetachBuffer` — detach a buffer slot from the queue.
-pub fn detach_buffer(binder: &Binder, relay: &Service, slot: i32) -> Result<(), DetachBufferError> {
+pub fn detach_buffer(binder: &Binder, relay: &Session, slot: i32) -> Result<(), DetachBufferError> {
     igbp_transact(
         binder,
         relay,
@@ -288,7 +288,7 @@ pub fn detach_buffer(binder: &Binder, relay: &Service, slot: i32) -> Result<(), 
 /// transform hint, pending-buffer count).
 pub fn queue_buffer(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     slot: i32,
     input: &BqBufferInput,
 ) -> Result<BqBufferOutput, QueueBufferError> {
@@ -323,7 +323,7 @@ pub fn queue_buffer(
 /// `bqCancelBuffer` — return an unfilled buffer slot to the server.
 pub fn cancel_buffer(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     slot: i32,
     fence: &BqMultiFence,
 ) -> Result<(), CancelBufferError> {
@@ -345,7 +345,7 @@ pub fn cancel_buffer(
 }
 
 /// `bqQuery` — query a single producer property (e.g. `NATIVE_WINDOW_FORMAT`).
-pub fn query(binder: &Binder, relay: &Service, what: i32) -> Result<i32, QueryError> {
+pub fn query(binder: &Binder, relay: &Session, what: i32) -> Result<i32, QueryError> {
     igbp_transact(
         binder,
         relay,
@@ -367,7 +367,7 @@ pub fn query(binder: &Binder, relay: &Service, what: i32) -> Result<i32, QueryEr
 /// Returns the server's initial [`BqBufferOutput`].
 pub fn connect(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     api: i32,
     producer_controlled_by_app: bool,
 ) -> Result<BqBufferOutput, ConnectError> {
@@ -398,7 +398,7 @@ pub fn connect(
 }
 
 /// `bqDisconnect` — disconnect from the producer.
-pub fn disconnect(binder: &Binder, relay: &Service, api: i32) -> Result<(), DisconnectError> {
+pub fn disconnect(binder: &Binder, relay: &Session, api: i32) -> Result<(), DisconnectError> {
     igbp_transact(
         binder,
         relay,
@@ -442,7 +442,7 @@ pub struct BqGraphicBufferInput<'a> {
 /// libnx's `hasInput=false` branch).
 pub fn set_preallocated_buffer(
     binder: &Binder,
-    relay: &Service,
+    relay: &Session,
     slot: i32,
     input: Option<&BqGraphicBufferInput<'_>>,
 ) -> Result<(), SetPreallocatedBufferError> {

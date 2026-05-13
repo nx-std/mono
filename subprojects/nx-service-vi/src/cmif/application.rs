@@ -4,7 +4,7 @@
 
 use core::ptr;
 
-use nx_sf::{cmif, hipc::BufferMode, service::Service};
+use nx_sf::{cmif, hipc::BufferMode, service::Session};
 use nx_svc::{
     ipc::{self, Handle as SessionHandle},
     raw::Handle as RawHandle,
@@ -16,24 +16,24 @@ use crate::{
 };
 
 /// Gets IHOSBinderDriverRelay session.
-pub fn get_relay_service(session: SessionHandle) -> Result<Service, GetSubServiceError> {
+pub fn get_relay_service(session: SessionHandle) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(session, application_cmds::GET_RELAY_SERVICE)
 }
 
 /// Gets ISystemDisplayService session.
-pub fn get_system_display_service(session: SessionHandle) -> Result<Service, GetSubServiceError> {
+pub fn get_system_display_service(session: SessionHandle) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(session, application_cmds::GET_SYSTEM_DISPLAY_SERVICE)
 }
 
 /// Gets IManagerDisplayService session.
-pub fn get_manager_display_service(session: SessionHandle) -> Result<Service, GetSubServiceError> {
+pub fn get_manager_display_service(session: SessionHandle) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(session, application_cmds::GET_MANAGER_DISPLAY_SERVICE)
 }
 
 /// Gets IHOSBinderDriverIndirect session (2.0.0+).
 pub fn get_indirect_display_transaction_service(
     session: SessionHandle,
-) -> Result<Service, GetSubServiceError> {
+) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(
         session,
         application_cmds::GET_INDIRECT_DISPLAY_TRANSACTION_SERVICE,
@@ -44,7 +44,7 @@ pub fn get_indirect_display_transaction_service(
 fn get_sub_service_no_params(
     session: SessionHandle,
     cmd_id: u32,
-) -> Result<Service, GetSubServiceError> {
+) -> Result<Session, GetSubServiceError> {
     let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
     let fmt = cmif::RequestFormatBuilder::new(cmd_id).build();
@@ -68,7 +68,11 @@ fn get_sub_service_no_params(
     // SAFETY: handle is a valid session handle from the kernel
     let session_handle = unsafe { SessionHandle::from_raw(handle) };
 
-    Ok(Service::new(session_handle))
+    // Sub-services here are non-domain handles obtained via move-handle.
+    // Skip the pointer-buffer-size query (libnx doesn't issue it on these
+    // sub-services either); callers that need pointer-buffer dispatch can
+    // upgrade the value later.
+    Ok(Session::from_handle(session_handle, 0))
 }
 
 /// Opens a display by name.

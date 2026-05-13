@@ -3,7 +3,7 @@
 //! The Binder protocol is used to communicate with graphics buffer producers
 //! via parcel-based transactions.
 
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::raw::Handle as RawHandle;
 
 use crate::{
@@ -47,19 +47,19 @@ impl Binder {
     /// Initializes the binder session.
     ///
     /// This increments both weak and strong references on the binder object.
-    pub fn init_session(&mut self, relay: &Service) -> Result<(), InitSessionError> {
+    pub fn init_session(&mut self, relay: &Session) -> Result<(), InitSessionError> {
         if self.initialized {
             return Err(InitSessionError::AlreadyInitialized);
         }
 
         // Increase weak reference
-        cmif::binder::adjust_refcount(relay.session, self.id, 1, 0)
+        cmif::binder::adjust_refcount(relay.handle(), self.id, 1, 0)
             .map_err(InitSessionError::IncreaseWeakRef)?;
 
         // Increase strong reference
-        if let Err(e) = cmif::binder::adjust_refcount(relay.session, self.id, 1, 1) {
+        if let Err(e) = cmif::binder::adjust_refcount(relay.handle(), self.id, 1, 1) {
             // Rollback weak ref on failure
-            let _ = cmif::binder::adjust_refcount(relay.session, self.id, -1, 0);
+            let _ = cmif::binder::adjust_refcount(relay.handle(), self.id, -1, 0);
             return Err(InitSessionError::IncreaseStrongRef(e));
         }
 
@@ -70,15 +70,15 @@ impl Binder {
     /// Closes the binder session.
     ///
     /// This decrements both strong and weak references.
-    pub fn close(&mut self, relay: &Service) {
+    pub fn close(&mut self, relay: &Session) {
         if !self.initialized {
             return;
         }
 
         // Decrease strong reference
-        let _ = cmif::binder::adjust_refcount(relay.session, self.id, -1, 1);
+        let _ = cmif::binder::adjust_refcount(relay.handle(), self.id, -1, 1);
         // Decrease weak reference
-        let _ = cmif::binder::adjust_refcount(relay.session, self.id, -1, 0);
+        let _ = cmif::binder::adjust_refcount(relay.handle(), self.id, -1, 0);
 
         self.initialized = false;
     }
@@ -88,7 +88,7 @@ impl Binder {
     /// Sends `in_parcel` and receives the response in `out_parcel`.
     pub fn transact(
         &self,
-        relay: &Service,
+        relay: &Session,
         code: u32,
         in_parcel: &Parcel,
         out_parcel: &mut Parcel,
@@ -130,7 +130,7 @@ impl Binder {
 
         // Perform transaction
         cmif::binder::transact_parcel(
-            relay.session,
+            relay.handle(),
             self.id,
             code,
             &in_buf[..total_in_size],
@@ -179,14 +179,14 @@ impl Binder {
     /// Used to get fence sync event handles.
     pub fn get_native_handle(
         &self,
-        relay: &Service,
+        relay: &Session,
         inval: u32,
     ) -> Result<RawHandle, GetNativeHandleError> {
         if !self.initialized {
             return Err(GetNativeHandleError::NotInitialized);
         }
 
-        cmif::binder::get_native_handle(relay.session, self.id, inval)
+        cmif::binder::get_native_handle(relay.handle(), self.id, inval)
             .map_err(GetNativeHandleError::Cmif)
     }
 }
