@@ -66,7 +66,7 @@ pub(crate) fn create_socket(
     let input: u8 = if enable_disconnection_emulation { 1 } else { 0 };
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::CREATE_SOCKET)
             .in_raw((&raw const input).cast::<u8>(), size_of::<u8>())
@@ -79,11 +79,13 @@ pub(crate) fn create_socket(
     // SAFETY: response payload is at least size_of::<i32>().
     let err = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
 
-    if result.objects.is_empty() {
-        return Err(CreateSocketError::MissingObject);
-    }
-
-    Ok((err, result.objects[0]))
+    let object = result
+        .take_object(0)
+        .ok_or(CreateSocketError::MissingObject)?;
+    // The pool re-opens this id per request via `SessionGuard::open_object_raw`;
+    // wrap in `ManuallyDrop` so the server-side object outlives this call.
+    let raw = core::mem::ManuallyDrop::new(object).object_id().to_raw();
+    Ok((err, raw))
 }
 
 /// Starts a select operation (cmd 130).
@@ -281,7 +283,7 @@ pub(crate) fn socket_accept_results(
     task_id: u32,
 ) -> Result<(AcceptResultsOut, u32), AcceptResultsError> {
     // SAFETY: `task_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         object
             .dispatch(proto::SOCKET_ACCEPT_RESULTS)
             .in_raw((&raw const task_id).cast::<u8>(), size_of::<u32>())
@@ -294,11 +296,13 @@ pub(crate) fn socket_accept_results(
     // SAFETY: response payload is at least size_of::<AcceptResultsOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<AcceptResultsOut>()) };
 
-    if result.objects.is_empty() {
-        return Err(AcceptResultsError::MissingObject);
-    }
-
-    Ok((out, result.objects[0]))
+    let accepted = result
+        .take_object(0)
+        .ok_or(AcceptResultsError::MissingObject)?;
+    // Pool re-opens this id per request; keep the server-side object alive
+    // beyond this call.
+    let raw = core::mem::ManuallyDrop::new(accepted).object_id().to_raw();
+    Ok((out, raw))
 }
 
 /// Socket recv start (cmd 11).
