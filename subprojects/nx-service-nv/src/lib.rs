@@ -14,7 +14,7 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_applet::{AppletType, aruid::Aruid};
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::{
     ipc::Handle as SessionHandle,
     mem::tmem::{Handle as TmemHandle, MemoryPermission},
@@ -50,10 +50,13 @@ pub use self::{
 /// Provides access to NVIDIA driver operations including device management
 /// and ioctl commands.
 pub struct NvService {
-    /// Main service session.
-    main_session: Service,
     /// Clone session for parallel ioctl operations.
-    clone_session: Service,
+    ///
+    /// Declared before `main_session` so the implicit `Drop` order closes the
+    /// clone session first, matching libnx's `nvServiceClose()` behaviour.
+    clone_session: Session,
+    /// Main service session.
+    main_session: Session,
     /// Transfer memory backing for cleanup.
     ///
     /// The handle is closed early (after Initialize), but we keep the backing
@@ -63,7 +66,7 @@ pub struct NvService {
 }
 
 // SAFETY: NvService is safe to send across threads because:
-// - All Service instances are just session handles (u32)
+// - All Session instances are just session handles (u32)
 // - TransferMemoryBacking just holds a pointer and size, no kernel handle
 unsafe impl Send for NvService {}
 
@@ -76,13 +79,13 @@ impl NvService {
     /// Returns the main service session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.main_session.session
+        self.main_session.handle()
     }
 
     /// Returns the clone service session handle.
     #[inline]
     pub fn clone_session(&self) -> SessionHandle {
-        self.clone_session.session
+        self.clone_session.handle()
     }
 
     /// Returns the appropriate session for a given ioctl request.
@@ -96,25 +99,25 @@ impl NvService {
         // Check masked ioctls
         for &ioctl in proto::CLONE_SESSION_IOCTLS {
             if masked == ioctl {
-                return self.clone_session.session;
+                return self.clone_session.handle();
             }
         }
 
         // Check exact match ioctls
         for &ioctl in proto::CLONE_SESSION_IOCTLS_EXACT {
             if request == ioctl {
-                return self.clone_session.session;
+                return self.clone_session.handle();
             }
         }
 
-        self.main_session.session
+        self.main_session.handle()
     }
 
     /// Opens a device by path.
     ///
     /// Returns the file descriptor on success.
     pub fn open(&self, device_path: &str) -> Result<Fd, OpenError> {
-        cmif::open(self.main_session.session, device_path.as_bytes())
+        cmif::open(self.main_session.handle(), device_path.as_bytes())
     }
 
     /// Performs an ioctl operation.
@@ -210,25 +213,28 @@ impl NvService {
 
     /// Closes a device file descriptor.
     pub fn close_fd(&self, fd: Fd) -> Result<(), CloseError> {
-        cmif::close(self.main_session.session, fd)
+        cmif::close(self.main_session.handle(), fd)
     }
 
     /// Queries an event for a device.
     ///
     /// Returns the event handle on success.
     pub fn query_event(&self, fd: Fd, event_id: u32) -> Result<RawHandle, QueryEventError> {
-        cmif::query_event(self.main_session.session, fd, event_id)
+        cmif::query_event(self.main_session.handle(), fd, event_id)
     }
+}
 
-    /// Consumes and closes the NV service session.
-    pub fn close(self) {
-        // Close clone session first to match libnx behavior
-        self.clone_session.close();
-        self.main_session.close();
+impl Drop for NvService {
+    fn drop(&mut self) {
+        // The `Session` fields (`clone_session`, `main_session`) own their
+        // kernel handles and close them on Drop — no manual `close()` needed.
+        // `clone_session` is declared first so Rust drops it first, matching
+        // libnx's `nvServiceClose()` ordering.
 
         // Wait for transfer memory permission to return to RW, then free backing.
-        // The handle was already closed during connect(), so we just need to wait
-        // for the service to release the memory and then free our backing allocation.
+        // The tmem handle was already closed during `connect()`, so we just
+        // wait for the service to release the memory and then free our backing
+        // allocation.
         if let Some(src) = self.transfer_mem_backing.src {
             let _ = unsafe {
                 tmem::wait_for_permission_raw(
@@ -239,7 +245,12 @@ impl NvService {
             };
         }
 
-        unsafe { tmem::free_backing(self.transfer_mem_backing) };
+        // SAFETY: `transfer_mem_backing` is a struct of plain Copy fields
+        // (an `Option<NonNull<_>>`, `usize`, and bitflags). Moving it out of
+        // `&mut self` via `ptr::read` is safe inside `Drop` because the field
+        // is not accessed again after this call.
+        let backing = unsafe { core::ptr::read(&self.transfer_mem_backing) };
+        unsafe { tmem::free_backing(backing) };
     }
 }
 
@@ -282,12 +293,7 @@ pub fn connect(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectError::GetService)?;
 
-    let main_session = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let main_session = Session::from_handle(handle, 0);
 
     // Create transfer memory
     let transfer_mem = unsafe { tmem::create(config.transfer_mem_size, MemoryPermission::NONE) }
@@ -297,26 +303,25 @@ pub fn connect(
     // SAFETY: We're converting our tmem handle to the expected type for the IPC call.
     // The handle is valid because we just created the transfer memory above.
     if let Err(e) = cmif::initialize(
-        main_session.session,
+        main_session.handle(),
         ProcessHandle::current_process(),
         unsafe { TmemHandle::from_raw(transfer_mem.handle().to_raw()) },
         config.transfer_mem_size as u32,
     ) {
-        // Clean up on failure
+        // Clean up on failure: free the tmem we just created; the main session
+        // closes its kernel handle via RAII when this scope ends.
         let _ = unsafe { tmem::close(transfer_mem) };
-        main_session.close();
         return Err(ConnectError::Initialize(e));
     }
 
     // Close the tmem handle early, matching libnx's tmemCloseHandle() pattern.
     // The service has its own copy of the handle from Initialize().
-    // We keep the backing memory pointer for cleanup in close().
+    // We keep the backing memory pointer for cleanup on Drop.
     let transfer_mem_backing = match unsafe { tmem::close_handle_keep_backing(transfer_mem) } {
         Ok(backing) => backing,
         Err(e) => {
-            // If closing the handle fails, free the backing and clean up
+            // Free the backing; `main_session` is dropped (and closed) on return.
             unsafe { tmem::free_backing(e.backing) };
-            main_session.close();
             return Err(ConnectError::CloseTransferMemHandle(e.reason));
         }
     };
@@ -325,7 +330,7 @@ pub fn connect(
     let clone_session = match main_session.try_clone_ex(1) {
         Ok(s) => s,
         Err(e) => {
-            main_session.close();
+            // Free the backing; `main_session` is dropped (and closed) on return.
             unsafe { tmem::free_backing(transfer_mem_backing) };
             return Err(ConnectError::CloneSession(e));
         }
@@ -334,12 +339,12 @@ pub fn connect(
     // Try to set client PID (best effort, may not have ARUID)
     if let Some(aruid) = aruid {
         // Ignore errors - matches libnx behavior
-        let _ = cmif::set_client_pid(main_session.session, aruid);
+        let _ = cmif::set_client_pid(main_session.handle(), aruid);
     }
 
     Ok(NvService {
-        main_session,
         clone_session,
+        main_session,
         transfer_mem_backing,
     })
 }
@@ -374,5 +379,5 @@ pub enum ConnectError {
     CloseTransferMemHandle(#[source] nx_svc::mem::tmem::CloseHandleError),
     /// Failed to clone session.
     #[error("failed to clone session")]
-    CloneSession(#[source] nx_sf::service::TryCloneExError),
+    CloneSession(#[source] nx_sf::service::CloneObjectExError),
 }
