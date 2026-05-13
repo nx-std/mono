@@ -320,6 +320,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-btm"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-btmsys"
 version = "0.1.0"
 dependencies = [
