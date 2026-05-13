@@ -382,6 +382,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-capsc"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-caps",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-capsdc"
 version = "0.1.0"
 dependencies = [
@@ -574,6 +588,19 @@ dependencies = [
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-service-hidbus"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "nx-sys-thread-tls",
+ "static_assertions",
  "thiserror",
 ]
 
