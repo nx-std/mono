@@ -33,15 +33,10 @@ use crate::{
     WindowController,
     aruid::Aruid,
     role::{
-        Application, ApplicationExtras, DrainExtrasError, LibraryApplet, LibraryAppletExtras,
-        OverlayApplet, OverlayAppletExtras, Role, SystemApplet, SystemAppletExtras,
+        Application, DrainExtrasError, LibraryApplet, OverlayApplet, Role, SystemApplet,
         SystemApplication,
     },
 };
-
-// =====================================================================
-// Core sub-interfaces (universal across all roles)
-// =====================================================================
 
 /// The seven sub-interfaces every AM role exposes (proxy cmds 0–4, 11, 1000).
 pub struct CoreSubInterfaces {
@@ -88,21 +83,7 @@ impl CoreSubInterfaces {
             debug_functions,
         })
     }
-
-    fn close(self) {
-        self.debug_functions.close();
-        self.library_applet_creator.close();
-        self.display_controller.close();
-        self.audio_controller.close();
-        self.window_controller.close();
-        self.self_controller.close();
-        self.common_state_getter.close();
-    }
 }
-
-// =====================================================================
-// Proxy<R>
-// =====================================================================
 
 /// Role-typed proxy bundling every IPC handle AM admits for role `R`.
 pub struct Proxy<R: Role> {
@@ -126,18 +107,6 @@ impl<R: Role> Proxy<R> {
         })
     }
 
-    /// Closes every sub-interface, the proxy, and the root service in reverse
-    /// acquisition order. Consumes `self`.
-    pub fn close(self)
-    where
-        R::Extras: ExtrasClose,
-    {
-        self.extras.close();
-        self.core.close();
-        self.proxy.close();
-        self.service.close();
-    }
-
     /// Returns the underlying root [`AppletService`] (appletOE/appletAE).
     #[inline]
     pub fn service(&self) -> &AppletService {
@@ -155,8 +124,6 @@ impl<R: Role> Proxy<R> {
     pub fn extras(&self) -> &R::Extras {
         &self.extras
     }
-
-    // --- Core sub-interface accessors (available on every role) ---
 
     #[inline]
     pub fn common_state_getter(&self) -> &CommonStateGetter {
@@ -193,8 +160,6 @@ impl<R: Role> Proxy<R> {
         &self.core.debug_functions
     }
 
-    // --- Common convenience methods (universal: IPC accepted from every role) ---
-
     /// `IWindowController::AcquireForegroundRights` (cmd 10).
     ///
     /// AM only acts on this for the foreground-eligible roles; non-Application
@@ -204,42 +169,6 @@ impl<R: Role> Proxy<R> {
         self.window_controller().acquire_foreground_rights()
     }
 }
-
-/// Trait implemented by each `R::Extras` type to permit a generic `close`.
-/// Implemented for every shipped Extras struct in [`crate::role`].
-pub trait ExtrasClose {
-    fn close(self);
-}
-
-impl ExtrasClose for ApplicationExtras {
-    fn close(self) {
-        ApplicationExtras::close(self)
-    }
-}
-
-impl ExtrasClose for LibraryAppletExtras {
-    fn close(self) {
-        LibraryAppletExtras::close(self)
-    }
-}
-
-impl ExtrasClose for SystemAppletExtras {
-    fn close(self) {
-        SystemAppletExtras::close(self)
-    }
-}
-
-impl ExtrasClose for OverlayAppletExtras {
-    fn close(self) {
-        OverlayAppletExtras::close(self)
-    }
-}
-
-// =====================================================================
-// Role-specific methods on Proxy<R>
-// =====================================================================
-
-// --- Application ---
 
 impl Proxy<Application> {
     /// `IApplicationFunctions` (proxy cmd 20).
@@ -279,7 +208,6 @@ impl Proxy<Application> {
     }
 }
 
-// --- SystemApplication ---
 //
 // Shares ApplicationExtras (same `IApplicationProxy` class) but is rejected by
 // AM's runtime gating for SetFocusHandlingMode / SetOutOfFocusSuspendingEnabled.
@@ -298,8 +226,6 @@ impl Proxy<SystemApplication> {
         self.application_functions().notify_running()
     }
 }
-
-// --- LibraryApplet ---
 
 impl Proxy<LibraryApplet> {
     /// `IProcessWindingController` (proxy cmd 10).
@@ -333,8 +259,6 @@ impl Proxy<LibraryApplet> {
     }
 }
 
-// --- SystemApplet ---
-
 impl Proxy<SystemApplet> {
     /// `IGlobalStateController` (proxy cmd 21).
     #[inline]
@@ -355,8 +279,6 @@ impl Proxy<SystemApplet> {
     }
 }
 
-// --- OverlayApplet ---
-
 impl Proxy<OverlayApplet> {
     /// `IAppletCommonFunctions` (proxy cmd 21, HOS 7.0.0+).
     #[inline]
@@ -370,10 +292,6 @@ impl Proxy<OverlayApplet> {
         self.extras.global_state_controller.as_ref()
     }
 }
-
-// =====================================================================
-// Per-role open functions
-// =====================================================================
 
 /// Opens an Application proxy on `appletOE` and drains every sub-interface.
 ///
@@ -439,10 +357,6 @@ fn open<R: Role>(sm: &SmService, process_handle: ProcessHandle) -> Result<Proxy<
     Proxy::<R>::from_session(service, proxy)
 }
 
-// =====================================================================
-// Errors
-// =====================================================================
-
 /// Aggregate error returned by the per-role `open_*` functions.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
@@ -474,10 +388,6 @@ pub enum OpenError {
     #[error("failed to drain role-specific extras")]
     DrainExtras(#[source] DrainExtrasError),
 }
-
-// =====================================================================
-// Convenience: read AppletResourceUserId from the proxy
-// =====================================================================
 
 impl<R: Role> Proxy<R> {
     /// Returns the applet resource user ID, fetched via `IWindowController`.

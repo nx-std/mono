@@ -74,21 +74,10 @@ impl sealed::Sealed for SystemApplet {}
 impl sealed::Sealed for OverlayApplet {}
 impl sealed::Sealed for SystemApplication {}
 
-// =====================================================================
-// Extras structs
-// =====================================================================
-
 /// Sub-interfaces unique to [`Application`] / [`SystemApplication`]
 /// (`IApplicationProxy` class).
 pub struct ApplicationExtras {
     pub application_functions: ApplicationFunctions,
-}
-
-impl ApplicationExtras {
-    /// Closes the application-specific sub-interface sessions.
-    pub fn close(self) {
-        self.application_functions.close();
-    }
 }
 
 /// Sub-interfaces unique to [`LibraryApplet`].
@@ -106,40 +95,12 @@ pub struct LibraryAppletExtras {
     pub global_state_controller: Option<GlobalStateController>,
 }
 
-impl LibraryAppletExtras {
-    pub fn close(self) {
-        self.process_winding_controller.close();
-        if let Some(s) = self.library_applet_self_accessor {
-            s.close();
-        }
-        if let Some(s) = self.home_menu_functions {
-            s.close();
-        }
-        if let Some(s) = self.applet_common_functions {
-            s.close();
-        }
-        if let Some(s) = self.global_state_controller {
-            s.close();
-        }
-    }
-}
-
 /// Sub-interfaces unique to [`SystemApplet`].
 pub struct SystemAppletExtras {
     pub global_state_controller: GlobalStateController,
     pub application_creator: ApplicationCreator,
     /// `IAppletCommonFunctions` (proxy cmd 23 for SystemApplet, HOS 7.0.0+).
     pub applet_common_functions: Option<AppletCommonFunctions>,
-}
-
-impl SystemAppletExtras {
-    pub fn close(self) {
-        self.global_state_controller.close();
-        self.application_creator.close();
-        if let Some(s) = self.applet_common_functions {
-            s.close();
-        }
-    }
 }
 
 /// Sub-interfaces unique to [`OverlayApplet`].
@@ -149,21 +110,6 @@ pub struct OverlayAppletExtras {
     /// `IGlobalStateController` (proxy cmd 23, HOS 15.0.0+).
     pub global_state_controller: Option<GlobalStateController>,
 }
-
-impl OverlayAppletExtras {
-    pub fn close(self) {
-        if let Some(s) = self.applet_common_functions {
-            s.close();
-        }
-        if let Some(s) = self.global_state_controller {
-            s.close();
-        }
-    }
-}
-
-// =====================================================================
-// Role impls
-// =====================================================================
 
 impl Role for Application {
     const APPLET_TYPE: AppletType = AppletType::Application;
@@ -260,10 +206,6 @@ impl Role for OverlayApplet {
         })
     }
 }
-
-// =====================================================================
-// Error type
-// =====================================================================
 
 /// Error returned by [`Role::drain_extras`].
 #[derive(Debug, thiserror::Error)]

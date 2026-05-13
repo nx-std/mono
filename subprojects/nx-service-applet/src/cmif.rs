@@ -6,7 +6,7 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif::ParseResponseError,
-    service::{BufferAttr, DispatchError, Service, ServiceConvertToDomainError},
+    service::{BufferAttr, ConvertToDomainError, DispatchError, Domain, DomainObject},
 };
 use nx_svc::{process::Handle as ProcessHandle, thread};
 
@@ -14,7 +14,7 @@ use crate::{
     AppletCommonFunctions, AppletProxyService, ApplicationCreator, ApplicationFunctions,
     AudioController, CommonStateGetter, DebugFunctions, DisplayController, GlobalStateController,
     HomeMenuFunctions, LibraryAppletCreator, LibraryAppletSelfAccessor, ProcessWindingController,
-    SelfController, WindowController,
+    SelfController, WindowController, alias_domain,
     aruid::Aruid,
     proto::{
         AppletAttribute, AppletFocusHandlingMode, AppletType, CMD_AF_NOTIFY_RUNNING,
@@ -62,7 +62,7 @@ const AM_BUSY_DEFAULT_MAX_RETRIES: u32 = 100;
 /// retries up to [`AM_BUSY_DEFAULT_MAX_RETRIES`] times with a 100ms delay between
 /// attempts, returning [`OpenProxyError::Timeout`] if AM is still busy after that.
 pub fn open_proxy(
-    service: &Service,
+    domain: &Domain,
     applet_type: AppletType,
     process_handle: ProcessHandle,
     attr: Option<&AppletAttribute>,
@@ -91,7 +91,7 @@ pub fn open_proxy(
     let mut attempts: u32 = 0;
     let result = loop {
         // Dispatch builders are consumed by send(); rebuild each iteration.
-        let mut dispatch = service
+        let mut dispatch = domain
             .dispatch(cmd_id)
             .send_pid()
             .in_handle(process_handle.to_raw())
@@ -129,16 +129,13 @@ pub fn open_proxy(
 
     let object_id = result.objects[0];
 
-    // Create proxy as domain subservice by constructing Service directly.
-    // This shares the parent's session handle with a distinct object_id.
-    let proxy_service = Service {
-        session: service.session,
-        own_handle: 0, // Subservice doesn't own the handle
+    // Build the proxy wrapper. The domain alias shares the parent's kernel
+    // handle and the close-on-drop is suppressed; the root [`AppletService`]
+    // closes the kernel handle once on its own [`Drop`].
+    Ok(AppletProxyService {
+        domain: alias_domain(domain),
         object_id,
-        pointer_buffer_size: service.pointer_buffer_size,
-    };
-
-    Ok(AppletProxyService(proxy_service))
+    })
 }
 
 /// Error returned by [`open_proxy`].
@@ -160,7 +157,7 @@ pub enum OpenProxyError {
 
 /// Gets the ICommonStateGetter sub-interface from the proxy.
 pub fn get_common_state_getter(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<CommonStateGetter, GetCommonStateGetterError> {
     let result = proxy
         .dispatch(CMD_GET_COMMON_STATE_GETTER)
@@ -174,15 +171,10 @@ pub fn get_common_state_getter(
 
     let object_id = result.objects[0];
 
-    // Create sub-interface as domain subservice
-    let service = Service {
-        session: proxy.session,
-        own_handle: 0,
+    Ok(CommonStateGetter {
+        domain: alias_domain(proxy.domain()),
         object_id,
-        pointer_buffer_size: proxy.pointer_buffer_size,
-    };
-
-    Ok(CommonStateGetter(service))
+    })
 }
 
 /// Error returned by [`get_common_state_getter`].
@@ -197,7 +189,9 @@ pub enum GetCommonStateGetterError {
 }
 
 /// Gets the ISelfController sub-interface from the proxy.
-pub fn get_self_controller(proxy: &Service) -> Result<SelfController, GetSelfControllerError> {
+pub fn get_self_controller(
+    proxy: &DomainObject<'_>,
+) -> Result<SelfController, GetSelfControllerError> {
     let result = proxy
         .dispatch(CMD_GET_SELF_CONTROLLER)
         .out_objects(1)
@@ -210,15 +204,10 @@ pub fn get_self_controller(proxy: &Service) -> Result<SelfController, GetSelfCon
 
     let object_id = result.objects[0];
 
-    // Create sub-interface as domain subservice
-    let service = Service {
-        session: proxy.session,
-        own_handle: 0,
+    Ok(SelfController {
+        domain: alias_domain(proxy.domain()),
         object_id,
-        pointer_buffer_size: proxy.pointer_buffer_size,
-    };
-
-    Ok(SelfController(service))
+    })
 }
 
 /// Error returned by [`get_self_controller`].
@@ -234,7 +223,7 @@ pub enum GetSelfControllerError {
 
 /// Gets the IWindowController sub-interface from the proxy.
 pub fn get_window_controller(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<WindowController, GetWindowControllerError> {
     let result = proxy
         .dispatch(CMD_GET_WINDOW_CONTROLLER)
@@ -248,15 +237,10 @@ pub fn get_window_controller(
 
     let object_id = result.objects[0];
 
-    // Create sub-interface as domain subservice
-    let service = Service {
-        session: proxy.session,
-        own_handle: 0,
+    Ok(WindowController {
+        domain: alias_domain(proxy.domain()),
         object_id,
-        pointer_buffer_size: proxy.pointer_buffer_size,
-    };
-
-    Ok(WindowController(service))
+    })
 }
 
 /// Error returned by [`get_window_controller`].
@@ -272,7 +256,7 @@ pub enum GetWindowControllerError {
 
 /// Acquires foreground rights via IWindowController.
 pub fn acquire_foreground_rights(
-    window_controller: &Service,
+    window_controller: &DomainObject<'_>,
 ) -> Result<(), AcquireForegroundRightsError> {
     window_controller
         .dispatch(CMD_WC_ACQUIRE_FOREGROUND_RIGHTS)
@@ -309,7 +293,7 @@ pub enum AcquireForegroundRightsError {
 /// fail. The runtime targets modern HOS so this is unconditional here. Callers that
 /// must support <2.0.0 should call cmd 13 and cmd 16 separately and gate the latter.
 pub fn set_focus_handling_mode(
-    self_controller: &Service,
+    self_controller: &DomainObject<'_>,
     mode: AppletFocusHandlingMode,
 ) -> Result<(), SetFocusHandlingModeError> {
     // Translate the high-level mode into the four-flag representation libnx uses.
@@ -359,7 +343,7 @@ pub enum SetFocusHandlingModeError {
 
 /// Sets whether to suspend when out of focus (ISelfController, 2.0.0+).
 pub fn set_out_of_focus_suspending_enabled(
-    self_controller: &Service,
+    self_controller: &DomainObject<'_>,
     enabled: bool,
 ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
     let input: u8 = enabled as u8;
@@ -392,7 +376,7 @@ pub enum ConnectError {
     GetService(#[source] nx_service_sm::GetServiceCmifError),
     /// Failed to convert service to domain.
     #[error("failed to convert to domain")]
-    ConvertToDomain(#[source] ServiceConvertToDomainError),
+    ConvertToDomain(#[source] ConvertToDomainError),
 }
 
 /// Enables operation mode change notifications (ISelfController, cmd 11).
@@ -400,7 +384,7 @@ pub enum ConnectError {
 /// When enabled, the applet receives `OperationModeChanged` messages
 /// when the console transitions between handheld and docked modes.
 pub fn set_operation_mode_changed_notification(
-    self_controller: &Service,
+    self_controller: &DomainObject<'_>,
     enabled: bool,
 ) -> Result<(), SetOperationModeChangedNotificationError> {
     let input: u8 = enabled as u8;
@@ -430,7 +414,7 @@ pub enum SetOperationModeChangedNotificationError {
 /// When enabled, the applet receives `PerformanceModeChanged` messages
 /// when CPU/GPU clock speeds change.
 pub fn set_performance_mode_changed_notification(
-    self_controller: &Service,
+    self_controller: &DomainObject<'_>,
     enabled: bool,
 ) -> Result<(), SetPerformanceModeChangedNotificationError> {
     let input: u8 = enabled as u8;
@@ -462,7 +446,7 @@ pub enum SetPerformanceModeChangedNotificationError {
 ///
 /// Returns `Ok(None)` if the system returns ARUID 0 (invalid).
 pub fn get_applet_resource_user_id(
-    window_controller: &Service,
+    window_controller: &DomainObject<'_>,
 ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
     let result = window_controller
         .dispatch(CMD_WC_GET_APPLET_RESOURCE_USER_ID)
@@ -493,7 +477,7 @@ pub enum GetAppletResourceUserIdError {
 
 /// Gets the IApplicationFunctions sub-interface from the proxy (Application type only).
 pub fn get_application_functions(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
     let result = proxy
         .dispatch(CMD_GET_APPLICATION_FUNCTIONS)
@@ -507,15 +491,10 @@ pub fn get_application_functions(
 
     let object_id = result.objects[0];
 
-    // Create sub-interface as domain subservice
-    let service = Service {
-        session: proxy.session,
-        own_handle: 0,
+    Ok(ApplicationFunctions {
+        domain: alias_domain(proxy.domain()),
         object_id,
-        pointer_buffer_size: proxy.pointer_buffer_size,
-    };
-
-    Ok(ApplicationFunctions(service))
+    })
 }
 
 /// Error returned by [`get_application_functions`].
@@ -533,7 +512,7 @@ pub enum GetApplicationFunctionsError {
 ///
 /// This should be called after waiting for InFocus state, acquiring foreground rights,
 /// and setting up focus handling mode.
-pub fn notify_running(app_funcs: &Service) -> Result<bool, NotifyRunningError> {
+pub fn notify_running(app_funcs: &DomainObject<'_>) -> Result<bool, NotifyRunningError> {
     let result = app_funcs
         .dispatch(CMD_AF_NOTIFY_RUNNING)
         .out_size(size_of::<u8>())
@@ -562,7 +541,7 @@ pub enum NotifyRunningError {
 
 /// Creates a managed display layer (ISelfController, cmd 40).
 pub fn create_managed_display_layer(
-    self_controller: &Service,
+    self_controller: &DomainObject<'_>,
 ) -> Result<u64, CreateManagedDisplayLayerError> {
     let result = self_controller
         .dispatch(CMD_SC_CREATE_MANAGED_DISPLAY_LAYER)
@@ -591,14 +570,6 @@ pub enum CreateManagedDisplayLayerError {
     InvalidResponse,
 }
 
-// ---------------------------------------------------------------------------
-// Generic sub-interface getters
-//
-// The remaining proxy sub-interfaces share an identical "dispatch + extract
-// domain object" shape. They share a single error type and a private helper
-// so adding a new sub-interface is a one-line getter.
-// ---------------------------------------------------------------------------
-
 /// Shared error returned by the generic sub-interface getters.
 ///
 /// Used by every `get_*` method on [`AppletProxyService`] except the four
@@ -615,8 +586,11 @@ pub enum GetSubInterfaceError {
     MissingObject,
 }
 
-/// Generic helper: dispatches `cmd_id` and returns the raw domain subservice.
-fn get_sub_interface(proxy: &Service, cmd_id: u32) -> Result<Service, GetSubInterfaceError> {
+/// Generic helper: dispatches `cmd_id` and returns the raw object id.
+fn get_sub_interface_object_id(
+    proxy: &DomainObject<'_>,
+    cmd_id: u32,
+) -> Result<u32, GetSubInterfaceError> {
     let result = proxy
         .dispatch(cmd_id)
         .out_objects(1)
@@ -627,50 +601,72 @@ fn get_sub_interface(proxy: &Service, cmd_id: u32) -> Result<Service, GetSubInte
         return Err(GetSubInterfaceError::MissingObject);
     }
 
-    Ok(Service {
-        session: proxy.session,
-        own_handle: 0,
-        object_id: result.objects[0],
-        pointer_buffer_size: proxy.pointer_buffer_size,
-    })
+    Ok(result.objects[0])
 }
 
 /// Gets IAudioController (cmd 3).
-pub fn get_audio_controller(proxy: &Service) -> Result<AudioController, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_AUDIO_CONTROLLER).map(AudioController)
+pub fn get_audio_controller(
+    proxy: &DomainObject<'_>,
+) -> Result<AudioController, GetSubInterfaceError> {
+    get_sub_interface_object_id(proxy, CMD_GET_AUDIO_CONTROLLER).map(|object_id| AudioController {
+        domain: alias_domain(proxy.domain()),
+        object_id,
+    })
 }
 
 /// Gets IDisplayController (cmd 4).
-pub fn get_display_controller(proxy: &Service) -> Result<DisplayController, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_DISPLAY_CONTROLLER).map(DisplayController)
+pub fn get_display_controller(
+    proxy: &DomainObject<'_>,
+) -> Result<DisplayController, GetSubInterfaceError> {
+    get_sub_interface_object_id(proxy, CMD_GET_DISPLAY_CONTROLLER).map(|object_id| {
+        DisplayController {
+            domain: alias_domain(proxy.domain()),
+            object_id,
+        }
+    })
 }
 
 /// Gets IProcessWindingController (cmd 10, LibraryApplet only).
 pub fn get_process_winding_controller(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<ProcessWindingController, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_PROCESS_WINDING_CONTROLLER).map(ProcessWindingController)
+    get_sub_interface_object_id(proxy, CMD_GET_PROCESS_WINDING_CONTROLLER).map(|object_id| {
+        ProcessWindingController {
+            domain: alias_domain(proxy.domain()),
+            object_id,
+        }
+    })
 }
 
 /// Gets ILibraryAppletCreator (cmd 11).
 pub fn get_library_applet_creator(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<LibraryAppletCreator, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_LIBRARY_APPLET_CREATOR).map(LibraryAppletCreator)
+    get_sub_interface_object_id(proxy, CMD_GET_LIBRARY_APPLET_CREATOR).map(|object_id| {
+        LibraryAppletCreator {
+            domain: alias_domain(proxy.domain()),
+            object_id,
+        }
+    })
 }
 
 /// Gets ILibraryAppletSelfAccessor (cmd 20, LibraryApplet pre-15.0.0).
 pub fn get_library_applet_self_accessor(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<LibraryAppletSelfAccessor, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_FUNCTIONS_OR_SELF_ACCESSOR).map(LibraryAppletSelfAccessor)
+    get_sub_interface_object_id(proxy, CMD_GET_FUNCTIONS_OR_SELF_ACCESSOR).map(|object_id| {
+        LibraryAppletSelfAccessor {
+            domain: alias_domain(proxy.domain()),
+            object_id,
+        }
+    })
 }
 
 /// Gets IAppletCommonFunctions (cmd 21 for non-SystemApplet, cmd 23 for SystemApplet).
 ///
 /// HOS 7.0.0+. Returns `MissingObject` when called for an unsupported applet type.
 pub fn get_applet_common_functions(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
     applet_type: AppletType,
 ) -> Result<AppletCommonFunctions, GetSubInterfaceError> {
     let cmd_id = match applet_type {
@@ -678,13 +674,16 @@ pub fn get_applet_common_functions(
         AppletType::LibraryApplet | AppletType::OverlayApplet => CMD_GET_APPLET_COMMON_FUNCTIONS,
         _ => return Err(GetSubInterfaceError::MissingObject),
     };
-    get_sub_interface(proxy, cmd_id).map(AppletCommonFunctions)
+    get_sub_interface_object_id(proxy, cmd_id).map(|object_id| AppletCommonFunctions {
+        domain: alias_domain(proxy.domain()),
+        object_id,
+    })
 }
 
 /// Gets IGlobalStateController (cmd 21 for SystemApplet, cmd 23 for
 /// LibraryApplet/OverlayApplet on HOS 15.0.0+).
 pub fn get_global_state_controller(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
     applet_type: AppletType,
 ) -> Result<GlobalStateController, GetSubInterfaceError> {
     let cmd_id = match applet_type {
@@ -694,22 +693,42 @@ pub fn get_global_state_controller(
         }
         _ => return Err(GetSubInterfaceError::MissingObject),
     };
-    get_sub_interface(proxy, cmd_id).map(GlobalStateController)
+    get_sub_interface_object_id(proxy, cmd_id).map(|object_id| GlobalStateController {
+        domain: alias_domain(proxy.domain()),
+        object_id,
+    })
 }
 
 /// Gets IApplicationCreator (cmd 22, SystemApplet only).
 pub fn get_application_creator(
-    proxy: &Service,
+    proxy: &DomainObject<'_>,
 ) -> Result<ApplicationCreator, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_APPLICATION_CREATOR).map(ApplicationCreator)
+    get_sub_interface_object_id(proxy, CMD_GET_APPLICATION_CREATOR).map(|object_id| {
+        ApplicationCreator {
+            domain: alias_domain(proxy.domain()),
+            object_id,
+        }
+    })
 }
 
 /// Gets IHomeMenuFunctions (cmd 22, LibraryApplet on HOS 15.0.0+).
-pub fn get_home_menu_functions(proxy: &Service) -> Result<HomeMenuFunctions, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_APPLICATION_CREATOR).map(HomeMenuFunctions)
+pub fn get_home_menu_functions(
+    proxy: &DomainObject<'_>,
+) -> Result<HomeMenuFunctions, GetSubInterfaceError> {
+    get_sub_interface_object_id(proxy, CMD_GET_APPLICATION_CREATOR).map(|object_id| {
+        HomeMenuFunctions {
+            domain: alias_domain(proxy.domain()),
+            object_id,
+        }
+    })
 }
 
 /// Gets IDebugFunctions (cmd 1000).
-pub fn get_debug_functions(proxy: &Service) -> Result<DebugFunctions, GetSubInterfaceError> {
-    get_sub_interface(proxy, CMD_GET_DEBUG_FUNCTIONS).map(DebugFunctions)
+pub fn get_debug_functions(
+    proxy: &DomainObject<'_>,
+) -> Result<DebugFunctions, GetSubInterfaceError> {
+    get_sub_interface_object_id(proxy, CMD_GET_DEBUG_FUNCTIONS).map(|object_id| DebugFunctions {
+        domain: alias_domain(proxy.domain()),
+        object_id,
+    })
 }

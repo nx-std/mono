@@ -316,8 +316,10 @@
 
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
+use core::mem::ManuallyDrop;
+
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::{Domain, DomainObject, Session};
 use nx_svc::{ipc::Handle as SessionHandle, process::Handle as ProcessHandle, sync::EventHandle};
 
 use crate::aruid::Aruid;
@@ -347,34 +349,65 @@ pub use self::{
     },
 };
 
-/// Defines a sub-interface wrapper with the standard `session/object_id/close` accessors.
+/// Builds a `ManuallyDrop<Domain>` aliasing the kernel handle and pointer-buffer
+/// size of `parent`. The returned domain shares the parent's kernel handle and
+/// must NOT be dropped — its [`Drop`] is suppressed by [`ManuallyDrop`] so the
+/// underlying session is closed exactly once by the owning root [`AppletService`].
+#[inline]
+fn alias_domain(parent: &Domain) -> ManuallyDrop<Domain> {
+    // SAFETY: We are creating an alias of an already-converted domain handle.
+    // The alias' [`Drop`] is suppressed via [`ManuallyDrop`]; the real owner
+    // (the root [`AppletService`]) closes the kernel handle.
+    ManuallyDrop::new(unsafe {
+        Domain::from_handle_unchecked(parent.handle(), parent.pointer_buffer_size())
+    })
+}
+
+/// Defines a sub-interface wrapper that aliases the root domain's kernel handle
+/// and addresses a specific domain object id within it.
 ///
-/// All "stub" sub-interfaces added to provide access to libnx sub-services follow the same
-/// shape — they wrap a domain subservice and expose only the standard accessors. Per-command
-/// methods can be added later as consumers need them.
+/// All "stub" sub-interfaces added to provide access to libnx sub-services follow
+/// the same shape — they share the root domain's session and dispatch against
+/// their `object_id`. The wrappers do not own the kernel handle: the server-side
+/// objects are released when the owning [`AppletService`] (which owns the root
+/// [`Domain`]) is dropped and the kernel cascades object close on its side.
+/// Per-command methods can be added later as consumers need them.
 macro_rules! sub_interface_stub {
     ($(#[$meta:meta])* $name:ident) => {
         $(#[$meta])*
-        #[repr(transparent)]
-        pub struct $name(Service);
+        pub struct $name {
+            /// Alias of the root domain (close suppressed via [`ManuallyDrop`]).
+            domain: ManuallyDrop<Domain>,
+            /// Domain object id this wrapper addresses.
+            object_id: u32,
+        }
 
         impl $name {
             /// Returns the underlying session handle.
             #[inline]
             pub fn session(&self) -> SessionHandle {
-                self.0.session
+                self.domain.handle()
             }
 
-            /// Returns the domain object ID (0 if non-domain).
+            /// Returns the domain object ID.
             #[inline]
             pub fn object_id(&self) -> u32 {
-                self.0.object_id
+                self.object_id
             }
 
-            /// Consumes and closes the interface.
+            /// Borrowed view onto this wrapper's domain object.
+            ///
+            /// The per-object close is suppressed via [`ManuallyDrop`]; the
+            /// underlying server-side object is closed implicitly when the
+            /// owning root [`AppletService`] is dropped.
             #[inline]
-            pub fn close(self) {
-                self.0.close();
+            #[allow(dead_code)]
+            fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
+                ManuallyDrop::new(
+                    self.domain
+                        .open_object_raw(self.object_id)
+                        .expect("sub-interface holds a non-zero domain object id"),
+                )
             }
         }
     };
@@ -461,20 +494,16 @@ sub_interface_stub! {
 ///
 /// This is the root service session, converted to domain mode for efficient
 /// sub-object management. Use [`open_proxy`] to get a proxy for your applet type.
+/// Dropping the service closes the underlying kernel session; the server cascades
+/// object close on its side for every sub-object opened against this domain.
 #[repr(transparent)]
-pub struct AppletService(Service);
+pub struct AppletService(Domain);
 
 impl AppletService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the applet service.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 
     /// Opens a proxy session for the specified applet type.
@@ -520,26 +549,38 @@ impl AppletService {
 /// - `ISelfController` - Focus handling, screenshots, etc.
 /// - `IWindowController` - Foreground rights
 /// - And more depending on applet type
-#[repr(transparent)]
-pub struct AppletProxyService(Service);
+///
+/// The proxy is a domain object of the root [`AppletService`] and is closed
+/// implicitly when the owning [`AppletService`] is dropped.
+pub struct AppletProxyService {
+    /// Alias of the root domain (close suppressed via [`ManuallyDrop`]).
+    domain: ManuallyDrop<Domain>,
+    /// Domain object id of the proxy.
+    object_id: u32,
+}
 
 impl AppletProxyService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
+        self.domain.handle()
     }
 
-    /// Returns the domain object ID of this proxy (0 if non-domain).
+    /// Returns the domain object ID of this proxy.
     #[inline]
     pub fn object_id(&self) -> u32 {
-        self.0.object_id
+        self.object_id
     }
 
-    /// Consumes and closes the proxy service.
+    /// Borrowed view onto the proxy domain object. Per-object close is
+    /// suppressed; the proxy is closed when the parent [`AppletService`] drops.
     #[inline]
-    pub fn close(self) {
-        self.0.close();
+    fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
+        ManuallyDrop::new(
+            self.domain
+                .open_object_raw(self.object_id)
+                .expect("AppletProxyService holds a non-zero domain object id"),
+        )
     }
 
     /// Gets the ICommonStateGetter sub-interface.
@@ -547,7 +588,7 @@ impl AppletProxyService {
     /// Provides access to focus state, operation mode, and message events.
     #[inline]
     pub fn get_common_state_getter(&self) -> Result<CommonStateGetter, GetCommonStateGetterError> {
-        cmif::get_common_state_getter(&self.0)
+        cmif::get_common_state_getter(&self.as_object())
     }
 
     /// Gets the ISelfController sub-interface.
@@ -555,7 +596,7 @@ impl AppletProxyService {
     /// Provides control over focus handling, screenshots, and more.
     #[inline]
     pub fn get_self_controller(&self) -> Result<SelfController, GetSelfControllerError> {
-        cmif::get_self_controller(&self.0)
+        cmif::get_self_controller(&self.as_object())
     }
 
     /// Gets the IWindowController sub-interface.
@@ -563,7 +604,7 @@ impl AppletProxyService {
     /// Provides control over foreground display rights.
     #[inline]
     pub fn get_window_controller(&self) -> Result<WindowController, GetWindowControllerError> {
-        cmif::get_window_controller(&self.0)
+        cmif::get_window_controller(&self.as_object())
     }
 
     /// Gets the IApplicationFunctions sub-interface (Application type only).
@@ -574,19 +615,19 @@ impl AppletProxyService {
     pub fn get_application_functions(
         &self,
     ) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
-        cmif::get_application_functions(&self.0)
+        cmif::get_application_functions(&self.as_object())
     }
 
     /// Gets the IAudioController sub-interface (cmd 3, all applet types).
     #[inline]
     pub fn get_audio_controller(&self) -> Result<AudioController, GetSubInterfaceError> {
-        cmif::get_audio_controller(&self.0)
+        cmif::get_audio_controller(&self.as_object())
     }
 
     /// Gets the IDisplayController sub-interface (cmd 4, all applet types).
     #[inline]
     pub fn get_display_controller(&self) -> Result<DisplayController, GetSubInterfaceError> {
-        cmif::get_display_controller(&self.0)
+        cmif::get_display_controller(&self.as_object())
     }
 
     /// Gets the IProcessWindingController sub-interface (cmd 10, LibraryApplet only).
@@ -594,13 +635,13 @@ impl AppletProxyService {
     pub fn get_process_winding_controller(
         &self,
     ) -> Result<ProcessWindingController, GetSubInterfaceError> {
-        cmif::get_process_winding_controller(&self.0)
+        cmif::get_process_winding_controller(&self.as_object())
     }
 
     /// Gets the ILibraryAppletCreator sub-interface (cmd 11, all applet types).
     #[inline]
     pub fn get_library_applet_creator(&self) -> Result<LibraryAppletCreator, GetSubInterfaceError> {
-        cmif::get_library_applet_creator(&self.0)
+        cmif::get_library_applet_creator(&self.as_object())
     }
 
     /// Gets the ILibraryAppletSelfAccessor sub-interface (cmd 20, LibraryApplet only,
@@ -609,7 +650,7 @@ impl AppletProxyService {
     pub fn get_library_applet_self_accessor(
         &self,
     ) -> Result<LibraryAppletSelfAccessor, GetSubInterfaceError> {
-        cmif::get_library_applet_self_accessor(&self.0)
+        cmif::get_library_applet_self_accessor(&self.as_object())
     }
 
     /// Gets the IAppletCommonFunctions sub-interface (HOS 7.0.0+, non-Application).
@@ -622,7 +663,7 @@ impl AppletProxyService {
         &self,
         applet_type: AppletType,
     ) -> Result<AppletCommonFunctions, GetSubInterfaceError> {
-        cmif::get_applet_common_functions(&self.0, applet_type)
+        cmif::get_applet_common_functions(&self.as_object(), applet_type)
     }
 
     /// Gets the IGlobalStateController sub-interface.
@@ -634,25 +675,25 @@ impl AppletProxyService {
         &self,
         applet_type: AppletType,
     ) -> Result<GlobalStateController, GetSubInterfaceError> {
-        cmif::get_global_state_controller(&self.0, applet_type)
+        cmif::get_global_state_controller(&self.as_object(), applet_type)
     }
 
     /// Gets the IApplicationCreator sub-interface (cmd 22, SystemApplet only).
     #[inline]
     pub fn get_application_creator(&self) -> Result<ApplicationCreator, GetSubInterfaceError> {
-        cmif::get_application_creator(&self.0)
+        cmif::get_application_creator(&self.as_object())
     }
 
     /// Gets the IHomeMenuFunctions sub-interface (cmd 22, LibraryApplet on 15.0.0+).
     #[inline]
     pub fn get_home_menu_functions(&self) -> Result<HomeMenuFunctions, GetSubInterfaceError> {
-        cmif::get_home_menu_functions(&self.0)
+        cmif::get_home_menu_functions(&self.as_object())
     }
 
     /// Gets the IDebugFunctions sub-interface (cmd 1000, all applet types).
     #[inline]
     pub fn get_debug_functions(&self) -> Result<DebugFunctions, GetSubInterfaceError> {
-        cmif::get_debug_functions(&self.0)
+        cmif::get_debug_functions(&self.as_object())
     }
 }
 
@@ -663,26 +704,33 @@ impl AppletProxyService {
 /// - Current focus state
 /// - Operation mode (handheld/docked)
 /// - Performance mode
-#[repr(transparent)]
-pub struct CommonStateGetter(Service);
+///
+/// Closed implicitly when the owning [`AppletService`] is dropped.
+pub struct CommonStateGetter {
+    domain: ManuallyDrop<Domain>,
+    object_id: u32,
+}
 
 impl CommonStateGetter {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
+        self.domain.handle()
     }
 
-    /// Returns the domain object ID (0 if non-domain).
+    /// Returns the domain object ID.
     #[inline]
     pub fn object_id(&self) -> u32 {
-        self.0.object_id
+        self.object_id
     }
 
-    /// Consumes and closes the interface.
     #[inline]
-    pub fn close(self) {
-        self.0.close();
+    fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
+        ManuallyDrop::new(
+            self.domain
+                .open_object_raw(self.object_id)
+                .expect("CommonStateGetter holds a non-zero domain object id"),
+        )
     }
 
     /// Gets the message event handle.
@@ -691,7 +739,7 @@ impl CommonStateGetter {
     /// Use with `ReceiveMessage` to get the actual message.
     #[inline]
     pub fn get_event_handle(&self) -> Result<EventHandle, GetEventHandleError> {
-        common_state::get_event_handle(&self.0)
+        common_state::get_event_handle(&self.as_object())
     }
 
     /// Receives a pending message.
@@ -699,25 +747,25 @@ impl CommonStateGetter {
     /// Returns `Ok(None)` if no message is pending.
     #[inline]
     pub fn receive_message(&self) -> Result<Option<AppletMessage>, ReceiveMessageError> {
-        common_state::receive_message(&self.0)
+        common_state::receive_message(&self.as_object())
     }
 
     /// Gets the current operation mode (handheld/docked).
     #[inline]
     pub fn get_operation_mode(&self) -> Result<AppletOperationMode, GetOperationModeError> {
-        common_state::get_operation_mode(&self.0)
+        common_state::get_operation_mode(&self.as_object())
     }
 
     /// Gets the current performance mode.
     #[inline]
     pub fn get_performance_mode(&self) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
-        common_state::get_performance_mode(&self.0)
+        common_state::get_performance_mode(&self.as_object())
     }
 
     /// Gets the current focus state.
     #[inline]
     pub fn get_current_focus_state(&self) -> Result<AppletFocusState, GetCurrentFocusStateError> {
-        common_state::get_current_focus_state(&self.0)
+        common_state::get_current_focus_state(&self.as_object())
     }
 }
 
@@ -728,26 +776,33 @@ impl CommonStateGetter {
 /// - Out-of-focus suspending
 /// - Screenshots
 /// - And more
-#[repr(transparent)]
-pub struct SelfController(Service);
+///
+/// Closed implicitly when the owning [`AppletService`] is dropped.
+pub struct SelfController {
+    domain: ManuallyDrop<Domain>,
+    object_id: u32,
+}
 
 impl SelfController {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
+        self.domain.handle()
     }
 
-    /// Returns the domain object ID (0 if non-domain).
+    /// Returns the domain object ID.
     #[inline]
     pub fn object_id(&self) -> u32 {
-        self.0.object_id
+        self.object_id
     }
 
-    /// Consumes and closes the interface.
     #[inline]
-    pub fn close(self) {
-        self.0.close();
+    fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
+        ManuallyDrop::new(
+            self.domain
+                .open_object_raw(self.object_id)
+                .expect("SelfController holds a non-zero domain object id"),
+        )
     }
 
     /// Sets the focus handling mode.
@@ -769,7 +824,7 @@ impl SelfController {
         &self,
         mode: AppletFocusHandlingMode,
     ) -> Result<(), SetFocusHandlingModeError> {
-        cmif::set_focus_handling_mode(&self.0, mode)
+        cmif::set_focus_handling_mode(&self.as_object(), mode)
     }
 
     /// Sets whether to suspend when out of focus (HOS 2.0.0+).
@@ -788,7 +843,7 @@ impl SelfController {
         &self,
         enabled: bool,
     ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
-        cmif::set_out_of_focus_suspending_enabled(&self.0, enabled)
+        cmif::set_out_of_focus_suspending_enabled(&self.as_object(), enabled)
     }
 
     /// Enables or disables operation mode change notifications.
@@ -802,7 +857,7 @@ impl SelfController {
         &self,
         enabled: bool,
     ) -> Result<(), SetOperationModeChangedNotificationError> {
-        cmif::set_operation_mode_changed_notification(&self.0, enabled)
+        cmif::set_operation_mode_changed_notification(&self.as_object(), enabled)
     }
 
     /// Enables or disables performance mode change notifications.
@@ -816,7 +871,7 @@ impl SelfController {
         &self,
         enabled: bool,
     ) -> Result<(), SetPerformanceModeChangedNotificationError> {
-        cmif::set_performance_mode_changed_notification(&self.0, enabled)
+        cmif::set_performance_mode_changed_notification(&self.as_object(), enabled)
     }
 
     /// Creates a managed display layer.
@@ -824,33 +879,40 @@ impl SelfController {
     /// Returns the layer ID on success.
     #[inline]
     pub fn create_managed_display_layer(&self) -> Result<u64, CreateManagedDisplayLayerError> {
-        cmif::create_managed_display_layer(&self.0)
+        cmif::create_managed_display_layer(&self.as_object())
     }
 }
 
 /// IWindowController sub-interface.
 ///
 /// Provides control over foreground display rights.
-#[repr(transparent)]
-pub struct WindowController(Service);
+///
+/// Closed implicitly when the owning [`AppletService`] is dropped.
+pub struct WindowController {
+    domain: ManuallyDrop<Domain>,
+    object_id: u32,
+}
 
 impl WindowController {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
+        self.domain.handle()
     }
 
-    /// Returns the domain object ID (0 if non-domain).
+    /// Returns the domain object ID.
     #[inline]
     pub fn object_id(&self) -> u32 {
-        self.0.object_id
+        self.object_id
     }
 
-    /// Consumes and closes the interface.
     #[inline]
-    pub fn close(self) {
-        self.0.close();
+    fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
+        ManuallyDrop::new(
+            self.domain
+                .open_object_raw(self.object_id)
+                .expect("WindowController holds a non-zero domain object id"),
+        )
     }
 
     /// Gets the applet resource user ID.
@@ -864,7 +926,7 @@ impl WindowController {
     pub fn get_applet_resource_user_id(
         &self,
     ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
-        cmif::get_applet_resource_user_id(&self.0)
+        cmif::get_applet_resource_user_id(&self.as_object())
     }
 
     /// Acquires foreground display rights.
@@ -872,7 +934,7 @@ impl WindowController {
     /// Must be called after waiting for `InFocus` state during initialization.
     #[inline]
     pub fn acquire_foreground_rights(&self) -> Result<(), AcquireForegroundRightsError> {
-        cmif::acquire_foreground_rights(&self.0)
+        cmif::acquire_foreground_rights(&self.as_object())
     }
 }
 
@@ -880,26 +942,33 @@ impl WindowController {
 ///
 /// Provides application-specific functionality like NotifyRunning.
 /// Only available for `AppletType::Application` via appletOE.
-#[repr(transparent)]
-pub struct ApplicationFunctions(Service);
+///
+/// Closed implicitly when the owning [`AppletService`] is dropped.
+pub struct ApplicationFunctions {
+    domain: ManuallyDrop<Domain>,
+    object_id: u32,
+}
 
 impl ApplicationFunctions {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
+        self.domain.handle()
     }
 
-    /// Returns the domain object ID (0 if non-domain).
+    /// Returns the domain object ID.
     #[inline]
     pub fn object_id(&self) -> u32 {
-        self.0.object_id
+        self.object_id
     }
 
-    /// Consumes and closes the interface.
     #[inline]
-    pub fn close(self) {
-        self.0.close();
+    fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
+        ManuallyDrop::new(
+            self.domain
+                .open_object_raw(self.object_id)
+                .expect("ApplicationFunctions holds a non-zero domain object id"),
+        )
     }
 
     /// Notifies the system that the application has completed initialization
@@ -909,7 +978,7 @@ impl ApplicationFunctions {
     /// and setting up focus handling mode. Only valid for `AppletType::Application`.
     #[inline]
     pub fn notify_running(&self) -> Result<bool, NotifyRunningError> {
-        cmif::notify_running(&self.0)
+        cmif::notify_running(&self.as_object())
     }
 }
 
@@ -956,17 +1025,13 @@ pub fn connect(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectError::GetService)?;
 
-    // Create service and convert to domain
-    let mut service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
-
-    service
+    // Build an owned session (the pointer-buffer-size query is internal) and
+    // promote it to a domain. On failure the inner [`Session`] is dropped,
+    // closing the kernel handle.
+    let session = Session::new(handle);
+    let domain = session
         .convert_to_domain()
-        .map_err(ConnectError::ConvertToDomain)?;
+        .map_err(|(_session, err)| ConnectError::ConvertToDomain(err))?;
 
-    Ok(Some(AppletService(service)))
+    Ok(Some(AppletService(domain)))
 }

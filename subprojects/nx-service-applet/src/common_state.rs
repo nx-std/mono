@@ -6,7 +6,7 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{DispatchError, OutHandleAttr, Service};
+use nx_sf::service::{DispatchError, DomainObject, OutHandleAttr};
 use nx_svc::sync::EventHandle;
 
 use crate::proto::{
@@ -26,7 +26,7 @@ use crate::proto::{
 /// the handle is signaled and a message has been received, callers MUST reset
 /// the signal manually (e.g. via [`nx_svc::sync::reset_signal`]) or subsequent
 /// waits will return immediately and busy-loop.
-pub fn get_event_handle(csg: &Service) -> Result<EventHandle, GetEventHandleError> {
+pub fn get_event_handle(csg: &DomainObject<'_>) -> Result<EventHandle, GetEventHandleError> {
     let result = csg
         .dispatch(CMD_CSG_GET_EVENT_HANDLE)
         .out_handle(0, OutHandleAttr::Copy)
@@ -55,7 +55,9 @@ pub enum GetEventHandleError {
 /// Receives a pending message from ICommonStateGetter.
 ///
 /// Returns `Ok(None)` if no message is pending (error 0x680).
-pub fn receive_message(csg: &Service) -> Result<Option<AppletMessage>, ReceiveMessageError> {
+pub fn receive_message(
+    csg: &DomainObject<'_>,
+) -> Result<Option<AppletMessage>, ReceiveMessageError> {
     let result = csg
         .dispatch(CMD_CSG_RECEIVE_MESSAGE)
         .out_size(size_of::<u32>())
@@ -99,7 +101,9 @@ pub enum ReceiveMessageError {
 }
 
 /// Gets the current operation mode from ICommonStateGetter.
-pub fn get_operation_mode(csg: &Service) -> Result<AppletOperationMode, GetOperationModeError> {
+pub fn get_operation_mode(
+    csg: &DomainObject<'_>,
+) -> Result<AppletOperationMode, GetOperationModeError> {
     let result = csg
         .dispatch(CMD_CSG_GET_OPERATION_MODE)
         .out_size(size_of::<u8>())
@@ -130,7 +134,7 @@ pub enum GetOperationModeError {
 
 /// Gets the current performance mode from ICommonStateGetter.
 pub fn get_performance_mode(
-    csg: &Service,
+    csg: &DomainObject<'_>,
 ) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
     let result = csg
         .dispatch(CMD_CSG_GET_PERFORMANCE_MODE)
@@ -163,7 +167,7 @@ pub enum GetPerformanceModeError {
 
 /// Gets the current focus state from ICommonStateGetter.
 pub fn get_current_focus_state(
-    csg: &Service,
+    csg: &DomainObject<'_>,
 ) -> Result<AppletFocusState, GetCurrentFocusStateError> {
     let result = csg
         .dispatch(CMD_CSG_GET_CURRENT_FOCUS_STATE)
