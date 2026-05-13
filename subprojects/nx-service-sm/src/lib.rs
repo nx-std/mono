@@ -17,7 +17,7 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 pub use nx_sf::ServiceName;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
 mod cmif;
@@ -47,19 +47,13 @@ const CONNECT_RETRY_SLEEP_NS: u64 = 50_000_000; // 50ms
 ///
 /// Provides type safety to distinguish SM sessions from regular services.
 #[repr(transparent)]
-pub struct SmService(Service);
+pub struct SmService(Session);
 
 impl SmService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the SM session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 }
 
@@ -71,7 +65,7 @@ impl SmService {
         &self,
         name: ServiceName,
     ) -> Result<SessionHandle, GetServiceCmifError> {
-        cmif::get_service_handle(self.0.session, name)
+        cmif::get_service_handle(self.0.handle(), name)
     }
 
     /// Registers a service using CMIF protocol.
@@ -82,7 +76,7 @@ impl SmService {
         is_light: bool,
         max_sessions: i32,
     ) -> Result<SessionHandle, RegisterServiceCmifError> {
-        cmif::register_service(self.0.session, name, is_light, max_sessions)
+        cmif::register_service(self.0.handle(), name, is_light, max_sessions)
     }
 
     /// Unregisters a service using CMIF protocol.
@@ -91,7 +85,7 @@ impl SmService {
         &self,
         name: ServiceName,
     ) -> Result<(), UnregisterServiceCmifError> {
-        cmif::unregister_service(self.0.session, name)
+        cmif::unregister_service(self.0.handle(), name)
     }
 
     /// Detaches the client using CMIF protocol.
@@ -99,7 +93,7 @@ impl SmService {
     /// Only available on HOS 11.0.0-11.0.1.
     #[inline]
     pub fn detach_client_cmif(&self) -> Result<(), DetachClientCmifError> {
-        cmif::detach_client(self.0.session)
+        cmif::detach_client(self.0.handle())
     }
 }
 
@@ -115,7 +109,7 @@ impl SmService {
         &self,
         name: ServiceName,
     ) -> Result<SessionHandle, GetServiceTipcError> {
-        tipc::get_service_handle(self.0.session, name)
+        tipc::get_service_handle(self.0.handle(), name)
     }
 
     /// Registers a service using TIPC protocol.
@@ -126,7 +120,7 @@ impl SmService {
         is_light: bool,
         max_sessions: i32,
     ) -> Result<SessionHandle, RegisterServiceTipcError> {
-        tipc::register_service(self.0.session, name, is_light, max_sessions)
+        tipc::register_service(self.0.handle(), name, is_light, max_sessions)
     }
 
     /// Unregisters a service using TIPC protocol.
@@ -135,7 +129,7 @@ impl SmService {
         &self,
         name: ServiceName,
     ) -> Result<(), UnregisterServiceTipcError> {
-        tipc::unregister_service(self.0.session, name)
+        tipc::unregister_service(self.0.handle(), name)
     }
 
     /// Detaches the client using TIPC protocol.
@@ -143,7 +137,7 @@ impl SmService {
     /// Only available on Atmosphere.
     #[inline]
     pub fn detach_client_tipc(&self) -> Result<(), DetachClientTipcError> {
-        tipc::detach_client(self.0.session)
+        tipc::detach_client(self.0.handle())
     }
 }
 
@@ -166,18 +160,11 @@ pub fn connect() -> Result<SmService, ConnectError> {
         }
     };
 
-    // Create a minimal service (no pointer buffer query yet)
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    // Send RegisterClient (command 0) via CMIF with send_pid=true.
+    // pointer_buffer_size is 0 because SM doesn't use pointer buffers.
+    cmif::register_client(handle).map_err(ConnectError::RegisterClient)?;
 
-    // Send RegisterClient (command 0) via CMIF with send_pid=true
-    cmif::register_client(service.session).map_err(ConnectError::RegisterClient)?;
-
-    Ok(SmService(service))
+    Ok(SmService(Session::from_handle(handle, 0)))
 }
 
 /// Error returned by [`connect`].
