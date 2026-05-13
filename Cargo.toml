@@ -17,6 +17,7 @@ members = [
     "subprojects/nx-service-audin",
     "subprojects/nx-service-audout",
     "subprojects/nx-service-audrec",
+    "subprojects/nx-service-audren",
     "subprojects/nx-service-avm",
     "subprojects/nx-service-bpc",
     "subprojects/nx-service-bsd",
