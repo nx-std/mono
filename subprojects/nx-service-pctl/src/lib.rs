@@ -155,11 +155,13 @@ impl PctlService {
     /// `Domain` is dropped.
     #[inline]
     fn subobject(&self) -> ManuallyDrop<DomainObject<'_>> {
-        ManuallyDrop::new(
-            self.factory
-                .open_object_raw(self.object_id)
-                .expect("PctlService holds a non-zero sub-object id"),
-        )
+        // SAFETY: `object_id` was returned by `create_service*` and the
+        // server-side object stays alive for the lifetime of `self.factory`.
+        // `subobject` returns a `ManuallyDrop`, so the per-call view is the
+        // only live `DomainObject` for that id at a time.
+        let object = unsafe { self.factory.open_object_raw(self.object_id) }
+            .expect("PctlService holds a non-zero sub-object id");
+        ManuallyDrop::new(object)
     }
 }
 

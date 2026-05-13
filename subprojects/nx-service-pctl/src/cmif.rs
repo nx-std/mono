@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the parental controls service.
 
-use core::mem::size_of;
+use core::mem::{ManuallyDrop, size_of};
 
 use nx_sf::service::{DispatchError, Domain, DomainObject, OutHandleAttr};
 
@@ -12,35 +12,26 @@ use crate::{
 
 /// Creates an IParentalControlService sub-object (pre-4.0.0 wire format).
 ///
-/// Sends PID and returns the raw sub-object ID.
+/// Sends PID. Returns the raw sub-object id; the underlying [`DomainObject`]
+/// is kept alive via [`ManuallyDrop`] so the factory can re-open it per call.
 pub(crate) fn create_service_legacy(domain: &Domain) -> Result<u32, CreateServiceError> {
-    let pid_reserved: u64 = 0;
-    // SAFETY: `pid_reserved` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::CREATE_SERVICE_LEGACY)
-            .in_raw((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
-            .send_pid()
-            .out_objects(1)
-            .send()
-            .map_err(CreateServiceError::Dispatch)?
-    };
-
-    if result.objects.is_empty() {
-        return Err(CreateServiceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    create_service_at(domain, proto::CREATE_SERVICE_LEGACY)
 }
 
 /// Creates an IParentalControlService sub-object (4.0.0+ wire format).
 ///
-/// Sends PID and returns the raw sub-object ID.
+/// Sends PID. Returns the raw sub-object id; the underlying [`DomainObject`]
+/// is kept alive via [`ManuallyDrop`] so the factory can re-open it per call.
 pub(crate) fn create_service(domain: &Domain) -> Result<u32, CreateServiceError> {
+    create_service_at(domain, proto::CREATE_SERVICE)
+}
+
+fn create_service_at(domain: &Domain, cmd_id: u32) -> Result<u32, CreateServiceError> {
     let pid_reserved: u64 = 0;
     // SAFETY: `pid_reserved` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
-            .dispatch(proto::CREATE_SERVICE)
+            .dispatch(cmd_id)
             .in_raw((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
             .send_pid()
             .out_objects(1)
@@ -48,10 +39,10 @@ pub(crate) fn create_service(domain: &Domain) -> Result<u32, CreateServiceError>
             .map_err(CreateServiceError::Dispatch)?
     };
 
-    if result.objects.is_empty() {
-        return Err(CreateServiceError::MissingObject);
-    }
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateServiceError::MissingObject)?;
+    Ok(ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Confirms launch-application permission (post-init on 4.0.0+).
