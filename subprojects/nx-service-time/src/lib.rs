@@ -16,7 +16,7 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 use core::ptr::NonNull;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 use nx_sys_mem::shmem::{self as sys_shmem, Mapped, Permissions};
 
@@ -48,17 +48,17 @@ const SHMEM_SIZE: usize = 0x1000;
 ///
 /// Provides access to system clocks, steady clock, and timezone operations.
 pub struct TimeService {
-    service: Service,
-    user_system_clock: Service,
-    network_system_clock: Option<Service>,
-    steady_clock: Service,
-    timezone_service: Service,
+    service: Session,
+    user_system_clock: Session,
+    network_system_clock: Option<Session>,
+    steady_clock: Session,
+    timezone_service: Session,
     shmem_ptr: Option<NonNull<u8>>,
     _shmem: Option<sys_shmem::SharedMemory<Mapped>>,
 }
 
 // SAFETY: TimeService is safe to send across threads because:
-// - All Service instances are just session handles (u32)
+// - All Session instances are just session handles (u32)
 // - shmem_ptr points to read-only shared memory that is thread-safe
 // - _shmem manages a kernel shared memory handle which is thread-safe
 unsafe impl Send for TimeService {}
@@ -72,48 +72,37 @@ impl TimeService {
     /// Returns the underlying service session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.service.session
+        self.service.handle()
     }
 
     /// Returns the user system clock session handle.
     #[inline]
     pub fn user_system_clock_session(&self) -> SessionHandle {
-        self.user_system_clock.session
+        self.user_system_clock.handle()
     }
 
     /// Returns the network system clock session handle, if available.
     #[inline]
     pub fn network_system_clock_session(&self) -> Option<SessionHandle> {
-        self.network_system_clock.as_ref().map(|svc| svc.session)
+        self.network_system_clock.as_ref().map(|svc| svc.handle())
     }
 
     /// Returns the steady clock session handle.
     #[inline]
     pub fn steady_clock_session(&self) -> SessionHandle {
-        self.steady_clock.session
+        self.steady_clock.handle()
     }
 
     /// Returns the timezone service session handle.
     #[inline]
     pub fn timezone_service_session(&self) -> SessionHandle {
-        self.timezone_service.session
+        self.timezone_service.handle()
     }
 
     /// Returns the shared memory pointer if available (6.0.0+).
     #[inline]
     pub fn shared_memory_ptr(&self) -> Option<*const u8> {
         self.shmem_ptr.map(|ptr| ptr.as_ptr() as *const u8)
-    }
-
-    /// Consumes and closes the time service session.
-    pub fn close(self) {
-        self.service.close();
-        self.user_system_clock.close();
-        if let Some(svc) = self.network_system_clock {
-            svc.close();
-        }
-        self.steady_clock.close();
-        self.timezone_service.close();
     }
 
     /// Gets the current time from the specified clock type.
@@ -128,11 +117,11 @@ impl TimeService {
 
         // Fall back to IPC call
         let session = match clock_type {
-            TimeType::UserSystemClock => self.user_system_clock.session,
+            TimeType::UserSystemClock => self.user_system_clock.handle(),
             TimeType::NetworkSystemClock => self
                 .network_system_clock
                 .as_ref()
-                .map(|svc| svc.session)
+                .map(|svc| svc.handle())
                 .ok_or(GetCurrentTimeError::NetworkClockUnavailable)?,
             TimeType::LocalSystemClock => {
                 // LocalSystemClock not supported in minimal scope
@@ -194,7 +183,7 @@ impl TimeService {
         &self,
         timestamp: u64,
     ) -> Result<(TimeCalendarTime, TimeCalendarAdditionalInfo), ToCalendarTimeError> {
-        cmif::to_calendar_time_with_my_rule(self.timezone_service.session, timestamp)
+        cmif::to_calendar_time_with_my_rule(self.timezone_service.handle(), timestamp)
     }
 }
 
@@ -222,58 +211,33 @@ pub fn connect(sm: &SmService, service_type: TimeServiceType) -> Result<TimeServ
         .get_service_handle_cmif(service_name)
         .map_err(ConnectError::GetService)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     // Get user system clock (always required)
-    let user_clock_handle = cmif::get_standard_user_system_clock(service.session)
+    let user_clock_handle = cmif::get_standard_user_system_clock(service.handle())
         .map_err(ConnectError::GetUserSystemClock)?;
 
-    let user_system_clock = Service {
-        session: user_clock_handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let user_system_clock = Session::from_handle(user_clock_handle, 0);
 
     // Get network system clock (best effort, may fail)
-    let network_system_clock = cmif::get_standard_network_system_clock(service.session)
+    let network_system_clock = cmif::get_standard_network_system_clock(service.handle())
         .ok()
-        .map(|handle| Service {
-            session: handle,
-            own_handle: 1,
-            object_id: 0,
-            pointer_buffer_size: 0,
-        });
+        .map(|handle| Session::from_handle(handle, 0));
 
     // Get steady clock
     let steady_clock_handle =
-        cmif::get_standard_steady_clock(service.session).map_err(ConnectError::GetSteadyClock)?;
+        cmif::get_standard_steady_clock(service.handle()).map_err(ConnectError::GetSteadyClock)?;
 
-    let steady_clock = Service {
-        session: steady_clock_handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let steady_clock = Session::from_handle(steady_clock_handle, 0);
 
     // Get timezone service
     let timezone_handle =
-        cmif::get_time_zone_service(service.session).map_err(ConnectError::GetTimeZoneService)?;
+        cmif::get_time_zone_service(service.handle()).map_err(ConnectError::GetTimeZoneService)?;
 
-    let timezone_service = Service {
-        session: timezone_handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let timezone_service = Session::from_handle(timezone_handle, 0);
 
     // Try to get shared memory (6.0.0+, best effort)
-    let (shmem_ptr, _shmem) = match cmif::get_shared_memory_native_handle(service.session) {
+    let (shmem_ptr, _shmem) = match cmif::get_shared_memory_native_handle(service.handle()) {
         Ok(shmem_handle) => {
             // Map shared memory (0x1000 bytes, read-only)
             let shmem_unmapped = sys_shmem::load_remote(shmem_handle, SHMEM_SIZE, Permissions::R);
