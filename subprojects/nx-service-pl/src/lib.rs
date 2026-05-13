@@ -18,7 +18,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -38,19 +38,13 @@ pub use self::{
 ///
 /// Wraps a connection to either `pl:u` or `pl:s`.
 #[repr(transparent)]
-pub struct PlService(Service);
+pub struct PlService(Session);
 
 impl PlService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 }
 
@@ -59,7 +53,7 @@ impl PlService {
     /// Requests loading of a shared font into shared memory.
     #[inline]
     pub fn request_load(&self, font_type: u32) -> Result<(), RequestLoadError> {
-        cmif::request_load(self.0.session, font_type)
+        cmif::request_load(self.0.handle(), font_type)
     }
 
     /// Gets the load state of a shared font.
@@ -67,13 +61,13 @@ impl PlService {
     /// Returns the load state: 0 = not loaded, 1 = loaded.
     #[inline]
     pub fn get_load_state(&self, font_type: u32) -> Result<u32, GetLoadStateError> {
-        cmif::get_load_state(self.0.session, font_type)
+        cmif::get_load_state(self.0.handle(), font_type)
     }
 
     /// Gets the size of a shared font in bytes.
     #[inline]
     pub fn get_size(&self, font_type: u32) -> Result<u32, GetSizeError> {
-        cmif::get_size(self.0.session, font_type)
+        cmif::get_size(self.0.handle(), font_type)
     }
 
     /// Gets the byte offset of a shared font within shared memory.
@@ -82,7 +76,7 @@ impl PlService {
         &self,
         font_type: u32,
     ) -> Result<u32, GetSharedMemoryAddressOffsetError> {
-        cmif::get_shared_memory_address_offset(self.0.session, font_type)
+        cmif::get_shared_memory_address_offset(self.0.handle(), font_type)
     }
 
     /// Gets the shared memory native handle (copy handle).
@@ -91,7 +85,7 @@ impl PlService {
     /// the font shared memory region (0x1100000 bytes, read-only).
     #[inline]
     pub fn get_shared_memory_native_handle(&self) -> Result<u32, GetSharedMemoryNativeHandleError> {
-        cmif::get_shared_memory_native_handle(self.0.session)
+        cmif::get_shared_memory_native_handle(self.0.handle())
     }
 
     /// Gets shared fonts for a language code.
@@ -110,7 +104,7 @@ impl PlService {
         offsets: &mut [u32],
         sizes: &mut [u32],
     ) -> Result<GetSharedFontOut, GetSharedFontError> {
-        cmif::get_shared_font(self.0.session, language_code, types, offsets, sizes)
+        cmif::get_shared_font(self.0.handle(), language_code, types, offsets, sizes)
     }
 }
 
@@ -120,12 +114,7 @@ pub fn connect_plu_cmif(sm: &SmService) -> Result<PlService, ConnectPluCmifError
         .get_service_handle_cmif(PLU_SERVICE_NAME)
         .map_err(ConnectPluCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(PlService(service))
 }
@@ -141,12 +130,7 @@ pub fn connect_pls_cmif(sm: &SmService) -> Result<PlService, ConnectPlsCmifError
         .get_service_handle_cmif(PLS_SERVICE_NAME)
         .map_err(ConnectPlsCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(PlService(service))
 }
