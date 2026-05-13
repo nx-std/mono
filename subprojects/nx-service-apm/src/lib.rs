@@ -14,7 +14,7 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Service;
+use nx_sf::service::Session;
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -32,19 +32,13 @@ pub use self::{
 ///
 /// Provides type safety to distinguish APM sessions from other services.
 #[repr(transparent)]
-pub struct ApmService(Service);
+pub struct ApmService(Session);
 
 impl ApmService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the APM service session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 
     /// Opens an ISession for performance configuration.
@@ -53,14 +47,8 @@ impl ApmService {
     /// configurations.
     #[inline]
     pub fn open_session(&self) -> Result<ApmSession, OpenSessionError> {
-        let session_handle = cmif::open_session(self.0.session)?;
-        let service = Service {
-            session: session_handle,
-            own_handle: 1,
-            object_id: 0,
-            pointer_buffer_size: 0,
-        };
-        Ok(ApmSession(service))
+        let session_handle = cmif::open_session(self.0.handle())?;
+        Ok(ApmSession(Session::from_handle(session_handle, 0)))
     }
 
     /// Gets the current performance mode.
@@ -68,7 +56,7 @@ impl ApmService {
     /// Returns either [`PerformanceMode::Normal`] or [`PerformanceMode::Boost`].
     #[inline]
     pub fn get_performance_mode(&self) -> Result<PerformanceMode, GetPerformanceModeError> {
-        cmif::get_performance_mode(self.0.session)
+        cmif::get_performance_mode(self.0.handle())
     }
 }
 
@@ -76,19 +64,13 @@ impl ApmService {
 ///
 /// Provides per-session performance configuration management.
 #[repr(transparent)]
-pub struct ApmSession(Service);
+pub struct ApmSession(Session);
 
 impl ApmSession {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the APM session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 
     /// Sets the performance configuration for a given mode.
@@ -110,7 +92,7 @@ impl ApmSession {
         mode: PerformanceMode,
         config: u32,
     ) -> Result<(), SetPerformanceConfigurationError> {
-        cmif::set_performance_configuration(self.0.session, mode, config)
+        cmif::set_performance_configuration(self.0.handle(), mode, config)
     }
 
     /// Gets the performance configuration for a given mode.
@@ -121,7 +103,7 @@ impl ApmSession {
         &self,
         mode: PerformanceMode,
     ) -> Result<u32, GetPerformanceConfigurationError> {
-        cmif::get_performance_configuration(self.0.session, mode)
+        cmif::get_performance_configuration(self.0.handle(), mode)
     }
 }
 
@@ -139,14 +121,7 @@ pub fn connect(sm: &SmService) -> Result<ApmService, ConnectError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectError::GetService)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
-
-    Ok(ApmService(service))
+    Ok(ApmService(Session::from_handle(handle, 0)))
 }
 
 /// Error returned by [`connect`].
