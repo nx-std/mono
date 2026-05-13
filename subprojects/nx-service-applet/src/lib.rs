@@ -403,11 +403,12 @@ macro_rules! sub_interface_stub {
             #[inline]
             #[allow(dead_code)]
             fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-                ManuallyDrop::new(
-                    self.domain
-                        .open_object_raw(self.object_id)
-                        .expect("sub-interface holds a non-zero domain object id"),
-                )
+                // SAFETY: `object_id` was returned by the server within this
+                // sub-interface's parent domain; the `ManuallyDrop` view is
+                // the only live `DomainObject` for this id at a time.
+                let object = unsafe { self.domain.open_object_raw(self.object_id) }
+                    .expect("sub-interface holds a non-zero domain object id");
+                ManuallyDrop::new(object)
             }
         }
     };
@@ -576,11 +577,12 @@ impl AppletProxyService {
     /// suppressed; the proxy is closed when the parent [`AppletService`] drops.
     #[inline]
     fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-        ManuallyDrop::new(
-            self.domain
-                .open_object_raw(self.object_id)
-                .expect("AppletProxyService holds a non-zero domain object id"),
-        )
+        // SAFETY: `object_id` was returned by the server within this proxy's
+        // parent domain; the `ManuallyDrop` view is the only live
+        // `DomainObject` for this id at a time.
+        let object = unsafe { self.domain.open_object_raw(self.object_id) }
+            .expect("AppletProxyService holds a non-zero domain object id");
+        ManuallyDrop::new(object)
     }
 
     /// Gets the ICommonStateGetter sub-interface.
@@ -726,11 +728,10 @@ impl CommonStateGetter {
 
     #[inline]
     fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-        ManuallyDrop::new(
-            self.domain
-                .open_object_raw(self.object_id)
-                .expect("CommonStateGetter holds a non-zero domain object id"),
-        )
+        // SAFETY: see `AppletProxyService::as_object`.
+        let object = unsafe { self.domain.open_object_raw(self.object_id) }
+            .expect("CommonStateGetter holds a non-zero domain object id");
+        ManuallyDrop::new(object)
     }
 
     /// Gets the message event handle.
@@ -798,11 +799,10 @@ impl SelfController {
 
     #[inline]
     fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-        ManuallyDrop::new(
-            self.domain
-                .open_object_raw(self.object_id)
-                .expect("SelfController holds a non-zero domain object id"),
-        )
+        // SAFETY: see `AppletProxyService::as_object`.
+        let object = unsafe { self.domain.open_object_raw(self.object_id) }
+            .expect("SelfController holds a non-zero domain object id");
+        ManuallyDrop::new(object)
     }
 
     /// Sets the focus handling mode.
@@ -908,11 +908,10 @@ impl WindowController {
 
     #[inline]
     fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-        ManuallyDrop::new(
-            self.domain
-                .open_object_raw(self.object_id)
-                .expect("WindowController holds a non-zero domain object id"),
-        )
+        // SAFETY: see `AppletProxyService::as_object`.
+        let object = unsafe { self.domain.open_object_raw(self.object_id) }
+            .expect("WindowController holds a non-zero domain object id");
+        ManuallyDrop::new(object)
     }
 
     /// Gets the applet resource user ID.
@@ -964,11 +963,10 @@ impl ApplicationFunctions {
 
     #[inline]
     fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-        ManuallyDrop::new(
-            self.domain
-                .open_object_raw(self.object_id)
-                .expect("ApplicationFunctions holds a non-zero domain object id"),
-        )
+        // SAFETY: see `AppletProxyService::as_object`.
+        let object = unsafe { self.domain.open_object_raw(self.object_id) }
+            .expect("ApplicationFunctions holds a non-zero domain object id");
+        ManuallyDrop::new(object)
     }
 
     /// Notifies the system that the application has completed initialization

@@ -89,7 +89,7 @@ pub fn open_proxy(
     let reserved: u64 = 0;
 
     let mut attempts: u32 = 0;
-    let result = loop {
+    let mut result = loop {
         // Dispatch builders are consumed by send(); rebuild each iteration.
         let mut dispatch = domain
             .dispatch(cmd_id)
@@ -122,12 +122,11 @@ pub fn open_proxy(
         }
     };
 
-    // Extract the domain object ID for the proxy
-    if result.objects.is_empty() {
-        return Err(OpenProxyError::MissingObject);
-    }
-
-    let object_id = result.objects[0];
+    // Extract the proxy domain object id; keep it alive via `ManuallyDrop`
+    // so the server-side object outlives this call and the proxy wrapper
+    // can re-open it through `alias_domain`.
+    let object = result.take_object(0).ok_or(OpenProxyError::MissingObject)?;
+    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
 
     // Build the proxy wrapper. The domain alias shares the parent's kernel
     // handle and the close-on-drop is suppressed; the root [`AppletService`]
@@ -159,17 +158,16 @@ pub enum OpenProxyError {
 pub fn get_common_state_getter(
     proxy: &DomainObject<'_>,
 ) -> Result<CommonStateGetter, GetCommonStateGetterError> {
-    let result = proxy
+    let mut result = proxy
         .dispatch(CMD_GET_COMMON_STATE_GETTER)
         .out_objects(1)
         .send()
         .map_err(GetCommonStateGetterError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetCommonStateGetterError::MissingObject);
-    }
-
-    let object_id = result.objects[0];
+    let object = result
+        .take_object(0)
+        .ok_or(GetCommonStateGetterError::MissingObject)?;
+    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
 
     Ok(CommonStateGetter {
         domain: alias_domain(proxy.domain()),
@@ -192,17 +190,16 @@ pub enum GetCommonStateGetterError {
 pub fn get_self_controller(
     proxy: &DomainObject<'_>,
 ) -> Result<SelfController, GetSelfControllerError> {
-    let result = proxy
+    let mut result = proxy
         .dispatch(CMD_GET_SELF_CONTROLLER)
         .out_objects(1)
         .send()
         .map_err(GetSelfControllerError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetSelfControllerError::MissingObject);
-    }
-
-    let object_id = result.objects[0];
+    let object = result
+        .take_object(0)
+        .ok_or(GetSelfControllerError::MissingObject)?;
+    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
 
     Ok(SelfController {
         domain: alias_domain(proxy.domain()),
@@ -225,17 +222,16 @@ pub enum GetSelfControllerError {
 pub fn get_window_controller(
     proxy: &DomainObject<'_>,
 ) -> Result<WindowController, GetWindowControllerError> {
-    let result = proxy
+    let mut result = proxy
         .dispatch(CMD_GET_WINDOW_CONTROLLER)
         .out_objects(1)
         .send()
         .map_err(GetWindowControllerError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetWindowControllerError::MissingObject);
-    }
-
-    let object_id = result.objects[0];
+    let object = result
+        .take_object(0)
+        .ok_or(GetWindowControllerError::MissingObject)?;
+    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
 
     Ok(WindowController {
         domain: alias_domain(proxy.domain()),
@@ -479,17 +475,16 @@ pub enum GetAppletResourceUserIdError {
 pub fn get_application_functions(
     proxy: &DomainObject<'_>,
 ) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
-    let result = proxy
+    let mut result = proxy
         .dispatch(CMD_GET_APPLICATION_FUNCTIONS)
         .out_objects(1)
         .send()
         .map_err(GetApplicationFunctionsError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetApplicationFunctionsError::MissingObject);
-    }
-
-    let object_id = result.objects[0];
+    let object = result
+        .take_object(0)
+        .ok_or(GetApplicationFunctionsError::MissingObject)?;
+    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
 
     Ok(ApplicationFunctions {
         domain: alias_domain(proxy.domain()),
@@ -587,21 +582,23 @@ pub enum GetSubInterfaceError {
 }
 
 /// Generic helper: dispatches `cmd_id` and returns the raw object id.
+/// The freshly-minted `DomainObject` is wrapped in `ManuallyDrop` so the
+/// server-side object outlives this call; the caller re-opens the id via
+/// the long-lived parent domain.
 fn get_sub_interface_object_id(
     proxy: &DomainObject<'_>,
     cmd_id: u32,
 ) -> Result<u32, GetSubInterfaceError> {
-    let result = proxy
+    let mut result = proxy
         .dispatch(cmd_id)
         .out_objects(1)
         .send()
         .map_err(GetSubInterfaceError::Dispatch)?;
 
-    if result.objects.is_empty() {
-        return Err(GetSubInterfaceError::MissingObject);
-    }
-
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(GetSubInterfaceError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Gets IAudioController (cmd 3).
