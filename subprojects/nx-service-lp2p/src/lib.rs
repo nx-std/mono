@@ -111,8 +111,9 @@ impl Lp2pNetworkService<'_> {
         results: &mut [Lp2pScanResult],
     ) -> Result<i32, DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::scan(&object, info, results)
     }
@@ -120,8 +121,9 @@ impl Lp2pNetworkService<'_> {
     /// Creates a group (cmd 768).
     pub fn create_group(&self, info: &Lp2pGroupInfo) -> Result<(), DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::create_group(&object, info)
     }
@@ -129,8 +131,9 @@ impl Lp2pNetworkService<'_> {
     /// Destroys the previously created group (cmd 776).
     pub fn destroy_group(&self) -> Result<(), DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::destroy_group(&object)
     }
@@ -138,8 +141,9 @@ impl Lp2pNetworkService<'_> {
     /// Sets the advertise data for the current group (cmd 784).
     pub fn set_advertise_data(&self, data: &[u8]) -> Result<(), DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::set_advertise_data(&object, data)
     }
@@ -156,8 +160,9 @@ impl Lp2pNetworkService<'_> {
         flags: u32,
     ) -> Result<(), DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::send_to_other_group(&object, data, addr, group_id, frequency, channel, flags)
     }
@@ -169,8 +174,9 @@ impl Lp2pNetworkService<'_> {
         buffer: &mut [u8],
     ) -> Result<RecvFromOtherGroupResult, DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         let out = cmif::recv_from_other_group(&object, flags, buffer)?;
         Ok(RecvFromOtherGroupResult {
@@ -185,8 +191,9 @@ impl Lp2pNetworkService<'_> {
     /// Adds an acceptable group ID for receiving inter-group data (cmd 1552).
     pub fn add_acceptable_group_id(&self, group_id: Lp2pGroupId) -> Result<(), DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::add_acceptable_group_id(&object, group_id)
     }
@@ -194,8 +201,9 @@ impl Lp2pNetworkService<'_> {
     /// Removes the acceptable group ID (cmd 1560).
     pub fn remove_acceptable_group_id(&self) -> Result<(), DispatchError> {
         let guard = self.service.pool.acquire();
-        let object = guard
-            .open_object_raw(self.service.network_service_object_id)
+        // SAFETY: `network_service_object_id` was returned by the server and
+        // validated at `connect_cmif`; the pool guard makes this slot exclusive.
+        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
             .expect("network_service object id validated at connect_cmif");
         cmif::remove_acceptable_group_id(&object)
     }
@@ -386,7 +394,7 @@ pub enum ConnectCmifError {
     ConvertToDomain(#[source] ConvertToDomainError),
     /// Creating the INetworkService sub-object failed.
     #[error("failed to create INetworkService sub-object")]
-    CreateNetworkService(#[source] DispatchError),
+    CreateNetworkService(#[source] cmif::CreateNetworkServiceError),
     /// Cloning the root session for the pool failed.
     #[error("failed to clone lp2p session for the pool")]
     CloneSession(#[source] nx_sf::service::CloneObjectError),

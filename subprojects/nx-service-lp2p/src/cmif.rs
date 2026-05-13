@@ -12,14 +12,16 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Root service commands
-// ---------------------------------------------------------------------------
-
 /// Creates an INetworkService sub-object (cmd 0).
 ///
 /// Returns the raw sub-object ID for the new `INetworkService` domain object.
-pub(crate) fn create_network_service(domain: &Domain, inval: u32) -> Result<u32, DispatchError> {
+/// The freshly-minted [`DomainObject`] is wrapped in [`core::mem::ManuallyDrop`]
+/// so the server-side object outlives this call — the pool-acquired slot
+/// re-opens the same id per request via [`Domain::open_object_raw`].
+pub(crate) fn create_network_service(
+    domain: &Domain,
+    inval: u32,
+) -> Result<u32, CreateNetworkServiceError> {
     let input = CreateNetworkServiceIn {
         inval,
         _pad: 0,
@@ -27,7 +29,7 @@ pub(crate) fn create_network_service(domain: &Domain, inval: u32) -> Result<u32,
     };
 
     // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
+    let mut result = unsafe {
         domain
             .dispatch(proto::CREATE_NETWORK_SERVICE)
             .in_raw(
@@ -36,10 +38,14 @@ pub(crate) fn create_network_service(domain: &Domain, inval: u32) -> Result<u32,
             )
             .send_pid()
             .out_objects(1)
-            .send()?
+            .send()
+            .map_err(CreateNetworkServiceError::Dispatch)?
     };
 
-    Ok(result.objects[0])
+    let object = result
+        .take_object(0)
+        .ok_or(CreateNetworkServiceError::MissingObject)?;
+    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
 }
 
 /// Creates an INetworkServiceMonitor sub-object (cmd 8, non-domain).
@@ -64,10 +70,6 @@ pub(crate) fn create_network_service_monitor(session: &Session) -> Result<u32, C
 
     Ok(result.move_handles[0])
 }
-
-// ---------------------------------------------------------------------------
-// INetworkService commands (domain, dispatched through session pool)
-// ---------------------------------------------------------------------------
 
 /// Scans for groups (cmd 512).
 pub(crate) fn scan(
@@ -220,10 +222,6 @@ pub(crate) fn remove_acceptable_group_id(object: &DomainObject<'_>) -> Result<()
         .send()
         .map(|_| ())
 }
-
-// ---------------------------------------------------------------------------
-// INetworkServiceMonitor commands (non-domain, direct dispatch)
-// ---------------------------------------------------------------------------
 
 /// Attaches the network interface state change event (cmd 256).
 pub(crate) fn attach_network_interface_state_change_event(
@@ -404,9 +402,23 @@ pub(crate) fn get_members(
     Ok(total_out)
 }
 
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
+/// Errors from [`create_network_service`].
+#[derive(Debug, thiserror::Error)]
+pub enum CreateNetworkServiceError {
+    /// The underlying IPC dispatch for `CreateNetworkService` failed.
+    ///
+    /// Reported when sending the CMIF request or parsing the response header
+    /// fails (kernel rejection, malformed reply, etc.).
+    #[error("IPC dispatch failed for CreateNetworkService")]
+    Dispatch(#[source] DispatchError),
+    /// The server replied successfully but did not include the requested
+    /// `INetworkService` domain sub-object in the response.
+    ///
+    /// Treated as a protocol violation: the call asked for one out object,
+    /// so a missing slot leaves the caller without a usable handle.
+    #[error("CreateNetworkService returned no domain sub-object")]
+    MissingObject,
+}
 
 /// Errors from [`create_network_service_monitor`].
 #[derive(Debug, thiserror::Error)]
