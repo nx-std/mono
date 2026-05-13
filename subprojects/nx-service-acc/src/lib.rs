@@ -32,7 +32,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Service};
+use nx_sf::service::{DispatchError, Session};
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -54,7 +54,7 @@ pub use self::{
 /// Use [`get_profile`](Self::get_profile) to obtain a profile sub-object for
 /// a specific user.
 #[repr(transparent)]
-pub struct AccService(Service);
+pub struct AccService(Session);
 
 // SAFETY: all operations go through the kernel which serializes
 // `svcSendSyncRequest` per session handle.
@@ -65,13 +65,7 @@ impl AccService {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the service session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 
     /// Gets the total number of user profiles.
@@ -102,12 +96,7 @@ impl AccService {
     pub fn get_profile(&self, uid: AccountUid) -> Result<AccountProfile, GetProfileError> {
         let raw_handle = cmif::get_profile(&self.0, uid)?;
 
-        let service = Service {
-            session: unsafe { SessionHandle::from_raw(raw_handle) },
-            own_handle: 1,
-            object_id: 0,
-            pointer_buffer_size: 0,
-        };
+        let service = Session::from_handle(unsafe { SessionHandle::from_raw(raw_handle) }, 0);
 
         Ok(AccountProfile(service))
     }
@@ -151,7 +140,7 @@ impl AccService {
 /// Obtained via [`AccService::get_profile`]. Owns its own independent session
 /// handle.
 #[repr(transparent)]
-pub struct AccountProfile(Service);
+pub struct AccountProfile(Session);
 
 // SAFETY: all operations go through the kernel which serializes
 // `svcSendSyncRequest` per session handle.
@@ -162,13 +151,7 @@ impl AccountProfile {
     /// Returns the underlying session handle.
     #[inline]
     pub fn session(&self) -> SessionHandle {
-        self.0.session
-    }
-
-    /// Consumes and closes the profile session.
-    #[inline]
-    pub fn close(self) {
-        self.0.close();
+        self.0.handle()
     }
 
     /// Gets profile base and user data.
@@ -205,12 +188,7 @@ pub fn connect_cmif_application(sm: &SmService) -> Result<AccService, ConnectCmi
         .get_service_handle_cmif(SERVICE_NAME_APPLICATION)
         .map_err(ConnectCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(AccService(service))
 }
@@ -221,12 +199,7 @@ pub fn connect_cmif_system(sm: &SmService) -> Result<AccService, ConnectCmifErro
         .get_service_handle_cmif(SERVICE_NAME_SYSTEM)
         .map_err(ConnectCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(AccService(service))
 }
@@ -237,12 +210,7 @@ pub fn connect_cmif_administrator(sm: &SmService) -> Result<AccService, ConnectC
         .get_service_handle_cmif(SERVICE_NAME_ADMINISTRATOR)
         .map_err(ConnectCmifError)?;
 
-    let service = Service {
-        session: handle,
-        own_handle: 1,
-        object_id: 0,
-        pointer_buffer_size: 0,
-    };
+    let service = Session::from_handle(handle, 0);
 
     Ok(AccService(service))
 }

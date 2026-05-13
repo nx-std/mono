@@ -2,12 +2,12 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{DispatchError, Service};
+use nx_sf::service::{DispatchError, Session};
 
 /// CMIF request with a single `Copy` input and a single `Copy` output.
 #[inline]
 pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
-    service: &Service,
+    service: &Session,
     cmd_id: u32,
     input: I,
 ) -> Result<O, DispatchError> {
@@ -25,7 +25,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
 
 /// CMIF request with no input and a single `Copy` output.
 #[inline]
-pub(crate) fn dispatch_out<O: Copy>(service: &Service, cmd_id: u32) -> Result<O, DispatchError> {
+pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O, DispatchError> {
     let result = service.dispatch(cmd_id).out_size(size_of::<O>()).send()?;
     // SAFETY: the response payload is at least `size_of::<O>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
