@@ -3,7 +3,7 @@
 //! This module implements HID commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_service_applet::aruid::{Aruid, NO_ARUID};
 use nx_sf::cmif;
@@ -21,39 +21,36 @@ pub fn create_applet_resource(
     session: SessionHandle,
     aruid: Option<Aruid>,
 ) -> Result<SessionHandle, CreateAppletResourceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
-        .context(0x20)
-        .data_size(8) // u64 aruid
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write ARUID (NO_ARUID if not available)
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    // SAFETY: req.data points to valid payload area with space for u64.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::INITIALIZE_APPLET_RESOURCE)
+            .context(0x20)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(CreateAppletResourceError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
     }
 
     ipc::send_sync_request(session).map_err(CreateAppletResourceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response::<()>(buf.as_array())
         .map_err(CreateAppletResourceError::ParseResponse)?;
 
-    // Extract the move handle from response
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(CreateAppletResourceError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(CreateAppletResourceError::MissingHandle);
+    };
 
-    // SAFETY: Handle is from a valid IPC response.
+    // SAFETY: the kernel returned a valid session handle in the response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
@@ -63,28 +60,28 @@ pub fn create_applet_resource(
 pub fn get_shared_memory_handle(
     session: SessionHandle,
 ) -> Result<ShmemHandle, GetSharedMemoryHandleError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt =
-        cmif::RequestFormatBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, applet_resource_cmds::GET_SHARED_MEMORY_HANDLE)
+            .send()
+            .map_err(GetSharedMemoryHandleError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSharedMemoryHandleError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response::<()>(buf.as_array())
         .map_err(GetSharedMemoryHandleError::ParseResponse)?;
 
-    // Extract the copy handle from response
-    let handle = resp
-        .copy_handles
-        .first()
-        .copied()
-        .ok_or(GetSharedMemoryHandleError::MissingHandle)?;
+    let Some(&handle) = resp.copy_handles.first() else {
+        return Err(GetSharedMemoryHandleError::MissingHandle);
+    };
 
-    // SAFETY: Handle is from a valid IPC response.
+    // SAFETY: the kernel returned a valid shared memory handle in the response.
     Ok(unsafe { ShmemHandle::from_raw(handle) })
 }
 
@@ -98,22 +95,8 @@ pub fn activate_npad(
     session: SessionHandle,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateNpadError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     // Use modern revision (0x5 for firmware 18.0.0+)
     let revision: u32 = 0x5;
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
-        .context(0x20)
-        .data_size(16) // u32 revision + u32 pad + u64 ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write input data: u32 revision, u32 pad, u64 ARUID
-    // SAFETY: req.data points to valid payload area with space for the struct.
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     #[repr(C)]
@@ -127,15 +110,29 @@ pub fn activate_npad(
         pad: 0,
         aruid,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_NPAD_WITH_REVISION)
+            .context(0x20)
+            .data_size(size_of::<Input>())
+            .send_pid()
+            .send()
+            .map_err(ActivateNpadError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
+        // `repr(C)` and `input` is a valid value on the stack.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(ActivateNpadError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ActivateNpadError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateNpadError::ParseResponse)?;
 
     Ok(())
 }
@@ -148,19 +145,6 @@ pub fn set_supported_npad_style_set(
     aruid: Option<Aruid>,
     style_set: u32,
 ) -> Result<(), SetSupportedNpadStyleSetError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
-        .context(0x20)
-        .data_size(16) // u32 style_set + u32 pad + u64 ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write input data: u32 style_set, u32 pad, u64 ARUID
-    // SAFETY: req.data points to valid payload area with space for the struct.
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     #[repr(C)]
@@ -174,14 +158,29 @@ pub fn set_supported_npad_style_set(
         pad: 0,
         aruid,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::SET_SUPPORTED_NPAD_STYLE_SET)
+            .context(0x20)
+            .data_size(size_of::<Input>())
+            .send_pid()
+            .send()
+            .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
+        // `repr(C)` and `input` is a valid value on the stack.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetSupportedNpadStyleSetError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array())
         .map_err(SetSupportedNpadStyleSetError::ParseResponse)?;
 
     Ok(())
@@ -195,34 +194,31 @@ pub fn set_supported_npad_id_type(
     aruid: Option<Aruid>,
     ids: &[u32],
 ) -> Result<(), SetSupportedNpadIdTypeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let buffer_size = ids.len() * 4;
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
-        .context(0x20)
-        .data_size(8) // u64 ARUID
-        .in_pointers(1) // HipcPointer for IDs array
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write ARUID to data section
-    // SAFETY: req.data points to valid payload area with space for u64.
+    let buffer_size = core::mem::size_of_val(ids);
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
-    }
 
-    // Add IDs array as input pointer
-    req.add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::SET_SUPPORTED_NPAD_ID_TYPE)
+            .context(0x20)
+            .data_size(size_of::<u64>())
+            .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
+            .send_pid()
+            .send()
+            .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+    }
 
     ipc::send_sync_request(session).map_err(SetSupportedNpadIdTypeError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array())
         .map_err(SetSupportedNpadIdTypeError::ParseResponse)?;
 
     Ok(())
@@ -235,29 +231,29 @@ pub fn activate_touch_screen(
     session: SessionHandle,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateTouchScreenError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
-        .context(0x20)
-        .data_size(8) // u64 ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write ARUID
-    // SAFETY: req.data points to valid payload area with space for u64.
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_TOUCH_SCREEN)
+            .context(0x20)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(ActivateTouchScreenError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
     }
 
     ipc::send_sync_request(session).map_err(ActivateTouchScreenError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ActivateTouchScreenError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateTouchScreenError::ParseResponse)?;
 
     Ok(())
 }
@@ -269,29 +265,29 @@ pub fn activate_keyboard(
     session: SessionHandle,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateKeyboardError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_KEYBOARD)
-        .context(0x20)
-        .data_size(8) // u64 ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write ARUID
-    // SAFETY: req.data points to valid payload area with space for u64.
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_KEYBOARD)
+            .context(0x20)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(ActivateKeyboardError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
     }
 
     ipc::send_sync_request(session).map_err(ActivateKeyboardError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ActivateKeyboardError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateKeyboardError::ParseResponse)?;
 
     Ok(())
 }
@@ -303,29 +299,29 @@ pub fn activate_mouse(
     session: SessionHandle,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateMouseError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_MOUSE)
-        .context(0x20)
-        .data_size(8) // u64 ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write ARUID
-    // SAFETY: req.data points to valid payload area with space for u64.
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_MOUSE)
+            .context(0x20)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(ActivateMouseError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
     }
 
     ipc::send_sync_request(session).map_err(ActivateMouseError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ActivateMouseError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateMouseError::ParseResponse)?;
 
     Ok(())
 }
@@ -337,19 +333,6 @@ pub fn activate_gesture(
     session: SessionHandle,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateGestureError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::ACTIVATE_GESTURE)
-        .context(0x20)
-        .data_size(16) // u32 val + u32 pad + u64 ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write input data: u32 val = 1, u32 pad, u64 ARUID
-    // SAFETY: req.data points to valid payload area with space for the struct.
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     #[repr(C)]
@@ -363,15 +346,29 @@ pub fn activate_gesture(
         pad: 0,
         aruid,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_GESTURE)
+            .context(0x20)
+            .data_size(size_of::<Input>())
+            .send_pid()
+            .send()
+            .map_err(ActivateGestureError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
+        // `repr(C)` and `input` is a valid value on the stack.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(ActivateGestureError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ActivateGestureError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateGestureError::ParseResponse)?;
 
     Ok(())
 }
@@ -379,12 +376,15 @@ pub fn activate_gesture(
 /// Error returned by [`create_applet_resource`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateAppletResourceError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -393,12 +393,15 @@ pub enum CreateAppletResourceError {
 /// Error returned by [`get_shared_memory_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryHandleError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
     /// Missing shared memory handle in response.
     #[error("missing shared memory handle in response")]
     MissingHandle,
@@ -407,76 +410,97 @@ pub enum GetSharedMemoryHandleError {
 /// Error returned by [`activate_npad`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateNpadError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`set_supported_npad_style_set`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetSupportedNpadStyleSetError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`set_supported_npad_id_type`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetSupportedNpadIdTypeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`activate_touch_screen`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateTouchScreenError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`activate_keyboard`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateKeyboardError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`activate_mouse`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateMouseError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`activate_gesture`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateGestureError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
