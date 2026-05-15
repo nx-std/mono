@@ -40,21 +40,27 @@ pub(crate) fn session_open(
         max_videos,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::SESSION_OPEN)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<SessionOpenIn>())
-            .buffer(
-                name_utf16.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(name_utf16),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .in_handle(tmem_handle)
-            .send()
-            .map(|_| ())
-            .map_err(SessionOpenError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SessionOpenIn>())
+    };
+    // SAFETY: `name_utf16` is a valid `&[u16]`; viewing it as bytes for the
+    // IN buffer is sound.
+    let name_bytes = unsafe {
+        core::slice::from_raw_parts(
+            name_utf16.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(name_utf16),
+        )
+    };
+    object
+        .dispatch(proto::SESSION_OPEN)
+        .in_raw(in_bytes)
+        .in_buffer(name_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_handle(tmem_handle)
+        .send()
+        .map(|_| ())
+        .map_err(SessionOpenError)
 }
 
 /// Closes the MTP session.
