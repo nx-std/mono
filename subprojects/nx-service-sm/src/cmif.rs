@@ -16,43 +16,47 @@ pub fn get_service_handle(
     session: SessionHandle,
     name: ServiceName,
 ) -> Result<SessionHandle, GetServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_SERVICE_HANDLE)
+            .data_size(size_of::<ServiceName>())
+            .send()
+            .map_err(GetServiceError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_SERVICE_HANDLE)
-        .data_size(size_of::<ServiceName>())
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for ServiceName.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<ServiceName>().cast_mut(), name);
+        // SAFETY: `req.data` is exactly `size_of::<ServiceName>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ServiceName>(), name) };
     }
 
     ipc::send_sync_request(session).map_err(GetServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(GetServiceError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp =
+        cmif::parse_response::<()>(buf.as_array()).map_err(GetServiceError::ParseResponse)?;
 
-    if resp.move_handles.is_empty() {
+    let Some(&handle) = resp.move_handles.first() else {
         return Err(GetServiceError::MissingHandle);
-    }
+    };
 
-    // SAFETY: Kernel returned a valid handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+    // SAFETY: the kernel returned a valid session handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
 /// Error returned by [`get_service_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetServiceError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
@@ -66,8 +70,6 @@ pub fn register_service(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<SessionHandle, RegisterServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     #[repr(C)]
     struct RegisterServiceIn {
         name: ServiceName,
@@ -83,44 +85,47 @@ pub fn register_service(
         max_sessions,
     };
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::REGISTER_SERVICE)
-        .data_size(size_of::<RegisterServiceIn>())
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::REGISTER_SERVICE)
+            .data_size(size_of::<RegisterServiceIn>())
+            .send()
+            .map_err(RegisterServiceError::BuildRequest)?;
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<RegisterServiceIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<RegisterServiceIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<RegisterServiceIn>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(RegisterServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(RegisterServiceError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp =
+        cmif::parse_response::<()>(buf.as_array()).map_err(RegisterServiceError::ParseResponse)?;
 
-    if resp.move_handles.is_empty() {
+    let Some(&handle) = resp.move_handles.first() else {
         return Err(RegisterServiceError::MissingHandle);
-    }
+    };
 
-    // SAFETY: Kernel returned a valid handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+    // SAFETY: the kernel returned a valid session handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
 /// Error returned by [`register_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterServiceError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
@@ -132,25 +137,25 @@ pub fn unregister_service(
     session: SessionHandle,
     name: ServiceName,
 ) -> Result<(), UnregisterServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::UNREGISTER_SERVICE)
+            .data_size(size_of::<ServiceName>())
+            .send()
+            .map_err(UnregisterServiceError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::UNREGISTER_SERVICE)
-        .data_size(size_of::<ServiceName>())
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<ServiceName>().cast_mut(), name);
+        // SAFETY: `req.data` is exactly `size_of::<ServiceName>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ServiceName>(), name) };
     }
 
     ipc::send_sync_request(session).map_err(UnregisterServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(UnregisterServiceError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(UnregisterServiceError::ParseResponse)?;
 
     Ok(())
 }
@@ -158,12 +163,15 @@ pub fn unregister_service(
 /// Error returned by [`unregister_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum UnregisterServiceError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Detaches the client from the Service Manager using CMIF protocol.
@@ -171,26 +179,26 @@ pub enum UnregisterServiceError {
 /// Only available on HOS 11.0.0-11.0.1.
 #[inline]
 pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::DETACH_CLIENT)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(DetachClientError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::DETACH_CLIENT)
-        .data_size(size_of::<u64>())
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), 0u64);
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), 0u64) };
     }
 
     ipc::send_sync_request(session).map_err(DetachClientError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(DetachClientError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(DetachClientError::ParseResponse)?;
 
     Ok(())
 }
@@ -198,12 +206,15 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 /// Error returned by [`detach_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum DetachClientError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Registers the client with the Service Manager using CMIF protocol.
@@ -211,26 +222,26 @@ pub enum DetachClientError {
 /// Sends the RegisterClient command (cmd 0) with PID.
 #[inline]
 pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::REGISTER_CLIENT)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(RegisterClientError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::REGISTER_CLIENT)
-        .data_size(size_of::<u64>())
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u64.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), 0u64);
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), 0u64) };
     }
 
     ipc::send_sync_request(session).map_err(RegisterClientError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(RegisterClientError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(RegisterClientError::ParseResponse)?;
 
     Ok(())
 }
@@ -238,10 +249,13 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 /// Error returned by [`register_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterClientError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }

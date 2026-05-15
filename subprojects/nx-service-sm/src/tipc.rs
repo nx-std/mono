@@ -5,7 +5,7 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{ServiceName, tipc};
+use nx_sf::{ServiceName, cmif, tipc};
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
 use crate::proto;
@@ -18,43 +18,40 @@ pub fn get_service_handle(
     session: SessionHandle,
     name: ServiceName,
 ) -> Result<SessionHandle, GetServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = tipc::TipcBuilder::new(&mut buf, proto::GET_SERVICE_HANDLE)
+            .data_size(size_of::<ServiceName>())
+            .send()
+            .map_err(GetServiceError::BuildRequest)?;
 
-    let fmt = tipc::RequestFormat {
-        request_id: proto::GET_SERVICE_HANDLE,
-        data_size: size_of::<ServiceName>(),
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { tipc::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for ServiceName.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<ServiceName>().cast_mut(), name);
+        // SAFETY: `req.data` is exactly `size_of::<ServiceName>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ServiceName>(), name) };
     }
 
     ipc::send_sync_request(session).map_err(GetServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp =
-        unsafe { tipc::parse_response(ipc_buf, 0) }.map_err(GetServiceError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = tipc::parse_response(buf.as_array(), 0).map_err(GetServiceError::ParseResponse)?;
 
-    if resp.move_handles.is_empty() {
+    let Some(&handle) = resp.move_handles.first() else {
         return Err(GetServiceError::MissingHandle);
-    }
+    };
 
-    // SAFETY: Kernel returned a valid handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+    // SAFETY: the kernel returned a valid session handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
 /// Error returned by [`get_service_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetServiceError {
+    /// Failed to build the TIPC request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
@@ -74,8 +71,6 @@ pub fn register_service(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<SessionHandle, RegisterServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     #[repr(C)]
     struct RegisterServiceTipcIn {
         name: ServiceName,
@@ -89,44 +84,43 @@ pub fn register_service(
         is_light: u8::from(is_light),
     };
 
-    let fmt = tipc::RequestFormat {
-        request_id: proto::REGISTER_SERVICE,
-        data_size: size_of::<RegisterServiceTipcIn>(),
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = tipc::TipcBuilder::new(&mut buf, proto::REGISTER_SERVICE)
+            .data_size(size_of::<RegisterServiceTipcIn>())
+            .send()
+            .map_err(RegisterServiceError::BuildRequest)?;
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { tipc::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<RegisterServiceTipcIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<RegisterServiceTipcIn>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<RegisterServiceTipcIn>(), input);
+        }
     }
 
     ipc::send_sync_request(session).map_err(RegisterServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let resp =
-        unsafe { tipc::parse_response(ipc_buf, 0) }.map_err(RegisterServiceError::ParseResponse)?;
+        tipc::parse_response(buf.as_array(), 0).map_err(RegisterServiceError::ParseResponse)?;
 
-    if resp.move_handles.is_empty() {
+    let Some(&handle) = resp.move_handles.first() else {
         return Err(RegisterServiceError::MissingHandle);
-    }
+    };
 
-    // SAFETY: Kernel returned a valid handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(resp.move_handles[0]) })
+    // SAFETY: the kernel returned a valid session handle in the response.
+    Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
 /// Error returned by [`register_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterServiceError {
+    /// Failed to build the TIPC request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
@@ -144,31 +138,25 @@ pub fn unregister_service(
     session: SessionHandle,
     name: ServiceName,
 ) -> Result<(), UnregisterServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = tipc::TipcBuilder::new(&mut buf, proto::UNREGISTER_SERVICE)
+            .data_size(size_of::<ServiceName>())
+            .send()
+            .map_err(UnregisterServiceError::BuildRequest)?;
 
-    let fmt = tipc::RequestFormat {
-        request_id: proto::UNREGISTER_SERVICE,
-        data_size: size_of::<ServiceName>(),
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { tipc::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<ServiceName>().cast_mut(), name);
+        // SAFETY: `req.data` is exactly `size_of::<ServiceName>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ServiceName>(), name) };
     }
 
     ipc::send_sync_request(session).map_err(UnregisterServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { tipc::parse_response(ipc_buf, 0) }
-        .map_err(UnregisterServiceError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    tipc::parse_response(buf.as_array(), 0).map_err(UnregisterServiceError::ParseResponse)?;
 
     Ok(())
 }
@@ -176,6 +164,9 @@ pub fn unregister_service(
 /// Error returned by [`unregister_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum UnregisterServiceError {
+    /// Failed to build the TIPC request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
@@ -189,26 +180,23 @@ pub enum UnregisterServiceError {
 /// Only available on Atmosphere.
 #[inline]
 pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = tipc::RequestFormat {
-        request_id: proto::DETACH_CLIENT,
-        data_size: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { tipc::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        // The detach-client request carries no payload data.
+        tipc::TipcBuilder::new(&mut buf, proto::DETACH_CLIENT)
+            .send_pid()
+            .send()
+            .map_err(DetachClientError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(DetachClientError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp =
-        unsafe { tipc::parse_response(ipc_buf, 0) }.map_err(DetachClientError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    tipc::parse_response(buf.as_array(), 0).map_err(DetachClientError::ParseResponse)?;
 
     Ok(())
 }
@@ -216,6 +204,9 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 /// Error returned by [`detach_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum DetachClientError {
+    /// Failed to build the TIPC request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
@@ -230,26 +221,23 @@ pub enum DetachClientError {
 #[expect(dead_code)]
 #[inline]
 pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = tipc::RequestFormat {
-        request_id: proto::REGISTER_CLIENT,
-        data_size: 0,
-        num_in_buffers: 0,
-        num_out_buffers: 0,
-        num_inout_buffers: 0,
-        num_handles: 0,
-        send_pid: true,
-    };
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { tipc::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        // The register-client request carries no payload data.
+        tipc::TipcBuilder::new(&mut buf, proto::REGISTER_CLIENT)
+            .send_pid()
+            .send()
+            .map_err(RegisterClientError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(RegisterClientError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp =
-        unsafe { tipc::parse_response(ipc_buf, 0) }.map_err(RegisterClientError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    tipc::parse_response(buf.as_array(), 0).map_err(RegisterClientError::ParseResponse)?;
 
     Ok(())
 }
@@ -257,6 +245,9 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 /// Error returned by [`register_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterClientError {
+    /// Failed to build the TIPC request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
