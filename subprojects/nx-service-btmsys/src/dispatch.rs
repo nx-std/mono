@@ -24,14 +24,11 @@ pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O,
 pub(crate) fn dispatch_in<I: Copy>(
     service: &Session,
     cmd_id: u32,
-    input: &I,
+    input: I,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((input as *const I).cast::<u8>(), size_of::<I>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    service.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
 }
