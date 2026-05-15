@@ -1,6 +1,17 @@
-### Editors
+### Editors, IDEs and Agents
 /.idea
 /.vscode
+
+# Claude Code
+/.claude
+!/.claude/skills/
+
+# Agents (Codex)
+/.agents
+!/.agents/skills/
+
+/.codex
+
 
 ### Meson
 # subproject directories
