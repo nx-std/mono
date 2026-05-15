@@ -38,16 +38,14 @@ pub(crate) fn set_touch_screen_auto_pilot_state(
     service: &Session,
     states: &[HidTouchState],
 ) -> Result<(), DispatchError> {
-    let buf_ptr = states.as_ptr().cast::<u8>();
-    let buf_len = core::mem::size_of_val(states);
-
+    // SAFETY: `states` is a valid `&[HidTouchState]`; viewing it as a byte
+    // slice for the IN buffer is sound, and the slice borrows `states`.
+    let buf_bytes = unsafe {
+        core::slice::from_raw_parts(states.as_ptr().cast::<u8>(), core::mem::size_of_val(states))
+    };
     service
         .dispatch(proto::SET_TOUCH_SCREEN_AUTO_PILOT_STATE)
-        .buffer(
-            buf_ptr,
-            buf_len,
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -147,18 +145,20 @@ pub(crate) fn acquire_operation_event_handle(
     service: &Session,
     unique_pad_id: UniquePadId,
 ) -> Result<u32, AcquireEventError> {
-    // SAFETY: `unique_pad_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::ACQUIRE_OPERATION_EVENT_HANDLE)
-            .in_raw(
-                (&raw const unique_pad_id).cast::<u8>(),
-                size_of::<UniquePadId>(),
-            )
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(AcquireEventError::Dispatch)?
+    // SAFETY: `unique_pad_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const unique_pad_id).cast::<u8>(),
+            size_of::<UniquePadId>(),
+        )
     };
+    let result = service
+        .dispatch(proto::ACQUIRE_OPERATION_EVENT_HANDLE)
+        .in_raw(in_bytes)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(AcquireEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
         return Err(AcquireEventError::MissingHandle);
@@ -183,18 +183,20 @@ pub(crate) fn read_serial_flash(
         unique_pad_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::READ_SERIAL_FLASH)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<ReadSerialFlashIn>(),
-            )
-            .in_handle(tmem_handle)
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<ReadSerialFlashIn>(),
+        )
+    };
+    service
+        .dispatch(proto::READ_SERIAL_FLASH)
+        .in_raw(in_bytes)
+        .in_handle(tmem_handle)
+        .send()
+        .map(|_| ())
 }
 
 /// WriteSerialFlash (cmd 230, 6.0.0+). Sends the raw IPC with a copy-handle-in for
@@ -215,18 +217,20 @@ pub(crate) fn write_serial_flash(
         unique_pad_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::WRITE_SERIAL_FLASH)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<WriteSerialFlashIn>(),
-            )
-            .in_handle(tmem_handle)
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<WriteSerialFlashIn>(),
+        )
+    };
+    service
+        .dispatch(proto::WRITE_SERIAL_FLASH)
+        .in_raw(in_bytes)
+        .in_handle(tmem_handle)
+        .send()
+        .map(|_| ())
 }
 
 /// GetOperationResult (cmd 231, 6.0.0+).
@@ -258,16 +262,18 @@ pub(crate) fn get_abstracted_pad_handles(
     service: &Session,
     handles: &mut [AbstractedPadHandle],
 ) -> Result<i32, DispatchError> {
-    let buf_ptr = handles.as_mut_ptr().cast::<u8>();
-    let buf_len = core::mem::size_of_val(handles);
-
+    // SAFETY: `handles` is a valid `&mut [AbstractedPadHandle]`; viewing it as
+    // a mutable byte slice for the OUT buffer is sound, and the slice borrows
+    // `handles`.
+    let buf_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            handles.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(handles),
+        )
+    };
     let result = service
         .dispatch(proto::GET_ABSTRACTED_PAD_HANDLES)
-        .buffer(
-            buf_ptr,
-            buf_len,
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(buf_bytes, BufferAttr::HIPC_POINTER)
         .out_size(size_of::<i32>())
         .send()?;
 
@@ -289,23 +295,26 @@ pub(crate) fn get_abstracted_pads_state(
     handles: &mut [AbstractedPadHandle],
     states: &mut [AbstractedPadState],
 ) -> Result<i32, DispatchError> {
-    let handles_ptr = handles.as_mut_ptr().cast::<u8>();
-    let handles_len = core::mem::size_of_val(handles);
-    let states_ptr = states.as_mut_ptr().cast::<u8>();
-    let states_len = core::mem::size_of_val(states);
-
+    // SAFETY: `handles` is a valid `&mut` slice; viewing it as mutable bytes
+    // for the OUT buffer is sound, and the slice borrows `handles`.
+    let handles_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            handles.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(handles),
+        )
+    };
+    // SAFETY: `states` is a valid `&mut` slice; viewing it as mutable bytes
+    // for the OUT buffer is sound, and the slice borrows `states`.
+    let states_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            states.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(states),
+        )
+    };
     let result = service
         .dispatch(proto::GET_ABSTRACTED_PADS_STATE)
-        .buffer(
-            handles_ptr,
-            handles_len,
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
-        .buffer(
-            states_ptr,
-            states_len,
-            BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-        )
+        .out_buffer(handles_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(states_bytes, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<i32>())
         .send()?;
 
@@ -356,15 +365,17 @@ pub(crate) fn attach_hdls_work_buffer_legacy(
     tmem_handle: u32,
     tmem_size: u64,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `tmem_size` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::ATTACH_HDLS_WORK_BUFFER)
-            .in_raw((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
-            .in_handle(tmem_handle)
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `tmem_size` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
+    };
+    service
+        .dispatch(proto::ATTACH_HDLS_WORK_BUFFER)
+        .in_raw(in_bytes)
+        .in_handle(tmem_handle)
+        .send()
+        .map(|_| ())
 }
 
 /// AttachHdlsWorkBuffer \[13.0.0+\] (cmd 324, copy-handle-in for tmem, out session ID).
@@ -373,15 +384,17 @@ pub(crate) fn attach_hdls_work_buffer(
     tmem_handle: u32,
     tmem_size: u64,
 ) -> Result<HdlsSessionId, DispatchError> {
-    // SAFETY: `tmem_size` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::ATTACH_HDLS_WORK_BUFFER)
-            .in_raw((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
-            .in_handle(tmem_handle)
-            .out_size(size_of::<u64>())
-            .send()?
+    // SAFETY: `tmem_size` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
+    let result = service
+        .dispatch(proto::ATTACH_HDLS_WORK_BUFFER)
+        .in_raw(in_bytes)
+        .in_handle(tmem_handle)
+        .out_size(size_of::<u64>())
+        .send()?;
 
     // SAFETY: response payload is at least 8 bytes.
     let id = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
