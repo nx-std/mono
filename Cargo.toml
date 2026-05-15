@@ -23,6 +23,7 @@ members = [
     "subprojects/nx-service-bpc",
     "subprojects/nx-service-bsd",
     "subprojects/nx-service-bt",
+    "subprojects/nx-service-btdrv",
     "subprojects/nx-service-btm",
     "subprojects/nx-service-btmsys",
     "subprojects/nx-service-btmu",
