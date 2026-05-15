@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the I2C service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
@@ -14,25 +14,28 @@ use crate::{proto, types::I2cTransactionOption};
 ///
 /// Returns a [`Session`] representing the opened session.
 pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSessionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_SESSION)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(OpenSessionError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::OPEN_SESSION)
-        .data_size(size_of::<u32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), device);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), device);
+        }
     }
 
     ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(OpenSessionError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp =
+        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSessionError::ParseResponse)?;
 
     let raw_handle = resp
         .move_handles
@@ -55,20 +58,18 @@ pub fn send_auto(
 ) -> Result<(), SendAutoError> {
     let option_raw: u32 = option.bits();
 
-    // SAFETY: `option_raw` lives on the stack until `send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SEND_AUTO)
-            .in_raw((&raw const option_raw).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                buf.as_ptr(),
-                buf.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(SendAutoError)
-    }
+    // SAFETY: `option_raw` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
+    };
+    service
+        .dispatch(proto::SEND_AUTO)
+        .in_raw(in_bytes)
+        .in_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
+        .send()
+        .map(|_| ())
+        .map_err(SendAutoError)
 }
 
 /// Receives data from an I2C device with automatic buffer selection.
@@ -79,20 +80,18 @@ pub fn receive_auto(
 ) -> Result<(), ReceiveAutoError> {
     let option_raw: u32 = option.bits();
 
-    // SAFETY: `option_raw` lives on the stack until `send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::RECEIVE_AUTO)
-            .in_raw((&raw const option_raw).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                buf.as_mut_ptr(),
-                buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(ReceiveAutoError)
-    }
+    // SAFETY: `option_raw` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
+    };
+    service
+        .dispatch(proto::RECEIVE_AUTO)
+        .in_raw(in_bytes)
+        .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
+        .send()
+        .map(|_| ())
+        .map_err(ReceiveAutoError)
 }
 
 /// Executes a command list on the I2C device.
@@ -103,16 +102,8 @@ pub fn execute_command_list(
 ) -> Result<(), ExecuteCommandListError> {
     service
         .dispatch(proto::EXECUTE_COMMAND_LIST)
-        .buffer(
-            dst.as_mut_ptr(),
-            dst.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-        )
-        .buffer(
-            cmd_list.as_ptr(),
-            cmd_list.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(dst, BufferAttr::HIPC_AUTO_SELECT)
+        .in_buffer(cmd_list, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
         .map_err(ExecuteCommandListError)
@@ -121,12 +112,15 @@ pub fn execute_command_list(
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response did not contain the expected move handle.
     #[error("missing session handle in response")]
     MissingHandle,
