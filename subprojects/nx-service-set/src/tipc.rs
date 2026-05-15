@@ -5,7 +5,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::{hipc::BufferMode, tipc};
+use nx_sf::{cmif, hipc::BufferMode, tipc};
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
 use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, FirmwareVersion};
@@ -37,38 +37,30 @@ fn get_firmware_version_inner(
     session: SessionHandle,
     cmd_id: u32,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    // Allocate output buffer on stack
+    // Allocate output buffer on stack.
     let mut out = FirmwareVersion::new();
 
-    let fmt = tipc::RequestFormat {
-        request_id: cmd_id,
-        data_size: 0, // No input data
-        num_in_buffers: 0,
-        num_out_buffers: 1, // One output buffer for FirmwareVersion
-        num_inout_buffers: 0,
-        num_handles: 0,
-        send_pid: false,
-    };
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { tipc::make_request(ipc_buf, fmt) };
-
-    // Add the output buffer for FirmwareVersion
-    // SAFETY: out is valid and properly aligned for FirmwareVersion.
-    req.add_out_buffer(
-        (&raw mut out).cast::<u8>(),
-        size_of::<FirmwareVersion>(),
-        BufferMode::Normal,
-    );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        tipc::TipcBuilder::new(&mut buf, cmd_id)
+            .add_out_buffer(
+                (&raw mut out).cast::<u8>(),
+                size_of::<FirmwareVersion>(),
+                BufferMode::Normal,
+            )
+            .send()
+            .map_err(GetFirmwareVersionError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetFirmwareVersionError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
     // Size is 0 because response data comes via buffer, not inline.
-    let _resp = unsafe { tipc::parse_response(ipc_buf, 0) }
-        .map_err(GetFirmwareVersionError::ParseResponse)?;
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    tipc::parse_response(buf.as_array(), 0).map_err(GetFirmwareVersionError::ParseResponse)?;
 
     Ok(out)
 }
@@ -76,6 +68,9 @@ fn get_firmware_version_inner(
 /// Error returned by [`get_firmware_version`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetFirmwareVersionError {
+    /// Failed to build the TIPC request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),

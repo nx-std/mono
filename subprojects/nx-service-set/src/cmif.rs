@@ -36,26 +36,25 @@ fn get_firmware_version_inner(
     session: SessionHandle,
     cmd_id: u32,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    // Allocate output buffer on stack
+    // Allocate output buffer on stack.
     let mut out = FirmwareVersion::new();
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .out_fixed_pointers(1) // One fixed-size output pointer
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Add the output buffer for FirmwareVersion
-    // SAFETY: out is valid and properly aligned for FirmwareVersion.
-    req.add_out_fixed_pointer((&raw mut out).cast::<u8>(), size_of::<FirmwareVersion>());
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .add_out_fixed_pointer((&raw mut out).cast::<u8>(), size_of::<FirmwareVersion>())
+            .send()
+            .map_err(GetFirmwareVersionError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetFirmwareVersionError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetFirmwareVersionError::ParseResponse)?;
 
     Ok(out)
@@ -64,10 +63,13 @@ fn get_firmware_version_inner(
 /// Error returned by [`get_firmware_version`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetFirmwareVersionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
