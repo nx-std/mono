@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the fan service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -12,33 +12,32 @@ pub fn open_controller(
     session: SessionHandle,
     device_code: u32,
 ) -> Result<SessionHandle, OpenControllerError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_CONTROLLER)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(OpenControllerError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::OPEN_CONTROLLER)
-        .data_size(size_of::<u32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), device_code);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), device_code) };
     }
 
     ipc::send_sync_request(session).map_err(OpenControllerError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(OpenControllerError::ParseResponse)?;
 
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(OpenControllerError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(OpenControllerError::MissingHandle);
+    };
 
-    // SAFETY: handle is from a valid IPC response.
+    // SAFETY: the kernel returned a valid session handle in the response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
@@ -47,24 +46,25 @@ pub fn set_rotation_speed_level(
     session: SessionHandle,
     level: f32,
 ) -> Result<(), SetRotationSpeedLevelError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_ROTATION_SPEED_LEVEL)
+            .data_size(size_of::<f32>())
+            .send()
+            .map_err(SetRotationSpeedLevelError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SET_ROTATION_SPEED_LEVEL)
-        .data_size(size_of::<f32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for f32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<f32>().cast_mut(), level);
+        // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<f32>(), level) };
     }
 
     ipc::send_sync_request(session).map_err(SetRotationSpeedLevelError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(SetRotationSpeedLevelError::ParseResponse)?;
 
     Ok(())
@@ -72,20 +72,25 @@ pub fn set_rotation_speed_level(
 
 /// Gets the current fan rotation speed level from the controller.
 pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotationSpeedLevelError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_ROTATION_SPEED_LEVEL).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        // The get-rotation-speed-level request carries no payload data.
+        cmif::CmifBuilder::new(&mut buf, proto::GET_ROTATION_SPEED_LEVEL)
+            .send()
+            .map_err(GetRotationSpeedLevelError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetRotationSpeedLevelError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<f32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
         .map_err(GetRotationSpeedLevelError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for f32.
+    // SAFETY: `resp.data` is exactly `size_of::<f32>()` bytes.
     let level = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
 
     Ok(level)
@@ -94,12 +99,15 @@ pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotati
 /// Error returned by [`open_controller`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenControllerError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response did not contain the expected move handle.
     #[error("missing controller handle in response")]
     MissingHandle,
@@ -108,21 +116,27 @@ pub enum OpenControllerError {
 /// Error returned by [`set_rotation_speed_level`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetRotationSpeedLevelError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_rotation_speed_level`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetRotationSpeedLevelError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
