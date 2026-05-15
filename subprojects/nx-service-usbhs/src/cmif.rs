@@ -40,22 +40,22 @@ pub(crate) fn query_interfaces_with_filter(
     interfaces: *mut u8,
     interfaces_size: usize,
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `filter` and `interfaces` live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const *filter).cast::<u8>(),
-                size_of::<UsbHsInterfaceFilter>(),
-            )
-            .buffer(
-                interfaces,
-                interfaces_size,
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<i32>())
-            .send()?
+    // SAFETY: `filter` is a valid reference; viewing its bytes as a slice is
+    // sound. `interfaces` is a valid mutable pointer for `interfaces_size`
+    // bytes provided by the caller.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *filter).cast::<u8>(),
+            size_of::<UsbHsInterfaceFilter>(),
+        )
     };
+    let out_bytes = unsafe { core::slice::from_raw_parts_mut(interfaces, interfaces_size) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<i32>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let count = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
@@ -71,13 +71,12 @@ pub(crate) fn query_acquired_interfaces(
     interfaces: *mut u8,
     interfaces_size: usize,
 ) -> Result<i32, DispatchError> {
+    // SAFETY: `interfaces` is a valid mutable pointer for `interfaces_size`
+    // bytes provided by the caller.
+    let out_bytes = unsafe { core::slice::from_raw_parts_mut(interfaces, interfaces_size) };
     let result = service
         .dispatch(cmd_id)
-        .buffer(
-            interfaces,
-            interfaces_size,
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<i32>())
         .send()?;
 
@@ -100,17 +99,19 @@ pub(crate) fn create_interface_available_event(
         filter: *filter,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<CreateInterfaceAvailableEventIn>(),
-            )
-            .send()
-            .map_err(GetEventError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CreateInterfaceAvailableEventIn>(),
+        )
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(GetEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
         return Err(GetEventError::MissingHandle);
@@ -149,19 +150,21 @@ pub(crate) fn acquire_usb_if_legacy(
     interface_id: i32,
     info_out: *mut UsbHsInterfaceInfo,
 ) -> Result<u32, AcquireIfError> {
-    // SAFETY: `interface_id` and `info_out` live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::ACQUIRE_USB_IF_LEGACY)
-            .in_raw((&raw const interface_id).cast::<u8>(), size_of::<i32>())
-            .buffer(
-                info_out.cast::<u8>(),
-                size_of::<UsbHsInterfaceInfo>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map_err(AcquireIfError::Dispatch)?
+    // SAFETY: `interface_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound. `info_out`
+    // is a valid mutable pointer for `size_of::<UsbHsInterfaceInfo>()` bytes.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const interface_id).cast::<u8>(), size_of::<i32>())
     };
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
+    };
+    let result = service
+        .dispatch(proto::ACQUIRE_USB_IF_LEGACY)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map_err(AcquireIfError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(AcquireIfError::MissingHandle);
@@ -179,24 +182,23 @@ pub(crate) fn acquire_usb_if(
     intf_data_size: usize,
     info_out: *mut UsbHsInterfaceInfo,
 ) -> Result<u32, AcquireIfError> {
-    // SAFETY: `interface_id`, `intf_data_out`, `info_out` live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::ACQUIRE_USB_IF)
-            .in_raw((&raw const interface_id).cast::<u8>(), size_of::<i32>())
-            .buffer(
-                intf_data_out,
-                intf_data_size,
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                info_out.cast::<u8>(),
-                size_of::<UsbHsInterfaceInfo>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map_err(AcquireIfError::Dispatch)?
+    // SAFETY: `interface_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound. Both output
+    // pointers are valid mutable regions of the stated sizes.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const interface_id).cast::<u8>(), size_of::<i32>())
     };
+    let out_data_bytes = unsafe { core::slice::from_raw_parts_mut(intf_data_out, intf_data_size) };
+    let out_info_bytes = unsafe {
+        core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
+    };
+    let result = service
+        .dispatch(proto::ACQUIRE_USB_IF)
+        .in_raw(in_bytes)
+        .out_buffer(out_data_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(out_info_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map_err(AcquireIfError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(AcquireIfError::MissingHandle);
@@ -215,19 +217,20 @@ pub(crate) fn if_set_interface(
     id: u8,
     info_out: *mut UsbHsInterfaceInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `id` and `info_out` live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::IF_SET_INTERFACE)
-            .in_raw((&raw const id).cast::<u8>(), size_of::<u8>())
-            .buffer(
-                info_out.cast::<u8>(),
-                size_of::<UsbHsInterfaceInfo>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound. `info_out` is a valid
+    // mutable pointer for `size_of::<UsbHsInterfaceInfo>()` bytes.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const id).cast::<u8>(), size_of::<u8>()) };
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
+    };
+    service
+        .dispatch(proto::IF_SET_INTERFACE)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// GetInterface (cmd 2). Out: HipcMapAlias buffer (UsbHsInterfaceInfo).
@@ -235,13 +238,14 @@ pub(crate) fn if_get_interface(
     service: &Session,
     info_out: *mut UsbHsInterfaceInfo,
 ) -> Result<(), DispatchError> {
+    // SAFETY: `info_out` is a valid mutable pointer for
+    // `size_of::<UsbHsInterfaceInfo>()` bytes.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
+    };
     service
         .dispatch(proto::IF_GET_INTERFACE)
-        .buffer(
-            info_out.cast::<u8>(),
-            size_of::<UsbHsInterfaceInfo>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -252,19 +256,19 @@ pub(crate) fn if_get_alternate_interface(
     id: u8,
     info_out: *mut UsbHsInterfaceInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `id` and `info_out` live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::IF_GET_ALTERNATE_INTERFACE)
-            .in_raw((&raw const id).cast::<u8>(), size_of::<u8>())
-            .buffer(
-                info_out.cast::<u8>(),
-                size_of::<UsbHsInterfaceInfo>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `id` is a `Copy` value on the stack; viewing its bytes is sound.
+    // `info_out` is a valid mutable pointer for the stated size.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const id).cast::<u8>(), size_of::<u8>()) };
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
+    };
+    service
+        .dispatch(proto::IF_GET_ALTERNATE_INTERFACE)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// GetCurrentFrame. Out: u32.
@@ -289,11 +293,6 @@ pub(crate) fn if_submit_control_request(
     timeout_in_ms: u32,
 ) -> Result<u32, DispatchError> {
     let is_in = cmd_id == proto::IF_SUBMIT_CONTROL_REQUEST_IN;
-    let buf_attr = if is_in {
-        BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS)
-    } else {
-        BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS)
-    };
 
     let input = SubmitControlRequestIn {
         b_request,
@@ -304,15 +303,28 @@ pub(crate) fn if_submit_control_request(
         timeout_in_ms,
     };
 
-    // SAFETY: `input` and `buffer` live until `.send()` returns.
-    let result = unsafe {
+    // SAFETY: `input` is a `Copy` value on the stack; viewing its bytes is
+    // sound. `buffer` is a valid mutable pointer for `buffer_size` bytes.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<SubmitControlRequestIn>(),
+        )
+    };
+    let buf_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
+
+    let result = if is_in {
         service
             .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<SubmitControlRequestIn>(),
-            )
-            .buffer(buffer, buffer_size, buf_attr)
+            .in_raw(in_bytes)
+            .out_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+            .out_size(size_of::<u32>())
+            .send()?
+    } else {
+        service
+            .dispatch(cmd_id)
+            .in_raw(in_bytes)
+            .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
             .out_size(size_of::<u32>())
             .send()?
     };
@@ -350,13 +362,14 @@ pub(crate) fn if_get_ctrl_xfer_report(
     service: &Session,
     report_out: *mut UsbHsXferReport,
 ) -> Result<(), DispatchError> {
+    // SAFETY: `report_out` is a valid mutable pointer for
+    // `size_of::<UsbHsXferReport>()` bytes.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(report_out.cast::<u8>(), size_of::<UsbHsXferReport>())
+    };
     service
         .dispatch(proto::IF_GET_CTRL_XFER_REPORT)
-        .buffer(
-            report_out.cast::<u8>(),
-            size_of::<UsbHsXferReport>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -380,15 +393,17 @@ pub(crate) fn if_open_usb_ep(
         max_xfer_size,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<OpenUsbEpIn>())
-            .out_size(size_of::<UsbEndpointDescriptor>())
-            .send()
-            .map_err(OpenEpError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenUsbEpIn>())
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<UsbEndpointDescriptor>())
+        .send()
+        .map_err(OpenEpError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenEpError::MissingHandle);
@@ -416,26 +431,34 @@ pub(crate) fn ep_submit_request(
     buffer_size: usize,
 ) -> Result<u32, DispatchError> {
     let is_in = cmd_id == proto::EP_SUBMIT_REQUEST_IN;
-    let buf_attr = if is_in {
-        BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS)
-    } else {
-        BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS)
-    };
 
     let input = EpSubmitRequestIn {
         size,
         timeout_in_ms,
     };
 
-    // SAFETY: `input` and `buffer` live until `.send()` returns.
-    let result = unsafe {
+    // SAFETY: `input` is a `Copy` value on the stack; viewing its bytes is
+    // sound. `buffer` is a valid mutable pointer for `buffer_size` bytes.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<EpSubmitRequestIn>(),
+        )
+    };
+    let buf_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
+
+    let result = if is_in {
         service
             .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<EpSubmitRequestIn>(),
-            )
-            .buffer(buffer, buffer_size, buf_attr)
+            .in_raw(in_bytes)
+            .out_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+            .out_size(size_of::<u32>())
+            .send()?
+    } else {
+        service
+            .dispatch(cmd_id)
+            .in_raw(in_bytes)
+            .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
             .out_size(size_of::<u32>())
             .send()?
     };
@@ -472,15 +495,18 @@ pub(crate) fn ep_get_xfer_report(
     reports_size: usize,
     buf_attr: BufferAttr,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `max_reports` and `reports` live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::EP_GET_XFER_REPORT)
-            .in_raw((&raw const max_reports).cast::<u8>(), size_of::<u32>())
-            .buffer(reports, reports_size, buf_attr)
-            .out_size(size_of::<u32>())
-            .send()?
+    // SAFETY: `max_reports` is a `Copy` value on the stack; viewing its bytes
+    // is sound. `reports` is a valid mutable pointer for `reports_size` bytes.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const max_reports).cast::<u8>(), size_of::<u32>())
     };
+    let out_bytes = unsafe { core::slice::from_raw_parts_mut(reports, reports_size) };
+    let result = service
+        .dispatch(proto::EP_GET_XFER_REPORT)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, buf_attr)
+        .out_size(size_of::<u32>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let count = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -511,18 +537,22 @@ pub(crate) fn ep_batch_buffer_async(
         id,
     };
 
-    // SAFETY: `input` and `urbs` live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::EP_BATCH_BUFFER_ASYNC)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<EpBatchBufferAsyncIn>(),
-            )
-            .buffer(urbs.cast_mut(), urbs_size, buf_attr)
-            .out_size(size_of::<u32>())
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound. `urbs` is a valid
+    // pointer for `urbs_size` bytes provided by the caller.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<EpBatchBufferAsyncIn>(),
+        )
     };
+    let urbs_bytes = unsafe { core::slice::from_raw_parts(urbs, urbs_size) };
+    let result = service
+        .dispatch(proto::EP_BATCH_BUFFER_ASYNC)
+        .in_raw(in_bytes)
+        .in_buffer(urbs_bytes, buf_attr)
+        .out_size(size_of::<u32>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let xfer_id = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -551,15 +581,16 @@ pub(crate) fn ep_share_report_ring(
     size: u64,
     tmem_handle: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `size` and `tmem_handle` live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::EP_SHARE_REPORT_RING)
-            .in_raw((&raw const size).cast::<u8>(), size_of::<u64>())
-            .in_handle(tmem_handle)
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `size` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const size).cast::<u8>(), size_of::<u64>()) };
+    service
+        .dispatch(proto::EP_SHARE_REPORT_RING)
+        .in_raw(in_bytes)
+        .in_handle(tmem_handle)
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
