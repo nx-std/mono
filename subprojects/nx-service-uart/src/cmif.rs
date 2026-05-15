@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the UART service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
@@ -22,24 +22,25 @@ fn dispatch_in_u32_out_bool(
     cmd_id: u32,
     value: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(DispatchInU32OutBoolError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(size_of::<u32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), value);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), value) };
     }
 
     ipc::send_sync_request(session).map_err(DispatchInU32OutBoolError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u8>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
         .map_err(DispatchInU32OutBoolError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -50,10 +51,12 @@ fn dispatch_in_u32_out_bool(
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInU32OutBoolError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 fn dispatch_in_two_u32s_out_bool(
@@ -69,24 +72,26 @@ fn dispatch_in_two_u32s_out_bool(
     }
 
     let input = TwoU32s { val0, val1 };
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(size_of::<TwoU32s>())
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(size_of::<TwoU32s>())
+            .send()
+            .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for TwoU32s.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<TwoU32s>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<TwoU32s>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<TwoU32s>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u8>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
         .map_err(DispatchInTwoU32sOutBoolError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -97,24 +102,30 @@ fn dispatch_in_two_u32s_out_bool(
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInTwoU32sOutBoolError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .send()
+            .map_err(DispatchOutU64Error::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(DispatchOutU64Error::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u64>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
         .map_err(DispatchOutU64Error::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u64.
@@ -125,10 +136,12 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutU64Error {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 // ---------------------------------------------------------------------------
@@ -193,24 +206,26 @@ pub fn is_supported_flow_control_mode_for_dev(
 
 /// Creates a new port session (returns IPortSession as a move handle).
 pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSessionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::CREATE_PORT_SESSION).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::CREATE_PORT_SESSION)
+            .send()
+            .map_err(CreatePortSessionError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(CreatePortSessionError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(CreatePortSessionError::ParseResponse)?;
 
-    let raw_handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(CreatePortSessionError::MissingHandle)?;
+    let Some(&raw_handle) = resp.move_handles.first() else {
+        return Err(CreatePortSessionError::MissingHandle);
+    };
 
     // SAFETY: the kernel returned a valid move handle for the new port
     // session; ownership transfers to the new `Session`.
@@ -295,20 +310,23 @@ pub fn port_open_legacy(
         receive_buffer_length,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_OPEN)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<OpenPortLegacyIn>(),
-            )
-            .in_handle(send_tmem_handle)
-            .in_handle(receive_tmem_handle)
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(OpenPortError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenPortLegacyIn>()` bytes as a slice
+    // is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<OpenPortLegacyIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::PORT_OPEN)
+        .in_raw(in_bytes)
+        .in_handle(send_tmem_handle)
+        .in_handle(receive_tmem_handle)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(raw & 1 != 0)
@@ -342,17 +360,20 @@ pub fn port_open_v6(
         receive_buffer_length,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_OPEN)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
-            .in_handle(send_tmem_handle)
-            .in_handle(receive_tmem_handle)
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(OpenPortError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenPortV6In>()` bytes as a slice is
+    // sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
     };
+    let result = service
+        .dispatch(proto::PORT_OPEN)
+        .in_raw(in_bytes)
+        .in_handle(send_tmem_handle)
+        .in_handle(receive_tmem_handle)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(raw & 1 != 0)
@@ -389,17 +410,20 @@ pub fn port_open_v7(
         receive_buffer_length,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_OPEN)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
-            .in_handle(send_tmem_handle)
-            .in_handle(receive_tmem_handle)
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(OpenPortError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenPortV7In>()` bytes as a slice is
+    // sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
     };
+    let result = service
+        .dispatch(proto::PORT_OPEN)
+        .in_raw(in_bytes)
+        .in_handle(send_tmem_handle)
+        .in_handle(receive_tmem_handle)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(raw & 1 != 0)
@@ -426,20 +450,23 @@ pub fn port_open_for_dev_legacy(
         receive_buffer_length,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_OPEN_FOR_DEV)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<OpenPortLegacyIn>(),
-            )
-            .in_handle(send_tmem_handle)
-            .in_handle(receive_tmem_handle)
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(OpenPortError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenPortLegacyIn>()` bytes as a slice
+    // is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<OpenPortLegacyIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::PORT_OPEN_FOR_DEV)
+        .in_raw(in_bytes)
+        .in_handle(send_tmem_handle)
+        .in_handle(receive_tmem_handle)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(raw & 1 != 0)
@@ -473,17 +500,20 @@ pub fn port_open_for_dev_v6(
         receive_buffer_length,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_OPEN_FOR_DEV)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
-            .in_handle(send_tmem_handle)
-            .in_handle(receive_tmem_handle)
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(OpenPortError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenPortV6In>()` bytes as a slice is
+    // sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
     };
+    let result = service
+        .dispatch(proto::PORT_OPEN_FOR_DEV)
+        .in_raw(in_bytes)
+        .in_handle(send_tmem_handle)
+        .in_handle(receive_tmem_handle)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(raw & 1 != 0)
@@ -520,17 +550,20 @@ pub fn port_open_for_dev_v7(
         receive_buffer_length,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_OPEN_FOR_DEV)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
-            .in_handle(send_tmem_handle)
-            .in_handle(receive_tmem_handle)
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(OpenPortError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenPortV7In>()` bytes as a slice is
+    // sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
     };
+    let result = service
+        .dispatch(proto::PORT_OPEN_FOR_DEV)
+        .in_raw(in_bytes)
+        .in_handle(send_tmem_handle)
+        .in_handle(receive_tmem_handle)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(raw & 1 != 0)
@@ -545,11 +578,7 @@ pub fn port_get_writable_length(session: Handle) -> Result<u64, DispatchOutU64Er
 pub fn port_send(service: &Session, data: &[u8]) -> Result<u64, PortSendError> {
     let result = service
         .dispatch(proto::PORT_SEND)
-        .buffer(
-            data.as_ptr(),
-            data.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_AUTO_SELECT),
-        )
+        .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<u64>())
         .send()
         .map_err(PortSendError::Dispatch)?;
@@ -567,11 +596,7 @@ pub fn port_get_readable_length(session: Handle) -> Result<u64, DispatchOutU64Er
 pub fn port_receive(service: &Session, buf: &mut [u8]) -> Result<u64, PortReceiveError> {
     let result = service
         .dispatch(proto::PORT_RECEIVE)
-        .buffer(
-            buf.as_ptr(),
-            buf.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-        )
+        .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<u64>())
         .send()
         .map_err(PortReceiveError::Dispatch)?;
@@ -592,28 +617,29 @@ pub fn port_bind_port_event(
         threshold,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PORT_BIND_PORT_EVENT)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<BindPortEventIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(BindPortEventError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<BindPortEventIn>()` bytes as a slice
+    // is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<BindPortEventIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::PORT_BIND_PORT_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(BindPortEventError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     let success = raw & 1 != 0;
 
-    let event_handle = result
-        .copy_handles
-        .first()
-        .copied()
-        .ok_or(BindPortEventError::MissingHandle)?;
+    let Some(&event_handle) = result.copy_handles.first() else {
+        return Err(BindPortEventError::MissingHandle);
+    };
 
     Ok((success, event_handle))
 }
@@ -633,10 +659,12 @@ pub fn port_unbind_port_event(
 /// Error returned by [`create_port_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreatePortSessionError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     #[error("missing session handle in response")]
     MissingHandle,
 }
