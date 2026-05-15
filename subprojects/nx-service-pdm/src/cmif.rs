@@ -32,22 +32,28 @@ pub(crate) fn query_applet_event_v1_legacy(
     events: &mut [AppletEventV1],
 ) -> Result<i32, DispatchError> {
     let input = QueryAppletEventLegacyIn { entry_index };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_APPLET_EVENT)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryAppletEventLegacyIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryAppletEventLegacyIn>(),
+        )
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_APPLET_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -70,22 +76,28 @@ pub(crate) fn query_applet_event_v1(
         pad: [0; 3],
         entry_index,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_APPLET_EVENT)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryAppletEventIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryAppletEventIn>(),
+        )
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_APPLET_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -108,22 +120,28 @@ pub(crate) fn query_applet_event(
         pad: [0; 3],
         entry_index,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_APPLET_EVENT)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryAppletEventIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryAppletEventIn>(),
+        )
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_APPLET_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -257,19 +275,27 @@ pub(crate) fn query_last_play_time_legacy(
     application_ids: &[u64],
 ) -> Result<i32, DispatchError> {
     let count = playtimes.len().min(application_ids.len());
+    // SAFETY: `playtimes` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `playtimes`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            playtimes.as_mut_ptr().cast::<u8>(),
+            count * size_of::<LastPlayTime>(),
+        )
+    };
+    // SAFETY: `application_ids` is a valid `&` slice; viewing it as a byte
+    // slice for the IN buffer is sound.
+    let in_buf_bytes = unsafe {
+        core::slice::from_raw_parts(
+            application_ids.as_ptr().cast::<u8>(),
+            count * size_of::<u64>(),
+        )
+    };
     let result = service
         .dispatch(proto::QUERY_LAST_PLAY_TIME_LEGACY)
         .out_size(size_of::<i32>())
-        .buffer(
-            playtimes.as_mut_ptr().cast::<u8>(),
-            count * size_of::<LastPlayTime>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            application_ids.as_ptr().cast::<u8>(),
-            count * size_of::<u64>(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(in_buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
@@ -290,27 +316,37 @@ pub(crate) fn query_last_play_time(
     let input = QueryLastPlayTimeIn {
         flag: u8::from(flag),
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_LAST_PLAY_TIME)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryLastPlayTimeIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                playtimes.as_mut_ptr().cast::<u8>(),
-                count * size_of::<LastPlayTime>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                application_ids.as_ptr().cast::<u8>(),
-                count * size_of::<u64>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryLastPlayTimeIn>(),
+        )
     };
+    // SAFETY: `playtimes` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `playtimes`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            playtimes.as_mut_ptr().cast::<u8>(),
+            count * size_of::<LastPlayTime>(),
+        )
+    };
+    // SAFETY: `application_ids` is a valid `&` slice; viewing it as a byte
+    // slice for the IN buffer is sound.
+    let in_buf_bytes = unsafe {
+        core::slice::from_raw_parts(
+            application_ids.as_ptr().cast::<u8>(),
+            count * size_of::<u64>(),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_LAST_PLAY_TIME)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(in_buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -329,19 +365,25 @@ pub(crate) fn query_play_event(
     entry_index: i32,
     events: &mut [PlayEvent],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_PLAY_EVENT)
-            .in_raw((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_PLAY_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -376,19 +418,25 @@ pub(crate) fn query_account_event_v3(
     entry_index: i32,
     events: &mut [AccountEventV3],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_ACCOUNT_EVENT)
-            .in_raw((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_ACCOUNT_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -403,19 +451,25 @@ pub(crate) fn query_account_event_v10(
     entry_index: i32,
     events: &mut [AccountEventV10],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_ACCOUNT_EVENT)
-            .in_raw((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_ACCOUNT_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -430,19 +484,25 @@ pub(crate) fn query_account_event(
     entry_index: i32,
     events: &mut [AccountEvent],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_ACCOUNT_EVENT)
-            .in_raw((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_ACCOUNT_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -467,22 +527,28 @@ pub(crate) fn query_account_play_event(
         pad: 0,
         uid,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_ACCOUNT_PLAY_EVENT)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryAccountPlayEventIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                events.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(events),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryAccountPlayEventIn>(),
+        )
     };
+    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `events`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            events.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(events),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_ACCOUNT_PLAY_EVENT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -520,22 +586,29 @@ pub(crate) fn query_recently_played_application_legacy(
     application_ids: &mut [u64],
 ) -> Result<i32, DispatchError> {
     let input = QueryRecentlyPlayedAppLegacyIn { uid };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryRecentlyPlayedAppLegacyIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                application_ids.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(application_ids),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryRecentlyPlayedAppLegacyIn>(),
+        )
     };
+    // SAFETY: `application_ids` is a valid `&mut` slice; viewing it as a byte
+    // slice for the OUT buffer is sound, and the byte slice borrows
+    // `application_ids`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            application_ids.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(application_ids),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -556,22 +629,29 @@ pub(crate) fn query_recently_played_application(
         pad: [0; 7],
         uid,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<QueryRecentlyPlayedAppIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                application_ids.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(application_ids),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<QueryRecentlyPlayedAppIn>(),
+        )
     };
+    // SAFETY: `application_ids` is a valid `&mut` slice; viewing it as a byte
+    // slice for the OUT buffer is sound, and the byte slice borrows
+    // `application_ids`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            application_ids.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(application_ids),
+        )
+    };
+    let result = service
+        .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
