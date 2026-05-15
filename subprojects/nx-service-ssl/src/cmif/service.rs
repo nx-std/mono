@@ -26,19 +26,21 @@ pub(crate) fn create_context(
     } else {
         proto::CREATE_CONTEXT
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let mut result = unsafe {
-        domain
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<CreateContextIn>(),
-            )
-            .send_pid()
-            .out_objects(1)
-            .send()
-            .map_err(CreateContextError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<CreateContextIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CreateContextIn>(),
+        )
     };
+    let mut result = domain
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_objects(1)
+        .send()
+        .map_err(CreateContextError::Dispatch)?;
     let object = result
         .take_object(0)
         .ok_or(CreateContextError::MissingObject)?;
@@ -76,18 +78,18 @@ pub(crate) fn get_certificates_legacy(
     buffer: &mut [u8],
     ca_cert_ids: &[u32],
 ) -> Result<(), DispatchError> {
-    domain
-        .dispatch(proto::GET_CERTIFICATES)
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
+    // SAFETY: `ca_cert_ids` is a valid `&[u32]` slice; viewing it as bytes for
+    // the IN buffer is sound.
+    let ca_bytes = unsafe {
+        core::slice::from_raw_parts(
             ca_cert_ids.as_ptr().cast::<u8>(),
             core::mem::size_of_val(ca_cert_ids),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
+    };
+    domain
+        .dispatch(proto::GET_CERTIFICATES)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(ca_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -98,19 +100,19 @@ pub(crate) fn get_certificates(
     buffer: &mut [u8],
     ca_cert_ids: &[u32],
 ) -> Result<u32, DispatchError> {
+    // SAFETY: `ca_cert_ids` is a valid `&[u32]` slice; viewing it as bytes for
+    // the IN buffer is sound.
+    let ca_bytes = unsafe {
+        core::slice::from_raw_parts(
+            ca_cert_ids.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(ca_cert_ids),
+        )
+    };
     let result = domain
         .dispatch(proto::GET_CERTIFICATES)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            ca_cert_ids.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(ca_cert_ids),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(ca_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -125,14 +127,18 @@ pub(crate) fn get_certificate_buf_size(
     domain: &Domain,
     ca_cert_ids: &[u32],
 ) -> Result<u32, DispatchError> {
+    // SAFETY: `ca_cert_ids` is a valid `&[u32]` slice; viewing it as bytes for
+    // the IN buffer is sound.
+    let ca_bytes = unsafe {
+        core::slice::from_raw_parts(
+            ca_cert_ids.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(ca_cert_ids),
+        )
+    };
     let result = domain
         .dispatch(proto::GET_CERTIFICATE_BUF_SIZE)
         .out_size(size_of::<u32>())
-        .buffer(
-            ca_cert_ids.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(ca_cert_ids),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(ca_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -144,14 +150,15 @@ pub(crate) fn get_certificate_buf_size(
 
 /// Sets the interface version (3.0.0+, internal).
 pub(crate) fn set_interface_version(domain: &Domain, version: u32) -> Result<(), DispatchError> {
-    // SAFETY: `version` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::SET_INTERFACE_VERSION)
-            .in_raw((&raw const version).cast::<u8>(), size_of::<u32>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `version` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const version).cast::<u8>(), size_of::<u32>()) };
+    domain
+        .dispatch(proto::SET_INTERFACE_VERSION)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Flushes the session cache (5.0.0+).
@@ -160,18 +167,17 @@ pub(crate) fn flush_session_cache(
     hostname: &[u8],
     option_type: u32,
 ) -> Result<u32, DispatchError> {
-    let result = unsafe {
-        domain
-            .dispatch(proto::FLUSH_SESSION_CACHE)
-            .in_raw((&raw const option_type).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u32>())
-            .buffer(
-                hostname.as_ptr(),
-                hostname.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `option_type` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const option_type).cast::<u8>(), size_of::<u32>())
     };
+    let result = domain
+        .dispatch(proto::FLUSH_SESSION_CACHE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .in_buffer(hostname, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -186,19 +192,17 @@ pub(crate) fn set_debug_option(
     debug_type: u32,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `debug_type` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::SET_DEBUG_OPTION)
-            .in_raw((&raw const debug_type).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                buffer.as_ptr(),
-                buffer.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `debug_type` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
+    };
+    domain
+        .dispatch(proto::SET_DEBUG_OPTION)
+        .in_raw(in_bytes)
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// Gets a debug option (6.0.0+).
@@ -207,19 +211,17 @@ pub(crate) fn get_debug_option(
     debug_type: u32,
     buffer: &mut [u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `debug_type` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::GET_DEBUG_OPTION)
-            .in_raw((&raw const debug_type).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `debug_type` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
+    };
+    domain
+        .dispatch(proto::GET_DEBUG_OPTION)
+        .in_raw(in_bytes)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// Clears TLS 1.2 fallback flag (14.0.0+).
@@ -232,14 +234,15 @@ pub(crate) fn clear_tls12_fallback_flag(domain: &Domain) -> Result<(), DispatchE
 
 /// Sets the thread core mask (15.0.0+, system only).
 pub(crate) fn set_thread_core_mask(domain: &Domain, mask: u64) -> Result<(), DispatchError> {
-    // SAFETY: `mask` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::SET_THREAD_CORE_MASK)
-            .in_raw((&raw const mask).cast::<u8>(), size_of::<u64>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `mask` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const mask).cast::<u8>(), size_of::<u64>()) };
+    domain
+        .dispatch(proto::SET_THREAD_CORE_MASK)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Gets the thread core mask (15.0.0+, system only).

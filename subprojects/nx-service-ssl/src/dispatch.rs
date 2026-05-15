@@ -17,15 +17,11 @@ pub(crate) fn dispatch_in<I: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns; the dispatcher
-    // memcpys the bytes into the IPC buffer before sending.
-    unsafe {
-        object
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    object.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
 }
 
 /// CMIF request with a single `Copy` input payload and a `u32` output.
@@ -35,14 +31,15 @@ pub(crate) fn dispatch_in_out_u32<I: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .out_size(size_of::<u32>())
-            .send()?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    let result = object
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
         result.data[1],

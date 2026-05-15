@@ -26,11 +26,7 @@ pub(crate) fn set_socket_descriptor(
 pub(crate) fn set_host_name(object: &DomainObject<'_>, name: &[u8]) -> Result<(), DispatchError> {
     object
         .dispatch(proto::CONN_SET_HOST_NAME)
-        .buffer(
-            name.as_ptr(),
-            name.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(name, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -61,11 +57,7 @@ pub(crate) fn get_host_name(
     let result = object
         .dispatch(proto::CONN_GET_HOST_NAME)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -98,11 +90,7 @@ pub(crate) fn do_handshake_get_server_cert(
     let result = object
         .dispatch(proto::CONN_DO_HANDSHAKE_GET_SERVER_CERT)
         .out_size(size_of::<HandshakeServerCertOut>())
-        .buffer(
-            server_certbuf.as_mut_ptr(),
-            server_certbuf.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(server_certbuf, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     // SAFETY: response data is at least `size_of::<HandshakeServerCertOut>()` bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<HandshakeServerCertOut>()) })
@@ -113,11 +101,7 @@ pub(crate) fn read(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, 
     let result = object
         .dispatch(proto::CONN_READ)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -132,11 +116,7 @@ pub(crate) fn write(object: &DomainObject<'_>, buffer: &[u8]) -> Result<u32, Dis
     let result = object
         .dispatch(proto::CONN_WRITE)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_ptr(),
-            buffer.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -156,11 +136,7 @@ pub(crate) fn peek(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, 
     let result = object
         .dispatch(proto::CONN_PEEK)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -242,14 +218,15 @@ pub(crate) fn set_option(
 
 /// Gets a connection option.
 pub(crate) fn get_option(object: &DomainObject<'_>, option: u32) -> Result<bool, DispatchError> {
-    // SAFETY: `option` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::CONN_GET_OPTION)
-            .in_raw((&raw const option).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u8>())
-            .send()?
-    };
+    // SAFETY: `option` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const option).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(proto::CONN_GET_OPTION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .send()?;
     Ok(result.data[0] & 1 != 0)
 }
 
@@ -258,14 +235,18 @@ pub(crate) fn get_verify_cert_errors(
     object: &DomainObject<'_>,
     errors: &mut [u32],
 ) -> Result<(u32, u32), DispatchError> {
+    // SAFETY: `errors` is a valid `&mut [u32]` slice; viewing it as bytes for
+    // the OUT buffer is sound.
+    let errors_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            errors.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(errors),
+        )
+    };
     let result = object
         .dispatch(proto::CONN_GET_VERIFY_CERT_ERRORS)
         .out_size(size_of::<u32>() * 2)
-        .buffer(
-            errors.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(errors),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(errors_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     let out0 = u32::from_le_bytes([
         result.data[0],
@@ -288,19 +269,24 @@ pub(crate) fn get_cipher_info(
     out: &mut CipherInfo,
 ) -> Result<(), DispatchError> {
     let val: u32 = 1;
-    // SAFETY: `val` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::CONN_GET_CIPHER_INFO)
-            .in_raw((&raw const val).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                (out as *mut CipherInfo).cast::<u8>(),
-                size_of::<CipherInfo>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `val` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u32>()) };
+    // SAFETY: `out` is a valid `&mut CipherInfo`; viewing its bytes for the
+    // OUT buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut CipherInfo).cast::<u8>(),
+            size_of::<CipherInfo>(),
+        )
+    };
+    object
+        .dispatch(proto::CONN_GET_CIPHER_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// Sets the next ALPN protocol list (9.0.0+).
@@ -310,11 +296,7 @@ pub(crate) fn set_next_alpn_proto(
 ) -> Result<(), DispatchError> {
     object
         .dispatch(proto::CONN_SET_NEXT_ALPN_PROTO)
-        .buffer(
-            proto_list.as_ptr(),
-            proto_list.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(proto_list, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -327,11 +309,7 @@ pub(crate) fn get_next_alpn_proto(
     let result = object
         .dispatch(proto::CONN_GET_NEXT_ALPN_PROTO)
         .out_size(size_of::<GetNextAlpnProtoOut>())
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     // SAFETY: response data is at least `size_of::<GetNextAlpnProtoOut>()` bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<GetNextAlpnProtoOut>()) })
@@ -343,19 +321,16 @@ pub(crate) fn set_dtls_socket_descriptor(
     sockfd: i32,
     sockaddr: &[u8],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `sockfd` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::CONN_SET_DTLS_SOCKET_DESCRIPTOR)
-            .in_raw((&raw const sockfd).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                sockaddr.as_ptr(),
-                sockaddr.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
-    };
+    // SAFETY: `sockfd` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const sockfd).cast::<u8>(), size_of::<i32>()) };
+    let result = object
+        .dispatch(proto::CONN_SET_DTLS_SOCKET_DESCRIPTOR)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .in_buffer(sockaddr, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     let raw = u32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -368,13 +343,13 @@ pub(crate) fn set_dtls_socket_descriptor(
 /// Gets DTLS handshake timeout in nanoseconds (16.0.0+).
 pub(crate) fn get_dtls_handshake_timeout(object: &DomainObject<'_>) -> Result<u64, DispatchError> {
     let mut out: u64 = 0;
+    // SAFETY: `out` is a valid local u64; viewing its bytes for the OUT buffer
+    // is sound, and the slice borrows `out`.
+    let out_bytes =
+        unsafe { core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<u64>()) };
     object
         .dispatch(proto::CONN_GET_DTLS_HANDSHAKE_TIMEOUT)
-        .buffer(
-            (&raw mut out).cast::<u8>(),
-            size_of::<u64>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(out)
 }
@@ -408,13 +383,17 @@ pub(crate) fn set_srtp_ciphers(
     object: &DomainObject<'_>,
     ciphers: &[u16],
 ) -> Result<(), DispatchError> {
-    object
-        .dispatch(proto::CONN_SET_SRTP_CIPHERS)
-        .buffer(
+    // SAFETY: `ciphers` is a valid `&[u16]` slice; viewing it as bytes for
+    // the IN buffer is sound.
+    let cipher_bytes = unsafe {
+        core::slice::from_raw_parts(
             ciphers.as_ptr().cast::<u8>(),
             core::mem::size_of_val(ciphers),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
+    };
+    object
+        .dispatch(proto::CONN_SET_SRTP_CIPHERS)
+        .in_buffer(cipher_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -437,21 +416,9 @@ pub(crate) fn export_keying_material(
 ) -> Result<(), DispatchError> {
     object
         .dispatch(proto::CONN_EXPORT_KEYING_MATERIAL)
-        .buffer(
-            outbuf.as_mut_ptr(),
-            outbuf.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            label.as_ptr(),
-            label.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            context.as_ptr(),
-            context.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(outbuf, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(label, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(context, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }

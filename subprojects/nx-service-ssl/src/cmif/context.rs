@@ -84,19 +84,16 @@ pub(crate) fn import_server_pki(
     cert_data: &[u8],
     format: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `format` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::CTX_IMPORT_SERVER_PKI)
-            .in_raw((&raw const format).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u64>())
-            .buffer(
-                cert_data.as_ptr(),
-                cert_data.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
-    };
+    // SAFETY: `format` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const format).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(proto::CTX_IMPORT_SERVER_PKI)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .in_buffer(cert_data, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(u64::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -118,16 +115,8 @@ pub(crate) fn import_client_pki(
     let result = object
         .dispatch(proto::CTX_IMPORT_CLIENT_PKI)
         .out_size(size_of::<u64>())
-        .buffer(
-            pkcs12.as_ptr(),
-            pkcs12.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            password.as_ptr(),
-            password.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(pkcs12, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(password, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u64::from_le_bytes([
         result.data[0],
@@ -201,14 +190,16 @@ pub(crate) fn register_internal_pki(
     object: &DomainObject<'_>,
     internal_pki: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `internal_pki` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::CTX_REGISTER_INTERNAL_PKI)
-            .in_raw((&raw const internal_pki).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u64>())
-            .send()?
+    // SAFETY: `internal_pki` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const internal_pki).cast::<u8>(), size_of::<u32>())
     };
+    let result = object
+        .dispatch(proto::CTX_REGISTER_INTERNAL_PKI)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .send()?;
     Ok(u64::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -225,11 +216,7 @@ pub(crate) fn register_internal_pki(
 pub(crate) fn add_policy_oid(object: &DomainObject<'_>, oid: &[u8]) -> Result<(), DispatchError> {
     object
         .dispatch(proto::CTX_ADD_POLICY_OID)
-        .buffer(
-            oid.as_ptr(),
-            oid.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(oid, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -239,11 +226,7 @@ pub(crate) fn import_crl(object: &DomainObject<'_>, crl_data: &[u8]) -> Result<u
     let result = object
         .dispatch(proto::CTX_IMPORT_CRL)
         .out_size(size_of::<u64>())
-        .buffer(
-            crl_data.as_ptr(),
-            crl_data.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(crl_data, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(u64::from_le_bytes([
         result.data[0],
@@ -264,24 +247,17 @@ pub(crate) fn import_client_cert_key_pki(
     key: &[u8],
     format: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `format` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::CTX_IMPORT_CLIENT_CERT_KEY_PKI)
-            .in_raw((&raw const format).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u64>())
-            .buffer(
-                cert.as_ptr(),
-                cert.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                key.as_ptr(),
-                key.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
-    };
+    // SAFETY: `format` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const format).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(proto::CTX_IMPORT_CLIENT_CERT_KEY_PKI)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .in_buffer(cert, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(key, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(u64::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -302,30 +278,27 @@ pub(crate) fn generate_private_key_and_cert(
     val: u32,
     params: &crate::types::KeyAndCertParams,
 ) -> Result<GenerateKeyAndCertOut, GenerateKeyAndCertError> {
-    // SAFETY: `val` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::CTX_GENERATE_PRIVATE_KEY_AND_CERT)
-            .in_raw((&raw const val).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<GenerateKeyAndCertOut>())
-            .buffer(
-                cert_buf.as_mut_ptr(),
-                cert_buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                key_buf.as_mut_ptr(),
-                key_buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                (params as *const crate::types::KeyAndCertParams).cast::<u8>(),
-                size_of::<crate::types::KeyAndCertParams>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map_err(GenerateKeyAndCertError::Dispatch)?
+    // SAFETY: `val` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u32>()) };
+    // SAFETY: `params` is a valid reference; viewing its bytes for the IN buffer
+    // is sound.
+    let params_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (params as *const crate::types::KeyAndCertParams).cast::<u8>(),
+            size_of::<crate::types::KeyAndCertParams>(),
+        )
     };
+    let result = object
+        .dispatch(proto::CTX_GENERATE_PRIVATE_KEY_AND_CERT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<GenerateKeyAndCertOut>())
+        .out_buffer(cert_buf, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(key_buf, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(params_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map_err(GenerateKeyAndCertError::Dispatch)?;
     if result.data.len() < size_of::<GenerateKeyAndCertOut>() {
         return Err(GenerateKeyAndCertError::ShortResponse);
     }
