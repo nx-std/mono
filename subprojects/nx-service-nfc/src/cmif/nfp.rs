@@ -46,20 +46,26 @@ pub(crate) fn initialize(
     version_data: &[NfcRequiredMcuVersionData],
 ) -> Result<(), DispatchError> {
     let input = InitializeIn { aruid, zero: 0 };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_INITIALIZE)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<InitializeIn>())
-            .buffer(
-                version_data.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(version_data),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send_pid()
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<InitializeIn>())
+    };
+    // SAFETY: `version_data` is a valid slice; viewing it as bytes for the
+    // IN buffer is sound.
+    let version_bytes = unsafe {
+        core::slice::from_raw_parts(
+            version_data.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(version_data),
+        )
+    };
+    object
+        .dispatch(proto::NFP_INITIALIZE)
+        .in_raw(in_bytes)
+        .in_buffer(version_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send_pid()
+        .send()
+        .map(|_| ())
 }
 
 /// Finalize.
@@ -72,14 +78,15 @@ pub(crate) fn list_devices(
     object: &DomainObject<'_>,
     out: &mut [NfcDeviceHandle],
 ) -> Result<i32, DispatchError> {
+    // SAFETY: `out` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
+    };
     let result = object
         .dispatch(proto::NFP_LIST_DEVICES)
         .out_size(size_of::<i32>())
-        .buffer(
-            out.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out),
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
         .send()?;
 
     Ok(i32::from_le_bytes([
@@ -148,22 +155,20 @@ pub(crate) fn get_application_area(
     handle: &NfcDeviceHandle,
     buf: &mut [u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::NFP_GET_APPLICATION_AREA)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .out_size(size_of::<u32>())
-            .buffer(
-                buf.as_mut_ptr(),
-                buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
     };
+    let result = object
+        .dispatch(proto::NFP_GET_APPLICATION_AREA)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -179,22 +184,20 @@ pub(crate) fn set_application_area(
     handle: &NfcDeviceHandle,
     buf: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_SET_APPLICATION_AREA)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                buf.as_ptr(),
-                buf.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_SET_APPLICATION_AREA)
+        .in_raw(in_bytes)
+        .in_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// Flush.
@@ -224,22 +227,20 @@ pub(crate) fn create_application_area(
         handle: *handle,
         app_id,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_CREATE_APPLICATION_AREA)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<DeviceHandleAppIdIn>(),
-            )
-            .buffer(
-                buf.as_ptr(),
-                buf.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<DeviceHandleAppIdIn>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_CREATE_APPLICATION_AREA)
+        .in_raw(in_bytes)
+        .in_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// RecreateApplicationArea. [3.0.0+]
@@ -253,22 +254,20 @@ pub(crate) fn recreate_application_area(
         handle: *handle,
         app_id,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_RECREATE_APPLICATION_AREA)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<DeviceHandleAppIdIn>(),
-            )
-            .buffer(
-                buf.as_ptr(),
-                buf.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<DeviceHandleAppIdIn>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_RECREATE_APPLICATION_AREA)
+        .in_raw(in_bytes)
+        .in_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// GetApplicationAreaSize.
@@ -285,24 +284,31 @@ pub(crate) fn get_tag_info(
     handle: &NfcDeviceHandle,
     out: &mut NfpTagInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_TAG_INFO)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpTagInfo).cast::<u8>(),
-                size_of::<NfpTagInfo>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpTagInfo`; viewing its bytes for the
+    // OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut NfpTagInfo).cast::<u8>(),
+            size_of::<NfpTagInfo>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_GET_TAG_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// GetRegisterInfo.
@@ -311,24 +317,31 @@ pub(crate) fn get_register_info(
     handle: &NfcDeviceHandle,
     out: &mut NfpRegisterInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_REGISTER_INFO)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpRegisterInfo).cast::<u8>(),
-                size_of::<NfpRegisterInfo>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpRegisterInfo`; viewing its bytes for
+    // the OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut NfpRegisterInfo).cast::<u8>(),
+            size_of::<NfpRegisterInfo>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_GET_REGISTER_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// GetCommonInfo.
@@ -337,24 +350,31 @@ pub(crate) fn get_common_info(
     handle: &NfcDeviceHandle,
     out: &mut NfpCommonInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_COMMON_INFO)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpCommonInfo).cast::<u8>(),
-                size_of::<NfpCommonInfo>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpCommonInfo`; viewing its bytes for
+    // the OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut NfpCommonInfo).cast::<u8>(),
+            size_of::<NfpCommonInfo>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_GET_COMMON_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// GetModelInfo.
@@ -363,24 +383,31 @@ pub(crate) fn get_model_info(
     handle: &NfcDeviceHandle,
     out: &mut NfpModelInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_MODEL_INFO)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpModelInfo).cast::<u8>(),
-                size_of::<NfpModelInfo>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpModelInfo`; viewing its bytes for
+    // the OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut NfpModelInfo).cast::<u8>(),
+            size_of::<NfpModelInfo>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_GET_MODEL_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// AttachActivateEvent — returns a copy handle.
@@ -388,17 +415,19 @@ pub(crate) fn attach_activate_event(
     object: &DomainObject<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::NFP_ATTACH_ACTIVATE_EVENT)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()?
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
     };
+    let result = object
+        .dispatch(proto::NFP_ATTACH_ACTIVATE_EVENT)
+        .in_raw(in_bytes)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()?;
     Ok(result.copy_handles[0])
 }
 
@@ -407,17 +436,19 @@ pub(crate) fn attach_deactivate_event(
     object: &DomainObject<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::NFP_ATTACH_DEACTIVATE_EVENT)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()?
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
     };
+    let result = object
+        .dispatch(proto::NFP_ATTACH_DEACTIVATE_EVENT)
+        .in_raw(in_bytes)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()?;
     Ok(result.copy_handles[0])
 }
 
@@ -467,24 +498,31 @@ pub(crate) fn get_admin_info(
     handle: &NfcDeviceHandle,
     out: &mut NfpAdminInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_ADMIN_INFO)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpAdminInfo).cast::<u8>(),
-                size_of::<NfpAdminInfo>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpAdminInfo`; viewing its bytes for
+    // the OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut NfpAdminInfo).cast::<u8>(),
+            size_of::<NfpAdminInfo>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_GET_ADMIN_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// GetRegisterInfoPrivate (not for User).
@@ -493,24 +531,31 @@ pub(crate) fn get_register_info_private(
     handle: &NfcDeviceHandle,
     out: &mut NfpRegisterInfoPrivate,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_REGISTER_INFO_PRIVATE)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpRegisterInfoPrivate).cast::<u8>(),
-                size_of::<NfpRegisterInfoPrivate>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpRegisterInfoPrivate`; viewing its
+    // bytes for the OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut NfpRegisterInfoPrivate).cast::<u8>(),
+            size_of::<NfpRegisterInfoPrivate>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_GET_REGISTER_INFO_PRIVATE)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// SetRegisterInfoPrivate (not for User).
@@ -519,24 +564,31 @@ pub(crate) fn set_register_info_private(
     handle: &NfcDeviceHandle,
     info: &NfpRegisterInfoPrivate,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_SET_REGISTER_INFO_PRIVATE)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (info as *const NfpRegisterInfoPrivate).cast::<u8>(),
-                size_of::<NfpRegisterInfoPrivate>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::IN),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `info` is a valid reference; viewing its bytes for the IN
+    // pointer buffer is sound.
+    let info_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (info as *const NfpRegisterInfoPrivate).cast::<u8>(),
+            size_of::<NfpRegisterInfoPrivate>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_SET_REGISTER_INFO_PRIVATE)
+        .in_raw(in_bytes)
+        .in_buffer(
+            info_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// DeleteRegisterInfo (not for User).
@@ -570,24 +622,28 @@ pub(crate) fn get_all(
     handle: &NfcDeviceHandle,
     out: &mut NfpData,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_GET_ALL)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (out as *mut NfpData).cast::<u8>(),
-                size_of::<NfpData>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::OUT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut NfpData`; viewing its bytes for the
+    // OUT pointer buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut((out as *mut NfpData).cast::<u8>(), size_of::<NfpData>())
+    };
+    object
+        .dispatch(proto::NFP_GET_ALL)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// SetAll (debug only).
@@ -596,24 +652,28 @@ pub(crate) fn set_all(
     handle: &NfcDeviceHandle,
     data: &NfpData,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_SET_ALL)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                (data as *const NfpData).cast::<u8>(),
-                size_of::<NfpData>(),
-                BufferAttr::FIXED_SIZE
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::IN),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    // SAFETY: `data` is a valid reference; viewing its bytes for the IN
+    // pointer buffer is sound.
+    let data_bytes = unsafe {
+        core::slice::from_raw_parts((data as *const NfpData).cast::<u8>(), size_of::<NfpData>())
+    };
+    object
+        .dispatch(proto::NFP_SET_ALL)
+        .in_raw(in_bytes)
+        .in_buffer(
+            data_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// FlushDebug (debug only).
@@ -643,22 +703,20 @@ pub(crate) fn read_backup_data(
     handle: &NfcDeviceHandle,
     buf: &mut [u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::NFP_READ_BACKUP_DATA)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .out_size(size_of::<u32>())
-            .buffer(
-                buf.as_mut_ptr(),
-                buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
     };
+    let result = object
+        .dispatch(proto::NFP_READ_BACKUP_DATA)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -674,22 +732,20 @@ pub(crate) fn write_backup_data(
     handle: &NfcDeviceHandle,
     buf: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `*handle` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_WRITE_BACKUP_DATA)
-            .in_raw(
-                (&raw const *handle).cast::<u8>(),
-                size_of::<NfcDeviceHandle>(),
-            )
-            .buffer(
-                buf.as_ptr(),
-                buf.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `*handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *handle).cast::<u8>(),
+            size_of::<NfcDeviceHandle>(),
+        )
+    };
+    object
+        .dispatch(proto::NFP_WRITE_BACKUP_DATA)
+        .in_raw(in_bytes)
+        .in_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// WriteNtf (debug only).
@@ -703,17 +759,15 @@ pub(crate) fn write_ntf(
         handle: *handle,
         write_type,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::NFP_WRITE_NTF)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<WriteNtfIn>())
-            .buffer(
-                buf.as_ptr(),
-                buf.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<WriteNtfIn>())
+    };
+    object
+        .dispatch(proto::NFP_WRITE_NTF)
+        .in_raw(in_bytes)
+        .in_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
