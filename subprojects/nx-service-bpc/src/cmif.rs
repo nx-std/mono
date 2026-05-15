@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the BPC service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -9,36 +9,42 @@ use crate::{proto, types::SleepButtonState};
 
 /// Initiates a full system shutdown.
 pub fn shutdown_system(session: SessionHandle) -> Result<(), ShutdownSystemError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::SHUTDOWN_SYSTEM).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::SHUTDOWN_SYSTEM)
+            .send()
+            .map_err(ShutdownSystemError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(ShutdownSystemError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ShutdownSystemError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ShutdownSystemError::ParseResponse)?;
 
     Ok(())
 }
 
 /// Initiates a full system reboot.
 pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::REBOOT_SYSTEM).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::REBOOT_SYSTEM)
+            .send()
+            .map_err(RebootSystemError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(RebootSystemError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(RebootSystemError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RebootSystemError::ParseResponse)?;
 
     Ok(())
 }
@@ -50,20 +56,24 @@ pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
 pub fn get_sleep_button_state(
     session: SessionHandle,
 ) -> Result<SleepButtonState, GetSleepButtonStateError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_SLEEP_BUTTON_STATE).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::GET_SLEEP_BUTTON_STATE)
+            .send()
+            .map_err(GetSleepButtonStateError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSleepButtonStateError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u8>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
         .map_err(GetSleepButtonStateError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u8.
+    // SAFETY: parse_response_bytes guarantees at least size_of::<u8>() bytes in resp.data.
     let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
 
     SleepButtonState::from_raw(raw).ok_or(GetSleepButtonStateError::UnknownState(raw))
@@ -74,20 +84,24 @@ pub fn get_sleep_button_state(
 /// Only available on HOS [6.0.0+]. The caller must ensure the correct
 /// HOS version before invoking this command.
 pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_POWER_BUTTON).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::GET_POWER_BUTTON)
+            .send()
+            .map_err(GetPowerButtonError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetPowerButtonError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u8>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
         .map_err(GetPowerButtonError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u8.
+    // SAFETY: parse_response_bytes guarantees at least size_of::<u8>() bytes in resp.data.
     let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
 
     Ok(raw != 0)
@@ -96,28 +110,34 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
 /// Error returned by [`shutdown_system`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShutdownSystemError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`reboot_system`].
 #[derive(Debug, thiserror::Error)]
 pub enum RebootSystemError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_sleep_button_state`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSleepButtonStateError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     #[error("unknown sleep button state: {0}")]
     UnknownState(u8),
 }
@@ -125,8 +145,10 @@ pub enum GetSleepButtonStateError {
 /// Error returned by [`get_power_button`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPowerButtonError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
