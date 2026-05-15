@@ -47,6 +47,7 @@ members = [
     "subprojects/nx-service-hid",
     "subprojects/nx-service-hidbus",
     "subprojects/nx-service-hiddbg",
+    "subprojects/nx-service-hidsys",
     "subprojects/nx-service-htcs",
     "subprojects/nx-service-hwopus",
     "subprojects/nx-service-i2c",
