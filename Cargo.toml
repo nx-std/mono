@@ -52,6 +52,7 @@ members = [
     "subprojects/nx-service-i2c",
     "subprojects/nx-service-idlesys",
     "subprojects/nx-service-ins",
+    "subprojects/nx-service-irs",
     "subprojects/nx-service-lbl",
     "subprojects/nx-service-ldn",
     "subprojects/nx-service-ldr",
