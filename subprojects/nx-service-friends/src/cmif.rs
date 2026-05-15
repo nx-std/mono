@@ -37,21 +37,29 @@ pub(crate) fn get_user_setting(
     uid: AccountUid,
     out: &mut FriendsUserSetting,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `uid` lives on the stack until `.send()` returns.
-    unsafe {
-        object
-            .dispatch(proto::GET_USER_SETTING)
-            .in_raw((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
-            .buffer(
-                (out as *mut FriendsUserSetting).cast::<u8>(),
-                size_of::<FriendsUserSetting>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `uid` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<AccountUid>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
+    };
+    // SAFETY: `out` is a valid `&mut FriendsUserSetting`; viewing its bytes as
+    // a mutable byte slice for the OUT pointer buffer is sound, and the byte
+    // slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut FriendsUserSetting).cast::<u8>(),
+            size_of::<FriendsUserSetting>(),
+        )
+    };
+    object
+        .dispatch(proto::GET_USER_SETTING)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// Error returned by [`create_friend_service`].
