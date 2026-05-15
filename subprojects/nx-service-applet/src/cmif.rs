@@ -5,7 +5,7 @@
 use core::mem::size_of;
 
 use nx_sf::{
-    cmif::ParseResponseError,
+    cmif::ParseRespBytesError,
     service::{BufferAttr, ConvertToDomainError, DispatchError, Domain, DomainObject},
 };
 use nx_svc::{process::Handle as ProcessHandle, thread};
@@ -87,6 +87,11 @@ pub fn open_proxy(
 
     // Input data: u64 reserved = 0
     let reserved: u64 = 0;
+    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let reserved_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
+    };
 
     let mut attempts: u32 = 0;
     let mut result = loop {
@@ -95,23 +100,25 @@ pub fn open_proxy(
             .dispatch(cmd_id)
             .send_pid()
             .in_handle(process_handle.to_raw())
-            .out_objects(1);
-
-        // SAFETY: reserved is valid and lives until send() completes.
-        dispatch = unsafe { dispatch.in_raw((&raw const reserved).cast::<u8>(), size_of::<u64>()) };
+            .out_objects(1)
+            .in_raw(reserved_bytes);
 
         // Add attribute buffer for LibraryApplet with attributes
         if let Some(attr) = attr {
-            dispatch = dispatch.buffer(
-                (attr as *const AppletAttribute).cast::<u8>(),
-                size_of::<AppletAttribute>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            );
+            // SAFETY: `attr` is a valid `&AppletAttribute`; viewing it as a
+            // byte slice for the IN buffer is sound, and it borrows `attr`.
+            let attr_bytes = unsafe {
+                core::slice::from_raw_parts(
+                    (attr as *const AppletAttribute).cast::<u8>(),
+                    size_of::<AppletAttribute>(),
+                )
+            };
+            dispatch = dispatch.in_buffer(attr_bytes, BufferAttr::HIPC_MAP_ALIAS);
         }
 
         match dispatch.send() {
             Ok(r) => break r,
-            Err(DispatchError::ParseResponse(ParseResponseError::ServiceError(AM_BUSY_ERROR))) => {
+            Err(DispatchError::ParseResponse(ParseRespBytesError::ServiceError(AM_BUSY_ERROR))) => {
                 attempts += 1;
                 if attempts >= AM_BUSY_DEFAULT_MAX_RETRIES {
                     return Err(OpenProxyError::Timeout);
@@ -308,12 +315,9 @@ pub fn set_focus_handling_mode(
         suspend_on_background as u8,
     ];
 
-    let dispatch = self_controller.dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE);
-
-    // SAFETY: input is valid and lives until send() completes.
-    let dispatch = unsafe { dispatch.in_raw(input.as_ptr(), input.len()) };
-
-    dispatch
+    self_controller
+        .dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE)
+        .in_raw(&input)
         .send()
         .map_err(SetFocusHandlingModeError::Dispatch)?;
 
@@ -344,12 +348,9 @@ pub fn set_out_of_focus_suspending_enabled(
 ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
     let input: u8 = enabled as u8;
 
-    let dispatch = self_controller.dispatch(CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED);
-
-    // SAFETY: input is valid and lives until send() completes.
-    let dispatch = unsafe { dispatch.in_raw((&raw const input).cast::<u8>(), size_of::<u8>()) };
-
-    dispatch
+    self_controller
+        .dispatch(CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED)
+        .in_raw(core::slice::from_ref(&input))
         .send()
         .map_err(SetOutOfFocusSuspendingEnabledError::Dispatch)?;
 
@@ -385,12 +386,9 @@ pub fn set_operation_mode_changed_notification(
 ) -> Result<(), SetOperationModeChangedNotificationError> {
     let input: u8 = enabled as u8;
 
-    let dispatch = self_controller.dispatch(CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION);
-
-    // SAFETY: input is valid and lives until send() completes.
-    let dispatch = unsafe { dispatch.in_raw((&raw const input).cast::<u8>(), size_of::<u8>()) };
-
-    dispatch
+    self_controller
+        .dispatch(CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION)
+        .in_raw(core::slice::from_ref(&input))
         .send()
         .map_err(SetOperationModeChangedNotificationError::Dispatch)?;
 
@@ -415,12 +413,9 @@ pub fn set_performance_mode_changed_notification(
 ) -> Result<(), SetPerformanceModeChangedNotificationError> {
     let input: u8 = enabled as u8;
 
-    let dispatch = self_controller.dispatch(CMD_SC_SET_PERFORMANCE_MODE_CHANGED_NOTIFICATION);
-
-    // SAFETY: input is valid and lives until send() completes.
-    let dispatch = unsafe { dispatch.in_raw((&raw const input).cast::<u8>(), size_of::<u8>()) };
-
-    dispatch
+    self_controller
+        .dispatch(CMD_SC_SET_PERFORMANCE_MODE_CHANGED_NOTIFICATION)
+        .in_raw(core::slice::from_ref(&input))
         .send()
         .map_err(SetPerformanceModeChangedNotificationError::Dispatch)?;
 

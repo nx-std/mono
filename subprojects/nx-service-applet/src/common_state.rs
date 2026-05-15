@@ -76,7 +76,7 @@ pub fn receive_message(
         }
         Err(DispatchError::ParseResponse(err)) => {
             // Check for "no message available" error (0x680)
-            if let nx_sf::cmif::ParseResponseError::ServiceError(code) = err
+            if let nx_sf::cmif::ParseRespBytesError::ServiceError(code) = err
                 && code == 0x680
             {
                 return Ok(None);
