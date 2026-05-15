@@ -38,14 +38,16 @@ use crate::{
 /// dispatch error instead.
 pub(crate) fn get_client_id(object: &DomainObject<'_>) -> Result<NifmClientId, DispatchError> {
     let mut out = NifmClientId::default();
+    // SAFETY: `out` is a valid `&mut` value; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<NifmClientId>())
+    };
     object
         .dispatch(CMD_IGS_GET_CLIENT_ID)
-        .buffer(
-            (&raw mut out).cast::<u8>(),
-            size_of::<NifmClientId>(),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send()
         .map(|_| out)
@@ -61,15 +63,17 @@ pub(crate) fn get_client_id(object: &DomainObject<'_>) -> Result<NifmClientId, D
 /// re-open it per request.
 pub(crate) fn create_request(object: &DomainObject<'_>) -> Result<u32, CreateRequestError> {
     let selector: i32 = 0x2;
-    // SAFETY: `selector` lives on the stack until `send()` returns.
-    let mut result = unsafe {
-        object
-            .dispatch(CMD_IGS_CREATE_REQUEST)
-            .in_raw((&raw const selector).cast::<u8>(), size_of::<i32>())
-            .out_objects(1)
-            .send()
-            .map_err(CreateRequestError::Dispatch)?
+    // SAFETY: `selector` is a `Copy` value on the stack, valid until `send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const selector).cast::<u8>(), size_of::<i32>())
     };
+    let mut result = object
+        .dispatch(CMD_IGS_CREATE_REQUEST)
+        .in_raw(in_bytes)
+        .out_objects(1)
+        .send()
+        .map_err(CreateRequestError::Dispatch)?;
 
     let new_object = result
         .take_object(0)
@@ -101,14 +105,19 @@ pub(crate) fn get_current_network_profile(
     out: &mut NifmNetworkProfileData,
 ) -> Result<(), DispatchError> {
     let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
-    object
-        .dispatch(CMD_IGS_GET_CURRENT_NETWORK_PROFILE)
-        .buffer(
+    // SAFETY: `sf` is a valid `&mut` value; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `sf`.
+    let sf_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             (&raw mut sf).cast::<u8>(),
             size_of::<NifmSfNetworkProfileData>(),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        )
+    };
+    object
+        .dispatch(CMD_IGS_GET_CURRENT_NETWORK_PROFILE)
+        .out_buffer(
+            sf_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send()?;
     sf_to_network_profile_data(&sf, out);
@@ -128,21 +137,24 @@ pub(crate) fn enumerate_network_profiles(
     buffer: &mut [NifmNetworkProfileBasicInfo],
 ) -> Result<i32, DispatchError> {
     let in_kind: u8 = kind.as_raw();
-    // SAFETY: `in_kind` lives on the stack until `send()` returns. The buffer
-    // is exposed to the kernel via HipcMapAlias; the slice's lifetime covers
-    // the duration of the call.
-    let result = unsafe {
-        object
-            .dispatch(CMD_IGS_ENUMERATE_NETWORK_PROFILES)
-            .in_raw((&raw const in_kind).cast::<u8>(), size_of::<u8>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                buffer.as_mut_ptr().cast::<u8>(),
-                size_of::<NifmSfNetworkProfileBasicInfo>() * buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `in_kind` is a `Copy` value on the stack, valid until `send()`
+    // returns; viewing its single byte as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const in_kind).cast::<u8>(), size_of::<u8>()) };
+    // SAFETY: `buffer` is exposed to the kernel via HipcMapAlias; the byte
+    // slice borrows `buffer` for the duration of the call.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            buffer.as_mut_ptr().cast::<u8>(),
+            size_of::<NifmSfNetworkProfileBasicInfo>() * buffer.len(),
+        )
     };
+    let result = object
+        .dispatch(CMD_IGS_ENUMERATE_NETWORK_PROFILES)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     let total_entries = i32::from_le_bytes([
         result.data[0],
@@ -191,20 +203,26 @@ pub(crate) fn get_network_profile(
     out: &mut NifmNetworkProfileData,
 ) -> Result<(), DispatchError> {
     let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
-    // SAFETY: `uuid` lives on the stack until `send()` returns.
-    unsafe {
-        object
-            .dispatch(CMD_IGS_GET_NETWORK_PROFILE)
-            .in_raw((&raw const uuid).cast::<u8>(), size_of::<Uuid>())
-            .buffer(
-                (&raw mut sf).cast::<u8>(),
-                size_of::<NifmSfNetworkProfileData>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()?;
-    }
+    // SAFETY: `uuid` is a `Copy` value on the stack, valid until `send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const uuid).cast::<u8>(), size_of::<Uuid>()) };
+    // SAFETY: `sf` is a valid `&mut` value; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `sf`.
+    let sf_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (&raw mut sf).cast::<u8>(),
+            size_of::<NifmSfNetworkProfileData>(),
+        )
+    };
+    object
+        .dispatch(CMD_IGS_GET_NETWORK_PROFILE)
+        .in_raw(in_bytes)
+        .out_buffer(
+            sf_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()?;
     sf_to_network_profile_data(&sf, out);
     Ok(())
 }
@@ -221,14 +239,19 @@ pub(crate) fn set_network_profile(
 ) -> Result<Uuid, DispatchError> {
     let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
     sf_from_network_profile_data(profile, &mut sf);
-    let result = object
-        .dispatch(CMD_IGS_SET_NETWORK_PROFILE)
-        .buffer(
+    // SAFETY: `sf` is a valid value; viewing it as a byte slice for the IN
+    // buffer is sound, and the byte slice borrows `sf`.
+    let sf_bytes = unsafe {
+        core::slice::from_raw_parts(
             (&raw const sf).cast::<u8>(),
             size_of::<NifmSfNetworkProfileData>(),
-            BufferAttr::IN
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        )
+    };
+    let result = object
+        .dispatch(CMD_IGS_SET_NETWORK_PROFILE)
+        .in_buffer(
+            sf_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_size(size_of::<Uuid>())
         .send()?;
@@ -367,14 +390,16 @@ pub(crate) fn is_any_internet_request_accepted(
     object: &DomainObject<'_>,
     id: NifmClientId,
 ) -> Result<bool, DispatchError> {
+    // SAFETY: `id` is a `Copy` value on the stack, valid until `send()`
+    // returns; viewing its bytes as a slice is sound.
+    let id_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const id).cast::<u8>(), size_of::<NifmClientId>())
+    };
     let result = object
         .dispatch(CMD_IGS_IS_ANY_INTERNET_REQUEST_ACCEPTED)
-        .buffer(
-            (&raw const id).cast::<u8>(),
-            size_of::<NifmClientId>(),
-            BufferAttr::IN
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        .in_buffer(
+            id_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_size(size_of::<u8>())
         .send()?;

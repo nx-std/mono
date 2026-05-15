@@ -125,20 +125,17 @@ pub(crate) fn get_applet_info(
         mode: u32,
         out_size: u32,
     }
-    // SAFETY: `theme_color` lives on the stack until `send()` returns; the
-    // buffer is exposed via HipcMapAlias for the duration of the call.
-    let result = unsafe {
-        object
-            .dispatch(CMD_REQ_GET_APPLET_INFO)
-            .in_raw((&raw const theme_color).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<Out>())
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `theme_color` is a `Copy` value on the stack, valid until `send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const theme_color).cast::<u8>(), size_of::<u32>())
     };
+    let result = object
+        .dispatch(CMD_REQ_GET_APPLET_INFO)
+        .in_raw(in_bytes)
+        .out_size(size_of::<Out>())
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<Out>()) };
     Ok(AppletInfo {

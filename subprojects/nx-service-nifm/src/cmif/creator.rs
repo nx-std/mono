@@ -34,16 +34,18 @@ pub(crate) fn create_general_service_old(
 /// re-open it per request.
 pub(crate) fn create_general_service(creator: &Domain) -> Result<u32, CreateGeneralServiceError> {
     let reserved: u64 = 0;
-    // SAFETY: `reserved` lives on the stack until `send()` returns.
-    let mut result = unsafe {
-        creator
-            .dispatch(CMD_CREATE_GENERAL_SERVICE)
-            .send_pid()
-            .in_raw((&raw const reserved).cast::<u8>(), size_of::<u64>())
-            .out_objects(1)
-            .send()
-            .map_err(CreateGeneralServiceError::Dispatch)?
+    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
     };
+    let mut result = creator
+        .dispatch(CMD_CREATE_GENERAL_SERVICE)
+        .send_pid()
+        .in_raw(in_bytes)
+        .out_objects(1)
+        .send()
+        .map_err(CreateGeneralServiceError::Dispatch)?;
 
     let object = result
         .take_object(0)
