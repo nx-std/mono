@@ -13,14 +13,15 @@ pub(crate) fn open_location_resolver(
     service: &Session,
     storage: u8,
 ) -> Result<u32, OpenLocationResolverError> {
-    // SAFETY: `storage` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_LOCATION_RESOLVER)
-            .in_raw((&raw const storage).cast::<u8>(), size_of::<u8>())
-            .send()
-            .map_err(OpenLocationResolverError::Dispatch)?
-    };
+    // SAFETY: `storage` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
+    let result = service
+        .dispatch(proto::OPEN_LOCATION_RESOLVER)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(OpenLocationResolverError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenLocationResolverError::MissingHandle);

@@ -20,22 +20,19 @@ pub(crate) fn resolve_path(
     tid: u64,
     out: &mut [u8; LR_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `tid` lives on the stack until `.send()` returns.
-    // `out` is a caller-provided buffer valid for the lifetime of this call.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const tid).cast::<u8>(), size_of::<u64>())
-            .buffer(
-                out.as_mut_ptr(),
-                LR_MAX_PATH,
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `tid` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const tid).cast::<u8>(), size_of::<u64>()) };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out.as_mut_slice(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// Redirects a path: sends a `u64` title ID and an input path buffer via
@@ -46,20 +43,16 @@ pub(crate) fn redirect_path(
     tid: u64,
     path: &[u8; LR_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `tid` lives on the stack until `.send()` returns.
-    // `path` is a caller-provided buffer valid for the lifetime of this call.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const tid).cast::<u8>(), size_of::<u64>())
-            .buffer(
-                path.as_ptr(),
-                LR_MAX_PATH,
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `tid` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const tid).cast::<u8>(), size_of::<u64>()) };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(path.as_slice(), BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// Redirects an application path (9.0.0+ variant): sends two `u64` title IDs
@@ -75,23 +68,20 @@ pub(crate) fn redirect_application_path(
 
     let input = RedirectApplicationIn { tid, tid2 };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    // `path` is a caller-provided buffer valid for the lifetime of this call.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<RedirectApplicationIn>(),
-            )
-            .buffer(
-                path.as_ptr(),
-                LR_MAX_PATH,
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<RedirectApplicationIn>(),
+        )
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(path.as_slice(), BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// Dispatches a command with a single `u64` input and no output.
@@ -100,12 +90,9 @@ pub(crate) fn dispatch_in_u64(
     cmd_id: u32,
     value: u64,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `value` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const value).cast::<u8>(), size_of::<u64>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `value` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u64>()) };
+    service.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
 }
