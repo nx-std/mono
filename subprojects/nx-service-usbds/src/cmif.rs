@@ -40,15 +40,17 @@ pub(crate) fn bind_device(
     complex_id: u32,
     proc_handle: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: inputs live on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::BIND_DEVICE)
-            .in_raw((&raw const complex_id).cast::<u8>(), size_of::<u32>())
-            .in_handle(proc_handle)
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `complex_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const complex_id).cast::<u8>(), size_of::<u32>())
+    };
+    service
+        .dispatch(proto::BIND_DEVICE)
+        .in_raw(in_bytes)
+        .in_handle(proc_handle)
+        .send()
+        .map(|_| ())
 }
 
 /// GetStateChangeEvent. Returns the copy-handle for the event.
@@ -78,16 +80,8 @@ pub(crate) fn get_ds_interface_legacy(
 ) -> Result<(u32, u8), GetInterfaceError> {
     let result = service
         .dispatch(proto::GET_DS_INTERFACE_LEGACY)
-        .buffer(
-            descriptor.as_ptr().cast_mut(),
-            descriptor.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            interface_name.as_ptr().cast_mut(),
-            interface_name.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(descriptor, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(interface_name, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u8>())
         .send()
         .map_err(GetInterfaceError::Dispatch)?;
@@ -106,14 +100,15 @@ pub(crate) fn register_interface(
     cmd_id: u32,
     intf_num: u8,
 ) -> Result<u32, RegisterInterfaceError> {
-    // SAFETY: `intf_num` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const intf_num).cast::<u8>(), size_of::<u8>())
-            .send()
-            .map_err(RegisterInterfaceError::Dispatch)?
-    };
+    // SAFETY: `intf_num` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const intf_num).cast::<u8>(), size_of::<u8>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(RegisterInterfaceError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(RegisterInterfaceError::MissingHandle);
@@ -126,11 +121,7 @@ pub(crate) fn register_interface(
 pub(crate) fn set_vid_pid_bcd(service: &Session, deviceinfo: &[u8]) -> Result<(), DispatchError> {
     service
         .dispatch(proto::SET_VID_PID_BCD)
-        .buffer(
-            deviceinfo.as_ptr().cast_mut(),
-            deviceinfo.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(deviceinfo, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -146,15 +137,18 @@ pub(crate) fn add_usb_string_descriptor(
     cmd_id: u32,
     descriptor: &UsbStringDescriptor,
 ) -> Result<u8, DispatchError> {
+    // SAFETY: `UsbStringDescriptor` is a `#[repr(C)]` struct; viewing its
+    // `size_of` bytes as a byte slice for the IN buffer is sound, and the
+    // slice borrows `descriptor`.
+    let desc_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (descriptor as *const UsbStringDescriptor).cast::<u8>(),
+            size_of::<UsbStringDescriptor>(),
+        )
+    };
     let result = service
         .dispatch(cmd_id)
-        .buffer(
-            (descriptor as *const UsbStringDescriptor)
-                .cast::<u8>()
-                .cast_mut(),
-            size_of::<UsbStringDescriptor>(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(desc_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u8>())
         .send()?;
 
@@ -177,19 +171,16 @@ pub(crate) fn set_usb_device_descriptor(
     speed: u32,
     descriptor: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: inputs live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const speed).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                descriptor.as_ptr().cast_mut(),
-                descriptor.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `speed` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const speed).cast::<u8>(), size_of::<u32>()) };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(descriptor, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// SetBinaryObjectStore. Input buffer.
@@ -200,11 +191,7 @@ pub(crate) fn set_binary_object_store(
 ) -> Result<(), DispatchError> {
     service
         .dispatch(cmd_id)
-        .buffer(
-            bos.as_ptr().cast_mut(),
-            bos.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(bos, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -240,11 +227,7 @@ pub(crate) fn intf_get_setup_packet(
 ) -> Result<(), DispatchError> {
     service
         .dispatch(proto::INTF_GET_SETUP_PACKET)
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -294,11 +277,7 @@ pub(crate) fn intf_get_ds_endpoint(
 ) -> Result<u32, RegisterEndpointError> {
     let result = service
         .dispatch(proto::INTF_REGISTER_ENDPOINT)
-        .buffer(
-            descriptor.as_ptr().cast_mut(),
-            descriptor.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(descriptor, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u8>())
         .send()
         .map_err(RegisterEndpointError::Dispatch)?;
@@ -315,14 +294,16 @@ pub(crate) fn intf_register_endpoint(
     service: &Session,
     endpoint_address: u8,
 ) -> Result<u32, RegisterEndpointError> {
-    // SAFETY: `endpoint_address` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::INTF_REGISTER_ENDPOINT)
-            .in_raw((&raw const endpoint_address).cast::<u8>(), size_of::<u8>())
-            .send()
-            .map_err(RegisterEndpointError::Dispatch)?
+    // SAFETY: `endpoint_address` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const endpoint_address).cast::<u8>(), size_of::<u8>())
     };
+    let result = service
+        .dispatch(proto::INTF_REGISTER_ENDPOINT)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(RegisterEndpointError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(RegisterEndpointError::MissingHandle);
@@ -344,22 +325,20 @@ pub(crate) fn intf_append_configuration_data_legacy(
         speed,
     };
 
-    // SAFETY: `input` and `buffer` live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA_LEGACY)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<AppendConfigDataLegacyIn>(),
-            )
-            .buffer(
-                buffer.as_ptr().cast_mut(),
-                buffer.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<AppendConfigDataLegacyIn>(),
+        )
+    };
+    service
+        .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA_LEGACY)
+        .in_raw(in_bytes)
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// AppendConfigurationData (11.0.0+, cmd 10). Takes speed + buffer.
@@ -368,19 +347,16 @@ pub(crate) fn intf_append_configuration_data(
     speed: u32,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `speed` and `buffer` live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA)
-            .in_raw((&raw const speed).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                buffer.as_ptr().cast_mut(),
-                buffer.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `speed` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const speed).cast::<u8>(), size_of::<u32>()) };
+    service
+        .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA)
+        .in_raw(in_bytes)
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
