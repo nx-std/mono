@@ -25,8 +25,6 @@ pub fn pull_context(
     descriptor: u32,
     result: u32,
 ) -> Result<PullContextOutput, PullContextError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     #[repr(C)]
     struct Input {
         descriptor: u32,
@@ -40,31 +38,31 @@ pub fn pull_context(
         size: u32,
     }
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::PULL_CONTEXT)
-        .data_size(size_of::<Input>())
-        .out_buffers(1)
-        .build();
+    let input = Input { descriptor, result };
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::PULL_CONTEXT)
+            .data_size(size_of::<Input>())
+            .add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
+            .send()
+            .map_err(PullContextError::BuildRequest)?;
 
-    // SAFETY: req.data points to valid payload area with space for Input.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<Input>().cast_mut(),
-            Input { descriptor, result },
-        );
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
-
-    req.add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(PullContextError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<Output>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<Output>())
         .map_err(PullContextError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for Output.
+    // SAFETY: `resp.data` is exactly `size_of::<Output>()` bytes.
     let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
 
     Ok(PullContextOutput {
@@ -77,10 +75,13 @@ pub fn pull_context(
 /// Error returned by [`pull_context`].
 #[derive(Debug, thiserror::Error)]
 pub enum PullContextError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
