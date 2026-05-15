@@ -8,22 +8,22 @@ use crate::proto;
 /// Fills `out` with cryptographically-secure random bytes.
 #[inline]
 pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), GetRandomBytesError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_RANDOM_BYTES)
-        .out_buffers(1)
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    req.add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::GET_RANDOM_BYTES)
+            .add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal)
+            .send()
+            .map_err(GetRandomBytesError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetRandomBytesError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(GetRandomBytesError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(GetRandomBytesError::ParseResponse)?;
 
     Ok(())
 }
@@ -31,10 +31,13 @@ pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), Ge
 /// Error returned by [`get_random_bytes`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetRandomBytesError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
