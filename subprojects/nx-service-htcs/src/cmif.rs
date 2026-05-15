@@ -19,29 +19,33 @@ use crate::{
 /// Sends PID initialization on the manager session (cmd 100).
 pub(crate) fn manager_pid_init(domain: &Domain) -> Result<(), DispatchError> {
     let pid_placeholder: u64 = 0;
-    // SAFETY: `pid_placeholder` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::MANAGER_PID_INIT)
-            .in_raw((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
-            .send_pid()
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `pid_placeholder` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
+    };
+    domain
+        .dispatch(proto::MANAGER_PID_INIT)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()
+        .map(|_| ())
 }
 
 /// Sends PID initialization on the monitor session (cmd 101).
 pub(crate) fn monitor_pid_init(session: &Session) -> Result<(), DispatchError> {
     let pid_placeholder: u64 = 0;
-    // SAFETY: `pid_placeholder` lives on the stack until `.send()` returns.
-    unsafe {
-        session
-            .dispatch(proto::MONITOR_PID_INIT)
-            .in_raw((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
-            .send_pid()
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `pid_placeholder` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
+    };
+    session
+        .dispatch(proto::MONITOR_PID_INIT)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()
+        .map(|_| ())
 }
 
 /// Gets a peer name (shared implementation for cmds 10 and 11).
@@ -65,16 +69,17 @@ pub(crate) fn create_socket(
 ) -> Result<(i32, u32), CreateSocketError> {
     let input: u8 = if enable_disconnection_emulation { 1 } else { 0 };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let mut result = unsafe {
-        domain
-            .dispatch(proto::CREATE_SOCKET)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<u8>())
-            .out_size(size_of::<i32>())
-            .out_objects(1)
-            .send()
-            .map_err(CreateSocketError::Dispatch)?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u8>()) };
+    let mut result = domain
+        .dispatch(proto::CREATE_SOCKET)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_objects(1)
+        .send()
+        .map_err(CreateSocketError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let err = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
@@ -98,31 +103,41 @@ pub(crate) fn start_select(
     write_fds: &[i32],
     except_fds: &[i32],
 ) -> Result<(u32, u32), StartSelectError> {
-    // SAFETY: `tv` and fd slices live on the stack until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::START_SELECT)
-            .in_raw((&raw const *tv).cast::<u8>(), size_of::<HtcsTimeVal>())
-            .out_size(size_of::<u32>())
-            .buffer(
-                read_fds.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(read_fds),
-                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::IN),
-            )
-            .buffer(
-                write_fds.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(write_fds),
-                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::IN),
-            )
-            .buffer(
-                except_fds.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(except_fds),
-                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::IN),
-            )
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(StartSelectError::Dispatch)?
+    // SAFETY: `tv` is a valid reference; viewing its bytes as a slice is
+    // sound, and the slice lives until `.send()` returns.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const *tv).cast::<u8>(), size_of::<HtcsTimeVal>())
     };
+    // SAFETY: `read_fds`, `write_fds`, `except_fds` are valid `&[i32]`
+    // slices; viewing them as byte slices for IN buffers is sound.
+    let read_bytes = unsafe {
+        core::slice::from_raw_parts(
+            read_fds.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(read_fds),
+        )
+    };
+    let write_bytes = unsafe {
+        core::slice::from_raw_parts(
+            write_fds.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(write_fds),
+        )
+    };
+    let except_bytes = unsafe {
+        core::slice::from_raw_parts(
+            except_fds.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(except_fds),
+        )
+    };
+    let result = domain
+        .dispatch(proto::START_SELECT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .in_buffer(read_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(write_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(except_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(StartSelectError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let task_id = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -142,29 +157,38 @@ pub(crate) fn end_select(
     write_fds: &mut [i32],
     except_fds: &mut [i32],
 ) -> Result<EndSelectOut, DispatchError> {
-    // SAFETY: `task_id` and fd slices live until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::END_SELECT)
-            .in_raw((&raw const task_id).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<EndSelectOut>())
-            .buffer(
-                read_fds.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(read_fds),
-                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::OUT),
-            )
-            .buffer(
-                write_fds.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(write_fds),
-                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::OUT),
-            )
-            .buffer(
-                except_fds.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(except_fds),
-                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::OUT),
-            )
-            .send()?
+    // SAFETY: `task_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    // SAFETY: `read_fds`, `write_fds`, `except_fds` are valid `&mut [i32]`
+    // slices; viewing them as mutable byte slices for OUT buffers is sound.
+    let read_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            read_fds.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(read_fds),
+        )
     };
+    let write_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            write_fds.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(write_fds),
+        )
+    };
+    let except_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            except_fds.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(except_fds),
+        )
+    };
+    let result = domain
+        .dispatch(proto::END_SELECT)
+        .in_raw(in_bytes)
+        .out_size(size_of::<EndSelectOut>())
+        .out_buffer(read_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(write_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(except_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<EndSelectOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<EndSelectOut>()) };
@@ -193,17 +217,19 @@ pub(crate) fn socket_cmd_in_address(
     cmd_id: u32,
     address: &HtcsSockAddr,
 ) -> Result<SocketResult, DispatchError> {
-    // SAFETY: `address` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const *address).cast::<u8>(),
-                size_of::<HtcsSockAddr>(),
-            )
-            .out_size(size_of::<SocketResult>())
-            .send()?
+    // SAFETY: `address` is a valid reference; viewing its bytes as a slice is
+    // sound, and the slice lives until `.send()` returns.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *address).cast::<u8>(),
+            size_of::<HtcsSockAddr>(),
+        )
     };
+    let result = object
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<SocketResult>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -216,14 +242,15 @@ pub(crate) fn socket_cmd_in_i32(
     cmd_id: u32,
     value: i32,
 ) -> Result<SocketResult, DispatchError> {
-    // SAFETY: `value` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(cmd_id)
-            .in_raw((&raw const value).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<SocketResult>())
-            .send()?
-    };
+    // SAFETY: `value` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<i32>()) };
+    let result = object
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<SocketResult>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -238,14 +265,16 @@ pub(crate) fn socket_fcntl(
 ) -> Result<SocketResult, DispatchError> {
     let input = FcntlIn { command, value };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_FCNTL)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<FcntlIn>())
-            .out_size(size_of::<SocketResult>())
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<FcntlIn>())
     };
+    let result = object
+        .dispatch(proto::SOCKET_FCNTL)
+        .in_raw(in_bytes)
+        .out_size(size_of::<SocketResult>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -282,16 +311,17 @@ pub(crate) fn socket_accept_results(
     object: &DomainObject<'_>,
     task_id: u32,
 ) -> Result<(AcceptResultsOut, u32), AcceptResultsError> {
-    // SAFETY: `task_id` lives on the stack until `.send()` returns.
-    let mut result = unsafe {
-        object
-            .dispatch(proto::SOCKET_ACCEPT_RESULTS)
-            .in_raw((&raw const task_id).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<AcceptResultsOut>())
-            .out_objects(1)
-            .send()
-            .map_err(AcceptResultsError::Dispatch)?
-    };
+    // SAFETY: `task_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let mut result = object
+        .dispatch(proto::SOCKET_ACCEPT_RESULTS)
+        .in_raw(in_bytes)
+        .out_size(size_of::<AcceptResultsOut>())
+        .out_objects(1)
+        .send()
+        .map_err(AcceptResultsError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<AcceptResultsOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<AcceptResultsOut>()) };
@@ -315,16 +345,18 @@ pub(crate) fn socket_recv_start(
 ) -> Result<(u32, u32), RecvStartError> {
     let input = RecvStartIn { mem_size, flags };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_RECV_START)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<RecvStartIn>())
-            .out_size(size_of::<u32>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(RecvStartError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<RecvStartIn>())
     };
+    let result = object
+        .dispatch(proto::SOCKET_RECV_START)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(RecvStartError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let task_id = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -342,19 +374,16 @@ pub(crate) fn socket_recv_results(
     task_id: u32,
     buffer: &mut [u8],
 ) -> Result<TransferResult, DispatchError> {
-    // SAFETY: `task_id` and `buffer` live until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_RECV_RESULTS)
-            .in_raw((&raw const task_id).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<TransferResult>())
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::OUT),
-            )
-            .send()?
-    };
+    // SAFETY: `task_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(proto::SOCKET_RECV_RESULTS)
+        .in_raw(in_bytes)
+        .out_size(size_of::<TransferResult>())
+        .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<TransferResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) };
@@ -367,14 +396,15 @@ pub(crate) fn socket_cmd_in_u32_out_transfer(
     cmd_id: u32,
     value: u32,
 ) -> Result<TransferResult, DispatchError> {
-    // SAFETY: `value` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(cmd_id)
-            .in_raw((&raw const value).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<TransferResult>())
-            .send()?
-    };
+    // SAFETY: `value` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<TransferResult>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<TransferResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) };
@@ -391,19 +421,21 @@ pub(crate) fn socket_start_send(
 ) -> Result<(StartSendOut, u32), StartSendError> {
     let input = StartTransferIn::new(flags, size);
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_START_SEND)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StartTransferIn>(),
-            )
-            .out_size(size_of::<StartSendOut>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(StartSendError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StartTransferIn>(),
+        )
     };
+    let result = object
+        .dispatch(proto::SOCKET_START_SEND)
+        .in_raw(in_bytes)
+        .out_size(size_of::<StartSendOut>())
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(StartSendError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<StartSendOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<StartSendOut>()) };
@@ -425,19 +457,21 @@ pub(crate) fn socket_start_recv(
 ) -> Result<(u32, u32), StartRecvError> {
     let input = StartTransferIn::new(flags, size);
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_START_RECV)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StartTransferIn>(),
-            )
-            .out_size(size_of::<u32>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(StartRecvError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StartTransferIn>(),
+        )
     };
+    let result = object
+        .dispatch(proto::SOCKET_START_RECV)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(StartRecvError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let task_id = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -455,19 +489,16 @@ pub(crate) fn socket_end_recv(
     task_id: u32,
     buffer: &mut [u8],
 ) -> Result<TransferResult, DispatchError> {
-    // SAFETY: `task_id` and `buffer` live until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_END_RECV)
-            .in_raw((&raw const task_id).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<TransferResult>())
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::OUT),
-            )
-            .send()?
-    };
+    // SAFETY: `task_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(proto::SOCKET_END_RECV)
+        .in_raw(in_bytes)
+        .out_size(size_of::<TransferResult>())
+        .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<TransferResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) };
@@ -482,23 +513,21 @@ pub(crate) fn socket_send_start(
     buffer: &[u8],
     flags: i32,
 ) -> Result<(u32, u32), SendStartError> {
-    // SAFETY: `flags` and `buffer` live on the stack until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_SEND_START)
-            .in_raw((&raw const flags).cast::<u8>(), size_of::<i32>())
-            .out_size(size_of::<u32>())
-            .buffer(
-                buffer.as_ptr(),
-                buffer.len(),
-                BufferAttr::HIPC_AUTO_SELECT
-                    .or(BufferAttr::IN)
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-            )
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(SendStartError::Dispatch)?
-    };
+    // SAFETY: `flags` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<i32>()) };
+    let result = object
+        .dispatch(proto::SOCKET_SEND_START)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .in_buffer(
+            buffer,
+            BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+        )
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(SendStartError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let task_id = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -516,21 +545,19 @@ pub(crate) fn socket_continue_send(
     task_id: u32,
     buffer: &[u8],
 ) -> Result<ContinueSendOut, DispatchError> {
-    // SAFETY: `task_id` and `buffer` live until `.send()` returns.
-    let result = unsafe {
-        object
-            .dispatch(proto::SOCKET_CONTINUE_SEND)
-            .in_raw((&raw const task_id).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<ContinueSendOut>())
-            .buffer(
-                buffer.as_ptr(),
-                buffer.len(),
-                BufferAttr::HIPC_AUTO_SELECT
-                    .or(BufferAttr::IN)
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-            )
-            .send()?
-    };
+    // SAFETY: `task_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(proto::SOCKET_CONTINUE_SEND)
+        .in_raw(in_bytes)
+        .out_size(size_of::<ContinueSendOut>())
+        .in_buffer(
+            buffer,
+            BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+        )
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<ContinueSendOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<ContinueSendOut>()) };
