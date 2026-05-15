@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the temperature control service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -9,53 +9,63 @@ use crate::proto;
 
 /// Enables fan control.
 pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControlError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::ENABLE_FAN_CONTROL).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::ENABLE_FAN_CONTROL)
+            .send()
+            .map_err(EnableFanControlError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(EnableFanControlError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(EnableFanControlError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(EnableFanControlError::ParseResponse)?;
 
     Ok(())
 }
 
 /// Disables fan control.
 pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanControlError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::DISABLE_FAN_CONTROL).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::DISABLE_FAN_CONTROL)
+            .send()
+            .map_err(DisableFanControlError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(DisableFanControlError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(DisableFanControlError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DisableFanControlError::ParseResponse)?;
 
     Ok(())
 }
 
 /// Queries whether fan control is enabled.
 pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanControlEnabledError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::IS_FAN_CONTROL_ENABLED).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::IS_FAN_CONTROL_ENABLED)
+            .send()
+            .map_err(IsFanControlEnabledError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(IsFanControlEnabledError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u8>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
         .map_err(IsFanControlEnabledError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -68,17 +78,21 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
 pub fn get_skin_temperature_milli_c(
     session: SessionHandle,
 ) -> Result<i32, GetSkinTemperatureMilliCError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::GET_SKIN_TEMPERATURE_MILLI_C)
+            .send()
+            .map_err(GetSkinTemperatureMilliCError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSkinTemperatureMilliCError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<i32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
         .map_err(GetSkinTemperatureMilliCError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for i32.
@@ -90,43 +104,55 @@ pub fn get_skin_temperature_milli_c(
 /// Error returned by [`enable_fan_control`].
 #[derive(Debug, thiserror::Error)]
 pub enum EnableFanControlError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`disable_fan_control`].
 #[derive(Debug, thiserror::Error)]
 pub enum DisableFanControlError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`is_fan_control_enabled`].
 #[derive(Debug, thiserror::Error)]
 pub enum IsFanControlEnabledError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_skin_temperature_milli_c`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSkinTemperatureMilliCError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
