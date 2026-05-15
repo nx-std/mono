@@ -1,17 +1,33 @@
-//! Service Manager Management (`sm:m`) Protocol Implementation.
+//! Service Manager management (`sm:m`) protocol implementation.
 //!
-//! This crate exposes the SM management interface used by the kernel and
-//! Atmosphere to register and unregister processes with the Service Manager.
+//! `sm:m` is the privileged side of the Service Manager. Where `sm:` lets any
+//! process *look up* services, `sm:m` is how the system tells SM which
+//! processes exist and what each one is allowed to do.
+//!
+//! It exists to keep SM's view of the system in step with the set of running
+//! processes. As a process is launched it is registered with SM — together
+//! with the Service Access Control (SAC) data describing which services it may
+//! use as a client and host as a server — and when it exits it is
+//! unregistered. SM leans on this for every later lookup on `sm:`, so a
+//! process can only reach the services its SAC grants.
+//!
+//! Reach for this crate only when writing a process-management component;
+//! ordinary programs need just `sm:` (the `nx-service-sm` crate).
+//!
+//! ## Usage
+//!
+//! `sm:m` is itself a registered service, so [`connect`] obtains it through an
+//! existing [`SmService`] session. The resulting [`SmmService`] then offers
+//! two operations — register a process and unregister a process — each in a
+//! `_cmif` and a `_tipc` variant.
 //!
 //! ## Protocol Support
 //!
-//! Like the SM service itself, `sm:m` supports two protocols:
-//! - **CMIF**: Available on HOS < 12.0.0 (non-Atmosphere).
-//! - **TIPC**: Available on HOS 12.0.0+ and Atmosphere.
-//!
-//! Protocol selection is the caller's responsibility. Use the `_cmif` or
-//! `_tipc` method variants on [`SmmService`] as appropriate for the system
-//! version.
+//! `sm:m` speaks the same two IPC protocols as the rest of the system, CMIF
+//! and the newer TIPC, but accepts CMIF on a narrower range than the `sm:`
+//! port does: only stock Horizon OS older than `[12.0.0]`. Newer firmware and
+//! Atmosphère require TIPC. Choosing the `_cmif` or `_tipc` method variant
+//! that matches the running system is the caller's responsibility.
 
 #![no_std]
 
@@ -101,10 +117,6 @@ impl SmmService {
 ///
 /// The returned [`SmmService`] can be used with either CMIF or TIPC dispatch;
 /// `sm:m` is a single named port, and the protocol choice is per-request.
-///
-/// # Arguments
-///
-/// * `sm` - Service manager session
 pub fn connect(sm: &SmService) -> Result<SmmService, ConnectError> {
     let handle = sm
         .get_service_handle_cmif(SERVICE_NAME)

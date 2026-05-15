@@ -1,16 +1,50 @@
-//! Service Manager Protocol Implementation.
+//! Service Manager (`sm`) protocol implementation.
 //!
-//! This crate provides stateless SM protocol operations. All operations are
-//! methods on [`SmService`], which wraps an SM session handle.
+//! The Service Manager is how a process reaches everything else on Horizon OS.
+//! Services — filesystem, display, input, audio, and the rest — are not found
+//! by address or by linking: a process asks SM for one *by name* and receives
+//! a session it can talk to. SM is the directory that makes Horizon's
+//! service-oriented system navigable, and it is in place from early in boot.
+//!
+//! Two roles use it. A *client* resolves a service name into a usable session.
+//! A *service host* publishes a name so that those lookups can succeed. Either
+//! way the first step is the same — connect to SM and register as a client;
+//! only then does SM answer requests.
+//!
+//! This crate exposes stateless SM operations as methods on [`SmService`], the
+//! session returned by [`connect`]. It keeps no global state and never probes
+//! the system version, so the caller chooses the protocol per call.
+//!
+//! ## Connecting
+//!
+//! [`connect`] performs the handshake every process begins with: it reaches
+//! the `sm:` port — retrying while SM is still coming up during boot — and
+//! registers the caller as a client. The returned [`SmService`] is then ready
+//! for lookups and registrations.
+//!
+//! ## Operations
+//!
+//! Beyond that initial registration, [`SmService`] lets a caller:
+//!
+//! - **resolve a service** — turn a [`ServiceName`] into a session handle for
+//!   it; the everyday client operation.
+//! - **register / unregister a service** — publish or withdraw a name, and
+//!   obtain the port a host accepts sessions on.
+//! - **detach** — release the caller's own client registration.
 //!
 //! ## Protocol Support
 //!
-//! SM supports two protocols:
-//! - **CMIF**: Available on all HOS versions
-//! - **TIPC**: Available on HOS 12.0.0+ and Atmosphere
+//! SM speaks two IPC protocols: the original CMIF and the newer TIPC, which
+//! `sm` gained in `[12.0.0]` and Atmosphère speaks as well. Every operation
+//! comes in a `_cmif` and a `_tipc` variant; choosing the one that matches the
+//! running system is the caller's responsibility.
 //!
-//! Protocol selection is the caller's responsibility. Use the `_cmif` or `_tipc`
-//! method variants as appropriate for your system version.
+//! ## Hosversion variants
+//!
+//! Detaching a client became possible only in `[11.0.0]`, and its reach is
+//! narrow: [`SmService::detach_client_cmif`] works on `[11.0.0]`-`[11.0.1]`,
+//! while [`SmService::detach_client_tipc`] is an Atmosphère extension that
+//! stock SM does not provide.
 
 #![no_std]
 
