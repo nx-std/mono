@@ -1,6 +1,9 @@
 //! CMIF protocol operations for the clkrst service.
 
-use core::ptr;
+use core::{
+    mem::{size_of, size_of_val},
+    ptr,
+};
 
 use nx_sf::{cmif, hipc::BufferMode};
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -16,79 +19,84 @@ pub fn open_session(
     module_id: PcvModuleId,
     unk: u32,
 ) -> Result<SessionHandle, OpenSessionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_SESSION)
+            .data_size(size_of::<[u32; 2]>())
+            .send()
+            .map_err(OpenSessionError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::OPEN_SESSION)
-        .data_size(size_of::<[u32; 2]>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for two u32.
-    unsafe {
-        let data_ptr = req.data.as_ptr().cast::<u32>().cast_mut();
-        ptr::write_unaligned(data_ptr, module_id.as_raw());
-        ptr::write_unaligned(data_ptr.add(1), unk);
+        // SAFETY: `req.data` is exactly `size_of::<[u32; 2]>()` bytes.
+        unsafe {
+            let data_ptr = req.data.as_mut_ptr().cast::<u32>();
+            ptr::write_unaligned(data_ptr, module_id.as_raw());
+            ptr::write_unaligned(data_ptr.add(1), unk);
+        }
     }
 
     ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(OpenSessionError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp =
+        cmif::parse_response::<()>(buf.as_array()).map_err(OpenSessionError::ParseResponse)?;
 
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(OpenSessionError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(OpenSessionError::MissingHandle);
+    };
 
-    // SAFETY: handle is from a valid IPC response.
+    // SAFETY: the kernel returned a valid session handle in the response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
 /// Sets the clock rate in Hz.
 pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRateError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_CLOCK_RATE)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(SetClockRateError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SET_CLOCK_RATE)
-        .data_size(size_of::<u32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), hz);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), hz) };
     }
 
     ipc::send_sync_request(session).map_err(SetClockRateError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SetClockRateError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response::<()>(buf.as_array()).map_err(SetClockRateError::ParseResponse)?;
 
     Ok(())
 }
 
 /// Gets the current clock rate in Hz.
 pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_CLOCK_RATE).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::GET_CLOCK_RATE)
+            .send()
+            .map_err(GetClockRateError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetClockRateError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
         .map_err(GetClockRateError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u32.
+    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes.
     let hz = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     Ok(hz)
@@ -110,37 +118,36 @@ pub fn get_possible_clock_rates(
     session: SessionHandle,
     rates: &mut [u32],
 ) -> Result<PossibleClockRates, GetPossibleClockRatesError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     let max_count: i32 = rates.len() as i32;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
-        .data_size(size_of::<i32>())
-        .out_auto_buffers(1)
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_POSSIBLE_CLOCK_RATES)
+            .data_size(size_of::<i32>())
+            .add_out_auto_buffer(
+                rates.as_mut_ptr().cast::<u8>(),
+                size_of_val(rates),
+                BufferMode::Normal,
+            )
+            .send()
+            .map_err(GetPossibleClockRatesError::BuildRequest)?;
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for i32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<i32>().cast_mut(), max_count);
+        // SAFETY: `req.data` is exactly `size_of::<i32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), max_count) };
     }
-
-    req.add_out_auto_buffer(
-        rates.as_mut_ptr().cast::<u8>(),
-        size_of_val(rates),
-        BufferMode::Normal,
-    );
 
     ipc::send_sync_request(session).map_err(GetPossibleClockRatesError::SendRequest)?;
 
     // Response inline data: { i32 type, i32 count }.
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<[i32; 2]>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<[i32; 2]>())
         .map_err(GetPossibleClockRatesError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for [i32; 2].
+    // SAFETY: `resp.data` is at least `size_of::<[i32; 2]>()` bytes.
     let raw_type = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
     let count = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>().add(1)) };
 
@@ -153,10 +160,16 @@ pub fn get_possible_clock_rates(
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
+    /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
+    /// Response did not include the expected session handle.
     #[error("missing session handle in response")]
     MissingHandle,
 }
@@ -164,28 +177,44 @@ pub enum OpenSessionError {
 /// Error returned by [`set_clock_rate`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetClockRateError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
+    /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespError),
 }
 
 /// Error returned by [`get_clock_rate`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetClockRateError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
+    /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_possible_clock_rates`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPossibleClockRatesError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
+    /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
+    /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
+    /// Unknown clock rates list type.
     #[error("unknown clock rates list type: {0}")]
     UnknownListType(i32),
 }
