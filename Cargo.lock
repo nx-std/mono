@@ -904,6 +904,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-service-ns"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-svc",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-service-nv"
 version = "0.1.0"
 dependencies = [
