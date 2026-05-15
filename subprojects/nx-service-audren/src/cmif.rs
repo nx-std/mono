@@ -33,20 +33,22 @@ pub(crate) fn open_audio_renderer(
         aruid,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_AUDIO_RENDERER)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<OpenAudioRendererIn>(),
-            )
-            .send_pid()
-            .in_handle(tmem_handle)
-            .in_handle(process_handle)
-            .send()
-            .map_err(OpenAudioRendererError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<OpenAudioRendererIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<OpenAudioRendererIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::OPEN_AUDIO_RENDERER)
+        .in_raw(in_bytes)
+        .send_pid()
+        .in_handle(tmem_handle)
+        .in_handle(process_handle)
+        .send()
+        .map_err(OpenAudioRendererError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenAudioRendererError::MissingHandle);
@@ -60,18 +62,20 @@ pub(crate) fn get_work_buffer_size(
     service: &Session,
     param: &AudioRendererParameter,
 ) -> Result<u64, GetWorkBufferSizeError> {
-    // SAFETY: `param` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_WORK_BUFFER_SIZE)
-            .in_raw(
-                (&raw const *param).cast::<u8>(),
-                size_of::<AudioRendererParameter>(),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(GetWorkBufferSizeError)?
+    // SAFETY: `param` is a valid `&AudioRendererParameter`; viewing its bytes
+    // as a slice is sound, and the slice borrows `param`.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (param as *const AudioRendererParameter).cast::<u8>(),
+            size_of::<AudioRendererParameter>(),
+        )
     };
+    let result = service
+        .dispatch(proto::GET_WORK_BUFFER_SIZE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(GetWorkBufferSizeError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -140,21 +144,9 @@ fn renderer_request_update_impl(
 ) -> Result<(), RequestUpdateError> {
     service
         .dispatch(cmd_id)
-        .buffer(
-            out_param_buf.as_mut_ptr(),
-            out_param_buf.len(),
-            BufferAttr::OUT.or(transfer_attr),
-        )
-        .buffer(
-            perf_buf.as_mut_ptr(),
-            perf_buf.len(),
-            BufferAttr::OUT.or(transfer_attr),
-        )
-        .buffer(
-            in_param_buf.as_ptr().cast_mut(),
-            in_param_buf.len(),
-            BufferAttr::IN.or(transfer_attr),
-        )
+        .out_buffer(out_param_buf, transfer_attr)
+        .out_buffer(perf_buf, transfer_attr)
+        .in_buffer(in_param_buf, transfer_attr)
         .send()
         .map(|_| ())
         .map_err(RequestUpdateError)
@@ -185,14 +177,15 @@ pub(crate) fn renderer_set_rendering_time_limit(
     service: &Session,
     percent: i32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `percent` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::RENDERER_SET_RENDERING_TIME_LIMIT)
-            .in_raw((&raw const percent).cast::<u8>(), size_of::<i32>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `percent` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<i32>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const percent).cast::<u8>(), size_of::<i32>()) };
+    service
+        .dispatch(proto::RENDERER_SET_RENDERING_TIME_LIMIT)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
