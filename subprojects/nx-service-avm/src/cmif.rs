@@ -17,14 +17,16 @@ pub(crate) fn get_highest_available_version(
     id_2: u64,
 ) -> Result<u32, DispatchError> {
     let input = GetVersionIn { id_1, id_2 };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::GET_HIGHEST_AVAILABLE_VERSION)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
-            .out_size(size_of::<u32>())
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<GetVersionIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
     };
+    let result = domain
+        .dispatch(proto::GET_HIGHEST_AVAILABLE_VERSION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .send()?;
     // SAFETY: the response payload is at least `size_of::<u32>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
@@ -36,14 +38,16 @@ pub(crate) fn get_highest_required_version(
     id_2: u64,
 ) -> Result<u32, DispatchError> {
     let input = GetVersionIn { id_1, id_2 };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::GET_HIGHEST_REQUIRED_VERSION)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
-            .out_size(size_of::<u32>())
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<GetVersionIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
     };
+    let result = domain
+        .dispatch(proto::GET_HIGHEST_REQUIRED_VERSION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .send()?;
     // SAFETY: the response payload is at least `size_of::<u32>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
@@ -53,14 +57,16 @@ pub(crate) fn get_version_list_entry(
     domain: &Domain,
     application_id: u64,
 ) -> Result<AvmVersionListEntry, DispatchError> {
-    // SAFETY: `application_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::GET_VERSION_LIST_ENTRY)
-            .in_raw((&raw const application_id).cast::<u8>(), size_of::<u64>())
-            .out_size(size_of::<AvmVersionListEntry>())
-            .send()?
+    // SAFETY: `application_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its `size_of::<u64>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
+    let result = domain
+        .dispatch(proto::GET_VERSION_LIST_ENTRY)
+        .in_raw(in_bytes)
+        .out_size(size_of::<AvmVersionListEntry>())
+        .send()?;
     // SAFETY: the response payload is at least `size_of::<AvmVersionListEntry>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<AvmVersionListEntry>()) })
 }
@@ -85,14 +91,16 @@ pub(crate) fn get_launch_required_version(
     domain: &Domain,
     application_id: u64,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `application_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        domain
-            .dispatch(proto::GET_LAUNCH_REQUIRED_VERSION)
-            .in_raw((&raw const application_id).cast::<u8>(), size_of::<u64>())
-            .out_size(size_of::<u32>())
-            .send()?
+    // SAFETY: `application_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its `size_of::<u64>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
+    let result = domain
+        .dispatch(proto::GET_LAUNCH_REQUIRED_VERSION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .send()?;
     // SAFETY: the response payload is at least `size_of::<u32>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
@@ -107,14 +115,16 @@ pub(crate) fn upgrade_launch_required_version(
         version,
         application_id,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::UPGRADE_LAUNCH_REQUIRED_VERSION)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<PushVersionIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
+    };
+    domain
+        .dispatch(proto::UPGRADE_LAUNCH_REQUIRED_VERSION)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Pushes the launch version for an application.
@@ -127,14 +137,16 @@ pub(crate) fn push_launch_version(
         version,
         application_id,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::PUSH_LAUNCH_VERSION)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<PushVersionIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
+    };
+    domain
+        .dispatch(proto::PUSH_LAUNCH_VERSION)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Lists all version list entries into a buffer.
@@ -142,14 +154,18 @@ pub(crate) fn list_version_list(
     domain: &Domain,
     buffer: &mut [AvmVersionListEntry],
 ) -> Result<u32, DispatchError> {
+    // SAFETY: `buffer` is a valid `&mut [AvmVersionListEntry]`; viewing it as
+    // a byte slice for the OUT buffer is sound, and the byte slice borrows `buffer`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            buffer.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(buffer),
+        )
+    };
     let result = domain
         .dispatch(proto::LIST_VERSION_LIST)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(buffer),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
 
     Ok(u32::from_le_bytes([
@@ -165,14 +181,18 @@ pub(crate) fn list_required_version(
     domain: &Domain,
     buffer: &mut [AvmRequiredVersionEntry],
 ) -> Result<u32, DispatchError> {
+    // SAFETY: `buffer` is a valid `&mut [AvmRequiredVersionEntry]`; viewing it as
+    // a byte slice for the OUT buffer is sound, and the byte slice borrows `buffer`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            buffer.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(buffer),
+        )
+    };
     let result = domain
         .dispatch(proto::LIST_REQUIRED_VERSION)
         .out_size(size_of::<u32>())
-        .buffer(
-            buffer.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(buffer),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
 
     Ok(u32::from_le_bytes([
@@ -198,13 +218,17 @@ pub(crate) fn importer_set_data(
     object: &DomainObject<'_>,
     entries: &[AvmVersionListEntry],
 ) -> Result<(), DispatchError> {
-    object
-        .dispatch(proto::IMPORTER_SET_DATA)
-        .buffer(
+    // SAFETY: `entries` is a valid `&[AvmVersionListEntry]`; viewing it as
+    // a byte slice for the IN buffer is sound, and the slice borrows `entries`.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
             entries.as_ptr().cast::<u8>(),
             core::mem::size_of_val(entries),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
+    };
+    object
+        .dispatch(proto::IMPORTER_SET_DATA)
+        .in_buffer(in_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
