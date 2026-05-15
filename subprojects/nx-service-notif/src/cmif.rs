@@ -9,15 +9,17 @@ use crate::{dispatch::dispatch_in, proto, types::AlarmSetting};
 /// Initializes the Application variant (cmd 1000). Sends PID.
 pub(crate) fn initialize(domain: &Domain) -> Result<(), DispatchError> {
     let pid_reserved: u64 = 0;
-    // SAFETY: `pid_reserved` lives on the stack until `.send()` returns.
-    unsafe {
-        domain
-            .dispatch(proto::INITIALIZE)
-            .in_raw((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
-            .send_pid()
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `pid_reserved` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
+    };
+    domain
+        .dispatch(proto::INITIALIZE)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()
+        .map(|_| ())
 }
 
 /// Registers an alarm setting (cmd 500).
@@ -29,18 +31,18 @@ pub(crate) fn register_alarm_setting(
     alarm_setting: &AlarmSetting,
     app_param: &[u8],
 ) -> Result<u16, DispatchError> {
-    let result = domain
-        .dispatch(proto::REGISTER_ALARM_SETTING)
-        .buffer(
+    // SAFETY: `alarm_setting` lives on the caller's stack, valid until `.send()`
+    // returns; viewing it as a byte slice for the IN buffer is sound.
+    let setting_bytes = unsafe {
+        core::slice::from_raw_parts(
             (alarm_setting as *const AlarmSetting).cast::<u8>(),
             size_of::<AlarmSetting>(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
-        .buffer(
-            app_param.as_ptr(),
-            app_param.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+    };
+    let result = domain
+        .dispatch(proto::REGISTER_ALARM_SETTING)
+        .in_buffer(setting_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(app_param, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u16>())
         .send()?;
 
@@ -56,18 +58,18 @@ pub(crate) fn update_alarm_setting(
     alarm_setting: &AlarmSetting,
     app_param: &[u8],
 ) -> Result<(), DispatchError> {
-    domain
-        .dispatch(proto::UPDATE_ALARM_SETTING)
-        .buffer(
+    // SAFETY: `alarm_setting` lives on the caller's stack, valid until `.send()`
+    // returns; viewing it as a byte slice for the IN buffer is sound.
+    let setting_bytes = unsafe {
+        core::slice::from_raw_parts(
             (alarm_setting as *const AlarmSetting).cast::<u8>(),
             size_of::<AlarmSetting>(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
-        .buffer(
-            app_param.as_ptr(),
-            app_param.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+    };
+    domain
+        .dispatch(proto::UPDATE_ALARM_SETTING)
+        .in_buffer(setting_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(app_param, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -79,13 +81,15 @@ pub(crate) fn list_alarm_settings(
     domain: &Domain,
     out: &mut [AlarmSetting],
 ) -> Result<i32, DispatchError> {
+    // SAFETY: `out` is a valid `&mut [AlarmSetting]`; reinterpreting its memory
+    // as a mutable byte slice for the OUT buffer is sound and the slice lives
+    // until `.send()` returns.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
+    };
     let result = domain
         .dispatch(proto::LIST_ALARM_SETTINGS)
-        .buffer(
-            out.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<i32>())
         .send()?;
 
@@ -101,18 +105,17 @@ pub(crate) fn load_application_parameter(
     alarm_setting_id: u16,
     out: &mut [u8],
 ) -> Result<u32, DispatchError> {
-    let result = unsafe {
-        domain
-            .dispatch(proto::LOAD_APPLICATION_PARAMETER)
-            .in_raw((&raw const alarm_setting_id).cast::<u8>(), size_of::<u16>())
-            .buffer(
-                out.as_mut_ptr(),
-                out.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u32>())
-            .send()?
+    // SAFETY: `alarm_setting_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const alarm_setting_id).cast::<u8>(), size_of::<u16>())
     };
+    let result = domain
+        .dispatch(proto::LOAD_APPLICATION_PARAMETER)
+        .in_raw(in_bytes)
+        .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u32>())
+        .send()?;
 
     // SAFETY: response payload contains the u32 actual size.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
