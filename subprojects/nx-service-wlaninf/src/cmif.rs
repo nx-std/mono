@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the wlan:inf service.
 
-use core::mem::size_of;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -41,39 +41,37 @@ pub struct GetRssiError(#[source] pub DispatchError);
 /// Sends a CMIF request with no input payload and reads a single `u32` from
 /// the response data area.
 fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id).build();
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .send()
+            .map_err(DispatchError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(DispatchError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
         .map_err(DispatchError::ParseResponse)?;
 
-    if resp.data.len() < size_of::<u32>() {
-        return Err(DispatchError::ShortResponse);
-    }
-    Ok(u32::from_le_bytes([
-        resp.data[0],
-        resp.data[1],
-        resp.data[2],
-        resp.data[3],
-    ]))
+    // SAFETY: resp.data is at least size_of::<u32>() bytes as requested above.
+    Ok(unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) })
 }
 
 /// Low-level error returned by [`dispatch_no_in_u32`].
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
-    /// Response payload was shorter than the expected 4 bytes.
-    #[error("response payload shorter than 4 bytes")]
-    ShortResponse,
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
