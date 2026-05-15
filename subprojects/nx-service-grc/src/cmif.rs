@@ -30,20 +30,23 @@ pub(crate) fn transfer(
     buffer: *mut u8,
     buffer_len: usize,
 ) -> Result<TransferResult, TransferError> {
-    let result = unsafe {
-        service
-            .dispatch(proto::TRANSFER)
-            .in_raw((&raw const stream).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<TransferResult>())
-            .buffer(
-                buffer,
-                buffer_len,
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map_err(TransferError)?
-    };
+    // SAFETY: `stream` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const stream).cast::<u8>(), size_of::<u32>()) };
+    // SAFETY: `buffer` is a valid pointer to `buffer_len` writable bytes for
+    // the OUT buffer; the caller guarantees its validity for the duration of
+    // the call.
+    let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_len) };
+    let result = service
+        .dispatch(proto::TRANSFER)
+        .in_raw(in_bytes)
+        .out_size(size_of::<TransferResult>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map_err(TransferError)?;
 
+    // SAFETY: response payload is at least size_of::<TransferResult>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) })
 }
 
@@ -64,13 +67,16 @@ pub(crate) fn trimmer_begin_trim(
         id: *id,
     };
 
-    unsafe {
-        service
-            .dispatch(proto::TRIMMER_BEGIN_TRIM)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<BeginTrimIn>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<BeginTrimIn>())
+    };
+    service
+        .dispatch(proto::TRIMMER_BEGIN_TRIM)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Ends trimming and retrieves the output movie ID (cmd 2).
@@ -80,6 +86,7 @@ pub(crate) fn trimmer_end_trim(service: &Session) -> Result<GameMovieId, Dispatc
         .out_size(size_of::<GameMovieId>())
         .send()?;
 
+    // SAFETY: response payload is at least size_of::<GameMovieId>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GameMovieId>()) })
 }
 
@@ -103,20 +110,23 @@ pub(crate) fn trimmer_set_thumbnail_rgba(
 ) -> Result<(), DispatchError> {
     let input = SetThumbnailIn { width, height };
 
-    unsafe {
-        service
-            .dispatch(proto::TRIMMER_SET_THUMBNAIL_RGBA)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<SetThumbnailIn>())
-            .buffer(
-                buffer.cast_mut(),
-                buffer_len,
-                BufferAttr::IN
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE)
-                    .or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SetThumbnailIn>())
+    };
+    // SAFETY: `buffer` points to `buffer_len` readable bytes for the IN
+    // buffer; the caller guarantees its validity for the duration of the call.
+    let buf_bytes = unsafe { core::slice::from_raw_parts(buffer, buffer_len) };
+    service
+        .dispatch(proto::TRIMMER_SET_THUMBNAIL_RGBA)
+        .in_raw(in_bytes)
+        .in_buffer(
+            buf_bytes,
+            BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
@@ -200,16 +210,19 @@ pub(crate) fn maker_start_offscreen_recording(
         param: *param,
     };
 
-    unsafe {
-        service
-            .dispatch(proto::MAKER_START_OFFSCREEN_RECORDING)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StartRecordingIn>(),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StartRecordingIn>(),
+        )
+    };
+    service
+        .dispatch(proto::MAKER_START_OFFSCREEN_RECORDING)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Completes offscreen recording finish (pre-7.0.0, cmd 25).
@@ -230,26 +243,27 @@ pub(crate) fn maker_complete_offscreen_recording_finish_ex0(
         layer_handle,
     };
 
-    unsafe {
-        service
-            .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX0)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<CompleteFinishIn>(),
-            )
-            .buffer(
-                userdata.cast_mut(),
-                userdata_len,
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                thumbnail.cast_mut(),
-                thumbnail_len,
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CompleteFinishIn>(),
+        )
+    };
+    // SAFETY: `userdata` points to `userdata_len` readable bytes; the caller
+    // guarantees its validity for the duration of the call.
+    let userdata_bytes = unsafe { core::slice::from_raw_parts(userdata, userdata_len) };
+    // SAFETY: `thumbnail` points to `thumbnail_len` readable bytes; the caller
+    // guarantees its validity for the duration of the call.
+    let thumbnail_bytes = unsafe { core::slice::from_raw_parts(thumbnail, thumbnail_len) };
+    service
+        .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX0)
+        .in_raw(in_bytes)
+        .in_buffer(userdata_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(thumbnail_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
 }
 
 /// Completes offscreen recording finish (7.0.0+, cmd 26). Returns album entry.
@@ -270,28 +284,30 @@ pub(crate) fn maker_complete_offscreen_recording_finish_ex1(
         layer_handle,
     };
 
-    let result = unsafe {
-        service
-            .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX1)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<CompleteFinishIn>(),
-            )
-            .out_size(size_of::<ApplicationAlbumEntry>())
-            .buffer(
-                userdata.cast_mut(),
-                userdata_len,
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                thumbnail.cast_mut(),
-                thumbnail_len,
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map_err(CompleteFinishEx1Error)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CompleteFinishIn>(),
+        )
     };
+    // SAFETY: `userdata` points to `userdata_len` readable bytes; the caller
+    // guarantees its validity for the duration of the call.
+    let userdata_bytes = unsafe { core::slice::from_raw_parts(userdata, userdata_len) };
+    // SAFETY: `thumbnail` points to `thumbnail_len` readable bytes; the caller
+    // guarantees its validity for the duration of the call.
+    let thumbnail_bytes = unsafe { core::slice::from_raw_parts(thumbnail, thumbnail_len) };
+    let result = service
+        .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX1)
+        .in_raw(in_bytes)
+        .out_size(size_of::<ApplicationAlbumEntry>())
+        .in_buffer(userdata_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(thumbnail_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map_err(CompleteFinishEx1Error)?;
 
+    // SAFETY: response payload is at least size_of::<ApplicationAlbumEntry>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<ApplicationAlbumEntry>()) })
 }
 
@@ -315,19 +331,22 @@ pub(crate) fn maker_encode_offscreen_layer_audio_sample(
     buffer: *const u8,
     buffer_len: usize,
 ) -> Result<u64, DispatchError> {
-    let result = unsafe {
-        service
-            .dispatch(proto::MAKER_ENCODE_OFFSCREEN_LAYER_AUDIO_SAMPLE)
-            .in_raw((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
-            .out_size(size_of::<u64>())
-            .buffer(
-                buffer.cast_mut(),
-                buffer_len,
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `layer_handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
     };
+    // SAFETY: `buffer` points to `buffer_len` readable bytes for the IN
+    // buffer; the caller guarantees its validity for the duration of the call.
+    let buf_bytes = unsafe { core::slice::from_raw_parts(buffer, buffer_len) };
+    let result = service
+        .dispatch(proto::MAKER_ENCODE_OFFSCREEN_LAYER_AUDIO_SAMPLE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
+    // SAFETY: response payload is at least size_of::<u64>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
 
@@ -336,13 +355,16 @@ pub(crate) fn maker_get_offscreen_layer_recording_finish_ready_event(
     service: &Session,
     layer_handle: u64,
 ) -> Result<u32, DispatchError> {
-    let result = unsafe {
-        service
-            .dispatch(proto::MAKER_GET_OFFSCREEN_LAYER_RECORDING_FINISH_READY_EVENT)
-            .in_raw((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()?
+    // SAFETY: `layer_handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
     };
+    let result = service
+        .dispatch(proto::MAKER_GET_OFFSCREEN_LAYER_RECORDING_FINISH_READY_EVENT)
+        .in_raw(in_bytes)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()?;
 
     Ok(result.copy_handles[0])
 }
@@ -352,13 +374,16 @@ pub(crate) fn maker_get_offscreen_layer_audio_encode_ready_event(
     service: &Session,
     layer_handle: u64,
 ) -> Result<u32, DispatchError> {
-    let result = unsafe {
-        service
-            .dispatch(proto::MAKER_GET_OFFSCREEN_LAYER_AUDIO_ENCODE_READY_EVENT)
-            .in_raw((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()?
+    // SAFETY: `layer_handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
     };
+    let result = service
+        .dispatch(proto::MAKER_GET_OFFSCREEN_LAYER_AUDIO_ENCODE_READY_EVENT)
+        .in_raw(in_bytes)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()?;
 
     Ok(result.copy_handles[0])
 }
