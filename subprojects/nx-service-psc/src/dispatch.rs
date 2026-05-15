@@ -17,13 +17,9 @@ pub(crate) fn dispatch_in<I: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns; the dispatcher
-    // memcpys the bytes into the IPC buffer before sending.
-    unsafe {
-        object
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    object.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
 }

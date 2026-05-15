@@ -29,22 +29,27 @@ pub(crate) fn module_initialize(
     module_id: u32,
     dependencies: &[u32],
 ) -> Result<u32, ModuleInitializeError> {
-    // SAFETY: `module_id` lives on the stack until `.send()` returns.
-    // `dependencies` is a caller-provided buffer valid for the lifetime of
-    // this call.
-    let result = unsafe {
-        object
-            .dispatch(proto::MODULE_INITIALIZE)
-            .in_raw((&raw const module_id).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                dependencies.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(dependencies),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()
-            .map_err(ModuleInitializeError::Dispatch)?
+    // SAFETY: `module_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its `size_of::<u32>()` bytes as a slice is
+    // sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const module_id).cast::<u8>(), size_of::<u32>())
     };
+    // SAFETY: `dependencies` is a valid `&` slice; viewing it as a byte slice
+    // for the IN buffer is sound.
+    let dep_bytes = unsafe {
+        core::slice::from_raw_parts(
+            dependencies.as_ptr().cast::<u8>(),
+            core::mem::size_of_val(dependencies),
+        )
+    };
+    let result = object
+        .dispatch(proto::MODULE_INITIALIZE)
+        .in_raw(in_bytes)
+        .in_buffer(dep_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()
+        .map_err(ModuleInitializeError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
         return Err(ModuleInitializeError::MissingHandle);
