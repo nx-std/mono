@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the HID Bus service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::{cmif, hipc::BufferMode};
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -17,48 +17,67 @@ use crate::{
 // Dispatch helpers
 // ---------------------------------------------------------------------------
 
-fn dispatch_in<T>(session: SessionHandle, cmd_id: u32, value: &T) -> Result<(), DispatchError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+fn dispatch_in<T: Copy>(
+    session: SessionHandle,
+    cmd_id: u32,
+    value: &T,
+) -> Result<(), DispatchError> {
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(size_of::<T>())
+            .send()
+            .map_err(DispatchError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(size_of::<T>())
-        .build();
-
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<T>().cast_mut(), ptr::read(value));
+        // SAFETY: `req.data` is exactly `size_of::<T>()` bytes and `value`
+        // is a valid `T`; writing its bytes is sound.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<T>(), ptr::read(value));
+        }
     }
 
     ipc::send_sync_request(session).map_err(DispatchError::SendRequest)?;
 
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(DispatchError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
 
-fn dispatch_in_out<T, U>(
+fn dispatch_in_out<T: Copy, U: Copy>(
     session: SessionHandle,
     cmd_id: u32,
     value: &T,
 ) -> Result<U, DispatchError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(size_of::<T>())
+            .send()
+            .map_err(DispatchError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(size_of::<T>())
-        .build();
-
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<T>().cast_mut(), ptr::read(value));
+        // SAFETY: `req.data` is exactly `size_of::<T>()` bytes and `value`
+        // is a valid `T`; writing its bytes is sound.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<T>(), ptr::read(value));
+        }
     }
 
     ipc::send_sync_request(session).map_err(DispatchError::SendRequest)?;
 
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<U>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<U>())
         .map_err(DispatchError::ParseResponse)?;
 
+    // SAFETY: `resp.data` is at least `size_of::<U>()` bytes.
     let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<U>()) };
 
     Ok(out)
@@ -67,10 +86,12 @@ fn dispatch_in_out<T, U>(
 /// Error returned by hidbus dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 // ---------------------------------------------------------------------------
@@ -157,24 +178,28 @@ pub fn send_command_async(
     handle: BusHandle,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SEND_COMMAND_ASYNC)
+            .data_size(size_of::<BusHandle>())
+            .add_in_auto_buffer(buffer.as_ptr(), buffer.len(), BufferMode::Normal)
+            .send()
+            .map_err(DispatchError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SEND_COMMAND_ASYNC)
-        .data_size(size_of::<BusHandle>())
-        .in_auto_buffers(1)
-        .build();
-
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<BusHandle>().cast_mut(), handle);
+        // SAFETY: `req.data` is exactly `size_of::<BusHandle>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<BusHandle>(), handle);
+        }
     }
-
-    req.add_in_auto_buffer(buffer.as_ptr(), buffer.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(DispatchError::SendRequest)?;
 
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(DispatchError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -185,26 +210,31 @@ pub fn get_send_command_async_result(
     handle: BusHandle,
     buffer: &mut [u8],
 ) -> Result<u32, GetSendCommandAsyncResultError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_SEND_COMMAND_ASYNC_RESULT)
+            .data_size(size_of::<BusHandle>())
+            .add_out_auto_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::Normal)
+            .send()
+            .map_err(GetSendCommandAsyncResultError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_SEND_COMMAND_ASYNC_RESULT)
-        .data_size(size_of::<BusHandle>())
-        .out_auto_buffers(1)
-        .build();
-
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<BusHandle>().cast_mut(), handle);
+        // SAFETY: `req.data` is exactly `size_of::<BusHandle>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<BusHandle>(), handle);
+        }
     }
-
-    req.add_out_auto_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(GetSendCommandAsyncResultError::SendRequest)?;
 
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
         .map_err(GetSendCommandAsyncResultError::ParseResponse)?;
 
+    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes.
     let out_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     Ok(out_size)
@@ -213,10 +243,12 @@ pub fn get_send_command_async_result(
 /// Error returned by [`get_send_command_async_result`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSendCommandAsyncResultError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// SetEventForSendCommandAsyncResult (cmd 9).
@@ -224,22 +256,28 @@ pub fn set_event_for_send_command_async_result(
     session: SessionHandle,
     handle: BusHandle,
 ) -> Result<u32, SetEventError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
+            .data_size(size_of::<BusHandle>())
+            .send()
+            .map_err(SetEventError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
-        .data_size(size_of::<BusHandle>())
-        .build();
-
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<BusHandle>().cast_mut(), handle);
+        // SAFETY: `req.data` is exactly `size_of::<BusHandle>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<BusHandle>(), handle);
+        }
     }
 
     ipc::send_sync_request(session).map_err(SetEventError::SendRequest)?;
 
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(SetEventError::ParseResponse)?;
+        cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetEventError::ParseResponse)?;
 
     resp.copy_handles
         .first()
@@ -250,25 +288,33 @@ pub fn set_event_for_send_command_async_result(
 /// Error returned by [`set_event_for_send_command_async_result`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetEventError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     #[error("missing event handle in response")]
     MissingHandle,
 }
 
 /// GetSharedMemoryHandle (cmd 10).
 pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetSharedMemoryError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_SHARED_MEMORY_HANDLE).build();
-
-    unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::GET_SHARED_MEMORY_HANDLE)
+            .send()
+            .map_err(GetSharedMemoryError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSharedMemoryError::SendRequest)?;
 
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetSharedMemoryError::ParseResponse)?;
 
     resp.copy_handles
@@ -280,10 +326,12 @@ pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetShared
 /// Error returned by [`get_shared_memory_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     #[error("missing shared memory handle in response")]
     MissingHandle,
 }
@@ -297,41 +345,39 @@ pub fn enable_joy_polling_receive_mode(
     tmem_handle: u32,
     tmem_size: u32,
 ) -> Result<(), EnableJoyPollingError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     let input = EnableJoyPollingIn {
         tmem_size,
         polling_mode: polling_mode as u32,
         handle,
     };
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
-        .data_size(size_of::<EnableJoyPollingIn>())
-        .in_auto_buffers(1)
-        .handles(1)
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
+            .data_size(size_of::<EnableJoyPollingIn>())
+            .add_in_auto_buffer(
+                command_buffer.as_ptr(),
+                command_buffer.len(),
+                BufferMode::Normal,
+            )
+            .add_copy_handle(tmem_handle)
+            .send()
+            .map_err(EnableJoyPollingError::BuildRequest)?;
 
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<EnableJoyPollingIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<EnableJoyPollingIn>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<EnableJoyPollingIn>(), input);
+        }
     }
-
-    req.add_in_auto_buffer(
-        command_buffer.as_ptr(),
-        command_buffer.len(),
-        BufferMode::Normal,
-    );
-
-    req.add_handle(tmem_handle);
 
     ipc::send_sync_request(session).map_err(EnableJoyPollingError::SendRequest)?;
 
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(EnableJoyPollingError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(EnableJoyPollingError::ParseResponse)?;
 
     Ok(())
 }
@@ -339,10 +385,12 @@ pub fn enable_joy_polling_receive_mode(
 /// Error returned by [`enable_joy_polling_receive_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum EnableJoyPollingError {
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// DisableJoyPollingReceiveMode (cmd 12).
