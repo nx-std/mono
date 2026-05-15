@@ -205,7 +205,7 @@
 
 extern crate nx_panic_handler; // Provides #[panic_handler]
 
-use core::{ffi::c_void, mem::offset_of, ptr, ptr::NonNull};
+use core::{ffi::c_void, marker::PhantomData, mem::offset_of, ptr, ptr::NonNull};
 
 use nx_cpu::control_regs;
 use nx_svc::thread::Handle as ThreadHandle;
@@ -254,6 +254,13 @@ pub const THREAD_VARS_SIZE: usize = 0x20;
 /// to indicate that the structure has been properly set up.
 pub const THREAD_VARS_MAGIC: u32 = 0x21545624;
 
+/// Size of the IPC message buffer in bytes.
+///
+/// The IPC buffer occupies the first [`IPC_BUFFER_SIZE`] bytes of the Thread Local
+/// Region. The Horizon OS kernel reads request data from and writes response data
+/// to this region when a thread makes an IPC call.
+pub const IPC_BUFFER_SIZE: usize = 0x100;
+
 /// Returns the base address of this thread's Thread-Local Storage (TLS) block as a plain `usize`.
 ///
 /// On AArch64, the per-thread TLS pointer is exposed to user-mode code via the read-only
@@ -285,10 +292,10 @@ pub fn get_ptr() -> *mut ThreadLocalRegion {
 
 /// Returns a pointer to the current thread's IPC buffer.
 ///
-/// The IPC buffer is a 256-byte region at the start of the Thread Local Region
-/// used by the Horizon OS kernel for inter-process communication messages.
-/// When a thread makes IPC calls to system services, request/response data
-/// is marshaled through this buffer.
+/// The IPC buffer is a [`IPC_BUFFER_SIZE`]-byte region at the start of the Thread
+/// Local Region used by the Horizon OS kernel for inter-process communication
+/// messages. When a thread makes IPC calls to system services, request/response
+/// data is marshaled through this buffer.
 ///
 /// # Returns
 ///
@@ -301,6 +308,72 @@ pub fn ipc_buffer_ptr() -> NonNull<u8> {
     // SAFETY: get_ptr() returns a valid pointer to the current thread's TLS block.
     // The TLS region is always valid for the current thread, so ipc_buffer is non-null.
     unsafe { NonNull::new_unchecked((*tls).ipc_buffer.as_mut_ptr()) }
+}
+
+/// Borrows the current thread's IPC buffer as an [`IpcBuffer`].
+///
+/// # Safety
+///
+/// 1. No other live borrow of the TLS IPC buffer (via [`ipc_buffer_ptr`]
+///    or another `IpcBuffer`) may exist on this thread for the lifetime
+///    of the returned value.
+/// 2. The returned `IpcBuffer` must be dropped before any operation that
+///    causes the kernel to mutate the buffer (`svcSendSyncRequest` etc.).
+#[inline]
+pub unsafe fn ipc_buffer() -> IpcBuffer<'static> {
+    // SAFETY: ipc_buffer_ptr always points to a valid IPC_BUFFER_SIZE-byte
+    // region in the current thread's TLS; caller upholds the aliasing contract.
+    let ptr = ipc_buffer_ptr().as_ptr() as *mut [u8; IPC_BUFFER_SIZE];
+    IpcBuffer {
+        bytes: unsafe { &mut *ptr },
+        _marker: PhantomData,
+    }
+}
+
+/// Borrowed exclusive view of the current thread's IPC buffer.
+///
+/// Constructed via [`ipc_buffer`]; flowed into IPC marshaling code
+/// (`nx-sf`) so the rest of the IPC layer operates on a typed, sized
+/// view and never re-derives the buffer.
+///
+/// `IpcBuffer` is intentionally neither [`Send`] nor [`Sync`]: it references
+/// thread-local storage owned by the thread that constructed it, and may
+/// not be moved to or shared with another thread.
+pub struct IpcBuffer<'a> {
+    bytes: &'a mut [u8; IPC_BUFFER_SIZE],
+    // `*const ()` is neither `Send` nor `Sync`; this opts the whole struct
+    // out of both auto-traits to enforce thread-affinity.
+    _marker: PhantomData<*const ()>,
+}
+
+impl<'a> IpcBuffer<'a> {
+    /// Borrowed view of the underlying fixed-size array.
+    #[inline]
+    pub fn as_array(&self) -> &[u8; IPC_BUFFER_SIZE] {
+        self.bytes
+    }
+
+    /// Borrowed mutable view of the underlying fixed-size array.
+    #[inline]
+    pub fn as_array_mut(&mut self) -> &mut [u8; IPC_BUFFER_SIZE] {
+        self.bytes
+    }
+}
+
+impl core::ops::Deref for IpcBuffer<'_> {
+    type Target = [u8; IPC_BUFFER_SIZE];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.bytes
+    }
+}
+
+impl core::ops::DerefMut for IpcBuffer<'_> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.bytes
+    }
 }
 
 /// Returns a raw pointer to the TLS dynamic slots array for the current thread.

@@ -35,7 +35,9 @@
 
 #![no_std]
 
-extern crate nx_panic_handler; // Provides #[panic_handler]
+extern crate alloc;
+extern crate nx_panic_handler;
+// Provides #[panic_handler]
 
 pub mod cmif;
 pub mod hipc;

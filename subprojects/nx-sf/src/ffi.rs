@@ -340,14 +340,20 @@ fn clone_error_to_rc(err: CloneObjectError) -> u32 {
         CloneObjectError::SendRequest(e) => e.to_rc(),
         CloneObjectError::ParseResponse(e) => parse_response_error_to_rc(e),
         CloneObjectError::MissingHandle => GENERIC_ERROR,
+        CloneObjectError::Layout(_) => GENERIC_ERROR,
     }
 }
 
 /// Converts a parse response error to a raw result code.
-fn parse_response_error_to_rc(err: cmif::ParseResponseError) -> u32 {
+fn parse_response_error_to_rc(err: cmif::ParseRespError) -> u32 {
     match err {
-        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-        cmif::ParseResponseError::ServiceError(code) => code,
+        cmif::ParseRespError::InvalidMagic => GENERIC_ERROR,
+        cmif::ParseRespError::ServiceError(code) => code,
+        cmif::ParseRespError::Hipc(_)
+        | cmif::ParseRespError::TruncatedOutHeader
+        | cmif::ParseRespError::TruncatedDomainHeader
+        | cmif::ParseRespError::TruncatedPayload
+        | cmif::ParseRespError::TruncatedDomainObjects => GENERIC_ERROR,
     }
 }
 
@@ -357,6 +363,7 @@ fn clone_object_ex_error_to_rc(err: CloneObjectExError) -> u32 {
         CloneObjectExError::SendRequest(e) => e.to_rc(),
         CloneObjectExError::ParseResponse(e) => parse_response_error_to_rc(e),
         CloneObjectExError::MissingHandle => GENERIC_ERROR,
+        CloneObjectExError::Layout(_) => GENERIC_ERROR,
     }
 }
 
@@ -365,5 +372,6 @@ fn convert_to_domain_error_to_rc(err: ConvertToDomainError) -> u32 {
     match err {
         ConvertToDomainError::SendRequest(e) => e.to_rc(),
         ConvertToDomainError::ParseResponse(e) => parse_response_error_to_rc(e),
+        ConvertToDomainError::Layout(_) => GENERIC_ERROR,
     }
 }

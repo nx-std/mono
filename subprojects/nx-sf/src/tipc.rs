@@ -47,16 +47,29 @@
 //! [Response Payload]
 //! ```
 //!
+//! # Builder model
+//!
+//! [`TipcBuilder`] is the high-level entry point for full TIPC requests. It
+//! wraps a [`hipc::HipcRequestBuilder`] and exposes only the descriptor kinds
+//! TIPC supports (mapped buffers + copy handles). Finalize via
+//! [`send`](TipcBuilder::send). [`TipcPayload`] implements
+//! [`hipc::HipcPayload`] for direct use with [`hipc::HipcRequestBuilder`].
+//!
 //! # References
 //!
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/tipc.h` (fincs, SciresM)
 
-use core::{ptr::NonNull, slice};
+use core::{convert::Infallible, mem::size_of};
 
 use nx_svc::raw::Handle as RawHandle;
+use nx_sys_thread_tls::IPC_BUFFER_SIZE;
+use zerocopy::IntoBytes;
 
-use crate::hipc::{self, BufferMode};
+use crate::{
+    cmif::RequestLayoutError,
+    hipc::{self, BufferDescriptor, BufferMode, HipcPayload, HipcRequestBuilder},
+};
 
 /// TIPC command types.
 ///
@@ -85,75 +98,136 @@ impl From<CommandType> for hipc::MessageType {
     }
 }
 
-/// Builds a TIPC request message in the given buffer.
+/// [`HipcPayload`] writer for a TIPC request body.
 ///
-/// # Safety
+/// TIPC has no in-band header — the payload bytes sit directly at the start
+/// of the data-words region. The output is a [`TipcRequest`] bundling the
+/// HIPC frame and the carved data slice.
+#[derive(Debug, Clone, Copy)]
+pub struct TipcPayload {
+    data_size: usize,
+}
+
+impl TipcPayload {
+    /// Creates a TIPC payload writer of the given byte size.
+    #[inline]
+    pub const fn new(data_size: usize) -> Self {
+        Self { data_size }
+    }
+}
+
+impl HipcPayload for TipcPayload {
+    type Output<'a> = TipcRequest<'a>;
+    type Error = Infallible;
+
+    fn encoded_len(&self) -> usize {
+        self.data_size
+    }
+
+    fn encode<'a>(
+        self,
+        hipc: hipc::Request<'a>,
+        dst: &'a mut [u8],
+    ) -> Result<TipcRequest<'a>, Infallible> {
+        let (data, _) = dst.split_at_mut(self.data_size);
+        Ok(TipcRequest { hipc, data })
+    }
+}
+
+/// Fluent builder for a TIPC request.
 ///
-/// `base` must point to a valid buffer (typically TLS IPC buffer) with at least
-/// 0x200 bytes available.
-pub unsafe fn make_request(base: NonNull<u8>, fmt: RequestFormat) -> Request<'static> {
-    let num_data_words = fmt.data_size.div_ceil(4);
+/// Wraps a [`HipcRequestBuilder`] with the message type pre-set to
+/// `CommandType::request(request_id)` (ID + 16). Exposes only the descriptor
+/// kinds TIPC supports — mapped buffers and copy handles.
+pub struct TipcBuilder<'a, const N: usize> {
+    hipc: HipcRequestBuilder<'a, N>,
+    data_size: usize,
+}
 
-    let hipc_meta = hipc::Metadata {
-        message_type: CommandType::request(fmt.request_id),
-        num_send_statics: 0, // TIPC doesn't use pointer descriptors
-        num_send_buffers: fmt.num_in_buffers as usize,
-        num_recv_buffers: fmt.num_out_buffers as usize,
-        num_exch_buffers: fmt.num_inout_buffers as usize,
-        num_data_words,
-        recv_static_mode: None, // TIPC doesn't use pointer descriptors
-        send_pid: fmt.send_pid,
-        num_copy_handles: fmt.num_handles as usize,
-        num_move_handles: 0,
-    };
+impl<'a, const N: usize> TipcBuilder<'a, N> {
+    /// Starts a new builder for the given command ID and buffer.
+    #[inline]
+    pub fn new(buf: &'a mut [u8; N], request_id: u32) -> Self {
+        Self {
+            hipc: HipcRequestBuilder::new(buf, CommandType::request(request_id)),
+            data_size: 0,
+        }
+    }
 
-    // SAFETY: Caller guarantees `base` points to valid buffer with sufficient space.
-    let hipc_req = unsafe { hipc::make_request(base, hipc_meta) };
+    /// Sets the size of the payload data area in bytes. The caller fills it
+    /// via [`TipcRequest::data`] after [`send`](Self::send).
+    #[inline]
+    pub fn data_size(mut self, n: usize) -> Self {
+        self.data_size = n;
+        self
+    }
 
-    // Data pointer is directly at the start of data words (no CMIF header)
-    let data_ptr = hipc_req.data_words.as_mut_ptr() as *mut u8;
-    // SAFETY: data_ptr points within the valid HIPC data words region,
-    // and data_size was used to allocate num_data_words.
-    let data = unsafe { slice::from_raw_parts_mut(data_ptr, fmt.data_size) };
+    /// Enables sending the process ID alongside the request.
+    #[inline]
+    pub fn send_pid(mut self) -> Self {
+        self.hipc = self.hipc.with_send_pid();
+        self
+    }
 
-    Request {
-        hipc: hipc_req,
-        data,
-        send_buffer_idx: 0,
-        recv_buffer_idx: 0,
-        exch_buffer_idx: 0,
-        copy_handle_idx: 0,
+    /// Adds a mapped input buffer (Type A / Send Buffer).
+    #[inline]
+    pub fn add_in_buffer(mut self, buffer: *const u8, size: usize, mode: BufferMode) -> Self {
+        self.hipc = self
+            .hipc
+            .with_send_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
+        self
+    }
+
+    /// Adds a mapped output buffer (Type B / Recv Buffer).
+    #[inline]
+    pub fn add_out_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+        self.hipc = self
+            .hipc
+            .with_recv_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
+        self
+    }
+
+    /// Adds an exchange (in/out) buffer (Type W).
+    #[inline]
+    pub fn add_inout_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+        self.hipc = self
+            .hipc
+            .with_exch_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
+        self
+    }
+
+    /// Adds a copy handle to the request.
+    #[inline]
+    pub fn add_copy_handle(mut self, handle: impl Into<RawHandle>) -> Self {
+        self.hipc = self.hipc.with_copy_handle(handle.into());
+        self
+    }
+
+    /// Finalizes the request, writing the HIPC frame into the buffer.
+    pub fn send(self) -> Result<TipcRequest<'a>, RequestLayoutError> {
+        self.hipc.payload(TipcPayload::new(self.data_size))
     }
 }
 
 /// Builds a TIPC close request message.
 ///
-/// # Safety
+/// # Errors
 ///
-/// `base` must point to a valid buffer with sufficient space.
-pub unsafe fn make_close_request(base: NonNull<u8>) {
-    let hipc_meta = hipc::Metadata {
-        message_type: CommandType::Close.into(),
-        ..Default::default()
-    };
-
-    // SAFETY: Caller guarantees `base` points to valid buffer with sufficient space.
-    unsafe { hipc::make_request(base, hipc_meta) };
+/// Returns [`RequestLayoutError`] if the computed request size exceeds the
+/// IPC buffer (cannot happen for a close request in practice).
+pub fn close_request<const N: usize>(buf: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+    HipcRequestBuilder::new(buf, CommandType::Close).payload(TipcPayload::new(0))?;
+    Ok(())
 }
 
 /// Parses a TIPC response message.
-///
-/// # Safety
-///
-/// `base` must point to a valid TIPC response message buffer.
-pub unsafe fn parse_response(
-    base: NonNull<u8>,
+pub fn parse_response<'a>(
+    buf: &'a [u8; IPC_BUFFER_SIZE],
     size: usize,
-) -> Result<Response<'static>, ParseResponseError> {
-    // SAFETY: Caller guarantees `base` points to valid TIPC response buffer.
-    let hipc_resp = unsafe { hipc::parse_response(base) };
+) -> Result<Response<'a>, ParseResponseError> {
+    let hipc_resp = hipc::parse_response(buf)?;
 
-    // Result code is the first word of data
+    // Result code is the first word of data.
     if hipc_resp.data_words.is_empty() {
         return Err(ParseResponseError::EmptyResponse);
     }
@@ -163,14 +237,15 @@ pub unsafe fn parse_response(
         return Err(ParseResponseError::ServiceError(result));
     }
 
-    // SAFETY: We verified data_words is non-empty, so index 1 is within bounds
-    // when data_words.len() > 1 (which is implied by having payload data).
-    let data_ptr = unsafe { hipc_resp.data_words.as_ptr().add(1) } as *const u8;
-    let data_len = size;
-
-    // SAFETY: data_ptr points to valid memory within the response buffer,
-    // and caller guarantees size matches the expected response payload.
-    let data = unsafe { slice::from_raw_parts(data_ptr, data_len) };
+    // Skip the 4-byte result code prefix.
+    let (_result_word, payload) = hipc_resp
+        .data_words
+        .as_bytes()
+        .split_at_checked(size_of::<u32>())
+        .ok_or(ParseResponseError::TruncatedResult)?;
+    let (data, _) = payload
+        .split_at_checked(size)
+        .ok_or(ParseResponseError::TruncatedPayload)?;
 
     Ok(Response {
         data,
@@ -188,69 +263,27 @@ pub enum ParseResponseError {
     /// Service returned a non-zero result code.
     #[error("service error: {0:#x}")]
     ServiceError(u32),
+    /// Underlying HIPC layer rejected the response.
+    #[error("HIPC parse: {0}")]
+    Hipc(#[from] hipc::ResponseParseError),
+    /// Response data words too small to contain the result code word.
+    #[error("TIPC response too small for result code")]
+    TruncatedResult,
+    /// Response too small to contain the caller-requested payload size.
+    #[error("TIPC response too small for payload")]
+    TruncatedPayload,
 }
 
-/// Request format descriptor for TIPC.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct RequestFormat {
-    /// Command/method ID (will be stored as ID + 16 in HIPC message type).
-    pub request_id: u32,
-    /// Size of payload data in bytes.
-    pub data_size: usize,
-    /// Number of mapped input buffers (Type A / Send Buffer).
-    pub num_in_buffers: u32,
-    /// Number of mapped output buffers (Type B / Recv Buffer).
-    pub num_out_buffers: u32,
-    /// Number of exchange (bidirectional) buffers (Type W).
-    pub num_inout_buffers: u32,
-    /// Number of handles to copy.
-    pub num_handles: u32,
-    /// Whether to include process ID.
-    pub send_pid: bool,
-}
-
-/// Active TIPC request being built.
+/// Finalized TIPC request, returned by [`TipcBuilder::send`].
+///
+/// All HIPC descriptors are populated; the caller fills [`data`](Self::data)
+/// before sending the request via `SendSyncRequest`.
 #[derive(Debug)]
-pub struct Request<'a> {
-    /// Underlying HIPC request.
+pub struct TipcRequest<'a> {
+    /// Underlying HIPC frame with descriptor slots already populated.
     pub hipc: hipc::Request<'a>,
-    /// Payload data area.
+    /// Payload data area (size matches `TipcBuilder::data_size`).
     pub data: &'a mut [u8],
-    // Internal indices for tracking position
-    send_buffer_idx: usize,
-    recv_buffer_idx: usize,
-    exch_buffer_idx: usize,
-    copy_handle_idx: usize,
-}
-
-impl Request<'_> {
-    /// Adds a mapped input buffer (Type A / Send Buffer).
-    pub fn add_in_buffer(&mut self, buffer: *const u8, size: usize, mode: BufferMode) {
-        let idx = self.send_buffer_idx;
-        self.hipc.send_buffers[idx] = hipc::BufferDescriptor::new_buffer(buffer, size, mode);
-        self.send_buffer_idx += 1;
-    }
-
-    /// Adds a mapped output buffer (Type B / Recv Buffer).
-    pub fn add_out_buffer(&mut self, buffer: *mut u8, size: usize, mode: BufferMode) {
-        let idx = self.recv_buffer_idx;
-        self.hipc.recv_buffers[idx] = hipc::BufferDescriptor::new_buffer(buffer, size, mode);
-        self.recv_buffer_idx += 1;
-    }
-
-    /// Adds an exchange buffer (Type W / bidirectional).
-    pub fn add_inout_buffer(&mut self, buffer: *mut u8, size: usize, mode: BufferMode) {
-        let idx = self.exch_buffer_idx;
-        self.hipc.exch_buffers[idx] = hipc::BufferDescriptor::new_buffer(buffer, size, mode);
-        self.exch_buffer_idx += 1;
-    }
-
-    /// Adds a copy handle to the request.
-    pub fn add_handle(&mut self, handle: impl Into<RawHandle>) {
-        let idx = self.copy_handle_idx;
-        self.hipc.copy_handles[idx] = handle.into();
-        self.copy_handle_idx += 1;
-    }
 }
 
 /// Parsed TIPC response.

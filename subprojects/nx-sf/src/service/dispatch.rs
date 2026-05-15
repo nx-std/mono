@@ -15,18 +15,17 @@
 //!   `DomainObject`s for the same id unrepresentable in safe code.
 //!
 //! [`Session`]: super::Session
-//! [`Domain`]: super::Domain
-//! [`DomainObject`]: super::DomainObject
 //! [`OverrideService`]: super::OverrideService
 //! [`Session::dispatch`]: super::Session::dispatch
-//! [`Domain::dispatch`]: super::Domain::dispatch
-//! [`DomainObject::dispatch`]: super::DomainObject::dispatch
+//! [`Domain::dispatch`]: Domain::dispatch
+//! [`DomainObject::dispatch`]: DomainObject::dispatch
 //! [`OverrideService::dispatch`]: super::OverrideService::dispatch
 //! [`out_objects`]: DomainDispatch::out_objects
 
 use core::ptr;
 
 use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sys_thread_tls::IPC_BUFFER_SIZE;
 
 use super::domain::{Domain, DomainObject};
 use crate::{
@@ -166,16 +165,12 @@ impl<'a> Dispatch<'a> {
         self
     }
 
-    /// Sets the input data for the request.
-    ///
-    /// # Safety
-    ///
-    /// `data` must point to at least `size` readable bytes, and the pointed-to
-    /// memory must remain valid until [`send`](Self::send) returns.
+    /// Sets the input data for the request. The slice must remain valid
+    /// until [`send`](Self::send) returns; the borrow is enforced via `'a`.
     #[inline]
-    pub unsafe fn in_raw(mut self, data: *const u8, size: usize) -> Self {
-        self.in_data = data;
-        self.in_data_size = size;
+    pub fn in_raw(mut self, data: &'a [u8]) -> Self {
+        self.in_data = data.as_ptr();
+        self.in_data_size = data.len();
         self
     }
 
@@ -186,10 +181,39 @@ impl<'a> Dispatch<'a> {
         self
     }
 
-    /// Adds a buffer with the specified attributes. Silently ignored once
-    /// [`MAX_BUFFERS`] slots are full.
+    /// Adds an IN buffer. [`BufferAttr::IN`] is set automatically; the
+    /// caller supplies only the transport bits (e.g. [`BufferAttr::HIPC_MAP_ALIAS`],
+    /// [`BufferAttr::HIPC_POINTER`], [`BufferAttr::HIPC_AUTO_SELECT`],
+    /// [`BufferAttr::FIXED_SIZE`]). Silently ignored once [`MAX_BUFFERS`]
+    /// slots are full.
     #[inline]
-    pub fn buffer(mut self, ptr: *const u8, size: usize, attr: BufferAttr) -> Self {
+    pub fn in_buffer(self, data: &'a [u8], attr: BufferAttr) -> Self {
+        self.push_buffer(data.as_ptr(), data.len(), attr.or(BufferAttr::IN))
+    }
+
+    /// Adds an OUT buffer. [`BufferAttr::OUT`] is set automatically.
+    /// Silently ignored once [`MAX_BUFFERS`] slots are full.
+    #[inline]
+    pub fn out_buffer(self, data: &'a mut [u8], attr: BufferAttr) -> Self {
+        self.push_buffer(data.as_mut_ptr(), data.len(), attr.or(BufferAttr::OUT))
+    }
+
+    /// Adds an IN/OUT buffer. Both [`BufferAttr::IN`] and [`BufferAttr::OUT`]
+    /// are set automatically. Silently ignored once [`MAX_BUFFERS`] slots
+    /// are full.
+    #[inline]
+    pub fn inout_buffer(self, data: &'a mut [u8], attr: BufferAttr) -> Self {
+        self.push_buffer(
+            data.as_mut_ptr(),
+            data.len(),
+            attr.or(BufferAttr::IN).or(BufferAttr::OUT),
+        )
+    }
+
+    /// Records a buffer descriptor in the internal table. Silently ignored
+    /// once [`MAX_BUFFERS`] slots are full.
+    #[inline]
+    fn push_buffer(mut self, ptr: *const u8, size: usize, attr: BufferAttr) -> Self {
         if self.buffer_count < MAX_BUFFERS {
             self.buffers[self.buffer_count] = Buffer { ptr, size };
             self.buffer_attrs[self.buffer_count] = attr;
@@ -255,116 +279,106 @@ impl<'a> Dispatch<'a> {
     /// Crate-internal: used by [`Dispatch::send`] for the non-domain path and
     /// by [`DomainDispatch::send`] to wrap the response's raw object ids into
     /// [`DomainObject`] instances before exposing them to callers.
-    pub(crate) fn send_response(self) -> Result<cmif::Response<'static>, DispatchError> {
-        let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
+    pub(crate) fn send_response(self) -> Result<cmif::ResponseBytes<'static>, DispatchError> {
         let is_domain = self.object_id.is_some();
 
-        let (
-            num_in_auto,
-            num_out_auto,
-            num_in_buffers,
-            num_out_buffers,
-            num_inout_buffers,
-            num_in_pointers,
-            num_out_pointers,
-            num_out_fixed_pointers,
-        ) = count_buffer_kinds(&self.buffer_attrs[..self.buffer_count]);
+        {
+            // SAFETY: IPC operations are serialized on this thread.
+            let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-        let mut builder = cmif::RequestFormatBuilder::new(self.request_id)
-            .context(self.context)
-            .data_size(self.in_data_size)
-            .server_pointer_size(self.pointer_buffer_size as usize)
-            .in_auto_buffers(num_in_auto)
-            .out_auto_buffers(num_out_auto)
-            .in_buffers(num_in_buffers)
-            .out_buffers(num_out_buffers)
-            .inout_buffers(num_inout_buffers)
-            .in_pointers(num_in_pointers)
-            .out_pointers(num_out_pointers)
-            .out_fixed_pointers(num_out_fixed_pointers)
-            .objects(self.in_object_count as u32)
-            .handles(self.in_handle_count as u32);
+            let mut cb = cmif::CmifBuilder::new(&mut buf, self.request_id)
+                .pointer_buffer_size(self.pointer_buffer_size as usize)
+                .context(self.context)
+                .data_size(self.in_data_size);
 
-        if let Some(object_id) = self.object_id {
-            builder = builder.object_id(object_id);
-        }
-
-        if self.send_pid {
-            builder = builder.send_pid();
-        }
-
-        let fmt = builder.build();
-
-        // SAFETY: ipc_buf points to the current thread's IPC buffer.
-        let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-        if !self.in_data.is_null() && self.in_data_size > 0 {
-            // SAFETY: Caller of `in_raw` guarantees `in_data` is valid for
-            // `in_data_size` bytes; `req.data` is a freshly-allocated CMIF
-            // payload slot of at least that size.
-            unsafe {
-                ptr::copy_nonoverlapping(self.in_data, req.data.as_mut_ptr(), self.in_data_size);
+            if let Some(object_id) = self.object_id {
+                cb = cb.object_id(object_id);
             }
-        }
+            if self.send_pid {
+                cb = cb.send_pid();
+            }
 
-        for i in 0..self.buffer_count {
-            let buf = &self.buffers[i];
-            let attr = self.buffer_attrs[i];
-            let is_in = attr.contains(BufferAttr::IN);
-            let is_out = attr.contains(BufferAttr::OUT);
+            for i in 0..self.buffer_count {
+                let buf_desc = &self.buffers[i];
+                let attr = self.buffer_attrs[i];
+                let is_in = attr.contains(BufferAttr::IN);
+                let is_out = attr.contains(BufferAttr::OUT);
 
-            let mode = if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE) {
-                hipc::BufferMode::NonSecure
-            } else if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_DEVICE) {
-                hipc::BufferMode::NonDevice
-            } else {
-                hipc::BufferMode::Normal
-            };
+                let mode = if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE) {
+                    hipc::BufferMode::NonSecure
+                } else if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_DEVICE) {
+                    hipc::BufferMode::NonDevice
+                } else {
+                    hipc::BufferMode::Normal
+                };
 
-            if attr.contains(BufferAttr::HIPC_AUTO_SELECT) {
-                if is_in {
-                    req.add_in_auto_buffer(buf.ptr, buf.size, mode);
-                }
-                if is_out {
-                    req.add_out_auto_buffer(buf.ptr as *mut u8, buf.size, mode);
-                }
-            } else if attr.contains(BufferAttr::HIPC_MAP_ALIAS) {
-                if is_in && is_out {
-                    req.add_inout_buffer(buf.ptr as *mut u8, buf.size, mode);
-                } else if is_in {
-                    req.add_in_buffer(buf.ptr, buf.size, mode);
-                } else if is_out {
-                    req.add_out_buffer(buf.ptr as *mut u8, buf.size, mode);
-                }
-            } else if attr.contains(BufferAttr::HIPC_POINTER) {
-                if is_in {
-                    req.add_in_pointer(buf.ptr, buf.size);
-                } else if is_out {
-                    if attr.contains(BufferAttr::FIXED_SIZE) {
-                        req.add_out_fixed_pointer(buf.ptr as *mut u8, buf.size);
-                    } else {
-                        req.add_out_pointer(buf.ptr as *mut u8, buf.size);
+                if attr.contains(BufferAttr::HIPC_AUTO_SELECT) {
+                    if is_in {
+                        cb = cb.add_in_auto_buffer(buf_desc.ptr, buf_desc.size, mode);
+                    }
+                    if is_out {
+                        cb = cb.add_out_auto_buffer(buf_desc.ptr as *mut u8, buf_desc.size, mode);
+                    }
+                } else if attr.contains(BufferAttr::HIPC_MAP_ALIAS) {
+                    if is_in && is_out {
+                        cb = cb.add_inout_buffer(buf_desc.ptr as *mut u8, buf_desc.size, mode);
+                    } else if is_in {
+                        cb = cb.add_in_buffer(buf_desc.ptr, buf_desc.size, mode);
+                    } else if is_out {
+                        cb = cb.add_out_buffer(buf_desc.ptr as *mut u8, buf_desc.size, mode);
+                    }
+                } else if attr.contains(BufferAttr::HIPC_POINTER) {
+                    if is_in {
+                        cb = cb.add_in_pointer(buf_desc.ptr, buf_desc.size);
+                    } else if is_out {
+                        if attr.contains(BufferAttr::FIXED_SIZE) {
+                            cb = cb.add_out_fixed_pointer(buf_desc.ptr as *mut u8, buf_desc.size);
+                        } else {
+                            cb = cb.add_out_pointer(buf_desc.ptr as *mut u8, buf_desc.size);
+                        }
                     }
                 }
             }
-        }
 
-        for i in 0..self.in_object_count {
-            if let Some(obj) = self.in_objects[i] {
-                req.add_object(obj);
+            for i in 0..self.in_object_count {
+                if let Some(obj) = self.in_objects[i] {
+                    cb = cb.add_object(obj);
+                }
             }
-        }
 
-        for i in 0..self.in_handle_count {
-            req.add_handle(self.in_handles[i]);
+            for i in 0..self.in_handle_count {
+                cb = cb.add_copy_handle(self.in_handles[i]);
+            }
+
+            let req = cb.send().map_err(DispatchError::Layout)?;
+
+            if !self.in_data.is_null() && self.in_data_size > 0 {
+                // SAFETY: caller of `in_raw` guarantees `in_data` is valid for
+                // `in_data_size` bytes.
+                let in_slice =
+                    unsafe { core::slice::from_raw_parts(self.in_data, self.in_data_size) };
+                req.data[..self.in_data_size].copy_from_slice(in_slice);
+            }
         }
 
         ipc::send_sync_request(self.session).map_err(DispatchError::SendRequest)?;
 
-        // SAFETY: Response is in the TLS buffer after a successful send.
-        let resp = unsafe { cmif::parse_response(ipc_buf, is_domain, self.out_data_size) }
-            .map_err(DispatchError::ParseResponse)?;
+        // SAFETY: The kernel populated the TLS IPC buffer during the SVC above
+        // and there is no other live borrow of the buffer on this thread. We
+        // launder the `IpcBuffer`'s borrow to `'static` so the returned
+        // `Response` can outlive the local `IpcBuffer` guard; callers of
+        // `Dispatch::send` must consume the response before the next IPC
+        // operation on this thread.
+        let ipc_buf: &'static [u8; IPC_BUFFER_SIZE] = unsafe {
+            let buf = nx_sys_thread_tls::ipc_buffer();
+            &*(buf.as_array() as *const [u8; IPC_BUFFER_SIZE])
+        };
+        let resp = if is_domain {
+            cmif::parse_response_bytes_domain(ipc_buf, self.out_data_size)
+        } else {
+            cmif::parse_response_bytes(ipc_buf, self.out_data_size)
+        }
+        .map_err(DispatchError::ParseResponse)?;
 
         Ok(resp)
     }
@@ -373,12 +387,15 @@ impl<'a> Dispatch<'a> {
 /// Error returned by [`Dispatch::send`].
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
+    /// The request does not fit in the IPC buffer.
+    #[error("IPC request layout error")]
+    Layout(#[source] cmif::RequestLayoutError),
     /// The kernel rejected the underlying `SendSyncRequest`.
     #[error("failed to send IPC request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Result of a successful non-domain dispatch operation.
@@ -432,16 +449,11 @@ impl<'d> DomainDispatch<'d> {
         self
     }
 
-    /// Sets the input data for the request.
-    ///
-    /// # Safety
-    ///
-    /// `data` must point to at least `size` readable bytes, and the pointed-to
-    /// memory must remain valid until [`send`](Self::send) returns.
+    /// Sets the input data for the request. The slice must remain valid
+    /// until [`send`](Self::send) returns; the borrow is enforced via `'d`.
     #[inline]
-    pub unsafe fn in_raw(mut self, data: *const u8, size: usize) -> Self {
-        // SAFETY: Forwards the caller's contract to `Dispatch::in_raw`.
-        self.inner = unsafe { self.inner.in_raw(data, size) };
+    pub fn in_raw(mut self, data: &'d [u8]) -> Self {
+        self.inner = self.inner.in_raw(data);
         self
     }
 
@@ -452,11 +464,29 @@ impl<'d> DomainDispatch<'d> {
         self
     }
 
-    /// Adds a buffer with the specified attributes. Silently ignored once
+    /// Adds an IN buffer. [`BufferAttr::IN`] is set automatically; the
+    /// caller supplies only the transport bits. Silently ignored once
     /// [`MAX_BUFFERS`] slots are full.
     #[inline]
-    pub fn buffer(mut self, ptr: *const u8, size: usize, attr: BufferAttr) -> Self {
-        self.inner = self.inner.buffer(ptr, size, attr);
+    pub fn in_buffer(mut self, data: &'d [u8], attr: BufferAttr) -> Self {
+        self.inner = self.inner.in_buffer(data, attr);
+        self
+    }
+
+    /// Adds an OUT buffer. [`BufferAttr::OUT`] is set automatically.
+    /// Silently ignored once [`MAX_BUFFERS`] slots are full.
+    #[inline]
+    pub fn out_buffer(mut self, data: &'d mut [u8], attr: BufferAttr) -> Self {
+        self.inner = self.inner.out_buffer(data, attr);
+        self
+    }
+
+    /// Adds an IN/OUT buffer. Both [`BufferAttr::IN`] and [`BufferAttr::OUT`]
+    /// are set automatically. Silently ignored once [`MAX_BUFFERS`] slots
+    /// are full.
+    #[inline]
+    pub fn inout_buffer(mut self, data: &'d mut [u8], attr: BufferAttr) -> Self {
+        self.inner = self.inner.inout_buffer(data, attr);
         self
     }
 
@@ -518,7 +548,7 @@ impl<'d> DomainDispatch<'d> {
         let resp = self.inner.send_response()?;
 
         // `resp.objects.len()` is bounded by the server's response, which
-        // honours the request's `out_object_count` (capped at
+        // honors the request's `out_object_count` (capped at
         // `MAX_OUT_OBJECTS` by `DomainDispatch::out_objects`). The
         // `MAX_OUT_OBJECTS` zip bound below is a defensive guard, not a
         // silent truncation point.
@@ -583,60 +613,4 @@ impl<'d> DomainDispatchResult<'d> {
     pub fn into_objects(self) -> impl Iterator<Item = DomainObject<'d>> + 'd {
         self.objects.into_iter().flatten()
     }
-}
-
-/// Tallies the eight CMIF buffer-kind counts from a slice of attribute flags.
-fn count_buffer_kinds(attrs: &[BufferAttr]) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
-    let mut num_in_auto = 0u32;
-    let mut num_out_auto = 0u32;
-    let mut num_in_buffers = 0u32;
-    let mut num_out_buffers = 0u32;
-    let mut num_inout_buffers = 0u32;
-    let mut num_in_pointers = 0u32;
-    let mut num_out_pointers = 0u32;
-    let mut num_out_fixed_pointers = 0u32;
-
-    for attr in attrs {
-        let attr = *attr;
-        let is_in = attr.contains(BufferAttr::IN);
-        let is_out = attr.contains(BufferAttr::OUT);
-
-        if attr.contains(BufferAttr::HIPC_AUTO_SELECT) {
-            if is_in {
-                num_in_auto += 1;
-            }
-            if is_out {
-                num_out_auto += 1;
-            }
-        } else if attr.contains(BufferAttr::HIPC_MAP_ALIAS) {
-            if is_in && is_out {
-                num_inout_buffers += 1;
-            } else if is_in {
-                num_in_buffers += 1;
-            } else if is_out {
-                num_out_buffers += 1;
-            }
-        } else if attr.contains(BufferAttr::HIPC_POINTER) {
-            if is_in {
-                num_in_pointers += 1;
-            } else if is_out {
-                if attr.contains(BufferAttr::FIXED_SIZE) {
-                    num_out_fixed_pointers += 1;
-                } else {
-                    num_out_pointers += 1;
-                }
-            }
-        }
-    }
-
-    (
-        num_in_auto,
-        num_out_auto,
-        num_in_buffers,
-        num_out_buffers,
-        num_inout_buffers,
-        num_in_pointers,
-        num_out_pointers,
-        num_out_fixed_pointers,
-    )
 }

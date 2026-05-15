@@ -103,3 +103,6 @@ members = [
     "subprojects/nx-time",
     "subprojects/nx-wlaninf",
 ]
+
+[workspace.dependencies]
+zerocopy = { version = "0.8", default-features = false, features = ["derive"] }
