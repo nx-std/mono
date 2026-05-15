@@ -45,13 +45,17 @@ pub(crate) fn get_jit_debug_process_id_list(
     cmd_id: u32,
     out_pids: &mut [ProcessId],
 ) -> Result<u32, DispatchError> {
-    let result = service
-        .dispatch(cmd_id)
-        .buffer(
+    // SAFETY: `out_pids` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `out_pids`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             out_pids.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(out_pids),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
         )
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u32>())
         .send()?;
 
@@ -85,14 +89,16 @@ pub(crate) fn hook_to_create_process(
     cmd_id: u32,
     program_id: ProgramId,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `program_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const program_id).cast::<u8>(), size_of::<ProgramId>())
-            .out_handle(0, OutHandleAttr::Copy)
-            .send()?
+    // SAFETY: `program_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<ProgramId>())
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send()?;
 
     Ok(result.copy_handles[0])
 }
