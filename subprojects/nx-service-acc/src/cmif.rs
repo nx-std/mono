@@ -23,13 +23,17 @@ pub(crate) fn list_all_users(
     service: &Session,
     uids: &mut [AccountUid; USER_LIST_SIZE],
 ) -> Result<(), DispatchError> {
-    service
-        .dispatch(proto::LIST_ALL_USERS)
-        .buffer(
+    // SAFETY: `uids` is a valid `&mut` array; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `uids`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             uids.as_mut_ptr().cast::<u8>(),
             size_of::<[AccountUid; USER_LIST_SIZE]>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
         )
+    };
+    service
+        .dispatch(proto::LIST_ALL_USERS)
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
         .send()?;
     Ok(())
 }
@@ -41,52 +45,58 @@ pub(crate) fn get_last_opened_user(service: &Session) -> Result<AccountUid, Disp
 
 /// Gets an IProfile sub-object for a user. Returns the move handle.
 pub(crate) fn get_profile(service: &Session, uid: AccountUid) -> Result<u32, GetProfileError> {
-    // SAFETY: `uid` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_PROFILE)
-            .in_raw((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
-            .send()
-            .map_err(GetProfileError::Dispatch)?
+    // SAFETY: `uid` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<AccountUid>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
     };
+    let result = service
+        .dispatch(proto::GET_PROFILE)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(GetProfileError::Dispatch)?;
 
-    if result.move_handles.is_empty() {
+    let Some(&handle) = result.move_handles.first() else {
         return Err(GetProfileError::MissingHandle);
-    }
-    Ok(result.move_handles[0])
+    };
+    Ok(handle)
 }
 
 /// Initializes application info (pre-6.0.0). Sends PID.
 pub(crate) fn initialize_application_info_legacy(service: &Session) -> Result<(), DispatchError> {
     let input = InitializeApplicationInfoIn { pid_placeholder: 0 };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::INITIALIZE_APPLICATION_INFO_LEGACY)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<InitializeApplicationInfoIn>(),
-            )
-            .send_pid()
-            .send()?;
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<InitializeApplicationInfoIn>(),
+        )
+    };
+    service
+        .dispatch(proto::INITIALIZE_APPLICATION_INFO_LEGACY)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()?;
     Ok(())
 }
 
 /// Initializes application info (6.0.0+). Sends PID.
 pub(crate) fn initialize_application_info(service: &Session) -> Result<(), DispatchError> {
     let input = InitializeApplicationInfoIn { pid_placeholder: 0 };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::INITIALIZE_APPLICATION_INFO)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<InitializeApplicationInfoIn>(),
-            )
-            .send_pid()
-            .send()?;
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<InitializeApplicationInfoIn>(),
+        )
+    };
+    service
+        .dispatch(proto::INITIALIZE_APPLICATION_INFO)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()?;
     Ok(())
 }
 
@@ -121,15 +131,20 @@ pub(crate) fn profile_get(
     service: &Session,
     userdata: &mut AccountUserData,
 ) -> Result<AccountProfileBase, DispatchError> {
+    // SAFETY: `userdata` is a valid `&mut`; viewing it as a byte slice for the
+    // OUT buffer is sound, and the byte slice borrows `userdata`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (userdata as *mut AccountUserData).cast::<u8>(),
+            size_of::<AccountUserData>(),
+        )
+    };
     let result = service
         .dispatch(proto::PROFILE_GET)
         .out_size(size_of::<AccountProfileBase>())
-        .buffer(
-            (userdata as *mut AccountUserData).cast::<u8>(),
-            size_of::<AccountUserData>(),
-            BufferAttr::OUT
-                .or(BufferAttr::FIXED_SIZE)
-                .or(BufferAttr::HIPC_POINTER),
+        .out_buffer(
+            out_bytes,
+            BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send()?;
 
@@ -152,11 +167,7 @@ pub(crate) fn profile_load_image(service: &Session, buf: &mut [u8]) -> Result<u3
     let result = service
         .dispatch(proto::PROFILE_LOAD_IMAGE)
         .out_size(size_of::<u32>())
-        .buffer(
-            buf.as_mut_ptr(),
-            buf.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
 
     Ok(u32::from_le_bytes([
@@ -178,15 +189,16 @@ fn dispatch_in_out_with_pid<I: Copy, O: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<O, DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .out_size(size_of::<O>())
-            .send_pid()
-            .send()?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<O>())
+        .send_pid()
+        .send()?;
     // SAFETY: the response payload is at least `size_of::<O>()` bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }
