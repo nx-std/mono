@@ -20,21 +20,19 @@ pub(crate) fn set(
     key: &NcmContentMetaKey,
     data: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `key` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::DB_SET)
-            .in_raw(
-                (&raw const *key).cast::<u8>(),
-                size_of::<NcmContentMetaKey>(),
-            )
-            .buffer(
-                data.as_ptr(),
-                data.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?;
-    }
+    // SAFETY: `key` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let key_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *key).cast::<u8>(),
+            size_of::<NcmContentMetaKey>(),
+        )
+    };
+    service
+        .dispatch(proto::DB_SET)
+        .in_raw(key_bytes)
+        .in_buffer(data, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
     Ok(())
 }
 
@@ -44,22 +42,21 @@ pub(crate) fn get(
     key: &NcmContentMetaKey,
     out_data: &mut [u8],
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `key` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DB_GET)
-            .in_raw(
-                (&raw const *key).cast::<u8>(),
-                size_of::<NcmContentMetaKey>(),
-            )
-            .out_size(size_of::<u64>())
-            .buffer(
-                out_data.as_mut_ptr(),
-                out_data.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `key` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let key_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *key).cast::<u8>(),
+            size_of::<NcmContentMetaKey>(),
+        )
     };
+    let result = service
+        .dispatch(proto::DB_GET)
+        .in_raw(key_bytes)
+        .out_size(size_of::<u64>())
+        .out_buffer(out_data, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
+    // SAFETY: response payload is at least size_of::<u64>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
 
@@ -97,22 +94,29 @@ pub(crate) fn list_content_info(
         pad: 0,
         key: *key,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DB_LIST_CONTENT_INFO)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<ListContentInfoIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                out_info.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out_info),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<ListContentInfoIn>(),
+        )
     };
+    // SAFETY: `out_info` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `out_info`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_info.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_info),
+        )
+    };
+    let result = service
+        .dispatch(proto::DB_LIST_CONTENT_INFO)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
+    // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
 }
 
@@ -134,19 +138,26 @@ pub(crate) fn list(
         id_min,
         id_max,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DB_LIST)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<ListIn>())
-            .out_size(size_of::<ListOut>())
-            .buffer(
-                out_keys.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out_keys),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ListIn>())
     };
+    // SAFETY: `out_keys` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `out_keys`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_keys.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_keys),
+        )
+    };
+    let result = service
+        .dispatch(proto::DB_LIST)
+        .in_raw(in_bytes)
+        .out_size(size_of::<ListOut>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
+    // SAFETY: response payload is at least size_of::<ListOut>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<ListOut>()) })
 }
 
@@ -165,19 +176,25 @@ pub(crate) fn list_application(
     out_keys: &mut [NcmApplicationContentMetaKey],
 ) -> Result<ListOut, DispatchError> {
     let input = meta_type as u8;
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DB_LIST_APPLICATION)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<u8>())
-            .out_size(size_of::<ListOut>())
-            .buffer(
-                out_keys.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out_keys),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its single byte as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u8>()) };
+    // SAFETY: `out_keys` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `out_keys`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_keys.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_keys),
+        )
     };
+    let result = service
+        .dispatch(proto::DB_LIST_APPLICATION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<ListOut>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
+    // SAFETY: response payload is at least size_of::<ListOut>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<ListOut>()) })
 }
 
@@ -192,15 +209,17 @@ pub(crate) fn has_all(
     service: &Session,
     keys: &[NcmContentMetaKey],
 ) -> Result<bool, DispatchError> {
+    // SAFETY: `keys` is a valid `&` slice; viewing it as a byte slice
+    // for the IN buffer is sound, and the byte slice borrows `keys`.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(keys.as_ptr().cast::<u8>(), core::mem::size_of_val(keys))
+    };
     let result = service
         .dispatch(proto::DB_HAS_ALL)
         .out_size(size_of::<u8>())
-        .buffer(
-            keys.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(keys),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(in_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
+    // SAFETY: response payload is at least size_of::<u8>() bytes.
     let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(out & 1 != 0)
 }
@@ -237,18 +256,18 @@ pub(crate) fn lookup_orphan_content(
     content_ids: &[NcmContentId],
     out_orphaned: &mut [u8],
 ) -> Result<(), DispatchError> {
-    service
-        .dispatch(proto::DB_LOOKUP_ORPHAN_CONTENT)
-        .buffer(
-            out_orphaned.as_mut_ptr(),
-            out_orphaned.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
+    // SAFETY: `content_ids` is a valid `&` slice; viewing it as a byte slice
+    // for the IN buffer is sound, and the byte slice borrows `content_ids`.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
             content_ids.as_ptr().cast::<u8>(),
             core::mem::size_of_val(content_ids),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
+    };
+    service
+        .dispatch(proto::DB_LOOKUP_ORPHAN_CONTENT)
+        .out_buffer(out_orphaned, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(in_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
     Ok(())
 }
@@ -287,22 +306,29 @@ pub(crate) fn list_content_meta_info(
         pad: 0,
         key: *key,
     };
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DB_LIST_CONTENT_META_INFO)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<ListContentInfoIn>(),
-            )
-            .out_size(size_of::<i32>())
-            .buffer(
-                out_meta_info.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out_meta_info),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<ListContentInfoIn>(),
+        )
     };
+    // SAFETY: `out_meta_info` is a valid `&mut` slice; viewing it as a byte
+    // slice for the OUT buffer is sound, and the byte slice borrows `out_meta_info`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_meta_info.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_meta_info),
+        )
+    };
+    let result = service
+        .dispatch(proto::DB_LIST_CONTENT_META_INFO)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
+    // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
 }
 

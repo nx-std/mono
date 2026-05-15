@@ -11,14 +11,15 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<O, DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .out_size(size_of::<O>())
-            .send()?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<O>())
+        .send()?;
     // SAFETY: the response payload is at least `size_of::<O>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }
@@ -38,13 +39,11 @@ pub(crate) fn dispatch_in<I: Copy>(
     cmd_id: u32,
     input: I,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<I>())
-            .send()?;
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    service.dispatch(cmd_id).in_raw(in_bytes).send()?;
     Ok(())
 }
 
@@ -62,14 +61,15 @@ pub(crate) fn dispatch_in_u8_out_object(
     cmd_id: u32,
     input: u8,
 ) -> Result<u32, OpenSubObjectError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<u8>())
-            .send()
-            .map_err(OpenSubObjectError::Dispatch)?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<u8>()` byte as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u8>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(OpenSubObjectError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenSubObjectError::MissingHandle);
