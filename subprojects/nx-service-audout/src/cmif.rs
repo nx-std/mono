@@ -46,12 +46,10 @@ fn list_audio_outs_impl(
     device_names_buf: &mut [u8],
     buffer_attr: BufferAttr,
 ) -> Result<u32, ListAudioOutsError> {
-    let buf_size = device_names_buf.len();
-
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())
-        .buffer(device_names_buf.as_mut_ptr(), buf_size, buffer_attr)
+        .out_buffer(device_names_buf, buffer_attr)
         .send()
         .map_err(ListAudioOutsError)?;
 
@@ -103,40 +101,33 @@ fn open_audio_out_impl(
     device_name_out: &mut [u8],
     transfer_attr: BufferAttr,
 ) -> Result<(u32, OpenAudioOutOut), OpenAudioOutError> {
-    // SAFETY: `input`, `device_name_in`, and `device_name_out` live on the
-    // stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const *input).cast::<u8>(),
-                size_of::<OpenAudioOutIn>(),
-            )
-            .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
-            .send_pid()
-            .buffer(
-                device_name_in.as_ptr().cast_mut(),
-                device_name_in.len(),
-                BufferAttr::IN.or(transfer_attr),
-            )
-            .buffer(
-                device_name_out.as_mut_ptr(),
-                device_name_out.len(),
-                BufferAttr::OUT.or(transfer_attr),
-            )
-            .out_size(size_of::<OpenAudioOutOut>())
-            .send()
-            .map_err(OpenAudioOutError::Dispatch)?
+    // SAFETY: `input` is a `Copy`-compatible value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *input).cast::<u8>(),
+            size_of::<OpenAudioOutIn>(),
+        )
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
+        .send_pid()
+        .in_buffer(device_name_in, transfer_attr)
+        .out_buffer(device_name_out, transfer_attr)
+        .out_size(size_of::<OpenAudioOutOut>())
+        .send()
+        .map_err(OpenAudioOutError::Dispatch)?;
 
-    if result.move_handles.is_empty() {
+    let Some(&handle) = result.move_handles.first() else {
         return Err(OpenAudioOutError::MissingHandle);
-    }
+    };
 
     // SAFETY: response payload is at least size_of::<OpenAudioOutOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<OpenAudioOutOut>()) };
 
-    Ok((result.move_handles[0], out))
+    Ok((handle, out))
 }
 
 // ---------------------------------------------------------------------------
@@ -213,24 +204,29 @@ fn append_buffer_impl(
     buffer: &AudioOutBuffer,
     buffer_attr: BufferAttr,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` and `buffer` live on the stack until
-    // `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const buffer_client_ptr).cast::<u8>(),
-                size_of::<u64>(),
-            )
-            .buffer(
-                (&raw const *buffer).cast::<u8>(),
-                size_of::<AudioOutBuffer>(),
-                buffer_attr,
-            )
-            .send()
-            .map(|_| ())
-            .map_err(AppendBufferError)
-    }
+    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const buffer_client_ptr).cast::<u8>(),
+            size_of::<u64>(),
+        )
+    };
+    // SAFETY: `buffer` is a valid `&AudioOutBuffer`; viewing it as a byte
+    // slice for the IN buffer is sound, and the slice borrows `buffer`.
+    let buf_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *buffer).cast::<u8>(),
+            size_of::<AudioOutBuffer>(),
+        )
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(buf_bytes, buffer_attr)
+        .send()
+        .map(|_| ())
+        .map_err(AppendBufferError)
 }
 
 /// Gets a released audio output buffer (auto-select). \[3.0.0+\]
@@ -265,14 +261,15 @@ fn get_released_buffer_impl(
     out_buffer_ptr: &mut u64,
     buffer_attr: BufferAttr,
 ) -> Result<u32, GetReleasedBufferError> {
+    // SAFETY: `out_buffer_ptr` is a valid `&mut u64`; viewing it as a byte
+    // slice for the OUT buffer is sound, and the slice borrows it.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut((out_buffer_ptr as *mut u64).cast::<u8>(), size_of::<u64>())
+    };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())
-        .buffer(
-            (out_buffer_ptr as *mut u64).cast::<u8>(),
-            size_of::<u64>(),
-            buffer_attr,
-        )
+        .out_buffer(out_bytes, buffer_attr)
         .send()
         .map_err(GetReleasedBufferError)?;
 
@@ -287,17 +284,20 @@ pub(crate) fn audio_out_contains_buffer(
     service: &Session,
     buffer_client_ptr: u64,
 ) -> Result<bool, ContainsBufferError> {
-    let result = unsafe {
-        service
-            .dispatch(proto::AUDIO_OUT_CONTAINS_BUFFER)
-            .in_raw(
-                (&raw const buffer_client_ptr).cast::<u8>(),
-                size_of::<u64>(),
-            )
-            .out_size(size_of::<u8>())
-            .send()
-            .map_err(ContainsBufferError)?
+    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const buffer_client_ptr).cast::<u8>(),
+            size_of::<u64>(),
+        )
     };
+    let result = service
+        .dispatch(proto::AUDIO_OUT_CONTAINS_BUFFER)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .send()
+        .map_err(ContainsBufferError)?;
 
     // SAFETY: response payload is at least size_of::<u8>().
     let val = unsafe { ptr::read_unaligned(result.data.as_ptr()) };
@@ -346,15 +346,16 @@ pub(crate) fn audio_out_flush_buffers(service: &Session) -> Result<bool, Dispatc
 
 /// Sets the audio output volume. \[6.0.0+\]
 pub(crate) fn audio_out_set_volume(service: &Session, volume: f32) -> Result<(), SetVolumeError> {
-    // SAFETY: `volume` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::AUDIO_OUT_SET_VOLUME)
-            .in_raw((&raw const volume).cast::<u8>(), size_of::<f32>())
-            .send()
-            .map(|_| ())
-            .map_err(SetVolumeError)
-    }
+    // SAFETY: `volume` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const volume).cast::<u8>(), size_of::<f32>()) };
+    service
+        .dispatch(proto::AUDIO_OUT_SET_VOLUME)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
+        .map_err(SetVolumeError)
 }
 
 /// Gets the audio output volume. \[6.0.0+\]
@@ -479,28 +480,30 @@ fn dispatch_pid_delay(
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
     let input = PidDelayIn { pid, delay };
-
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<PidDelayIn>())
-            .send()
-            .map(|_| ())
-            .map_err(SuspendResumeError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PidDelayIn>())
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
+        .map_err(SuspendResumeError)
 }
 
 fn dispatch_get_volume(service: &Session, cmd_id: u32, pid: u64) -> Result<f32, GetVolumeError> {
-    // SAFETY: `pid` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const pid).cast::<u8>(), size_of::<u64>())
-            .out_size(size_of::<f32>())
-            .send()
-            .map_err(GetVolumeError)?
-    };
+    // SAFETY: `pid` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const pid).cast::<u8>(), size_of::<u64>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<f32>())
+        .send()
+        .map_err(GetVolumeError)?;
 
     // SAFETY: response payload is at least size_of::<f32>().
     let volume = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<f32>()) };
@@ -521,16 +524,17 @@ fn dispatch_set_volume(
         pid,
         delay,
     };
-
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<SetVolumeIn>())
-            .send()
-            .map(|_| ())
-            .map_err(SetVolumeError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SetVolumeIn>())
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
+        .map_err(SetVolumeError)
 }
 
 // ---------------------------------------------------------------------------
