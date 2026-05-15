@@ -18,8 +18,6 @@ pub fn get_display_service(
     session: SessionHandle,
     service_type: crate::types::ViServiceType,
 ) -> Result<Session, GetDisplayServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     // Command ID equals service type value
     let cmd_id = service_type.as_raw() as u32;
 
@@ -31,30 +29,34 @@ pub fn get_display_service(
         crate::types::ViServiceType::Default => 0,
     };
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(4) // inval
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(4) // inval
+            .send()
+            .map_err(GetDisplayServiceError::BuildRequest)?;
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write inval
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), inval);
+        // Write inval
+        // SAFETY: `req.data` is exactly 4 bytes; writing inval as u32 is sound.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), inval);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetDisplayServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetDisplayServiceError::ParseResponse)?;
 
     // Sub-service is returned via move handle
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(GetDisplayServiceError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(GetDisplayServiceError::MissingHandle);
+    };
 
     // SAFETY: handle is a valid session handle from the kernel
     let session_handle = unsafe { SessionHandle::from_raw(handle) };
@@ -68,18 +70,21 @@ pub fn get_display_service(
 ///
 /// Available on 16.0.0+ with Manager service type.
 pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(root_cmds::PREPARE_FATAL).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _ = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, root_cmds::PREPARE_FATAL)
+            .send()
+            .map_err(PrepareFatalError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(PrepareFatalError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(PrepareFatalError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(PrepareFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -88,18 +93,21 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
 ///
 /// Available on 16.0.0+ with Manager service type.
 pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(root_cmds::SHOW_FATAL).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _ = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, root_cmds::SHOW_FATAL)
+            .send()
+            .map_err(ShowFatalError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(ShowFatalError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(ShowFatalError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ShowFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -115,42 +123,45 @@ pub fn draw_fatal_rectangle(
     end_y: i32,
     color: u16,
 ) -> Result<(), DrawFatalRectangleError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` — naturally
-    // aligned, total 20 bytes (u16 + 2 bytes padding + 4 * s32).
-    let fmt = cmif::RequestFormatBuilder::new(root_cmds::DRAW_FATAL_RECTANGLE)
-        .data_size(20)
-        .build();
+        // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` — naturally
+        // aligned, total 20 bytes (u16 + 2 bytes padding + 4 * s32).
+        #[repr(C)]
+        struct Input {
+            color: u16,
+            x: i32,
+            y: i32,
+            end_x: i32,
+            end_y: i32,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            color,
+            x,
+            y,
+            end_x,
+            end_y,
+        };
 
-    #[repr(C)]
-    struct Input {
-        color: u16,
-        x: i32,
-        y: i32,
-        end_x: i32,
-        end_y: i32,
-    }
+        let req = cmif::CmifBuilder::new(&mut buf, root_cmds::DRAW_FATAL_RECTANGLE)
+            .data_size(20)
+            .send()
+            .map_err(DrawFatalRectangleError::BuildRequest)?;
 
-    let input = Input {
-        color,
-        x,
-        y,
-        end_x,
-        end_y,
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(DrawFatalRectangleError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(DrawFatalRectangleError::ParseResponse)?;
 
     Ok(())
@@ -172,57 +183,69 @@ pub fn draw_fatal_text32(
     fg_color: u32,
     initial_advance: i32,
 ) -> Result<i32, DrawFatalText32Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let fmt = cmif::RequestFormatBuilder::new(root_cmds::DRAW_FATAL_TEXT32)
-        .data_size(32) // x(4) + y(4) + scale_x(4) + scale_y(4) + font_type(4) + bg_color(4) + fg_color(4) + initial_advance(4)
-        .in_buffers(1) // UTF-32 codepoints
-        .build();
+        #[repr(C)]
+        struct Input {
+            x: i32,
+            y: i32,
+            scale_x: f32,
+            scale_y: f32,
+            font_type: u32,
+            bg_color: u32,
+            fg_color: u32,
+            initial_advance: i32,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            x,
+            y,
+            scale_x,
+            scale_y,
+            font_type,
+            bg_color,
+            fg_color,
+            initial_advance,
+        };
 
-    #[repr(C)]
-    struct Input {
-        x: i32,
-        y: i32,
-        scale_x: f32,
-        scale_y: f32,
-        font_type: u32,
-        bg_color: u32,
-        fg_color: u32,
-        initial_advance: i32,
+        // Add buffer (UTF-32 codepoints as bytes)
+        // SAFETY: `utf32_codepoints` is a valid &[u32] slice; reinterpreting its bytes
+        // as a u8 slice for the IN buffer is sound (u32 has no padding, any bit pattern
+        // is valid as bytes).
+        let codepoints_bytes = unsafe {
+            core::slice::from_raw_parts(
+                utf32_codepoints.as_ptr().cast::<u8>(),
+                utf32_codepoints.len() * 4,
+            )
+        };
+
+        let req = cmif::CmifBuilder::new(&mut buf, root_cmds::DRAW_FATAL_TEXT32)
+            .data_size(32) // x(4) + y(4) + scale_x(4) + scale_y(4) + font_type(4) + bg_color(4) + fg_color(4) + initial_advance(4)
+            .add_in_buffer(
+                codepoints_bytes.as_ptr(),
+                codepoints_bytes.len(),
+                nx_sf::hipc::BufferMode::Normal,
+            )
+            .send()
+            .map_err(DrawFatalText32Error::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
-
-    let input = Input {
-        x,
-        y,
-        scale_x,
-        scale_y,
-        font_type,
-        bg_color,
-        fg_color,
-        initial_advance,
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
-    }
-
-    // Add buffer (UTF-32 codepoints as bytes)
-    req.add_in_buffer(
-        utf32_codepoints.as_ptr().cast(),
-        utf32_codepoints.len() * 4,
-        nx_sf::hipc::BufferMode::Normal,
-    );
 
     ipc::send_sync_request(session).map_err(DrawFatalText32Error::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 4)
         .map_err(DrawFatalText32Error::ParseResponse)?;
 
     // Output: advance (i32)
+    // SAFETY: `resp.data` is exactly 4 bytes; reading it as i32 is sound.
     let advance = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
 
     Ok(advance)
@@ -231,12 +254,15 @@ pub fn draw_fatal_text32(
 /// Error from [`get_display_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayServiceError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Missing handle in response.
     #[error("missing handle in response")]
     MissingHandle,
@@ -245,43 +271,55 @@ pub enum GetDisplayServiceError {
 /// Error from [`prepare_fatal`].
 #[derive(Debug, thiserror::Error)]
 pub enum PrepareFatalError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`show_fatal`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShowFatalError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`draw_fatal_rectangle`].
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalRectangleError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`draw_fatal_text32`].
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalText32Error {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }

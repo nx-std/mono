@@ -32,28 +32,30 @@ pub fn get_z_order_count_min(
     session: SessionHandle,
     display_id: DisplayId,
 ) -> Result<i64, GetZOrderCountError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::GET_Z_ORDER_COUNT_MIN)
+            .data_size(8) // display_id
+            .send()
+            .map_err(GetZOrderCountError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MIN)
-        .data_size(8) // display_id
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<u64>().cast_mut(),
-            display_id.to_raw(),
-        );
+        // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), display_id.to_raw());
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetZOrderCountError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
         .map_err(GetZOrderCountError::ParseResponse)?;
 
+    // SAFETY: `resp.data` is exactly 8 bytes; reading it as i64 is sound.
     let z = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i64>()) };
 
     Ok(z)
@@ -64,28 +66,30 @@ pub fn get_z_order_count_max(
     session: SessionHandle,
     display_id: DisplayId,
 ) -> Result<i64, GetZOrderCountError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::GET_Z_ORDER_COUNT_MAX)
+            .data_size(8) // display_id
+            .send()
+            .map_err(GetZOrderCountError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MAX)
-        .data_size(8) // display_id
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<u64>().cast_mut(),
-            display_id.to_raw(),
-        );
+        // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), display_id.to_raw());
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetZOrderCountError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
         .map_err(GetZOrderCountError::ParseResponse)?;
 
+    // SAFETY: `resp.data` is exactly 8 bytes; reading it as i64 is sound.
     let z = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i64>()) };
 
     Ok(z)
@@ -105,26 +109,27 @@ pub fn get_display_logical_resolution(
     session: SessionHandle,
     display_id: DisplayId,
 ) -> Result<LogicalResolution, GetDisplayLogicalResolutionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
+            .data_size(8) // display_id
+            .send()
+            .map_err(GetDisplayLogicalResolutionError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
-        .data_size(8) // display_id
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<u64>().cast_mut(),
-            display_id.to_raw(),
-        );
+        // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), display_id.to_raw());
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetDisplayLogicalResolutionError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
         .map_err(GetDisplayLogicalResolutionError::ParseResponse)?;
 
     #[repr(C)]
@@ -133,6 +138,7 @@ pub fn get_display_logical_resolution(
         height: i32,
     }
 
+    // SAFETY: `resp.data` is exactly 8 bytes; reading it as Output (two i32) is sound.
     let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
 
     Ok(LogicalResolution {
@@ -150,40 +156,43 @@ pub fn set_display_magnification(
     width: i32,
     height: i32,
 ) -> Result<(), SetDisplayMagnificationError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::SET_DISPLAY_MAGNIFICATION)
-        .data_size(24) // x(4) + y(4) + width(4) + height(4) + display_id(8)
-        .build();
+        #[repr(C)]
+        struct Input {
+            x: i32,
+            y: i32,
+            width: i32,
+            height: i32,
+            display_id: u64,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            x,
+            y,
+            width,
+            height,
+            display_id: display_id.to_raw(),
+        };
 
-    #[repr(C)]
-    struct Input {
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        display_id: u64,
-    }
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_DISPLAY_MAGNIFICATION)
+            .data_size(24) // x(4) + y(4) + width(4) + height(4) + display_id(8)
+            .send()
+            .map_err(SetDisplayMagnificationError::BuildRequest)?;
 
-    let input = Input {
-        x,
-        y,
-        width,
-        height,
-        display_id: display_id.to_raw(),
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetDisplayMagnificationError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(SetDisplayMagnificationError::ParseResponse)?;
 
     Ok(())
@@ -196,37 +205,39 @@ pub fn set_layer_position(
     x: f32,
     y: f32,
 ) -> Result<(), SetLayerPositionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::SET_LAYER_POSITION)
-        .data_size(16) // x(4) + y(4) + layer_id(8)
-        .build();
+        #[repr(C)]
+        struct Input {
+            x: f32,
+            y: f32,
+            layer_id: u64,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            x,
+            y,
+            layer_id: layer_id.to_raw(),
+        };
 
-    #[repr(C)]
-    struct Input {
-        x: f32,
-        y: f32,
-        layer_id: u64,
-    }
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_POSITION)
+            .data_size(16) // x(4) + y(4) + layer_id(8)
+            .send()
+            .map_err(SetLayerPositionError::BuildRequest)?;
 
-    let input = Input {
-        x,
-        y,
-        layer_id: layer_id.to_raw(),
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetLayerPositionError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SetLayerPositionError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetLayerPositionError::ParseResponse)?;
 
     Ok(())
 }
@@ -238,37 +249,39 @@ pub fn set_layer_size(
     width: i64,
     height: i64,
 ) -> Result<(), SetLayerSizeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::SET_LAYER_SIZE)
-        .data_size(24) // layer_id(8) + width(8) + height(8)
-        .build();
+        #[repr(C)]
+        struct Input {
+            layer_id: u64,
+            width: i64,
+            height: i64,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            layer_id: layer_id.to_raw(),
+            width,
+            height,
+        };
 
-    #[repr(C)]
-    struct Input {
-        layer_id: u64,
-        width: i64,
-        height: i64,
-    }
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_SIZE)
+            .data_size(24) // layer_id(8) + width(8) + height(8)
+            .send()
+            .map_err(SetLayerSizeError::BuildRequest)?;
 
-    let input = Input {
-        layer_id: layer_id.to_raw(),
-        width,
-        height,
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetLayerSizeError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SetLayerSizeError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetLayerSizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -279,35 +292,37 @@ pub fn set_layer_z(
     layer_id: LayerId,
     z: i64,
 ) -> Result<(), SetLayerZError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::SET_LAYER_Z)
-        .data_size(16) // layer_id(8) + z(8)
-        .build();
+        #[repr(C)]
+        struct Input {
+            layer_id: u64,
+            z: i64,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            layer_id: layer_id.to_raw(),
+            z,
+        };
 
-    #[repr(C)]
-    struct Input {
-        layer_id: u64,
-        z: i64,
-    }
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_Z)
+            .data_size(16) // layer_id(8) + z(8)
+            .send()
+            .map_err(SetLayerZError::BuildRequest)?;
 
-    let input = Input {
-        layer_id: layer_id.to_raw(),
-        z,
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetLayerZError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SetLayerZError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetLayerZError::ParseResponse)?;
 
     Ok(())
 }
@@ -318,36 +333,39 @@ pub fn set_layer_visibility(
     layer_id: LayerId,
     visible: bool,
 ) -> Result<(), SetLayerVisibilityError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let fmt = cmif::RequestFormatBuilder::new(system_cmds::SET_LAYER_VISIBILITY)
-        .data_size(16) // visible(1) + pad(7) + layer_id(8)
-        .build();
+        #[repr(C)]
+        struct Input {
+            visible: u8,
+            _pad: [u8; 7],
+            layer_id: u64,
+        }
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
+        let input = Input {
+            visible: visible as u8,
+            _pad: [0; 7],
+            layer_id: layer_id.to_raw(),
+        };
 
-    #[repr(C)]
-    struct Input {
-        visible: u8,
-        _pad: [u8; 7],
-        layer_id: u64,
-    }
+        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_VISIBILITY)
+            .data_size(16) // visible(1) + pad(7) + layer_id(8)
+            .send()
+            .map_err(SetLayerVisibilityError::BuildRequest)?;
 
-    let input = Input {
-        visible: visible as u8,
-        _pad: [0; 7],
-        layer_id: layer_id.to_raw(),
-    };
-
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetLayerVisibilityError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _ = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(SetLayerVisibilityError::ParseResponse)?;
 
     Ok(())
@@ -358,76 +376,97 @@ pub fn set_layer_visibility(
 /// Error from Z-order count operations.
 #[derive(Debug, thiserror::Error)]
 pub enum GetZOrderCountError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`get_display_logical_resolution`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayLogicalResolutionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`set_display_magnification`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayMagnificationError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`set_layer_position`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerPositionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`set_layer_size`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerSizeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`set_layer_z`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerZError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error from [`set_layer_visibility`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerVisibilityError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
