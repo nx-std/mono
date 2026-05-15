@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the audio services.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -156,53 +156,54 @@ fn dispatch_pid_delay(
     pid: u64,
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmd)
-        .data_size(size_of::<PidDelayIn>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = PidDelayIn { pid, delay };
 
-    // SAFETY: req.data points to valid payload area with space for PidDelayIn.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<PidDelayIn>().cast_mut(), input);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd)
+            .data_size(size_of::<PidDelayIn>())
+            .send()
+            .map_err(SuspendResumeError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<PidDelayIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<PidDelayIn>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SuspendResumeError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SuspendResumeError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SuspendResumeError::ParseResponse)?;
 
     Ok(())
 }
 
 fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32, GetVolumeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd)
+            .data_size(size_of::<u64>())
+            .send()
+            .map_err(GetVolumeError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(cmd)
-        .data_size(size_of::<u64>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u64.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), pid);
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid) };
     }
 
     ipc::send_sync_request(session).map_err(GetVolumeError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<f32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
         .map_err(GetVolumeError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for f32.
+    // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
     let volume = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
 
     Ok(volume)
@@ -215,15 +216,6 @@ fn dispatch_set_volume(
     delay: u64,
     volume: f32,
 ) -> Result<(), SetVolumeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmd)
-        .data_size(size_of::<SetVolumeIn>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = SetVolumeIn {
         volume,
         _pad: [0; 4],
@@ -231,15 +223,25 @@ fn dispatch_set_volume(
         delay,
     };
 
-    // SAFETY: req.data points to valid payload area with space for SetVolumeIn.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<SetVolumeIn>().cast_mut(), input);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd)
+            .data_size(size_of::<SetVolumeIn>())
+            .send()
+            .map_err(SetVolumeError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<SetVolumeIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SetVolumeIn>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetVolumeError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(SetVolumeError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetVolumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -251,32 +253,41 @@ fn dispatch_set_volume(
 /// Error returned by suspend/resume operations.
 #[derive(Debug, thiserror::Error)]
 pub enum SuspendResumeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by get-volume operations.
 #[derive(Debug, thiserror::Error)]
 pub enum GetVolumeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by set-volume operations.
 #[derive(Debug, thiserror::Error)]
 pub enum SetVolumeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
