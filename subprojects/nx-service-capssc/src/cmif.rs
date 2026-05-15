@@ -23,16 +23,6 @@ pub fn capture_raw_image_with_timeout(
     timeout: i64,
     out_image: &mut [u8],
 ) -> Result<(), CaptureRawImageError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
-        .data_size(size_of::<CaptureRawImageIn>())
-        .out_buffers(1)
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = CaptureRawImageIn {
         layer_stack,
         _pad: 0,
@@ -43,25 +33,30 @@ pub fn capture_raw_image_with_timeout(
         timeout,
     };
 
-    // SAFETY: req.data points to valid payload area with space for CaptureRawImageIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<CaptureRawImageIn>().cast_mut(),
-            input,
-        );
-    }
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
+            .data_size(size_of::<CaptureRawImageIn>())
+            .add_out_buffer(
+                out_image.as_mut_ptr(),
+                out_image.len(),
+                BufferMode::NonSecure,
+            )
+            .send()
+            .map_err(CaptureRawImageError::BuildRequest)?;
 
-    req.add_out_buffer(
-        out_image.as_mut_ptr(),
-        out_image.len(),
-        BufferMode::NonSecure,
-    );
+        // SAFETY: `req.data` is exactly `size_of::<CaptureRawImageIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<CaptureRawImageIn>(), input) };
+    }
 
     ipc::send_sync_request(session).map_err(CaptureRawImageError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(CaptureRawImageError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CaptureRawImageError::ParseResponse)?;
 
     Ok(())
 }
@@ -82,36 +77,34 @@ pub fn open_raw_screen_shot_read_stream(
     layer_stack: ViLayerStack,
     timeout: i64,
 ) -> Result<ReadStreamInfo, OpenReadStreamError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
-        .data_size(size_of::<LayerStackTimeoutIn>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = LayerStackTimeoutIn {
         layer_stack,
         _pad: 0,
         timeout,
     };
 
-    // SAFETY: req.data points to valid payload area with space for LayerStackTimeoutIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<LayerStackTimeoutIn>().cast_mut(),
-            input,
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
+            .data_size(size_of::<LayerStackTimeoutIn>())
+            .send()
+            .map_err(OpenReadStreamError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<LayerStackTimeoutIn>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(OpenReadStreamError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<OpenReadStreamOut>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<OpenReadStreamOut>())
         .map_err(OpenReadStreamError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for OpenReadStreamOut.
+    // SAFETY: `resp.data` is exactly `size_of::<OpenReadStreamOut>()` bytes.
     let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<OpenReadStreamOut>()) };
 
     Ok(ReadStreamInfo {
@@ -125,18 +118,21 @@ pub fn open_raw_screen_shot_read_stream(
 pub fn close_raw_screen_shot_read_stream(
     session: SessionHandle,
 ) -> Result<(), CloseReadStreamError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM)
+            .send()
+            .map_err(CloseReadStreamError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(CloseReadStreamError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(CloseReadStreamError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CloseReadStreamError::ParseResponse)?;
 
     Ok(())
 }
@@ -149,30 +145,29 @@ pub fn read_raw_screen_shot_read_stream(
     offset: u64,
     out_buf: &mut [u8],
 ) -> Result<u64, ReadStreamError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
+            .data_size(size_of::<u64>())
+            .add_out_buffer(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal)
+            .send()
+            .map_err(ReadStreamError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
-        .data_size(size_of::<u64>())
-        .out_buffers(1)
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u64.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), offset);
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), offset) };
     }
-
-    req.add_out_buffer(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(ReadStreamError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u64>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
         .map_err(ReadStreamError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u64.
+    // SAFETY: `resp.data` is exactly `size_of::<u64>()` bytes.
     let bytes_read = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
 
     Ok(bytes_read)
@@ -187,39 +182,35 @@ pub fn capture_jpeg_screen_shot(
     timeout: i64,
     out_jpeg: &mut [u8],
 ) -> Result<u64, CaptureJpegError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::CAPTURE_JPEG_SCREEN_SHOT)
-        .data_size(size_of::<LayerStackTimeoutIn>())
-        .out_buffers(1)
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = LayerStackTimeoutIn {
         layer_stack,
         _pad: 0,
         timeout,
     };
 
-    // SAFETY: req.data points to valid payload area with space for LayerStackTimeoutIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<LayerStackTimeoutIn>().cast_mut(),
-            input,
-        );
-    }
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::CAPTURE_JPEG_SCREEN_SHOT)
+            .data_size(size_of::<LayerStackTimeoutIn>())
+            .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+            .send()
+            .map_err(CaptureJpegError::BuildRequest)?;
 
-    req.add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure);
+        // SAFETY: `req.data` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<LayerStackTimeoutIn>(), input) };
+    }
 
     ipc::send_sync_request(session).map_err(CaptureJpegError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u64>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
         .map_err(CaptureJpegError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u64.
+    // SAFETY: `resp.data` is exactly `size_of::<u64>()` bytes.
     let jpeg_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
 
     Ok(jpeg_size)
@@ -228,54 +219,69 @@ pub fn capture_jpeg_screen_shot(
 /// Error returned by [`capture_raw_image_with_timeout`].
 #[derive(Debug, thiserror::Error)]
 pub enum CaptureRawImageError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`open_raw_screen_shot_read_stream`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenReadStreamError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`close_raw_screen_shot_read_stream`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloseReadStreamError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`read_raw_screen_shot_read_stream`].
 #[derive(Debug, thiserror::Error)]
 pub enum ReadStreamError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`capture_jpeg_screen_shot`].
 #[derive(Debug, thiserror::Error)]
 pub enum CaptureJpegError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
