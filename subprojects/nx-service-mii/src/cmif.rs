@@ -14,14 +14,16 @@ use crate::{
 ///
 /// Returns the database session handle (move handle).
 pub(crate) fn open_database(service: &Session, key_code: u32) -> Result<u32, OpenDatabaseError> {
-    // SAFETY: `key_code` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_DATABASE)
-            .in_raw((&raw const key_code).cast::<u8>(), size_of::<u32>())
-            .send()
-            .map_err(OpenDatabaseError::Dispatch)?
+    // SAFETY: `key_code` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const key_code).cast::<u8>(), size_of::<u32>())
     };
+    let result = service
+        .dispatch(proto::OPEN_DATABASE)
+        .in_raw(in_bytes)
+        .send()
+        .map_err(OpenDatabaseError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenDatabaseError::MissingHandle);
@@ -56,19 +58,25 @@ pub(crate) fn db_get1(
 ) -> Result<i32, DispatchError> {
     let flag_val = flag.bits();
 
-    // SAFETY: `flag_val` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DB_GET1)
-            .in_raw((&raw const flag_val).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                buffer.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(buffer),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `flag_val` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const flag_val).cast::<u8>(), size_of::<u32>())
     };
+    // SAFETY: `buffer` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `buffer`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            buffer.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(buffer),
+        )
+    };
+    let result = service
+        .dispatch(proto::DB_GET1)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     Ok(i32::from_le_bytes([
         result.data[0],
