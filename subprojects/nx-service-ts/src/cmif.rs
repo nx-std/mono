@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the temperature measurement service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -14,24 +14,27 @@ pub fn get_temperature_range(
     session: SessionHandle,
     location: u8,
 ) -> Result<(i32, i32), GetTemperatureRangeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_TEMPERATURE_RANGE)
+            .data_size(size_of::<u8>())
+            .send()
+            .map_err(GetTemperatureRangeError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_TEMPERATURE_RANGE)
-        .data_size(size_of::<u8>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u8.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u8>().cast_mut(), location);
+        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), location);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetTemperatureRangeError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<[i32; 2]>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<[i32; 2]>())
         .map_err(GetTemperatureRangeError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for two i32.
@@ -42,24 +45,27 @@ pub fn get_temperature_range(
 
 /// Gets the temperature for a location, in Celsius.
 pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetTemperatureError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_TEMPERATURE)
+            .data_size(size_of::<u8>())
+            .send()
+            .map_err(GetTemperatureError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_TEMPERATURE)
-        .data_size(size_of::<u8>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u8.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u8>().cast_mut(), location);
+        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), location);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetTemperatureError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<i32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
         .map_err(GetTemperatureError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for i32.
@@ -73,24 +79,27 @@ pub fn get_temperature_milli_c(
     session: SessionHandle,
     location: u8,
 ) -> Result<i32, GetTemperatureMilliCError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_TEMPERATURE_MILLI_C)
+            .data_size(size_of::<u8>())
+            .send()
+            .map_err(GetTemperatureMilliCError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_TEMPERATURE_MILLI_C)
-        .data_size(size_of::<u8>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u8.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u8>().cast_mut(), location);
+        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), location);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetTemperatureMilliCError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<i32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
         .map_err(GetTemperatureMilliCError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for i32.
@@ -106,31 +115,32 @@ pub fn open_session(
     session: SessionHandle,
     device_code: u32,
 ) -> Result<SessionHandle, OpenSessionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_SESSION)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(OpenSessionError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::OPEN_SESSION)
-        .data_size(size_of::<u32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), device_code);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), device_code);
+        }
     }
 
     ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(OpenSessionError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp =
+        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSessionError::ParseResponse)?;
 
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(OpenSessionError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(OpenSessionError::MissingHandle);
+    };
 
     // SAFETY: handle is from a valid IPC response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
@@ -138,17 +148,21 @@ pub fn open_session(
 
 /// Gets the temperature from a session, as a float in Celsius.
 pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGetTemperatureError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::SESSION_GET_TEMPERATURE).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::SESSION_GET_TEMPERATURE)
+            .send()
+            .map_err(SessionGetTemperatureError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(SessionGetTemperatureError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<f32>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
         .map_err(SessionGetTemperatureError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for f32.
@@ -160,45 +174,57 @@ pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGet
 /// Error returned by [`get_temperature_range`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetTemperatureRangeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_temperature`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetTemperatureError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_temperature_milli_c`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetTemperatureMilliCError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response did not contain the expected move handle.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -207,10 +233,13 @@ pub enum OpenSessionError {
 /// Error returned by [`session_get_temperature`].
 #[derive(Debug, thiserror::Error)]
 pub enum SessionGetTemperatureError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
