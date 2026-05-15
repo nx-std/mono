@@ -95,19 +95,21 @@ pub(crate) fn get_device_condition(
     profile: u32,
     out: &mut [BtmConnectedDeviceV13],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `profile` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_DEVICE_CONDITION)
-            .in_raw((&raw const profile).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                out.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
+    // SAFETY: `profile` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const profile).cast::<u8>(), size_of::<u32>()) };
+    // SAFETY: `out` is a valid `&mut [BtmConnectedDeviceV13]`; viewing it as
+    // a byte slice for the OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
+    let result = service
+        .dispatch(proto::GET_DEVICE_CONDITION)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
@@ -123,7 +125,7 @@ pub(crate) fn set_burst_mode(
         addr: *addr,
         flag: u8::from(flag),
     };
-    dispatch_in(service, proto::SET_BURST_MODE, &input)
+    dispatch_in(service, proto::SET_BURST_MODE, input)
 }
 
 /// SetSlotMode (cmd 5).
@@ -136,12 +138,12 @@ pub(crate) fn set_slot_mode(
 
 /// SetBluetoothMode (cmd 6, pre-9.0.0).
 pub(crate) fn set_bluetooth_mode(service: &Session, mode: u32) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::SET_BLUETOOTH_MODE, &mode)
+    dispatch_in(service, proto::SET_BLUETOOTH_MODE, mode)
 }
 
 /// SetWlanMode (cmd 7).
 pub(crate) fn set_wlan_mode(service: &Session, mode: u32) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::SET_WLAN_MODE, &mode)
+    dispatch_in(service, proto::SET_WLAN_MODE, mode)
 }
 
 /// AcquireDeviceInfoEvent (cmd 8, pre-3.0.0 — no out flag).
@@ -172,19 +174,21 @@ pub(crate) fn get_device_info(
     profile: u32,
     out: &mut [BtmDeviceInfoV13],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `profile` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_DEVICE_INFO)
-            .in_raw((&raw const profile).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<i32>())
-            .buffer(
-                out.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
+    // SAFETY: `profile` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const profile).cast::<u8>(), size_of::<u32>()) };
+    // SAFETY: `out` is a valid `&mut [BtmDeviceInfoV13]`; viewing it as
+    // a byte slice for the OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
+    let result = service
+        .dispatch(proto::GET_DEVICE_INFO)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i32>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
@@ -195,7 +199,7 @@ pub(crate) fn add_device_info_legacy(
     service: &Session,
     info: &BtmDeviceInfoV1,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::ADD_DEVICE_INFO, info)
+    dispatch_in(service, proto::ADD_DEVICE_INFO, *info)
 }
 
 /// AddDeviceInfo \[13.0.0+\] (cmd 10, HipcPointer fixed in).
@@ -211,7 +215,7 @@ pub(crate) fn remove_device_info(
     service: &Session,
     addr: &BtdrvAddress,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::REMOVE_DEVICE_INFO, addr)
+    dispatch_in(service, proto::REMOVE_DEVICE_INFO, *addr)
 }
 
 /// IncreaseDeviceInfoOrder (cmd 12).
@@ -219,7 +223,7 @@ pub(crate) fn increase_device_info_order(
     service: &Session,
     addr: &BtdrvAddress,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::INCREASE_DEVICE_INFO_ORDER, addr)
+    dispatch_in(service, proto::INCREASE_DEVICE_INFO_ORDER, *addr)
 }
 
 /// LlrNotify \[pre-9.0.0\] (cmd 13, in address only).
@@ -227,7 +231,7 @@ pub(crate) fn llr_notify_legacy(
     service: &Session,
     addr: &BtdrvAddress,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::LLR_NOTIFY, addr)
+    dispatch_in(service, proto::LLR_NOTIFY, *addr)
 }
 
 /// LlrNotify \[9.0.0+\] (cmd 13, in address + unk).
@@ -241,7 +245,7 @@ pub(crate) fn llr_notify(
         pad: [0; 2],
         unk,
     };
-    dispatch_in(service, proto::LLR_NOTIFY, &input)
+    dispatch_in(service, proto::LLR_NOTIFY, input)
 }
 
 /// EnableRadio (cmd 14).
@@ -256,7 +260,7 @@ pub(crate) fn disable_radio(service: &Session) -> Result<(), DispatchError> {
 
 /// HidDisconnect (cmd 16).
 pub(crate) fn hid_disconnect(service: &Session, addr: &BtdrvAddress) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::HID_DISCONNECT, addr)
+    dispatch_in(service, proto::HID_DISCONNECT, *addr)
 }
 
 /// HidSetRetransmissionMode (cmd 17).
@@ -265,24 +269,28 @@ pub(crate) fn hid_set_retransmission_mode(
     addr: &BtdrvAddress,
     list: &BtmZeroRetransmissionList,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::HID_SET_RETRANSMISSION_MODE)
-            .in_raw(
-                (addr as *const BtdrvAddress).cast::<u8>(),
-                size_of::<BtdrvAddress>(),
-            )
-            .buffer(
-                (list as *const BtmZeroRetransmissionList).cast::<u8>(),
-                size_of::<BtmZeroRetransmissionList>(),
-                BufferAttr::IN
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const *addr).cast::<u8>(), size_of::<BtdrvAddress>())
+    };
+    // SAFETY: `list` is a valid reference; viewing its bytes as a slice for
+    // the IN buffer is sound, and the byte slice borrows `list`.
+    let list_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (list as *const BtmZeroRetransmissionList).cast::<u8>(),
+            size_of::<BtmZeroRetransmissionList>(),
+        )
+    };
+    service
+        .dispatch(proto::HID_SET_RETRANSMISSION_MODE)
+        .in_raw(in_bytes)
+        .in_buffer(
+            list_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +320,7 @@ pub(crate) fn is_llr_started(service: &Session) -> Result<bool, DispatchError> {
 
 /// EnableSlotSaving (cmd 21, 4.0.0+).
 pub(crate) fn enable_slot_saving(service: &Session, flag: bool) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::ENABLE_SLOT_SAVING, &u8::from(flag))
+    dispatch_in(service, proto::ENABLE_SLOT_SAVING, u8::from(flag))
 }
 
 /// ProtectDeviceInfo (cmd 22, 5.0.0+).
@@ -325,7 +333,7 @@ pub(crate) fn protect_device_info(
         addr: *addr,
         flag: u8::from(flag),
     };
-    dispatch_in(service, proto::PROTECT_DEVICE_INFO, &input)
+    dispatch_in(service, proto::PROTECT_DEVICE_INFO, input)
 }
 
 // ---------------------------------------------------------------------------
@@ -342,11 +350,7 @@ pub(crate) fn get_ble_scan_parameter_general(
     service: &Session,
     parameter_id: u16,
 ) -> Result<BtdrvBleAdvertisePacketParameter, DispatchError> {
-    dispatch_in_out(
-        service,
-        proto::GET_BLE_SCAN_PARAMETER_GENERAL,
-        &parameter_id,
-    )
+    dispatch_in_out(service, proto::GET_BLE_SCAN_PARAMETER_GENERAL, parameter_id)
 }
 
 /// GetBleScanParameterSmartDevice (cmd 25, 5.1.0+).
@@ -357,7 +361,7 @@ pub(crate) fn get_ble_scan_parameter_smart_device(
     dispatch_in_out(
         service,
         proto::GET_BLE_SCAN_PARAMETER_SMART_DEVICE,
-        &parameter_id,
+        parameter_id,
     )
 }
 
@@ -366,7 +370,7 @@ pub(crate) fn start_ble_scan_for_general(
     service: &Session,
     param: &BtdrvBleAdvertisePacketParameter,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::START_BLE_SCAN_FOR_GENERAL, param)
+    dispatch_in(service, proto::START_BLE_SCAN_FOR_GENERAL, *param)
 }
 
 /// StopBleScanForGeneral (cmd 27, 5.1.0+).
@@ -387,7 +391,7 @@ pub(crate) fn start_ble_scan_for_paired(
     service: &Session,
     param: &BtdrvBleAdvertisePacketParameter,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::START_BLE_SCAN_FOR_PAIRED, param)
+    dispatch_in(service, proto::START_BLE_SCAN_FOR_PAIRED, *param)
 }
 
 /// StopBleScanForPaired (cmd 30, 5.1.0+).
@@ -400,7 +404,7 @@ pub(crate) fn start_ble_scan_for_smart_device(
     service: &Session,
     uuid: &BtdrvGattAttributeUuid,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::START_BLE_SCAN_FOR_SMART_DEVICE, uuid)
+    dispatch_in(service, proto::START_BLE_SCAN_FOR_SMART_DEVICE, *uuid)
 }
 
 /// StopBleScanForSmartDevice (cmd 32, 5.1.0+).
@@ -433,7 +437,7 @@ pub(crate) fn acquire_ble_connection_event(
 
 /// BleConnect (cmd 35, 5.1.0+).
 pub(crate) fn ble_connect(service: &Session, addr: &BtdrvAddress) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::BLE_CONNECT, addr)
+    dispatch_in(service, proto::BLE_CONNECT, *addr)
 }
 
 /// BleConnect \[5.0.0-5.0.2\] (cmd 24).
@@ -441,12 +445,12 @@ pub(crate) fn ble_connect_legacy(
     service: &Session,
     addr: &BtdrvAddress,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::BLE_CONNECT_LEGACY, addr)
+    dispatch_in(service, proto::BLE_CONNECT_LEGACY, *addr)
 }
 
 /// BleOverrideConnection (cmd 36, 5.1.0+).
 pub(crate) fn ble_override_connection(service: &Session, id: u32) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::BLE_OVERRIDE_CONNECTION, &id)
+    dispatch_in(service, proto::BLE_OVERRIDE_CONNECTION, id)
 }
 
 /// BleDisconnect (cmd 37, 5.1.0+).
@@ -454,7 +458,7 @@ pub(crate) fn ble_disconnect(
     service: &Session,
     connection_handle: u32,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::BLE_DISCONNECT, &connection_handle)
+    dispatch_in(service, proto::BLE_DISCONNECT, connection_handle)
 }
 
 /// BleDisconnect \[5.0.0-5.0.2\] (cmd 25).
@@ -462,7 +466,7 @@ pub(crate) fn ble_disconnect_legacy(
     service: &Session,
     connection_handle: u32,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::BLE_DISCONNECT_LEGACY, &connection_handle)
+    dispatch_in(service, proto::BLE_DISCONNECT_LEGACY, connection_handle)
 }
 
 /// BleGetConnectionState (cmd 38, 5.1.0+).
@@ -529,7 +533,7 @@ pub(crate) fn ble_pair_device(
         param: *param,
         connection_handle,
     };
-    dispatch_in(service, proto::BLE_PAIR_DEVICE, &input)
+    dispatch_in(service, proto::BLE_PAIR_DEVICE, input)
 }
 
 /// BleUnpairDeviceOnBoth (cmd 42, 5.1.0+).
@@ -542,7 +546,7 @@ pub(crate) fn ble_unpair_device_on_both(
         param: *param,
         connection_handle,
     };
-    dispatch_in(service, proto::BLE_UNPAIR_DEVICE_ON_BOTH, &input)
+    dispatch_in(service, proto::BLE_UNPAIR_DEVICE_ON_BOTH, input)
 }
 
 /// BleUnPairDevice (cmd 43, 5.1.0+).
@@ -555,7 +559,7 @@ pub(crate) fn ble_unpair_device(
         addr: *addr,
         param: *param,
     };
-    dispatch_in(service, proto::BLE_UNPAIR_DEVICE, &input)
+    dispatch_in(service, proto::BLE_UNPAIR_DEVICE, input)
 }
 
 /// BleGetPairedAddresses (cmd 44, 5.1.0+).
@@ -564,22 +568,28 @@ pub(crate) fn ble_get_paired_addresses(
     param: &BtdrvBleAdvertisePacketParameter,
     addrs: &mut [BtdrvAddress],
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `param` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::BLE_GET_PAIRED_ADDRESSES)
-            .in_raw(
-                (param as *const BtdrvBleAdvertisePacketParameter).cast::<u8>(),
-                size_of::<BtdrvBleAdvertisePacketParameter>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                addrs.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(addrs),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
+    // SAFETY: `param` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *param).cast::<u8>(),
+            size_of::<BtdrvBleAdvertisePacketParameter>(),
+        )
     };
+    // SAFETY: `addrs` is a valid `&mut [BtdrvAddress]`; viewing it as a byte
+    // slice for the OUT buffer is sound, and the byte slice borrows `addrs`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            addrs.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(addrs),
+        )
+    };
+    let result = service
+        .dispatch(proto::BLE_GET_PAIRED_ADDRESSES)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -667,8 +677,7 @@ pub(crate) fn get_gatt_included_services(
         service,
         connection_handle,
         service_handle,
-        services.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(services),
+        services,
         proto::GET_GATT_INCLUDED_SERVICES,
     )
 }
@@ -684,8 +693,7 @@ pub(crate) fn get_gatt_included_services_legacy(
         service,
         connection_handle,
         service_handle,
-        services.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(services),
+        services,
         proto::GET_GATT_INCLUDED_SERVICES_LEGACY,
     )
 }
@@ -733,8 +741,7 @@ pub(crate) fn get_gatt_characteristics(
         service,
         connection_handle,
         service_handle,
-        characteristics.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(characteristics),
+        characteristics,
         proto::GET_GATT_CHARACTERISTICS,
     )
 }
@@ -750,8 +757,7 @@ pub(crate) fn get_gatt_characteristics_legacy(
         service,
         connection_handle,
         service_handle,
-        characteristics.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(characteristics),
+        characteristics,
         proto::GET_GATT_CHARACTERISTICS_LEGACY,
     )
 }
@@ -767,8 +773,7 @@ pub(crate) fn get_gatt_descriptors(
         service,
         connection_handle,
         char_handle,
-        descriptors.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(descriptors),
+        descriptors,
         proto::GET_GATT_DESCRIPTORS,
     )
 }
@@ -784,8 +789,7 @@ pub(crate) fn get_gatt_descriptors_legacy(
         service,
         connection_handle,
         char_handle,
-        descriptors.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(descriptors),
+        descriptors,
         proto::GET_GATT_DESCRIPTORS_LEGACY,
     )
 }
@@ -819,7 +823,7 @@ pub(crate) fn configure_ble_mtu(
         pad: 0,
         connection_handle,
     };
-    dispatch_in(service, proto::CONFIGURE_BLE_MTU, &input)
+    dispatch_in(service, proto::CONFIGURE_BLE_MTU, input)
 }
 
 /// ConfigureBleMtu \[5.0.0-5.0.2\] (cmd 36).
@@ -833,12 +837,12 @@ pub(crate) fn configure_ble_mtu_legacy(
         pad: 0,
         connection_handle,
     };
-    dispatch_in(service, proto::CONFIGURE_BLE_MTU_LEGACY, &input)
+    dispatch_in(service, proto::CONFIGURE_BLE_MTU_LEGACY, input)
 }
 
 /// GetBleMtu (cmd 54, 5.1.0+).
 pub(crate) fn get_ble_mtu(service: &Session, connection_handle: u32) -> Result<u16, DispatchError> {
-    dispatch_in_out(service, proto::GET_BLE_MTU, &connection_handle)
+    dispatch_in_out(service, proto::GET_BLE_MTU, connection_handle)
 }
 
 /// GetBleMtu \[5.0.0-5.0.2\] (cmd 37).
@@ -846,7 +850,7 @@ pub(crate) fn get_ble_mtu_legacy(
     service: &Session,
     connection_handle: u32,
 ) -> Result<u16, DispatchError> {
-    dispatch_in_out(service, proto::GET_BLE_MTU_LEGACY, &connection_handle)
+    dispatch_in_out(service, proto::GET_BLE_MTU_LEGACY, connection_handle)
 }
 
 // ---------------------------------------------------------------------------
@@ -858,7 +862,7 @@ pub(crate) fn register_ble_gatt_data_path(
     service: &Session,
     path: &BtmBleDataPath,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::REGISTER_BLE_GATT_DATA_PATH, path)
+    dispatch_in(service, proto::REGISTER_BLE_GATT_DATA_PATH, *path)
 }
 
 /// RegisterBleGattDataPath \[5.0.0-5.0.2\] (cmd 38).
@@ -866,7 +870,7 @@ pub(crate) fn register_ble_gatt_data_path_legacy(
     service: &Session,
     path: &BtmBleDataPath,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::REGISTER_BLE_GATT_DATA_PATH_LEGACY, path)
+    dispatch_in(service, proto::REGISTER_BLE_GATT_DATA_PATH_LEGACY, *path)
 }
 
 /// UnregisterBleGattDataPath (cmd 56, 5.1.0+).
@@ -874,7 +878,7 @@ pub(crate) fn unregister_ble_gatt_data_path(
     service: &Session,
     path: &BtmBleDataPath,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::UNREGISTER_BLE_GATT_DATA_PATH, path)
+    dispatch_in(service, proto::UNREGISTER_BLE_GATT_DATA_PATH, *path)
 }
 
 /// UnregisterBleGattDataPath \[5.0.0-5.0.2\] (cmd 39).
@@ -882,7 +886,7 @@ pub(crate) fn unregister_ble_gatt_data_path_legacy(
     service: &Session,
     path: &BtmBleDataPath,
 ) -> Result<(), DispatchError> {
-    dispatch_in(service, proto::UNREGISTER_BLE_GATT_DATA_PATH_LEGACY, path)
+    dispatch_in(service, proto::UNREGISTER_BLE_GATT_DATA_PATH_LEGACY, *path)
 }
 
 // ---------------------------------------------------------------------------
@@ -899,7 +903,7 @@ pub(crate) fn register_applet_resource_user_id(
         unk,
         applet_resource_user_id,
     };
-    dispatch_in(service, proto::REGISTER_APPLET_RESOURCE_USER_ID, &input)
+    dispatch_in(service, proto::REGISTER_APPLET_RESOURCE_USER_ID, input)
 }
 
 /// RegisterAppletResourceUserId \[5.0.0-5.0.2\] (cmd 40).
@@ -915,7 +919,7 @@ pub(crate) fn register_applet_resource_user_id_legacy(
     dispatch_in(
         service,
         proto::REGISTER_APPLET_RESOURCE_USER_ID_LEGACY,
-        &input,
+        input,
     )
 }
 
@@ -927,7 +931,7 @@ pub(crate) fn unregister_applet_resource_user_id(
     dispatch_in(
         service,
         proto::UNREGISTER_APPLET_RESOURCE_USER_ID,
-        &applet_resource_user_id,
+        applet_resource_user_id,
     )
 }
 
@@ -939,7 +943,7 @@ pub(crate) fn unregister_applet_resource_user_id_legacy(
     dispatch_in(
         service,
         proto::UNREGISTER_APPLET_RESOURCE_USER_ID_LEGACY,
-        &applet_resource_user_id,
+        applet_resource_user_id,
     )
 }
 
@@ -951,7 +955,7 @@ pub(crate) fn set_applet_resource_user_id(
     dispatch_in(
         service,
         proto::SET_APPLET_RESOURCE_USER_ID,
-        &applet_resource_user_id,
+        applet_resource_user_id,
     )
 }
 
@@ -963,7 +967,7 @@ pub(crate) fn set_applet_resource_user_id_legacy(
     dispatch_in(
         service,
         proto::SET_APPLET_RESOURCE_USER_ID_LEGACY,
-        &applet_resource_user_id,
+        applet_resource_user_id,
     )
 }
 
@@ -977,14 +981,15 @@ fn dispatch_in_buf_ptr_fixed<T>(
     buf: &T,
     cmd_id: u32,
 ) -> Result<(), DispatchError> {
+    // SAFETY: `buf` is a valid reference; viewing its bytes as a slice for
+    // the IN buffer is sound, and the byte slice borrows `buf`.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
     service
         .dispatch(cmd_id)
-        .buffer(
-            (buf as *const T).cast::<u8>(),
-            size_of::<T>(),
-            BufferAttr::IN
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        .in_buffer(
+            in_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send()
         .map(|_| ())
@@ -996,14 +1001,15 @@ fn dispatch_out_buf_ptr_fixed<T>(
     buf: &mut T,
     cmd_id: u32,
 ) -> Result<(), DispatchError> {
+    // SAFETY: `buf` is a valid mutable reference; viewing its bytes as a slice
+    // for the OUT buffer is sound, and the byte slice borrows `buf`.
+    let out_bytes =
+        unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
     service
         .dispatch(cmd_id)
-        .buffer(
-            (buf as *mut T).cast::<u8>(),
-            size_of::<T>(),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send()
         .map(|_| ())
@@ -1015,14 +1021,18 @@ fn get_ble_scan_results(
     results: &mut [BtdrvBleScanResult],
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
+    // SAFETY: `results` is a valid `&mut [BtdrvBleScanResult]`; viewing it as
+    // a byte slice for the OUT buffer is sound, and the byte slice borrows `results`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            results.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(results),
+        )
+    };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())
-        .buffer(
-            results.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(results),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
 
     // SAFETY: response payload is at least 1 byte.
@@ -1035,14 +1045,18 @@ fn ble_get_connection_state_impl(
     info: &mut [BtdrvBleConnectionInfo],
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
+    // SAFETY: `info` is a valid `&mut [BtdrvBleConnectionInfo]`; viewing it as
+    // a byte slice for the OUT buffer is sound, and the byte slice borrows `info`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            info.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(info),
+        )
+    };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())
-        .buffer(
-            info.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(info),
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
         .send()?;
 
     // SAFETY: response payload is at least 1 byte.
@@ -1056,22 +1070,28 @@ fn get_gatt_services_impl(
     services: &mut [BtmGattService],
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `connection_handle` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const connection_handle).cast::<u8>(),
-                size_of::<u32>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                services.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(services),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `connection_handle` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const connection_handle).cast::<u8>(),
+            size_of::<u32>(),
+        )
     };
+    // SAFETY: `services` is a valid `&mut [BtmGattService]`; viewing it as a
+    // byte slice for the OUT buffer is sound, and the byte slice borrows `services`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            services.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(services),
+        )
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -1090,24 +1110,31 @@ fn get_gatt_service_impl(
         uuid: *uuid,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetGattServiceIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                (out_service as *mut BtmGattService).cast::<u8>(),
-                size_of::<BtmGattService>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetGattServiceIn>(),
+        )
     };
+    // SAFETY: `out_service` is a valid mutable reference; viewing its bytes as
+    // a slice for the OUT buffer is sound, and the byte slice borrows `out_service`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out_service as *mut BtmGattService).cast::<u8>(),
+            size_of::<BtmGattService>(),
+        )
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -1115,12 +1142,11 @@ fn get_gatt_service_impl(
 }
 
 /// Dispatches GATT service data query (in handle+connection_handle, HipcMapAlias out).
-fn get_gatt_service_data(
+fn get_gatt_service_data<T>(
     service: &Session,
     connection_handle: u32,
     handle: u16,
-    buffer: *mut u8,
-    buffer_size: usize,
+    buffer: &mut [T],
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
     let input = HandleConnectionIn {
@@ -1129,22 +1155,28 @@ fn get_gatt_service_data(
         connection_handle,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<HandleConnectionIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                buffer,
-                buffer_size,
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<HandleConnectionIn>(),
+        )
     };
+    // SAFETY: `buffer` is a valid mutable slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `buffer`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            buffer.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(buffer),
+        )
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -1164,24 +1196,31 @@ fn get_belonging_service_impl(
         connection_handle,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<HandleConnectionIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                (out_service as *mut BtmGattService).cast::<u8>(),
-                size_of::<BtmGattService>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<HandleConnectionIn>(),
+        )
     };
+    // SAFETY: `out_service` is a valid mutable reference; viewing its bytes as
+    // a slice for the OUT buffer is sound, and the byte slice borrows `out_service`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out_service as *mut BtmGattService).cast::<u8>(),
+            size_of::<BtmGattService>(),
+        )
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -1196,11 +1235,11 @@ fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventErro
         .send()
         .map_err(AcquireEventError::Dispatch)?;
 
-    if result.copy_handles.is_empty() {
+    let Some(handle) = result.copy_handles.first().copied() else {
         return Err(AcquireEventError::MissingHandle);
-    }
+    };
 
-    Ok(result.copy_handles[0])
+    Ok(handle)
 }
 
 /// Dispatches a command that returns a copy handle plus an out flag that must be nonzero.
@@ -1222,11 +1261,11 @@ fn acquire_event_with_flag(
         return Err(AcquireEventWithFlagError::FlagNotSet);
     }
 
-    if result.copy_handles.is_empty() {
+    let Some(handle) = result.copy_handles.first().copied() else {
         return Err(AcquireEventWithFlagError::MissingHandle);
-    }
+    };
 
-    Ok(result.copy_handles[0])
+    Ok(handle)
 }
 
 // ---------------------------------------------------------------------------
