@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the screenshot upload service.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::{cmif, hipc::BufferMode};
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -19,34 +19,31 @@ pub fn set_shim_library_version(
     version: u64,
     applet_resource_user_id: u64,
 ) -> Result<(), SetShimVersionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_SHIM_LIBRARY_VERSION)
+            .data_size(size_of::<SetShimVersionIn>())
+            .send_pid()
+            .send()
+            .map_err(SetShimVersionError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SET_SHIM_LIBRARY_VERSION)
-        .data_size(size_of::<SetShimVersionIn>())
-        .send_pid()
-        .build();
+        let input = SetShimVersionIn {
+            version,
+            applet_resource_user_id,
+        };
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    let input = SetShimVersionIn {
-        version,
-        applet_resource_user_id,
-    };
-
-    // SAFETY: req.data points to valid payload area with space for SetShimVersionIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<SetShimVersionIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<SetShimVersionIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SetShimVersionIn>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(SetShimVersionError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SetShimVersionError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetShimVersionError::ParseResponse)?;
 
     Ok(())
 }
@@ -59,41 +56,37 @@ pub fn save_screen_shot_ex0(
     applet_resource_user_id: u64,
     image: &[u8],
 ) -> Result<ApplicationAlbumEntry, SaveScreenShotEx0Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SAVE_SCREEN_SHOT_EX0)
+            .data_size(size_of::<SaveScreenShotIn>())
+            .send_pid()
+            .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+            .send()
+            .map_err(SaveScreenShotEx0Error::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SAVE_SCREEN_SHOT_EX0)
-        .data_size(size_of::<SaveScreenShotIn>())
-        .send_pid()
-        .in_buffers(1)
-        .build();
+        let input = SaveScreenShotIn {
+            attr: *attr,
+            report_option,
+            _pad: 0,
+            applet_resource_user_id,
+        };
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    let input = SaveScreenShotIn {
-        attr: *attr,
-        report_option,
-        _pad: 0,
-        applet_resource_user_id,
-    };
-
-    // SAFETY: req.data points to valid payload area with space for SaveScreenShotIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<SaveScreenShotIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<SaveScreenShotIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
     }
-
-    req.add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure);
 
     ipc::send_sync_request(session).map_err(SaveScreenShotEx0Error::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<ApplicationAlbumEntry>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<ApplicationAlbumEntry>())
         .map_err(SaveScreenShotEx0Error::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for ApplicationAlbumEntry.
+    // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
     let entry = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ApplicationAlbumEntry>()) };
 
     Ok(entry)
@@ -108,46 +101,42 @@ pub fn save_screen_shot_ex1(
     appdata: &ApplicationData,
     image: &[u8],
 ) -> Result<ApplicationAlbumEntry, SaveScreenShotEx1Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SAVE_SCREEN_SHOT_EX1)
+            .data_size(size_of::<SaveScreenShotIn>())
+            .send_pid()
+            .add_in_buffer(
+                (appdata as *const ApplicationData).cast::<u8>(),
+                size_of::<ApplicationData>(),
+                BufferMode::Normal,
+            )
+            .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+            .send()
+            .map_err(SaveScreenShotEx1Error::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SAVE_SCREEN_SHOT_EX1)
-        .data_size(size_of::<SaveScreenShotIn>())
-        .send_pid()
-        .in_buffers(2)
-        .build();
+        let input = SaveScreenShotIn {
+            attr: *attr,
+            report_option,
+            _pad: 0,
+            applet_resource_user_id,
+        };
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    let input = SaveScreenShotIn {
-        attr: *attr,
-        report_option,
-        _pad: 0,
-        applet_resource_user_id,
-    };
-
-    // SAFETY: req.data points to valid payload area with space for SaveScreenShotIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<SaveScreenShotIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<SaveScreenShotIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
     }
-
-    req.add_in_buffer(
-        (appdata as *const ApplicationData).cast::<u8>(),
-        size_of::<ApplicationData>(),
-        BufferMode::Normal,
-    );
-    req.add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure);
 
     ipc::send_sync_request(session).map_err(SaveScreenShotEx1Error::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<ApplicationAlbumEntry>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<ApplicationAlbumEntry>())
         .map_err(SaveScreenShotEx1Error::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for ApplicationAlbumEntry.
+    // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
     let entry = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ApplicationAlbumEntry>()) };
 
     Ok(entry)
@@ -162,45 +151,41 @@ pub fn save_screen_shot_ex2(
     list: &UserIdList,
     image: &[u8],
 ) -> Result<ApplicationAlbumEntry, SaveScreenShotEx2Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SAVE_SCREEN_SHOT_EX2)
+            .data_size(size_of::<SaveScreenShotIn>())
+            .add_in_buffer(
+                (list as *const UserIdList).cast::<u8>(),
+                size_of::<UserIdList>(),
+                BufferMode::Normal,
+            )
+            .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+            .send()
+            .map_err(SaveScreenShotEx2Error::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
-        .data_size(size_of::<SaveScreenShotIn>())
-        .in_buffers(2)
-        .build();
+        let input = SaveScreenShotIn {
+            attr: *attr,
+            report_option,
+            _pad: 0,
+            applet_resource_user_id,
+        };
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    let input = SaveScreenShotIn {
-        attr: *attr,
-        report_option,
-        _pad: 0,
-        applet_resource_user_id,
-    };
-
-    // SAFETY: req.data points to valid payload area with space for SaveScreenShotIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_ptr().cast::<SaveScreenShotIn>().cast_mut(),
-            input,
-        );
+        // SAFETY: `req.data` is exactly `size_of::<SaveScreenShotIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
     }
-
-    req.add_in_buffer(
-        (list as *const UserIdList).cast::<u8>(),
-        size_of::<UserIdList>(),
-        BufferMode::Normal,
-    );
-    req.add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure);
 
     ipc::send_sync_request(session).map_err(SaveScreenShotEx2Error::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<ApplicationAlbumEntry>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<ApplicationAlbumEntry>())
         .map_err(SaveScreenShotEx2Error::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for ApplicationAlbumEntry.
+    // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
     let entry = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ApplicationAlbumEntry>()) };
 
     Ok(entry)
@@ -209,43 +194,55 @@ pub fn save_screen_shot_ex2(
 /// Error returned by [`set_shim_library_version`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetShimVersionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`save_screen_shot_ex0`].
 #[derive(Debug, thiserror::Error)]
 pub enum SaveScreenShotEx0Error {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`save_screen_shot_ex1`].
 #[derive(Debug, thiserror::Error)]
 pub enum SaveScreenShotEx1Error {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`save_screen_shot_ex2`].
 #[derive(Debug, thiserror::Error)]
 pub enum SaveScreenShotEx2Error {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
