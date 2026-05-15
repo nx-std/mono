@@ -62,8 +62,6 @@ unsafe impl Send for LdrShellService {}
 unsafe impl Sync for LdrShellService {}
 
 impl LdrShellService {
-    /// Consumes and closes the service session.
-
     /// Sets program arguments (`[11.0.0+]`).
     ///
     /// On pre-11.0.0, use [`set_program_arguments_legacy`](Self::set_program_arguments_legacy).
@@ -104,8 +102,6 @@ unsafe impl Send for LdrDmntService {}
 unsafe impl Sync for LdrDmntService {}
 
 impl LdrDmntService {
-    /// Consumes and closes the service session.
-
     /// Sets program arguments (`[11.0.0+]`).
     #[inline]
     pub fn set_program_arguments(&self, program_id: u64, args: &[u8]) -> Result<(), DispatchError> {
@@ -155,8 +151,6 @@ unsafe impl Send for LdrPmService {}
 unsafe impl Sync for LdrPmService {}
 
 impl LdrPmService {
-    /// Consumes and closes the service session.
-
     /// Creates a process (legacy, pre-20.0.0/non-Atmosphere).
     ///
     /// Returns the process handle on success.

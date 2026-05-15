@@ -26,19 +26,17 @@ pub(crate) fn set_program_arguments(
     program_id: u64,
     args: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `program_id` and `args` live on the stack/caller until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SET_PROGRAM_ARGUMENTS)
-            .in_raw((&raw const program_id).cast::<u8>(), size_of::<u64>())
-            .buffer(
-                args.as_ptr(),
-                args.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `program_id` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<u64>())
+    };
+    service
+        .dispatch(proto::SET_PROGRAM_ARGUMENTS)
+        .in_raw(in_bytes)
+        .in_buffer(args, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// Sets program arguments (legacy, pre-11.0.0).
@@ -55,22 +53,20 @@ pub(crate) fn set_program_arguments_legacy(
         program_id,
     };
 
-    // SAFETY: `input` and `args` live on the stack/caller until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SET_PROGRAM_ARGUMENTS)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<SetProgramArgumentsLegacyIn>(),
-            )
-            .buffer(
-                args.as_ptr(),
-                args.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<SetProgramArgumentsLegacyIn>(),
+        )
+    };
+    service
+        .dispatch(proto::SET_PROGRAM_ARGUMENTS)
+        .in_raw(in_bytes)
+        .in_buffer(args, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// Flushes all program arguments.
@@ -88,20 +84,24 @@ pub(crate) fn get_process_module_info(
     pid: u64,
     out_modules: &mut [LoaderModuleInfo],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `pid` lives on the stack until `.send()` returns.
-    // `out_modules` is a caller-provided buffer valid for the lifetime of this call.
-    let result = unsafe {
-        service
-            .dispatch(proto::DMNT_GET_PROCESS_MODULE_INFO)
-            .in_raw((&raw const pid).cast::<u8>(), size_of::<u64>())
-            .buffer(
-                out_modules.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out_modules),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .out_size(size_of::<i32>())
-            .send()?
+    // SAFETY: `pid` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const pid).cast::<u8>(), size_of::<u64>()) };
+    // SAFETY: `out_modules` is a valid `&mut` slice; viewing it as bytes for
+    // the OUT buffer is sound, and the byte slice borrows `out_modules`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_modules.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_modules),
+        )
     };
+    let result = service
+        .dispatch(proto::DMNT_GET_PROCESS_MODULE_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .out_size(size_of::<i32>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
@@ -127,18 +127,20 @@ pub(crate) fn create_process_legacy(
         pin_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PM_CREATE_PROCESS)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<CreateProcessLegacyIn>(),
-            )
-            .in_handle(reslimit_handle)
-            .out_handle(0, OutHandleAttr::Move)
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CreateProcessLegacyIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::PM_CREATE_PROCESS)
+        .in_raw(in_bytes)
+        .in_handle(reslimit_handle)
+        .out_handle(0, OutHandleAttr::Move)
+        .send()?;
 
     Ok(result.move_handles[0])
 }
@@ -161,18 +163,20 @@ pub(crate) fn create_process(
         pin_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PM_CREATE_PROCESS)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<CreateProcessIn>(),
-            )
-            .in_handle(reslimit_handle)
-            .out_handle(0, OutHandleAttr::Move)
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CreateProcessIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::PM_CREATE_PROCESS)
+        .in_raw(in_bytes)
+        .in_handle(reslimit_handle)
+        .out_handle(0, OutHandleAttr::Move)
+        .send()?;
 
     Ok(result.move_handles[0])
 }
@@ -185,24 +189,30 @@ pub(crate) fn get_program_info_v1(
     loc: &NcmProgramLocation,
     out: &mut LoaderProgramInfoV1,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `loc` and `out` live for the duration of the call.
-    unsafe {
-        service
-            .dispatch(proto::PM_GET_PROGRAM_INFO)
-            .in_raw(
-                (&raw const *loc).cast::<u8>(),
-                size_of::<NcmProgramLocation>(),
-            )
-            .buffer(
-                (out as *mut LoaderProgramInfoV1).cast::<u8>(),
-                size_of::<LoaderProgramInfoV1>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `loc` is a `Copy` value; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *loc).cast::<u8>(),
+            size_of::<NcmProgramLocation>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut` reference; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut LoaderProgramInfoV1).cast::<u8>(),
+            size_of::<LoaderProgramInfoV1>(),
+        )
+    };
+    service
+        .dispatch(proto::PM_GET_PROGRAM_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// Gets program info (`[19.0.0+/Atmosphere]`).
@@ -221,24 +231,31 @@ pub(crate) fn get_program_info(
         loc: *loc,
     };
 
-    // SAFETY: `input` and `out` live for the duration of the call.
-    unsafe {
-        service
-            .dispatch(proto::PM_GET_PROGRAM_INFO)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetProgramInfoIn>(),
-            )
-            .buffer(
-                (out as *mut LoaderProgramInfo).cast::<u8>(),
-                size_of::<LoaderProgramInfo>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetProgramInfoIn>(),
+        )
+    };
+    // SAFETY: `out` is a valid `&mut` reference; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut LoaderProgramInfo).cast::<u8>(),
+            size_of::<LoaderProgramInfo>(),
+        )
+    };
+    service
+        .dispatch(proto::PM_GET_PROGRAM_INFO)
+        .in_raw(in_bytes)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// Pins a program, returning a pin ID.
@@ -246,17 +263,18 @@ pub(crate) fn pin_program(
     service: &Session,
     loc: &NcmProgramLocation,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `loc` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::PM_PIN_PROGRAM)
-            .in_raw(
-                (&raw const *loc).cast::<u8>(),
-                size_of::<NcmProgramLocation>(),
-            )
-            .out_size(size_of::<u64>())
-            .send()?
+    // SAFETY: `loc` is a `Copy` value; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *loc).cast::<u8>(),
+            size_of::<NcmProgramLocation>(),
+        )
     };
+    let result = service
+        .dispatch(proto::PM_PIN_PROGRAM)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u64>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
