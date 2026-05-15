@@ -185,23 +185,29 @@ pub(crate) fn ble_get_connection_state(
     info: &mut [BtdrvBleConnectionInfo],
     applet_resource_user_id: u64,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `applet_resource_user_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::BLE_GET_CONNECTION_STATE)
-            .in_raw(
-                (&raw const applet_resource_user_id).cast::<u8>(),
-                size_of::<u64>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                info.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(info),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .send_pid()
-            .send()?
+    // SAFETY: `applet_resource_user_id` is a `Copy` value on the stack, valid
+    // until `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const applet_resource_user_id).cast::<u8>(),
+            size_of::<u64>(),
+        )
     };
+    // SAFETY: `info` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `info`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            info.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(info),
+        )
+    };
+    let result = service
+        .dispatch(proto::BLE_GET_CONNECTION_STATE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -263,22 +269,28 @@ pub(crate) fn ble_get_paired_devices(
     param: &BtdrvBleAdvertisePacketParameter,
     addrs: &mut [BtdrvAddress],
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `param` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::BLE_GET_PAIRED_DEVICES)
-            .in_raw(
-                (param as *const BtdrvBleAdvertisePacketParameter).cast::<u8>(),
-                size_of::<BtdrvBleAdvertisePacketParameter>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                addrs.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(addrs),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
+    // SAFETY: `param` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (param as *const BtdrvBleAdvertisePacketParameter).cast::<u8>(),
+            size_of::<BtdrvBleAdvertisePacketParameter>(),
+        )
     };
+    // SAFETY: `addrs` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `addrs`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            addrs.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(addrs),
+        )
+    };
+    let result = service
+        .dispatch(proto::BLE_GET_PAIRED_DEVICES)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -308,23 +320,29 @@ pub(crate) fn get_gatt_services(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_GATT_SERVICES)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetGattServicesIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                services.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(services),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send_pid()
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetGattServicesIn>(),
+        )
     };
+    // SAFETY: `services` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `services`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            services.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(services),
+        )
+    };
+    let result = service
+        .dispatch(proto::GET_GATT_SERVICES)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -344,25 +362,32 @@ pub(crate) fn get_gatt_service(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_GATT_SERVICE)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetGattServiceIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                (out_service as *mut BtmGattService).cast::<u8>(),
-                size_of::<BtmGattService>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send_pid()
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetGattServiceIn>(),
+        )
     };
+    // SAFETY: `out_service` is a valid exclusive reference; viewing it as
+    // bytes for the OUT buffer is sound, and the byte slice borrows it.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out_service as *mut BtmGattService).cast::<u8>(),
+            size_of::<BtmGattService>(),
+        )
+    };
+    let result = service
+        .dispatch(proto::GET_GATT_SERVICE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -403,25 +428,32 @@ pub(crate) fn get_belonging_gatt_service(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_BELONGING_GATT_SERVICE)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GattServiceDataIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                (out_service as *mut BtmGattService).cast::<u8>(),
-                size_of::<BtmGattService>(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send_pid()
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GattServiceDataIn>(),
+        )
     };
+    // SAFETY: `out_service` is a valid exclusive reference; viewing it as
+    // bytes for the OUT buffer is sound, and the byte slice borrows it.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out_service as *mut BtmGattService).cast::<u8>(),
+            size_of::<BtmGattService>(),
+        )
+    };
+    let result = service
+        .dispatch(proto::GET_BELONGING_GATT_SERVICE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -505,15 +537,17 @@ pub(crate) fn get_ble_mtu(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_BLE_MTU)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<GetBleMtuIn>())
-            .out_size(size_of::<u16>())
-            .send_pid()
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetBleMtuIn>())
     };
+    let result = service
+        .dispatch(proto::GET_BLE_MTU)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u16>())
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u16>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u16>()) })
@@ -561,23 +595,29 @@ fn get_ble_scan_results(
     applet_resource_user_id: u64,
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `applet_resource_user_id` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const applet_resource_user_id).cast::<u8>(),
-                size_of::<u64>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                results.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(results),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send_pid()
-            .send()?
+    // SAFETY: `applet_resource_user_id` is a `Copy` value on the stack, valid
+    // until `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const applet_resource_user_id).cast::<u8>(),
+            size_of::<u64>(),
+        )
     };
+    // SAFETY: `results` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound, and the byte slice borrows `results`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            results.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(results),
+        )
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -601,23 +641,24 @@ fn get_gatt_service_data(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GattServiceDataIn>(),
-            )
-            .out_size(size_of::<u8>())
-            .buffer(
-                buffer,
-                buffer_size,
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send_pid()
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GattServiceDataIn>(),
+        )
     };
+    // SAFETY: `buffer` is a valid pointer to `buffer_size` writable bytes,
+    // exclusively borrowed for the duration of this call.
+    let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u8>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send_pid()
+        .send()?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
