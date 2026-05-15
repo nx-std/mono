@@ -3,7 +3,7 @@
 //! This module implements Time commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -40,26 +40,26 @@ pub fn get_standard_network_system_clock(
 pub fn get_standard_steady_clock(
     session: SessionHandle,
 ) -> Result<SessionHandle, GetSteadyClockError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt =
-        cmif::RequestFormatBuilder::new(static_service_cmds::GET_STANDARD_STEADY_CLOCK).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, static_service_cmds::GET_STANDARD_STEADY_CLOCK)
+            .send()
+            .map_err(GetSteadyClockError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSteadyClockError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetSteadyClockError::ParseResponse)?;
 
-    // Extract the move handle from response
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(GetSteadyClockError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(GetSteadyClockError::MissingHandle);
+    };
 
     // SAFETY: Handle is from a valid IPC response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
@@ -71,25 +71,26 @@ pub fn get_standard_steady_clock(
 pub fn get_time_zone_service(
     session: SessionHandle,
 ) -> Result<SessionHandle, GetTimeZoneServiceError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(static_service_cmds::GET_TIME_ZONE_SERVICE).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, static_service_cmds::GET_TIME_ZONE_SERVICE)
+            .send()
+            .map_err(GetTimeZoneServiceError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetTimeZoneServiceError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetTimeZoneServiceError::ParseResponse)?;
 
-    // Extract the move handle from response
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(GetTimeZoneServiceError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(GetTimeZoneServiceError::MissingHandle);
+    };
 
     // SAFETY: Handle is from a valid IPC response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
@@ -101,26 +102,29 @@ pub fn get_time_zone_service(
 pub fn get_shared_memory_native_handle(
     session: SessionHandle,
 ) -> Result<nx_svc::mem::shmem::Handle, GetSharedMemoryError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE)
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(
+            &mut buf,
+            static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE,
+        )
+        .send()
+        .map_err(GetSharedMemoryError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSharedMemoryError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetSharedMemoryError::ParseResponse)?;
 
-    // Extract the copy handle from response
-    let handle = resp
-        .copy_handles
-        .first()
-        .copied()
-        .ok_or(GetSharedMemoryError::MissingHandle)?;
+    let Some(&handle) = resp.copy_handles.first() else {
+        return Err(GetSharedMemoryError::MissingHandle);
+    };
 
     // SAFETY: Handle is from a valid IPC response.
     Ok(unsafe { nx_svc::mem::shmem::Handle::from_raw(handle) })
@@ -130,17 +134,21 @@ pub fn get_shared_memory_native_handle(
 ///
 /// This is ISystemClock command 0.
 pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(system_clock_cmds::GET_CURRENT_TIME).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, system_clock_cmds::GET_CURRENT_TIME)
+            .send()
+            .map_err(GetCurrentTimeError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetCurrentTimeError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetCurrentTimeError::ParseResponse)?;
 
     // Read u64 timestamp from response data
@@ -157,25 +165,30 @@ pub fn to_calendar_time_with_my_rule(
     session: SessionHandle,
     timestamp: u64,
 ) -> Result<(TimeCalendarTime, TimeCalendarAdditionalInfo), ToCalendarTimeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(
+            &mut buf,
+            timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE,
+        )
+        .data_size(size_of::<u64>())
+        .send()
+        .map_err(ToCalendarTimeError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE)
-        .data_size(8) // u64 timestamp
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write timestamp
-    // SAFETY: req.data points to valid payload area with space for u64.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), timestamp);
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), timestamp);
+        }
     }
 
     ipc::send_sync_request(session).map_err(ToCalendarTimeError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(ToCalendarTimeError::ParseResponse)?;
 
     // Read output structure
@@ -196,25 +209,26 @@ fn get_clock_session(
     session: SessionHandle,
     command_id: u32,
 ) -> Result<SessionHandle, GetSystemClockError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(command_id).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, command_id)
+            .send()
+            .map_err(GetSystemClockError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetSystemClockError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetSystemClockError::ParseResponse)?;
 
-    // Extract the move handle from response
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(GetSystemClockError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(GetSystemClockError::MissingHandle);
+    };
 
     // SAFETY: Handle is from a valid IPC response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
@@ -223,12 +237,15 @@ fn get_clock_session(
 /// Error returned by system clock retrieval operations.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSystemClockError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -237,12 +254,15 @@ pub enum GetSystemClockError {
 /// Error returned by steady clock retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSteadyClockError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -251,12 +271,15 @@ pub enum GetSteadyClockError {
 /// Error returned by timezone service retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetTimeZoneServiceError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -265,12 +288,15 @@ pub enum GetTimeZoneServiceError {
 /// Error returned by shared memory retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Missing shared memory handle in response.
     #[error("missing shared memory handle in response")]
     MissingHandle,
@@ -279,12 +305,15 @@ pub enum GetSharedMemoryError {
 /// Error returned by get current time operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetCurrentTimeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Network clock is not available.
     #[error("network clock is not available")]
     NetworkClockUnavailable,
@@ -299,10 +328,13 @@ pub enum GetCurrentTimeError {
 /// Error returned by calendar time conversion operation.
 #[derive(Debug, thiserror::Error)]
 pub enum ToCalendarTimeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
