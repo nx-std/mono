@@ -37,23 +37,29 @@ pub(crate) fn get_possible_clock_rates(
         max_count: rates.len() as i32,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    // `rates` is a caller-provided buffer valid for the lifetime of this call.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_POSSIBLE_CLOCK_RATES)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetPossibleClockRatesIn>(),
-            )
-            .out_size(size_of::<GetPossibleClockRatesOut>())
-            .buffer(
-                rates.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(rates),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<GetPossibleClockRatesIn>()` bytes as a
+    // slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetPossibleClockRatesIn>(),
+        )
     };
+    // SAFETY: `rates` is a valid `&mut` slice; viewing it as a byte slice for
+    // the OUT buffer is sound, and the byte slice borrows `rates`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            rates.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(rates),
+        )
+    };
+    let result = service
+        .dispatch(proto::GET_POSSIBLE_CLOCK_RATES)
+        .in_raw(in_bytes)
+        .out_size(size_of::<GetPossibleClockRatesOut>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: the response payload is at least `size_of::<GetPossibleClockRatesOut>()` bytes.
     Ok(unsafe {
