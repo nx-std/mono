@@ -11,14 +11,11 @@ pub(crate) fn dispatch_in_no_out<T>(
     cmd_id: u32,
     input: &T,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const *input).cast::<u8>(), size_of::<T>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
+    service.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
 }
 
 /// CMIF request with a raw input payload, no PID, raw output.
@@ -28,14 +25,15 @@ pub(crate) fn dispatch_in_out<T, U: Copy>(
     cmd_id: u32,
     input: &T,
 ) -> Result<U, DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const *input).cast::<u8>(), size_of::<T>())
-            .out_size(size_of::<U>())
-            .send()?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<U>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<U>().
     let val = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<U>()) };
@@ -61,15 +59,16 @@ pub(crate) fn dispatch_in_pid_out<T, U: Copy>(
     cmd_id: u32,
     input: &T,
 ) -> Result<U, DispatchError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const *input).cast::<u8>(), size_of::<T>())
-            .send_pid()
-            .out_size(size_of::<U>())
-            .send()?
-    };
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_size(size_of::<U>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<U>().
     let val = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<U>()) };
