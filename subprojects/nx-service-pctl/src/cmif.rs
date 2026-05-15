@@ -28,16 +28,18 @@ pub(crate) fn create_service(domain: &Domain) -> Result<u32, CreateServiceError>
 
 fn create_service_at(domain: &Domain, cmd_id: u32) -> Result<u32, CreateServiceError> {
     let pid_reserved: u64 = 0;
-    // SAFETY: `pid_reserved` lives on the stack until `.send()` returns.
-    let mut result = unsafe {
-        domain
-            .dispatch(cmd_id)
-            .in_raw((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
-            .send_pid()
-            .out_objects(1)
-            .send()
-            .map_err(CreateServiceError::Dispatch)?
+    // SAFETY: `pid_reserved` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
     };
+    let mut result = domain
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_objects(1)
+        .send()
+        .map_err(CreateServiceError::Dispatch)?;
 
     let object = result
         .take_object(0)
