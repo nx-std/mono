@@ -28,15 +28,17 @@ pub(crate) fn open_hardware_opus_decoder(
         size: tmem_size,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<OpenDecoderIn>())
-            .in_handle(tmem_handle)
-            .send()
-            .map_err(OpenDecoderError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenDecoderIn>())
     };
+    let result = service
+        .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER)
+        .in_raw(in_bytes)
+        .in_handle(tmem_handle)
+        .send()
+        .map_err(OpenDecoderError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenDecoderError::MissingHandle);
@@ -52,14 +54,15 @@ pub(crate) fn get_work_buffer_size(
 ) -> Result<u32, DispatchError> {
     let val: u64 = (sample_rate as u64) | ((channel_count as u64) << 32);
 
-    // SAFETY: `val` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_WORK_BUFFER_SIZE)
-            .in_raw((&raw const val).cast::<u8>(), size_of::<u64>())
-            .out_size(size_of::<u32>())
-            .send()?
-    };
+    // SAFETY: `val` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u64>()) };
+    let result = service
+        .dispatch(proto::GET_WORK_BUFFER_SIZE)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
@@ -76,20 +79,26 @@ pub(crate) fn open_hardware_opus_decoder_for_multi_stream(
 ) -> Result<u32, OpenDecoderError> {
     let size_val: u64 = tmem_size as u64;
 
-    // SAFETY: `size_val` and `state` live on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER_FOR_MULTI_STREAM)
-            .in_raw((&raw const size_val).cast::<u8>(), size_of::<u64>())
-            .buffer(
-                (&raw const *state).cast::<u8>(),
-                size_of::<HwopusMultistreamState>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .in_handle(tmem_handle)
-            .send()
-            .map_err(OpenDecoderError::Dispatch)?
+    // SAFETY: `size_val` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const size_val).cast::<u8>(), size_of::<u64>())
     };
+    // SAFETY: `state` is a valid reference; viewing its bytes as a slice for
+    // the IN pointer buffer is sound, and the slice borrows `state`.
+    let state_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *state).cast::<u8>(),
+            size_of::<HwopusMultistreamState>(),
+        )
+    };
+    let result = service
+        .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER_FOR_MULTI_STREAM)
+        .in_raw(in_bytes)
+        .in_buffer(state_bytes, BufferAttr::HIPC_POINTER)
+        .in_handle(tmem_handle)
+        .send()
+        .map_err(OpenDecoderError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenDecoderError::MissingHandle);
@@ -102,14 +111,18 @@ pub(crate) fn get_work_buffer_size_for_multi_stream(
     service: &Session,
     state: &HwopusMultistreamState,
 ) -> Result<u32, DispatchError> {
+    // SAFETY: `state` is a valid reference; viewing its bytes as a slice for
+    // the IN pointer buffer is sound, and the slice borrows `state`.
+    let state_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const *state).cast::<u8>(),
+            size_of::<HwopusMultistreamState>(),
+        )
+    };
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE_FOR_MULTI_STREAM)
         .out_size(size_of::<u32>())
-        .buffer(
-            (&raw const *state).cast::<u8>(),
-            size_of::<HwopusMultistreamState>(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .in_buffer(state_bytes, BufferAttr::HIPC_POINTER)
         .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -129,19 +142,16 @@ pub(crate) fn decode_interleaved_legacy(
     opusin: &[u8],
     pcmbuf: &mut [i16],
 ) -> Result<DecodeResult, DispatchError> {
+    // SAFETY: `pcmbuf` is a valid `&mut [i16]`; viewing it as mutable bytes
+    // for the OUT buffer is sound, and the slice borrows `pcmbuf`.
+    let pcm_bytes = unsafe {
+        core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
+    };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<DecodeResult>())
-        .buffer(
-            opusin.as_ptr(),
-            opusin.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            pcmbuf.as_mut_ptr().cast::<u8>(),
-            size_of_val(pcmbuf),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(opusin, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(pcm_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
 
     // SAFETY: response payload is at least size_of::<DecodeResult>().
@@ -157,20 +167,18 @@ pub(crate) fn decode_interleaved_with_perf(
     opusin: &[u8],
     pcmbuf: &mut [i16],
 ) -> Result<DecodeResultWithPerf, DispatchError> {
+    // SAFETY: `pcmbuf` is a valid `&mut [i16]`; viewing it as mutable bytes
+    // for the OUT buffer is sound, and the slice borrows `pcmbuf`.
+    let pcm_bytes = unsafe {
+        core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
+    };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<DecodeResultWithPerf>())
-        .buffer(
-            opusin.as_ptr(),
-            opusin.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
-        .buffer(
-            pcmbuf.as_mut_ptr().cast::<u8>(),
-            size_of_val(pcmbuf),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_MAP_ALIAS)
-                .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+        .in_buffer(opusin, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(
+            pcm_bytes,
+            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
         .send()?;
 
@@ -191,26 +199,26 @@ pub(crate) fn decode_interleaved_ex(
 ) -> Result<DecodeResultWithPerf, DispatchError> {
     let reset_flag: u8 = reset_context as u8;
 
-    // SAFETY: `reset_flag` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const reset_flag).cast::<u8>(), size_of::<u8>())
-            .out_size(size_of::<DecodeResultWithPerf>())
-            .buffer(
-                opusin.as_ptr(),
-                opusin.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                pcmbuf.as_mut_ptr().cast::<u8>(),
-                size_of_val(pcmbuf),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_MAP_ALIAS)
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-            )
-            .send()?
+    // SAFETY: `reset_flag` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const reset_flag).cast::<u8>(), size_of::<u8>())
     };
+    // SAFETY: `pcmbuf` is a valid `&mut [i16]`; viewing it as mutable bytes
+    // for the OUT buffer is sound, and the slice borrows `pcmbuf`.
+    let pcm_bytes = unsafe {
+        core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
+    };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<DecodeResultWithPerf>())
+        .in_buffer(opusin, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(
+            pcm_bytes,
+            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+        )
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<DecodeResultWithPerf>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<DecodeResultWithPerf>()) })
