@@ -46,11 +46,7 @@ pub(crate) fn create_sub_object(
 pub(crate) fn post_local_news(service: &Session, news: &[u8]) -> Result<(), DispatchError> {
     service
         .dispatch(proto::POST_LOCAL_NEWS)
-        .buffer(
-            news.as_ptr(),
-            news.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .in_buffer(news, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -61,19 +57,17 @@ pub(crate) fn set_passphrase(
     program_id: u64,
     passphrase: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `program_id` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SET_PASSPHRASE)
-            .in_raw((&raw const program_id).cast::<u8>(), size_of::<u64>())
-            .buffer(
-                passphrase.as_ptr(),
-                passphrase.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `program_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<u64>())
+    };
+    service
+        .dispatch(proto::SET_PASSPHRASE)
+        .in_raw(in_bytes)
+        .in_buffer(passphrase, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// Gets subscription status for a filter string.
@@ -84,11 +78,7 @@ pub(crate) fn get_subscription_status(
     let result = service
         .dispatch(proto::GET_SUBSCRIPTION_STATUS)
         .out_size(size_of::<u32>())
-        .buffer(
-            filter.as_ptr(),
-            filter.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .in_buffer(filter, BufferAttr::HIPC_POINTER)
         .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -101,19 +91,16 @@ pub(crate) fn get_topic_list(
     channel: u32,
     out_buf: &mut [u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `channel` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_TOPIC_LIST)
-            .in_raw((&raw const channel).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u32>())
-            .buffer(
-                out_buf.as_mut_ptr(),
-                out_buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()?
-    };
+    // SAFETY: `channel` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const channel).cast::<u8>(), size_of::<u32>()) };
+    let result = service
+        .dispatch(proto::GET_TOPIC_LIST)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_buffer(out_buf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
@@ -142,11 +129,7 @@ pub(crate) fn request_immediate_reception(
 ) -> Result<(), DispatchError> {
     service
         .dispatch(proto::REQUEST_IMMEDIATE_RECEPTION)
-        .buffer(
-            filter.as_ptr(),
-            filter.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .in_buffer(filter, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -157,19 +140,16 @@ pub(crate) fn set_subscription_status(
     status: u32,
     filter: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `status` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SET_SUBSCRIPTION_STATUS)
-            .in_raw((&raw const status).cast::<u8>(), size_of::<u32>())
-            .buffer(
-                filter.as_ptr(),
-                filter.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `status` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const status).cast::<u8>(), size_of::<u32>()) };
+    service
+        .dispatch(proto::SET_SUBSCRIPTION_STATUS)
+        .in_raw(in_bytes)
+        .in_buffer(filter, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// Clears all news storage.
@@ -190,11 +170,7 @@ pub(crate) fn get_news_database_dump(
     let result = service
         .dispatch(proto::GET_NEWS_DATABASE_DUMP)
         .out_size(size_of::<u64>())
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -227,11 +203,7 @@ pub(crate) fn event_holder_get(service: &Session) -> Result<u32, EventHolderGetE
 pub(crate) fn data_open(service: &Session, file_name: &[u8]) -> Result<(), DispatchError> {
     service
         .dispatch(proto::DATA_OPEN)
-        .buffer(
-            file_name.as_ptr(),
-            file_name.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .in_buffer(file_name, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -241,14 +213,16 @@ pub(crate) fn data_open_with_record_v1(
     service: &Session,
     record: &NewsRecordV1,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `record` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::DATA_OPEN_WITH_RECORD_V1)
-            .in_raw((&raw const *record).cast::<u8>(), size_of::<NewsRecordV1>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `record` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const *record).cast::<u8>(), size_of::<NewsRecordV1>())
+    };
+    service
+        .dispatch(proto::DATA_OPEN_WITH_RECORD_V1)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// Reads data from the opened news data (auto-select buffer).
@@ -257,19 +231,16 @@ pub(crate) fn data_read(
     offset: u64,
     out_buf: &mut [u8],
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `offset` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DATA_READ)
-            .in_raw((&raw const offset).cast::<u8>(), size_of::<u64>())
-            .out_size(size_of::<u64>())
-            .buffer(
-                out_buf.as_mut_ptr(),
-                out_buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()?
-    };
+    // SAFETY: `offset` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u64>()) };
+    let result = service
+        .dispatch(proto::DATA_READ)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u64>())
+        .out_buffer(out_buf, BufferAttr::HIPC_AUTO_SELECT)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
@@ -285,14 +256,16 @@ pub(crate) fn data_open_with_record(
     service: &Session,
     record: &NewsRecord,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `record` lives on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::DATA_OPEN_WITH_RECORD)
-            .in_raw((&raw const *record).cast::<u8>(), size_of::<NewsRecord>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `record` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const *record).cast::<u8>(), size_of::<NewsRecord>())
+    };
+    service
+        .dispatch(proto::DATA_OPEN_WITH_RECORD)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
@@ -307,29 +280,18 @@ pub(crate) fn database_get_list_v1(
     where_clause: &[u8],
     order_clause: &[u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `offset` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DATABASE_GET_LIST_V1)
-            .in_raw((&raw const offset).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u32>())
-            .buffer(
-                out_buf.as_mut_ptr(),
-                out_buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .buffer(
-                where_clause.as_ptr(),
-                where_clause.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                order_clause.as_ptr(),
-                order_clause.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
-    };
+    // SAFETY: `offset` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u32>()) };
+    let result = service
+        .dispatch(proto::DATABASE_GET_LIST_V1)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_buffer(out_buf, BufferAttr::HIPC_AUTO_SELECT)
+        .in_buffer(where_clause, BufferAttr::HIPC_POINTER)
+        .in_buffer(order_clause, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
@@ -340,11 +302,7 @@ pub(crate) fn database_count(service: &Session, filter: &[u8]) -> Result<u32, Di
     let result = service
         .dispatch(proto::DATABASE_COUNT)
         .out_size(size_of::<u32>())
-        .buffer(
-            filter.as_ptr(),
-            filter.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .in_buffer(filter, BufferAttr::HIPC_POINTER)
         .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -359,29 +317,18 @@ pub(crate) fn database_get_list(
     where_clause: &[u8],
     order_clause: &[u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `offset` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::DATABASE_GET_LIST)
-            .in_raw((&raw const offset).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<u32>())
-            .buffer(
-                out_buf.as_mut_ptr(),
-                out_buf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .buffer(
-                where_clause.as_ptr(),
-                where_clause.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                order_clause.as_ptr(),
-                order_clause.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
-    };
+    // SAFETY: `offset` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u32>()) };
+    let result = service
+        .dispatch(proto::DATABASE_GET_LIST)
+        .in_raw(in_bytes)
+        .out_size(size_of::<u32>())
+        .out_buffer(out_buf, BufferAttr::HIPC_AUTO_SELECT)
+        .in_buffer(where_clause, BufferAttr::HIPC_POINTER)
+        .in_buffer(order_clause, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
