@@ -16,14 +16,15 @@ use crate::proto::CMD_ICPM_REGISTER_CLIENT;
 /// the libnx `_ldnCmdInitialize` helper.
 pub(crate) fn register_client(object: &DomainObject<'_>) -> Result<(), DispatchError> {
     let reserved: u64 = 0;
-    // SAFETY: `reserved` lives on the stack until `send()` returns; the
-    // dispatcher memcpys the payload before dispatching.
-    unsafe {
-        object
-            .dispatch(CMD_ICPM_REGISTER_CLIENT)
-            .send_pid()
-            .in_raw((&raw const reserved).cast::<u8>(), size_of::<u64>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
+    };
+    object
+        .dispatch(CMD_ICPM_REGISTER_CLIENT)
+        .send_pid()
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }

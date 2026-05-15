@@ -49,14 +49,19 @@ pub(crate) fn get_network_info(
     session: &Session,
     out: &mut LdnNetworkInfo,
 ) -> Result<(), DispatchError> {
-    session
-        .dispatch(CMD_MON_GET_NETWORK_INFO)
-        .buffer(
+    // SAFETY: `out` is a valid `&mut LdnNetworkInfo`; viewing it as bytes for
+    // the OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             (out as *mut LdnNetworkInfo).cast::<u8>(),
             size_of::<LdnNetworkInfo>(),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        )
+    };
+    session
+        .dispatch(CMD_MON_GET_NETWORK_INFO)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send()
         .map(|_| ())

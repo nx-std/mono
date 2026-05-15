@@ -78,15 +78,17 @@ pub fn channel_band_to_channel(val: u16) -> i16 {
 /// `Initialize` (cmd 400) — pre-`[7.0.0]` path. `send_pid` + zero payload.
 pub(crate) fn initialize_legacy(object: &DomainObject<'_>) -> Result<(), DispatchError> {
     let reserved: u64 = 0;
-    // SAFETY: `reserved` lives on the stack until `send()` returns.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_INITIALIZE_LEGACY)
-            .send_pid()
-            .in_raw((&raw const reserved).cast::<u8>(), size_of::<u64>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
+    };
+    object
+        .dispatch(CMD_LCS_INITIALIZE_LEGACY)
+        .send_pid()
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// `InitializeWithVersion` — cmd 402 on `ldn:u` / cmd 403 on `ldn:s`.
@@ -111,15 +113,16 @@ pub(crate) fn initialize_with_version(
         _pad: 0,
         _reserved: 0,
     };
-    // SAFETY: input lives on the stack until send() returns.
-    unsafe {
-        object
-            .dispatch(cmd)
-            .send_pid()
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    object
+        .dispatch(cmd)
+        .send_pid()
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// `InitializeWithPriority` (cmd 404) — `ldn:s`-only, `[19.0.0+]`. The caller
@@ -141,15 +144,16 @@ pub(crate) fn initialize_with_priority(
         priority,
         _reserved: 0,
     };
-    // SAFETY: input lives on the stack until send() returns.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_INITIALIZE_WITH_PRIORITY)
-            .send_pid()
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    object
+        .dispatch(CMD_LCS_INITIALIZE_WITH_PRIORITY)
+        .send_pid()
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// `Finalize` (cmd 401).
@@ -194,14 +198,19 @@ pub(crate) fn get_network_info(
     object: &DomainObject<'_>,
     out: &mut LdnNetworkInfo,
 ) -> Result<(), DispatchError> {
-    object
-        .dispatch(CMD_LCS_GET_NETWORK_INFO)
-        .buffer(
+    // SAFETY: `out` is a valid `&mut LdnNetworkInfo`; viewing it as bytes for
+    // the OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             (out as *mut LdnNetworkInfo).cast::<u8>(),
             size_of::<LdnNetworkInfo>(),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
+        )
+    };
+    object
+        .dispatch(CMD_LCS_GET_NETWORK_INFO)
+        .out_buffer(
+            out_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send()
         .map(|_| ())
@@ -286,20 +295,27 @@ pub(crate) fn get_network_info_and_history(
     network_info: &mut LdnNetworkInfo,
     nodes: &mut [LdnNodeLatestUpdate],
 ) -> Result<(), DispatchError> {
-    object
-        .dispatch(CMD_LCS_GET_NETWORK_INFO_AND_HISTORY)
-        .buffer(
+    // SAFETY: `network_info` is a valid `&mut`; viewing it as bytes for OUT is sound.
+    let net_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             (network_info as *mut LdnNetworkInfo).cast::<u8>(),
             size_of::<LdnNetworkInfo>(),
-            BufferAttr::OUT
-                .or(BufferAttr::HIPC_POINTER)
-                .or(BufferAttr::FIXED_SIZE),
         )
-        .buffer(
+    };
+    // SAFETY: `nodes` is a valid `&mut` slice; viewing it as bytes for OUT is sound.
+    let nodes_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             nodes.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(nodes),
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
         )
+    };
+    object
+        .dispatch(CMD_LCS_GET_NETWORK_INFO_AND_HISTORY)
+        .out_buffer(
+            net_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .out_buffer(nodes_bytes, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -352,20 +368,24 @@ fn scan_inner(
         pad: [0; 6],
         filter: *filter,
     };
-    // SAFETY: `input` lives on the stack until `send()` returns; the buffer
-    // pointer/size is valid for the duration of the call.
-    let result = unsafe {
-        object
-            .dispatch(cmd)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .out_size(size_of::<i16>())
-            .buffer(
-                out_buf.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out_buf),
-                BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    // SAFETY: `out_buf` is a valid `&mut` slice; viewing it as bytes for the
+    // OUT buffer is sound.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_buf.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_buf),
+        )
     };
+    let result = object
+        .dispatch(cmd)
+        .in_raw(in_bytes)
+        .out_size(size_of::<i16>())
+        .out_buffer(out_bytes, BufferAttr::HIPC_AUTO_SELECT)
+        .send()?;
 
     let total: i16 = if result.data.len() >= 2 {
         i16::from_le_bytes([result.data[0], result.data[1]])
@@ -462,11 +482,7 @@ pub(crate) fn set_advertise_data(
 ) -> Result<(), DispatchError> {
     object
         .dispatch(CMD_LCS_SET_ADVERTISE_DATA)
-        .buffer(
-            data.as_ptr(),
-            data.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_AUTO_SELECT),
-        )
+        .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .send()
         .map(|_| ())
 }
@@ -529,14 +545,15 @@ pub(crate) fn create_network(
         _pad: 0,
         network_config: sanitize_network_config(network_config),
     };
-    // SAFETY: input lives on the stack until send() returns.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_CREATE_NETWORK)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    object
+        .dispatch(CMD_LCS_CREATE_NETWORK)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 /// `CreateNetworkPrivate` (cmd 203). `addrs == &[]` yields a non-private
@@ -565,19 +582,21 @@ pub(crate) fn create_network_private(
         _pad: 0,
         network_config: sanitize_network_config(network_config),
     };
-    // SAFETY: input + addrs are valid for the dispatch.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_CREATE_NETWORK_PRIVATE)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .buffer(
-                addrs.as_ptr().cast::<u8>(),
-                core::mem::size_of_val(addrs),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    // SAFETY: `addrs` is a valid `&[LdnAddressEntry]`; viewing it as bytes for
+    // the IN buffer is sound.
+    let addr_bytes = unsafe {
+        core::slice::from_raw_parts(addrs.as_ptr().cast::<u8>(), core::mem::size_of_val(addrs))
+    };
+    object
+        .dispatch(CMD_LCS_CREATE_NETWORK_PRIVATE)
+        .in_raw(in_bytes)
+        .in_buffer(addr_bytes, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// `Connect` (cmd 302).
@@ -603,21 +622,27 @@ pub(crate) fn connect(
         version,
         option,
     };
-    // SAFETY: input + network_info live for the duration of the call.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_CONNECT)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .buffer(
-                (network_info as *const LdnNetworkInfo).cast::<u8>(),
-                size_of::<LdnNetworkInfo>(),
-                BufferAttr::IN
-                    .or(BufferAttr::HIPC_POINTER)
-                    .or(BufferAttr::FIXED_SIZE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    // SAFETY: `network_info` is a valid `&LdnNetworkInfo`; viewing it as bytes
+    // for the IN buffer is sound.
+    let net_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (network_info as *const LdnNetworkInfo).cast::<u8>(),
+            size_of::<LdnNetworkInfo>(),
+        )
+    };
+    object
+        .dispatch(CMD_LCS_CONNECT)
+        .in_raw(in_bytes)
+        .in_buffer(
+            net_bytes,
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// `ConnectPrivate` (cmd 303).
@@ -650,14 +675,15 @@ pub(crate) fn connect_private(
         _pad: 0,
         network_config: sanitize_network_config(network_config),
     };
-    // SAFETY: input lives on the stack until send() returns.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_CONNECT_PRIVATE)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    object
+        .dispatch(CMD_LCS_CONNECT_PRIVATE)
+        .in_raw(in_bytes)
+        .send()
+        .map(|_| ())
 }
 
 //
@@ -744,19 +770,16 @@ fn send_action_frame_inner(
         channel,
         flags,
     };
-    // SAFETY: input + data are valid for the duration of the dispatch.
-    unsafe {
-        object
-            .dispatch(CMD_LCS_SEND_ACTION_FRAME)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<In>())
-            .buffer(
-                data.as_ptr(),
-                data.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
+    object
+        .dispatch(CMD_LCS_SEND_ACTION_FRAME)
+        .in_raw(in_bytes)
+        .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
+        .send()
+        .map(|_| ())
 }
 
 /// Decoded output of `RecvActionFrame`.
@@ -819,19 +842,16 @@ fn recv_action_frame_inner(
     data: &mut [u8],
     flags: u32,
 ) -> Result<RecvActionFrameRaw, DispatchError> {
-    // SAFETY: `flags` and `data` live for the duration of the dispatch.
-    let result = unsafe {
-        object
-            .dispatch(CMD_LCS_RECV_ACTION_FRAME)
-            .in_raw((&raw const flags).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<RecvActionFrameRaw>())
-            .buffer(
-                data.as_mut_ptr(),
-                data.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()?
-    };
+    // SAFETY: `flags` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
+    let result = object
+        .dispatch(CMD_LCS_RECV_ACTION_FRAME)
+        .in_raw(in_bytes)
+        .out_size(size_of::<RecvActionFrameRaw>())
+        .out_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
+        .send()?;
     // SAFETY: response payload is at least size_of::<RecvActionFrameRaw>() by
     // virtue of `out_size`; parse_response would have errored otherwise.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<RecvActionFrameRaw>()) })
