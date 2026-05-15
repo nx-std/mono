@@ -39,6 +39,7 @@ members = [
     "subprojects/nx-service-ectx",
     "subprojects/nx-service-fan",
     "subprojects/nx-service-fatal",
+    "subprojects/nx-service-fs",
     "subprojects/nx-service-friends",
     "subprojects/nx-service-fsldr",
     "subprojects/nx-service-fspr",
