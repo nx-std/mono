@@ -180,22 +180,21 @@ pub(crate) fn save_album_screenshot_file(
     file_id: &AlbumFileId,
     buffer: &[u8],
 ) -> Result<(), SaveScreenShotError> {
-    // SAFETY: `file_id` and `buffer` live on the stack/heap until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE)
-            .in_raw((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-            .buffer(
-                buffer.as_ptr().cast_mut(),
-                buffer.len(),
-                BufferAttr::IN
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE)
-                    .or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(SaveScreenShotError)
-    }
+    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
+    };
+    service
+        .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE)
+        .in_raw(in_bytes)
+        .in_buffer(
+            buffer,
+            BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
+        .map_err(SaveScreenShotError)
 }
 
 /// Saves an album screenshot file (extended, cmd 2202). \[4.0.0+\]
@@ -214,25 +213,24 @@ pub(crate) fn save_album_screenshot_file_ex(
         makernote_size,
     };
 
-    // SAFETY: `input` and `buffer` live on the stack/heap until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE_EX)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<SaveScreenShotFileExIn>(),
-            )
-            .buffer(
-                buffer.as_ptr().cast_mut(),
-                buffer.len(),
-                BufferAttr::IN
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE)
-                    .or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(SaveScreenShotError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<SaveScreenShotFileExIn>(),
+        )
+    };
+    service
+        .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE_EX)
+        .in_raw(in_bytes)
+        .in_buffer(
+            buffer,
+            BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
+        .map_err(SaveScreenShotError)
 }
 
 /// Sets overlay thumbnail data (shared impl for cmds 2301/2302).
@@ -242,22 +240,21 @@ pub(crate) fn set_overlay_thumbnail_data(
     file_id: &AlbumFileId,
     image: &[u8],
 ) -> Result<(), SetOverlayThumbnailError> {
-    // SAFETY: `file_id` and `image` live on the stack/heap until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-            .buffer(
-                image.as_ptr().cast_mut(),
-                image.len(),
-                BufferAttr::IN
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE)
-                    .or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(SetOverlayThumbnailError)
-    }
+    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(
+            image,
+            BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .send()
+        .map(|_| ())
+        .map_err(SetOverlayThumbnailError)
 }
 
 /// Opens an album control session (cmd 60001). Returns the sub-object service.
@@ -269,18 +266,20 @@ pub(crate) fn open_control_session(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_CONTROL_SESSION)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<OpenControlSessionIn>(),
-            )
-            .send_pid()
-            .send()
-            .map_err(OpenControlSessionError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<OpenControlSessionIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::OPEN_CONTROL_SESSION)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()
+        .map_err(OpenControlSessionError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenControlSessionError::MissingHandle);
@@ -334,23 +333,21 @@ pub(crate) fn ctrl_read_movie_data(
 ) -> Result<u64, ReadStreamDataError> {
     let input = StreamReadDataIn { stream, offset };
 
-    // SAFETY: `input` and `buffer` live on the stack/heap until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::CTRL_READ_MOVIE_DATA_FROM_READ_STREAM)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StreamReadDataIn>(),
-            )
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(ReadStreamDataError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StreamReadDataIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::CTRL_READ_MOVIE_DATA_FROM_READ_STREAM)
+        .in_raw(in_bytes)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -391,23 +388,21 @@ pub(crate) fn ctrl_read_image_data(
 ) -> Result<u64, ReadStreamDataError> {
     let input = StreamReadDataIn { stream, offset };
 
-    // SAFETY: `input` and `buffer` live on the stack/heap until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::CTRL_READ_IMAGE_DATA_FROM_READ_STREAM)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StreamReadDataIn>(),
-            )
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(ReadStreamDataError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StreamReadDataIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::CTRL_READ_IMAGE_DATA_FROM_READ_STREAM)
+        .in_raw(in_bytes)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -520,23 +515,21 @@ pub(crate) fn ctrl_read_data_from_write_stream(
 ) -> Result<u64, ReadStreamDataError> {
     let input = StreamReadDataIn { stream, offset };
 
-    // SAFETY: `input` and `buffer` live on the stack/heap until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::CTRL_READ_DATA_FROM_WRITE_STREAM)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StreamReadDataIn>(),
-            )
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(ReadStreamDataError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StreamReadDataIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::CTRL_READ_DATA_FROM_WRITE_STREAM)
+        .in_raw(in_bytes)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -553,23 +546,21 @@ pub(crate) fn ctrl_write_data_to_write_stream(
 ) -> Result<(), WriteStreamDataError> {
     let input = StreamWriteDataIn { stream, offset };
 
-    // SAFETY: `input` and `buffer` live on the stack/heap until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::CTRL_WRITE_DATA_TO_WRITE_STREAM)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StreamWriteDataIn>(),
-            )
-            .buffer(
-                buffer.as_ptr().cast_mut(),
-                buffer.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(WriteStreamDataError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StreamWriteDataIn>(),
+        )
+    };
+    service
+        .dispatch(proto::CTRL_WRITE_DATA_TO_WRITE_STREAM)
+        .in_raw(in_bytes)
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
+        .map_err(WriteStreamDataError)
 }
 
 /// Writes meta to a write stream (ctrl cmd 2424).
@@ -581,23 +572,21 @@ pub(crate) fn ctrl_write_meta_to_write_stream(
 ) -> Result<(), WriteStreamDataError> {
     let input = StreamWriteDataIn { stream, offset };
 
-    // SAFETY: `input` and `buffer` live on the stack/heap until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::CTRL_WRITE_META_TO_WRITE_STREAM)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<StreamWriteDataIn>(),
-            )
-            .buffer(
-                buffer.as_ptr().cast_mut(),
-                buffer.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(WriteStreamDataError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<StreamWriteDataIn>(),
+        )
+    };
+    service
+        .dispatch(proto::CTRL_WRITE_META_TO_WRITE_STREAM)
+        .in_raw(in_bytes)
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
+        .map_err(WriteStreamDataError)
 }
 
 /// Gets the broken reason for a write stream (ctrl cmd 2431).
