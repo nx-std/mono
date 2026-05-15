@@ -19,8 +19,6 @@
 //! builder uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage — no heap, no
 //! dynamic allocation.
 
-#![expect(clippy::identity_op)]
-
 use core::mem::size_of;
 
 use nx_svc::raw::Handle as RawHandle;
