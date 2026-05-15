@@ -3,7 +3,7 @@
 //! This module implements NV commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_service_applet::aruid::Aruid;
 use nx_sf::{cmif, hipc::BufferMode};
@@ -24,31 +24,33 @@ use crate::{
 ///
 /// This is INvDrvServices command 0.
 pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::OPEN)
-        .in_buffers(1) // Device path (Type A / HipcMapAlias)
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Add the device path as a Type A buffer (send buffer)
-    req.add_in_buffer(device_path.as_ptr(), device_path.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, nv_cmds::OPEN)
+            .add_in_buffer(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
+            .send()
+            .map_err(OpenError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(OpenError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(OpenError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    // Response contains: fd (u32), error (u32)
+    // Response contains: fd (u32), error (u32).
     #[repr(C)]
     struct Output {
         fd: u32,
         error: u32,
     }
 
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<Output>())
+        .map_err(OpenError::ParseResponse)?;
+
+    // SAFETY: `resp.data` is exactly `size_of::<Output>()` bytes.
     let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
 
     if output.error != 0 {
@@ -70,21 +72,7 @@ pub fn ioctl(
     out_size: usize,
     argp: *mut u8,
 ) -> Result<(), IoctlError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let num_in_auto = if in_size > 0 { 1 } else { 0 };
-    let num_out_auto = if out_size > 0 { 1 } else { 0 };
-
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::IOCTL)
-        .data_size(8) // fd + request
-        .in_auto_buffers(num_in_auto)
-        .out_auto_buffers(num_out_auto)
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write fd and request
+    // Write fd and request.
     #[repr(C)]
     struct Input {
         fd: u32,
@@ -95,25 +83,36 @@ pub fn ioctl(
         fd: fd.to_raw(),
         request,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
-    }
 
-    // Add auto-select buffers
-    if in_size > 0 {
-        req.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
-    }
-    if out_size > 0 {
-        req.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = {
+            let mut builder =
+                cmif::CmifBuilder::new(&mut buf, nv_cmds::IOCTL).data_size(size_of::<Input>());
+            if in_size > 0 {
+                builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+            }
+            if out_size > 0 {
+                builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+            }
+            builder.send().map_err(IoctlError::BuildRequest)?
+        };
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(IoctlError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(IoctlError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+        .map_err(IoctlError::ParseResponse)?;
 
-    // Response contains error code
+    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     if error != 0 {
@@ -137,22 +136,7 @@ pub fn ioctl2(
     extra_in: *const u8,
     extra_in_size: usize,
 ) -> Result<(), Ioctl2Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    // Auto buffers: argp in (if dir & write), inbuf, argp out (if dir & read)
-    let num_in_auto = if in_size > 0 { 1 } else { 0 } + 1; // +1 for extra_in
-    let num_out_auto = if out_size > 0 { 1 } else { 0 };
-
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::IOCTL2)
-        .data_size(8) // fd + request
-        .in_auto_buffers(num_in_auto)
-        .out_auto_buffers(num_out_auto)
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write fd and request
+    // Write fd and request.
     #[repr(C)]
     struct Input {
         fd: u32,
@@ -163,25 +147,38 @@ pub fn ioctl2(
         fd: fd.to_raw(),
         request,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
-    }
 
-    // Add auto-select buffers in order: argp in, extra in, argp out
-    if in_size > 0 {
-        req.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
-    }
-    req.add_in_auto_buffer(extra_in, extra_in_size, BufferMode::Normal);
-    if out_size > 0 {
-        req.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = {
+            // Auto buffers in order: argp in (if applicable), extra in, argp out (if applicable).
+            let mut builder =
+                cmif::CmifBuilder::new(&mut buf, nv_cmds::IOCTL2).data_size(size_of::<Input>());
+            if in_size > 0 {
+                builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+            }
+            builder = builder.add_in_auto_buffer(extra_in, extra_in_size, BufferMode::Normal);
+            if out_size > 0 {
+                builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+            }
+            builder.send().map_err(Ioctl2Error::BuildRequest)?
+        };
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(Ioctl2Error::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(Ioctl2Error::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+        .map_err(Ioctl2Error::ParseResponse)?;
 
+    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     if error != 0 {
@@ -205,21 +202,7 @@ pub fn ioctl3(
     extra_out: *mut u8,
     extra_out_size: usize,
 ) -> Result<(), Ioctl3Error> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let num_in_auto = if in_size > 0 { 1 } else { 0 };
-    let num_out_auto = if out_size > 0 { 1 } else { 0 } + 1; // +1 for extra_out
-
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::IOCTL3)
-        .data_size(8) // fd + request
-        .in_auto_buffers(num_in_auto)
-        .out_auto_buffers(num_out_auto)
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write fd and request
+    // Write fd and request.
     #[repr(C)]
     struct Input {
         fd: u32,
@@ -230,25 +213,38 @@ pub fn ioctl3(
         fd: fd.to_raw(),
         request,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
-    }
 
-    // Add auto-select buffers in order: argp in, argp out, extra out
-    if in_size > 0 {
-        req.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = {
+            // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra out.
+            let mut builder =
+                cmif::CmifBuilder::new(&mut buf, nv_cmds::IOCTL3).data_size(size_of::<Input>());
+            if in_size > 0 {
+                builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+            }
+            if out_size > 0 {
+                builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+            }
+            builder = builder.add_out_auto_buffer(extra_out, extra_out_size, BufferMode::Normal);
+            builder.send().map_err(Ioctl3Error::BuildRequest)?
+        };
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
-    if out_size > 0 {
-        req.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
-    }
-    req.add_out_auto_buffer(extra_out, extra_out_size, BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(Ioctl3Error::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(Ioctl3Error::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+        .map_err(Ioctl3Error::ParseResponse)?;
 
+    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     if error != 0 {
@@ -262,26 +258,28 @@ pub fn ioctl3(
 ///
 /// This is INvDrvServices command 2.
 pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::CLOSE)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(CloseError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::CLOSE)
-        .data_size(4) // fd
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write fd
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), fd.to_raw());
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), fd.to_raw()) };
     }
 
     ipc::send_sync_request(session).map_err(CloseError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(CloseError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+        .map_err(CloseError::ParseResponse)?;
 
+    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     if error != 0 {
@@ -300,30 +298,27 @@ pub fn initialize(
     tmem_handle: TmemHandle,
     tmem_size: u32,
 ) -> Result<(), InitializeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::INITIALIZE)
+            .data_size(size_of::<u32>())
+            .add_copy_handle(process_handle.to_raw())
+            .add_copy_handle(tmem_handle.to_raw())
+            .send()
+            .map_err(InitializeError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::INITIALIZE)
-        .data_size(4) // tmem_size
-        .handles(2) // process handle + tmem handle
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write tmem_size
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), tmem_size);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), tmem_size) };
     }
-
-    // Add copy handles
-    req.add_handle(process_handle.to_raw());
-    req.add_handle(tmem_handle.to_raw());
 
     ipc::send_sync_request(session).map_err(InitializeError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(InitializeError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(InitializeError::ParseResponse)?;
 
     Ok(())
 }
@@ -336,16 +331,7 @@ pub fn query_event(
     fd: Fd,
     event_id: u32,
 ) -> Result<RawHandle, QueryEventError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::QUERY_EVENT)
-        .data_size(8) // fd + event_id
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write fd and event_id
+    // Write fd and event_id.
     #[repr(C)]
     struct Input {
         fd: u32,
@@ -356,28 +342,39 @@ pub fn query_event(
         fd: fd.to_raw(),
         event_id,
     };
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<Input>().cast_mut(), input);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::QUERY_EVENT)
+            .data_size(size_of::<Input>())
+            .send()
+            .map_err(QueryEventError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
     }
 
     ipc::send_sync_request(session).map_err(QueryEventError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // Response contains error code (u32) and a copy handle for the event.
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
         .map_err(QueryEventError::ParseResponse)?;
 
-    // Response contains error code, and a copy handle for the event
+    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
     let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
 
     if error != 0 {
         return Err(QueryEventError::NvError(QueryEventNvError::from_raw(error)));
     }
 
-    let event_handle = resp
-        .copy_handles
-        .first()
-        .copied()
-        .ok_or(QueryEventError::MissingHandle)?;
+    let Some(&event_handle) = resp.copy_handles.first() else {
+        return Err(QueryEventError::MissingHandle);
+    };
 
     Ok(event_handle)
 }
@@ -386,26 +383,26 @@ pub fn query_event(
 ///
 /// This is INvDrvServices command 8.
 pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetClientPidError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::SET_CLIENT_PID)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(SetClientPidError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(nv_cmds::SET_CLIENT_PID)
-        .data_size(8) // ARUID
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // Write ARUID
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u64>().cast_mut(), aruid.to_raw());
+        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid.to_raw()) };
     }
 
     ipc::send_sync_request(session).map_err(SetClientPidError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(SetClientPidError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetClientPidError::ParseResponse)?;
 
     Ok(())
 }
@@ -413,12 +410,15 @@ pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetCli
 /// Error returned by open operation.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] OpenNvError),
@@ -427,12 +427,15 @@ pub enum OpenError {
 /// Error returned by ioctl operation.
 #[derive(Debug, thiserror::Error)]
 pub enum IoctlError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
@@ -441,12 +444,15 @@ pub enum IoctlError {
 /// Error returned by ioctl2 operation.
 #[derive(Debug, thiserror::Error)]
 pub enum Ioctl2Error {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
@@ -455,12 +461,15 @@ pub enum Ioctl2Error {
 /// Error returned by ioctl3 operation.
 #[derive(Debug, thiserror::Error)]
 pub enum Ioctl3Error {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
@@ -469,12 +478,15 @@ pub enum Ioctl3Error {
 /// Error returned by close operation.
 #[derive(Debug, thiserror::Error)]
 pub enum CloseError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] CloseNvError),
@@ -483,23 +495,29 @@ pub enum CloseError {
 /// Error returned by initialize operation.
 #[derive(Debug, thiserror::Error)]
 pub enum InitializeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by query_event operation.
 #[derive(Debug, thiserror::Error)]
 pub enum QueryEventError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] QueryEventNvError),
@@ -511,10 +529,13 @@ pub enum QueryEventError {
 /// Error returned by set_client_pid operation.
 #[derive(Debug, thiserror::Error)]
 pub enum SetClientPidError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
