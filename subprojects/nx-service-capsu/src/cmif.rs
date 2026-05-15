@@ -52,24 +52,22 @@ pub(crate) fn get_album_file_list_deprecated0(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` and `entries` live on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::GET_ALBUM_FILE_LIST_DEPRECATED0)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetAlbumFileListDeprecated0In>(),
-            )
-            .send_pid()
-            .buffer(
-                entries.as_mut_ptr(),
-                entries.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(GetAlbumFileListError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetAlbumFileListDeprecated0In>(),
+        )
     };
+    let result = service
+        .dispatch(proto::GET_ALBUM_FILE_LIST_DEPRECATED0)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let total = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -124,37 +122,35 @@ pub(crate) fn load_album_screenshot_image(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input`, `out`, `image`, `workbuf` live on the stack/heap until
-    // `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<LoadScreenShotIn>(),
-            )
-            .send_pid()
-            .buffer(
-                (out as *mut LoadAlbumScreenShotImageOutputForApplication).cast::<u8>(),
-                size_of::<LoadAlbumScreenShotImageOutputForApplication>(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                image.as_mut_ptr(),
-                image.len(),
-                BufferAttr::OUT
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE)
-                    .or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .buffer(
-                workbuf.as_mut_ptr(),
-                workbuf.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(LoadScreenShotImageError)
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<LoadScreenShotIn>(),
+        )
+    };
+    // SAFETY: `out` is a valid exclusive reference; viewing it as bytes for
+    // the OUT buffer is sound, and the byte slice borrows it.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            (out as *mut LoadAlbumScreenShotImageOutputForApplication).cast::<u8>(),
+            size_of::<LoadAlbumScreenShotImageOutputForApplication>(),
+        )
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(
+            image,
+            BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
+        )
+        .out_buffer(workbuf, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
+        .map_err(LoadScreenShotImageError)
 }
 
 /// Prechecks to create contents (cmd 130).
@@ -193,24 +189,22 @@ pub(crate) fn get_album_file_list_aae(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` and `entries` live on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetAlbumFileListAaeIn>(),
-            )
-            .send_pid()
-            .buffer(
-                entries.as_mut_ptr(),
-                entries.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(GetAlbumFileListError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetAlbumFileListAaeIn>(),
+        )
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let total = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -240,24 +234,22 @@ pub(crate) fn get_album_file_list_aae_uid(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` and `entries` live on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<GetAlbumFileListAaeUidIn>(),
-            )
-            .send_pid()
-            .buffer(
-                entries.as_mut_ptr(),
-                entries.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(GetAlbumFileListError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<GetAlbumFileListAaeUidIn>(),
+        )
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send_pid()
+        .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let total = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -276,18 +268,20 @@ pub(crate) fn open_accessor_session(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_ACCESSOR_SESSION)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<OpenAccessorSessionIn>(),
-            )
-            .send_pid()
-            .send()
-            .map_err(OpenAccessorSessionError::Dispatch)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<OpenAccessorSessionIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::OPEN_ACCESSOR_SESSION)
+        .in_raw(in_bytes)
+        .send_pid()
+        .send()
+        .map_err(OpenAccessorSessionError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenAccessorSessionError::MissingHandle);
@@ -342,23 +336,21 @@ pub(crate) fn read_movie_data(
 ) -> Result<u64, ReadMovieDataError> {
     let input = ReadMovieDataIn { stream, offset };
 
-    // SAFETY: `input` and `buffer` live on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<ReadMovieDataIn>(),
-            )
-            .buffer(
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .out_size(size_of::<u64>())
-            .send()
-            .map_err(ReadMovieDataError)?
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<ReadMovieDataIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
+        .in_raw(in_bytes)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
+        .out_size(size_of::<u64>())
+        .send()
+        .map_err(ReadMovieDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
     let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
