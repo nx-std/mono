@@ -21,19 +21,21 @@ pub(crate) fn open_final_output_recorder(
     service: &Session,
     input: &OpenRecorderIn,
 ) -> Result<(u32, FinalOutputRecorderParameterInternal), OpenRecorderError> {
-    // SAFETY: `input` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::OPEN_FINAL_OUTPUT_RECORDER)
-            .in_raw(
-                (&raw const *input).cast::<u8>(),
-                size_of::<OpenRecorderIn>(),
-            )
-            .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
-            .out_size(size_of::<FinalOutputRecorderParameterInternal>())
-            .send()
-            .map_err(OpenRecorderError::Dispatch)?
+    // SAFETY: `input` is a valid `&OpenRecorderIn`; viewing its bytes as a
+    // slice is sound, and the slice borrows `input` for the lifetime of the call.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (input as *const OpenRecorderIn).cast::<u8>(),
+            size_of::<OpenRecorderIn>(),
+        )
     };
+    let result = service
+        .dispatch(proto::OPEN_FINAL_OUTPUT_RECORDER)
+        .in_raw(in_bytes)
+        .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
+        .out_size(size_of::<FinalOutputRecorderParameterInternal>())
+        .send()
+        .map_err(OpenRecorderError::Dispatch)?;
 
     if result.move_handles.is_empty() {
         return Err(OpenRecorderError::MissingHandle);
@@ -78,23 +80,29 @@ pub(crate) fn recorder_append_buffer(
     buffer_client_ptr: u64,
     param: &FinalOutputRecorderBuffer,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` and `param` live on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::RECORDER_APPEND_BUFFER)
-            .in_raw(
-                (&raw const buffer_client_ptr).cast::<u8>(),
-                size_of::<u64>(),
-            )
-            .buffer(
-                (&raw const *param).cast::<u8>(),
-                size_of::<FinalOutputRecorderBuffer>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_AUTO_SELECT),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(AppendBufferError)
-    }
+    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const buffer_client_ptr).cast::<u8>(),
+            size_of::<u64>(),
+        )
+    };
+    // SAFETY: `param` is a valid `&FinalOutputRecorderBuffer`; viewing its bytes as
+    // an IN buffer slice is sound, and the slice borrows `param`.
+    let param_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (param as *const FinalOutputRecorderBuffer).cast::<u8>(),
+            size_of::<FinalOutputRecorderBuffer>(),
+        )
+    };
+    service
+        .dispatch(proto::RECORDER_APPEND_BUFFER)
+        .in_raw(in_bytes)
+        .in_buffer(param_bytes, BufferAttr::HIPC_AUTO_SELECT)
+        .send()
+        .map(|_| ())
+        .map_err(AppendBufferError)
 }
 
 /// Appends a final output recorder buffer (map-alias, legacy [1.0.0-2.x.x]).
@@ -103,23 +111,29 @@ pub(crate) fn recorder_append_buffer_legacy(
     buffer_client_ptr: u64,
     param: &FinalOutputRecorderBuffer,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` and `param` live on the stack until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::RECORDER_APPEND_BUFFER_LEGACY)
-            .in_raw(
-                (&raw const buffer_client_ptr).cast::<u8>(),
-                size_of::<u64>(),
-            )
-            .buffer(
-                (&raw const *param).cast::<u8>(),
-                size_of::<FinalOutputRecorderBuffer>(),
-                BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
-            )
-            .send()
-            .map(|_| ())
-            .map_err(AppendBufferError)
-    }
+    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const buffer_client_ptr).cast::<u8>(),
+            size_of::<u64>(),
+        )
+    };
+    // SAFETY: `param` is a valid `&FinalOutputRecorderBuffer`; viewing its bytes as
+    // an IN buffer slice is sound, and the slice borrows `param`.
+    let param_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (param as *const FinalOutputRecorderBuffer).cast::<u8>(),
+            size_of::<FinalOutputRecorderBuffer>(),
+        )
+    };
+    service
+        .dispatch(proto::RECORDER_APPEND_BUFFER_LEGACY)
+        .in_raw(in_bytes)
+        .in_buffer(param_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .send()
+        .map(|_| ())
+        .map_err(AppendBufferError)
 }
 
 /// Gets released final output recorder buffers (auto-select, [3.0.0+]).
@@ -134,7 +148,7 @@ pub(crate) fn recorder_get_released_buffers(
         service,
         proto::RECORDER_GET_RELEASED_BUFFERS,
         out_buffers,
-        BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
+        BufferAttr::HIPC_AUTO_SELECT,
     )
 }
 
@@ -150,7 +164,7 @@ pub(crate) fn recorder_get_released_buffers_legacy(
         service,
         proto::RECORDER_GET_RELEASED_BUFFERS_LEGACY,
         out_buffers,
-        BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
+        BufferAttr::HIPC_MAP_ALIAS,
     )
 }
 
@@ -158,14 +172,21 @@ fn get_released_impl(
     service: &Session,
     cmd_id: u32,
     out_buffers: &mut [u64],
-    buffer_attr: BufferAttr,
+    transfer_attr: BufferAttr,
 ) -> Result<(u32, u64), GetReleasedBuffersError> {
-    let buf_size = core::mem::size_of_val(out_buffers);
+    // SAFETY: `out_buffers` is a valid `&mut [u64]`; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `out_buffers`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            out_buffers.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(out_buffers),
+        )
+    };
 
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<GetReleasedBuffersOut>())
-        .buffer(out_buffers.as_mut_ptr().cast::<u8>(), buf_size, buffer_attr)
+        .out_buffer(out_bytes, transfer_attr)
         .send()
         .map_err(GetReleasedBuffersError)?;
 
