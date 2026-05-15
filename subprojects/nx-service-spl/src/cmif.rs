@@ -35,26 +35,10 @@ pub(crate) fn user_exp_mod(
 ) -> Result<(), DispatchError> {
     service
         .dispatch(proto::USER_EXP_MOD)
-        .buffer(
-            dst.as_mut_ptr(),
-            RSA_BUFFER_SIZE,
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
-        .buffer(
-            input.as_ptr().cast_mut(),
-            RSA_BUFFER_SIZE,
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
-        .buffer(
-            exp.as_ptr().cast_mut(),
-            exp.len(),
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
-        .buffer(
-            modulus.as_ptr().cast_mut(),
-            RSA_BUFFER_SIZE,
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(dst, BufferAttr::HIPC_POINTER)
+        .in_buffer(input, BufferAttr::HIPC_POINTER)
+        .in_buffer(exp, BufferAttr::HIPC_POINTER)
+        .in_buffer(modulus, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -77,11 +61,7 @@ pub(crate) fn set_config(
 pub(crate) fn get_random_bytes(service: &Session, out: &mut [u8]) -> Result<(), DispatchError> {
     service
         .dispatch(proto::GET_RANDOM_BYTES)
-        .buffer(
-            out.as_mut_ptr(),
-            out.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(out, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -174,28 +154,24 @@ pub(crate) fn crypt_aes_ctr(
 ) -> Result<(), DispatchError> {
     let input = CryptAesCtrIn { ctr: *ctr, keyslot };
 
-    // SAFETY: buffers live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::CRYPT_AES_CTR)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<CryptAesCtrIn>())
-            .buffer(
-                output.as_mut_ptr(),
-                output.len(),
-                BufferAttr::OUT
-                    .or(BufferAttr::HIPC_MAP_ALIAS)
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-            )
-            .buffer(
-                input_data.as_ptr().cast_mut(),
-                input_data.len(),
-                BufferAttr::IN
-                    .or(BufferAttr::HIPC_MAP_ALIAS)
-                    .or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<CryptAesCtrIn>()` bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<CryptAesCtrIn>())
+    };
+    service
+        .dispatch(proto::CRYPT_AES_CTR)
+        .in_raw(in_bytes)
+        .out_buffer(
+            output,
+            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+        )
+        .in_buffer(
+            input_data,
+            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+        )
+        .send()
+        .map(|_| ())
 }
 
 /// ComputeCmac (cmd 16).
@@ -204,19 +180,16 @@ pub(crate) fn compute_cmac(
     input_data: &[u8],
     keyslot: u32,
 ) -> Result<SplKey, DispatchError> {
-    // SAFETY: `keyslot` lives on the stack until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(proto::COMPUTE_CMAC)
-            .in_raw((&raw const keyslot).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<SplKey>())
-            .buffer(
-                input_data.as_ptr().cast_mut(),
-                input_data.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
-    };
+    // SAFETY: `keyslot` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its `size_of::<u32>()` bytes as a slice is sound.
+    let in_bytes =
+        unsafe { core::slice::from_raw_parts((&raw const keyslot).cast::<u8>(), size_of::<u32>()) };
+    let result = service
+        .dispatch(proto::COMPUTE_CMAC)
+        .in_raw(in_bytes)
+        .out_size(size_of::<SplKey>())
+        .in_buffer(input_data, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<SplKey>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SplKey>()) })
@@ -268,27 +241,21 @@ pub(crate) fn decrypt_rsa_private_key_legacy(
         version: version as u32,
     };
 
-    // SAFETY: buffers live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<DecryptRsaPrivateKeyLegacyIn>(),
-            )
-            .buffer(
-                dst.as_mut_ptr(),
-                dst.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                wrapped_rsa_key.as_ptr().cast_mut(),
-                wrapped_rsa_key.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<DecryptRsaPrivateKeyLegacyIn>(),
+        )
+    };
+    service
+        .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
+        .in_raw(in_bytes)
+        .out_buffer(dst, BufferAttr::HIPC_POINTER)
+        .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// DecryptRsaPrivateKey (5.0.0+, cmd 13).
@@ -304,24 +271,18 @@ pub(crate) fn decrypt_rsa_private_key(
         wrapped_key: *wrapped_key,
     };
 
-    // SAFETY: buffers live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
-            .buffer(
-                dst.as_mut_ptr(),
-                dst.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                wrapped_rsa_key.as_ptr().cast_mut(),
-                wrapped_rsa_key.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
+    };
+    service
+        .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
+        .in_raw(in_bytes)
+        .out_buffer(dst, BufferAttr::HIPC_POINTER)
+        .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
@@ -563,11 +524,7 @@ pub(crate) fn fs_get_package2_hash(
 ) -> Result<(), DispatchError> {
     service
         .dispatch(proto::FS_GET_PACKAGE2_HASH)
-        .buffer(
-            out_hash.as_mut_ptr(),
-            SHA256_HASH_SIZE,
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(out_hash, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -596,27 +553,21 @@ pub(crate) fn manu_encrypt_rsa_key_for_import(
         option,
     };
 
-    // SAFETY: buffers live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(proto::MANU_ENCRYPT_RSA_KEY_FOR_IMPORT)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<EncryptRsaKeyForImportIn>(),
-            )
-            .buffer(
-                out_wrapped_rsa_key.as_mut_ptr(),
-                out_wrapped_rsa_key.len(),
-                BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                wrapped_rsa_key.as_ptr().cast_mut(),
-                wrapped_rsa_key.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<EncryptRsaKeyForImportIn>(),
+        )
+    };
+    service
+        .dispatch(proto::MANU_ENCRYPT_RSA_KEY_FOR_IMPORT)
+        .in_raw(in_bytes)
+        .out_buffer(out_wrapped_rsa_key, BufferAttr::HIPC_POINTER)
+        .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 // ---------------------------------------------------------------------------
@@ -633,21 +584,9 @@ fn secure_exp_mod(
 ) -> Result<(), DispatchError> {
     service
         .dispatch(cmd_id)
-        .buffer(
-            dst.as_mut_ptr(),
-            RSA_BUFFER_SIZE,
-            BufferAttr::OUT.or(BufferAttr::HIPC_POINTER),
-        )
-        .buffer(
-            input.as_ptr().cast_mut(),
-            RSA_BUFFER_SIZE,
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
-        .buffer(
-            modulus.as_ptr().cast_mut(),
-            RSA_BUFFER_SIZE,
-            BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-        )
+        .out_buffer(dst, BufferAttr::HIPC_POINTER)
+        .in_buffer(input, BufferAttr::HIPC_POINTER)
+        .in_buffer(modulus, BufferAttr::HIPC_POINTER)
         .send()
         .map(|_| ())
 }
@@ -665,19 +604,17 @@ fn import_secure_exp_mod_key(
         wrapped_key: *wrapped_key,
     };
 
-    // SAFETY: buffers live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
-            .buffer(
-                wrapped_rsa_key.as_ptr().cast_mut(),
-                wrapped_rsa_key.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// ImportSecureExpModKey legacy (pre-5.0.0, used by ES cmd 17, FS cmd 9).
@@ -695,22 +632,20 @@ fn import_secure_exp_mod_key_legacy(
         version: version as u32,
     };
 
-    // SAFETY: buffers live until `.send()` returns.
-    unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw(
-                (&raw const input).cast::<u8>(),
-                size_of::<ImportSecureExpModKeyLegacyIn>(),
-            )
-            .buffer(
-                wrapped_rsa_key.as_ptr().cast_mut(),
-                wrapped_rsa_key.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()
-            .map(|_| ())
-    }
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<ImportSecureExpModKeyLegacyIn>(),
+        )
+    };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
+        .send()
+        .map(|_| ())
 }
 
 /// UnwrapRsaOaepWrappedKey dispatch (used by ES cmds 18, 31).
@@ -722,29 +657,19 @@ fn unwrap_rsa_oaep_wrapped_key(
     label_hash: &[u8],
     key_generation: u32,
 ) -> Result<SplKey, DispatchError> {
-    // SAFETY: buffers live until `.send()` returns.
-    let result = unsafe {
-        service
-            .dispatch(cmd_id)
-            .in_raw((&raw const key_generation).cast::<u8>(), size_of::<u32>())
-            .out_size(size_of::<SplKey>())
-            .buffer(
-                rsa_wrapped_key.as_ptr().cast_mut(),
-                RSA_BUFFER_SIZE,
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                modulus.as_ptr().cast_mut(),
-                RSA_BUFFER_SIZE,
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .buffer(
-                label_hash.as_ptr().cast_mut(),
-                label_hash.len(),
-                BufferAttr::IN.or(BufferAttr::HIPC_POINTER),
-            )
-            .send()?
+    // SAFETY: `key_generation` is a `Copy` value on the stack, valid until
+    // `.send()` returns; viewing its bytes as a slice is sound.
+    let in_bytes = unsafe {
+        core::slice::from_raw_parts((&raw const key_generation).cast::<u8>(), size_of::<u32>())
     };
+    let result = service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .out_size(size_of::<SplKey>())
+        .in_buffer(rsa_wrapped_key, BufferAttr::HIPC_POINTER)
+        .in_buffer(modulus, BufferAttr::HIPC_POINTER)
+        .in_buffer(label_hash, BufferAttr::HIPC_POINTER)
+        .send()?;
 
     // SAFETY: response payload is at least size_of::<SplKey>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SplKey>()) })
