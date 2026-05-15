@@ -18,9 +18,3 @@ nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"

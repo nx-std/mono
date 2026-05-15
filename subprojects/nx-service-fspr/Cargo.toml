@@ -15,9 +15,3 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 thiserror = { version = "2", default-features = false }
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"

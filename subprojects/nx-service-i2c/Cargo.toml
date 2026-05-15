@@ -18,9 +18,3 @@ nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 thiserror = { version = "2", default-features = false }
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"

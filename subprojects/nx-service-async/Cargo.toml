@@ -15,9 +15,3 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 static_assertions = "1"
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
