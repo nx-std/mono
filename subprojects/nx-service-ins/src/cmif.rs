@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the INS services.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -9,27 +9,30 @@ use crate::proto;
 
 /// Gets the last system tick an event was signaled at.
 pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTickError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_LAST_TICK)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(GetLastTickError::BuildRequest)?;
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_LAST_TICK)
-        .data_size(size_of::<u32>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), id);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), id);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetLastTickError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u64>()) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
         .map_err(GetLastTickError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u64.
+    // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.
     let tick = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
 
     Ok(tick)
@@ -48,30 +51,33 @@ pub fn get_readable_event(
     session: SessionHandle,
     id: u32,
 ) -> Result<nx_svc::sync::EventHandle, GetReadableEventError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_READABLE_EVENT)
-        .data_size(size_of::<EventInput>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = EventInput {
         id,
         _pad: 0,
         unk: 0,
     };
 
-    // SAFETY: req.data points to valid payload area with space for EventInput.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<EventInput>().cast_mut(), input);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_READABLE_EVENT)
+            .data_size(size_of::<EventInput>())
+            .send()
+            .map_err(GetReadableEventError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<EventInput>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<EventInput>(), input);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetReadableEventError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetReadableEventError::ParseResponse)?;
 
     let handle = resp
@@ -86,30 +92,33 @@ pub fn get_readable_event(
 
 /// Gets a writable event handle for the given send ID.
 pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWritableEventError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::GET_WRITABLE_EVENT)
-        .data_size(size_of::<EventInput>())
-        .build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let input = EventInput {
         id,
         _pad: 0,
         unk: 0,
     };
 
-    // SAFETY: req.data points to valid payload area with space for EventInput.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<EventInput>().cast_mut(), input);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_WRITABLE_EVENT)
+            .data_size(size_of::<EventInput>())
+            .send()
+            .map_err(GetWritableEventError::BuildRequest)?;
+
+        // SAFETY: `req.data` is exactly `size_of::<EventInput>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<EventInput>(), input);
+        }
     }
 
     ipc::send_sync_request(session).map_err(GetWritableEventError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(GetWritableEventError::ParseResponse)?;
 
     let handle = resp
@@ -124,23 +133,29 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
 /// Error returned by [`get_last_tick`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetLastTickError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_readable_event`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetReadableEventError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response did not contain the expected copy handle.
     #[error("missing event handle in response")]
     MissingHandle,
@@ -149,12 +164,15 @@ pub enum GetReadableEventError {
 /// Error returned by [`get_writable_event`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetWritableEventError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response did not contain the expected copy handle.
     #[error("missing event handle in response")]
     MissingHandle,
