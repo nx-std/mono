@@ -25,11 +25,7 @@ pub fn async_value_get_size(service: &Session) -> Result<u64, DispatchError> {
 pub fn async_value_get(service: &Session, buffer: &mut [u8]) -> Result<(), DispatchError> {
     service
         .dispatch(proto::ASYNC_VALUE_GET)
-        .buffer(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -47,13 +43,17 @@ pub fn async_value_get_error_context(
     service: &Session,
     context: &mut ErrorContext,
 ) -> Result<(), DispatchError> {
+    // SAFETY: `ErrorContext` is `#[repr(C)]`; viewing its `size_of` bytes as a
+    // byte slice for the OUT buffer is sound, and the slice borrows `context`.
+    let bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            ptr::from_mut(context).cast::<u8>(),
+            size_of::<ErrorContext>(),
+        )
+    };
     service
         .dispatch(proto::ASYNC_VALUE_GET_ERROR_CONTEXT)
-        .buffer(
-            (context as *mut ErrorContext).cast::<u8>(),
-            size_of::<ErrorContext>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
@@ -80,13 +80,17 @@ pub fn async_result_get_error_context(
     service: &Session,
     context: &mut ErrorContext,
 ) -> Result<(), DispatchError> {
+    // SAFETY: `ErrorContext` is `#[repr(C)]`; viewing its `size_of` bytes as a
+    // byte slice for the OUT buffer is sound, and the slice borrows `context`.
+    let bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            ptr::from_mut(context).cast::<u8>(),
+            size_of::<ErrorContext>(),
+        )
+    };
     service
         .dispatch(proto::ASYNC_RESULT_GET_ERROR_CONTEXT)
-        .buffer(
-            (context as *mut ErrorContext).cast::<u8>(),
-            size_of::<ErrorContext>(),
-            BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
-        )
+        .out_buffer(bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send()
         .map(|_| ())
 }
