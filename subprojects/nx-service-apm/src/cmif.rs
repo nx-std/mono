@@ -3,7 +3,7 @@
 //! This module implements APM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::ptr;
+use core::{mem::size_of, ptr};
 
 use nx_sf::cmif;
 use nx_svc::ipc::{self, Handle as SessionHandle};
@@ -17,27 +17,28 @@ use crate::proto::{
 ///
 /// This is IManager command 0.
 pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSessionError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(CMD_OPEN_SESSION).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, CMD_OPEN_SESSION)
+            .send()
+            .map_err(OpenSessionError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(OpenSessionError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp =
+        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSessionError::ParseResponse)?;
 
-    // Extract the move handle from response
-    let handle = resp
-        .move_handles
-        .first()
-        .copied()
-        .ok_or(OpenSessionError::MissingHandle)?;
+    let Some(&handle) = resp.move_handles.first() else {
+        return Err(OpenSessionError::MissingHandle);
+    };
 
-    // SAFETY: Handle is from a valid IPC response.
+    // SAFETY: the kernel returned a valid session handle in the response.
     Ok(unsafe { SessionHandle::from_raw(handle) })
 }
 
@@ -47,20 +48,23 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
 pub fn get_performance_mode(
     session: SessionHandle,
 ) -> Result<PerformanceMode, GetPerformanceModeError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(CMD_GET_PERFORMANCE_MODE).build();
-
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, CMD_GET_PERFORMANCE_MODE)
+            .send()
+            .map_err(GetPerformanceModeError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(GetPerformanceModeError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 4) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
         .map_err(GetPerformanceModeError::ParseResponse)?;
 
-    // Response contains a single i32
     if resp.data.len() < 4 {
         return Err(GetPerformanceModeError::InvalidResponse);
     }
@@ -78,9 +82,8 @@ pub fn set_performance_configuration(
     mode: PerformanceMode,
     config: u32,
 ) -> Result<(), SetPerformanceConfigurationError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     #[repr(C)]
+    #[derive(Clone, Copy)]
     struct InData {
         mode: u32,
         config: u32,
@@ -91,22 +94,25 @@ pub fn set_performance_configuration(
         config,
     };
 
-    let fmt = cmif::RequestFormatBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
-        .data_size(8) // Two u32 values
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, CMD_SET_PERFORMANCE_CONFIGURATION)
+            .data_size(size_of::<InData>())
+            .send()
+            .map_err(SetPerformanceConfigurationError::BuildRequest)?;
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for InData.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<InData>().cast_mut(), in_data);
+        // SAFETY: `req.data` is exactly `size_of::<InData>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<InData>(), in_data) };
     }
 
     ipc::send_sync_request(session).map_err(SetPerformanceConfigurationError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0)
         .map_err(SetPerformanceConfigurationError::ParseResponse)?;
 
     Ok(())
@@ -119,29 +125,29 @@ pub fn get_performance_configuration(
     session: SessionHandle,
     mode: PerformanceMode,
 ) -> Result<u32, GetPerformanceConfigurationError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     let in_data: u32 = mode as i32 as u32;
 
-    let fmt = cmif::RequestFormatBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
-        .data_size(4) // One u32 input
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_PERFORMANCE_CONFIGURATION)
+            .data_size(size_of::<u32>())
+            .send()
+            .map_err(GetPerformanceConfigurationError::BuildRequest)?;
 
-    // SAFETY: ipc_buf points to valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u32.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u32>().cast_mut(), in_data);
+        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), in_data) };
     }
 
     ipc::send_sync_request(session).map_err(GetPerformanceConfigurationError::SendRequest)?;
 
-    // SAFETY: Response is in TLS buffer after successful send.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, 4) }
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
         .map_err(GetPerformanceConfigurationError::ParseResponse)?;
 
-    // Response contains a single u32
     if resp.data.len() < 4 {
         return Err(GetPerformanceConfigurationError::InvalidResponse);
     }
@@ -154,12 +160,15 @@ pub fn get_performance_configuration(
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -168,12 +177,15 @@ pub enum OpenSessionError {
 /// Error returned by [`get_performance_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPerformanceModeError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response data was too short.
     #[error("invalid response data")]
     InvalidResponse,
@@ -185,23 +197,29 @@ pub enum GetPerformanceModeError {
 /// Error returned by [`set_performance_configuration`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetPerformanceConfigurationError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`get_performance_configuration`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPerformanceConfigurationError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
     /// Response data was too short.
     #[error("invalid response data")]
     InvalidResponse,
