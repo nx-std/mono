@@ -12,7 +12,7 @@
 use core::{mem::size_of, ptr};
 
 use nx_sf::{
-    cmif::{self, ParseResponseError},
+    cmif::{self, ParseRespBytesError},
     hipc::BufferMode,
 };
 use nx_svc::{
@@ -43,18 +43,6 @@ pub(crate) fn register_client(
     tmem_handle: TmemHandle,
     tmem_size: u64,
 ) -> Result<u64, RegisterClientError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::REGISTER_CLIENT)
-        .data_size(size_of::<RegisterClientIn>())
-        .handles(1)
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to the valid TLS IPC buffer; data_size accounts
-    // for the entire RegisterClientIn payload.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let payload = RegisterClientIn {
         config: BsdServiceConfigWire {
             version: config.version,
@@ -69,18 +57,31 @@ pub(crate) fn register_client(
         pid_placeholder: 0,
         tmem_size,
     };
-    // SAFETY: req.data has data_size bytes reserved for RegisterClientIn.
-    unsafe {
-        ptr::write_unaligned(req.data.as_mut_ptr().cast::<RegisterClientIn>(), payload);
+
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::REGISTER_CLIENT)
+            .data_size(size_of::<RegisterClientIn>())
+            .send_pid()
+            .add_copy_handle(tmem_handle.to_raw())
+            .send()
+            .map_err(RegisterClientError::BuildRequest)?;
+        // SAFETY: `req.data` is exactly `size_of::<RegisterClientIn>()` bytes.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<RegisterClientIn>(), payload);
+        }
     }
-    req.add_handle(tmem_handle.to_raw());
 
     ipc::send_sync_request(session).map_err(RegisterClientError::SendRequest)?;
 
-    // SAFETY: Response is in the TLS buffer after a successful send. The reply
-    // is a CMIF `u64 pid` payload — no extra `{ ret; errno; }` prefix here
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // The reply is a CMIF `u64 pid` payload — no extra `{ ret; errno; }` prefix here
     // because cmd 0 / cmd 1 don't use the dispatch path that adds it.
-    let resp = unsafe { cmif::parse_response(ipc_buf, false, size_of::<u64>()) }
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
         .map_err(RegisterClientError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least size_of::<u64>() bytes.
@@ -93,23 +94,25 @@ pub(crate) fn start_monitoring(
     monitor_session: SessionHandle,
     pid: u64,
 ) -> Result<(), StartMonitoringError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(cmds::START_MONITORING)
-        .data_size(size_of::<u64>())
-        .send_pid()
-        .build();
-
-    // SAFETY: ipc_buf points to the valid TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has 8 bytes reserved for the pid payload.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::START_MONITORING)
+            .data_size(size_of::<u64>())
+            .send_pid()
+            .send()
+            .map_err(StartMonitoringError::BuildRequest)?;
+        // SAFETY: req.data has 8 bytes reserved for the pid payload.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid) };
+    }
 
     ipc::send_sync_request(monitor_session).map_err(StartMonitoringError::SendRequest)?;
 
-    // SAFETY: Response in the TLS buffer; no response payload.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(StartMonitoringError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(StartMonitoringError::ParseResponse)?;
     Ok(())
 }
 
@@ -117,33 +120,37 @@ pub(crate) fn start_monitoring(
 // Shared response decoding for `_bsdDispatchImpl`-style commands
 // ---------------------------------------------------------------------------
 
-/// Outcome of decoding the `{ ret; errno; [extra...] }` reply.
-struct ServiceOutcome<'a> {
+/// Outcome of decoding the `{ ret; errno; [extra u32] }` reply.
+struct ServiceOutcome {
     ret: i32,
-    extra: &'a [u8],
+    /// Optional extra `u32` trailing the `CallResponse` prefix (e.g. addrlen,
+    /// optlen). `None` when the command emits no trailing payload.
+    extra_u32: Option<u32>,
 }
 
 /// Reads the standard BSD response prefix from the TLS buffer.
 ///
-/// On `ret >= 0`, returns the value and a slice over the trailing
-/// command-specific payload. On `ret < 0`, returns `Err((ret, errno))` so
-/// callers can map it into the right per-command `Service` variant.
+/// On `ret >= 0`, returns `ServiceOutcome`. On `ret < 0`, returns
+/// `Err(ServiceResponseFailure)`.
+///
+/// `has_extra_u32` controls whether a trailing `u32` after the
+/// `CallResponse` header is read and returned in `ServiceOutcome::extra_u32`.
 ///
 /// # Safety
 ///
-/// `ipc_buf` must be the live TLS IPC buffer right after a successful
-/// `send_sync_request`. `extra_out_size` must match what the command actually
-/// emitted in addition to the 8-byte prefix.
-unsafe fn read_service_response<'a>(
-    ipc_buf: core::ptr::NonNull<u8>,
-    extra_out_size: usize,
-) -> Result<ServiceOutcome<'a>, ServiceResponseFailure> {
-    // SAFETY: caller upholds preconditions.
-    let resp =
-        unsafe { cmif::parse_response(ipc_buf, false, size_of::<CallResponse>() + extra_out_size) }
-            .map_err(ServiceResponseFailure::Parse)?;
+/// Must be called right after a successful `send_sync_request`. No other
+/// borrow of the TLS IPC buffer may be live when this is called.
+unsafe fn read_service_response(
+    has_extra_u32: bool,
+) -> Result<ServiceOutcome, ServiceResponseFailure> {
+    let extra_size = if has_extra_u32 { size_of::<u32>() } else { 0 };
+    // SAFETY: caller upholds preconditions — no other borrow is live and the
+    // kernel has populated the TLS IPC buffer during the SVC.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<CallResponse>() + extra_size)
+        .map_err(ServiceResponseFailure::Parse)?;
 
-    // SAFETY: parse_response guaranteed at least size_of::<CallResponse>()
+    // SAFETY: parse_response_bytes guaranteed at least size_of::<CallResponse>()
     // bytes are valid in resp.data.
     let prefix = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<CallResponse>()) };
 
@@ -154,15 +161,22 @@ unsafe fn read_service_response<'a>(
         });
     }
 
-    let extra = &resp.data[size_of::<CallResponse>()..];
+    let extra_u32 = if has_extra_u32 {
+        let extra_bytes = &resp.data[size_of::<CallResponse>()..];
+        // SAFETY: parse_response_bytes guarantees `extra_size` bytes are valid.
+        Some(unsafe { ptr::read_unaligned(extra_bytes.as_ptr().cast::<u32>()) })
+    } else {
+        None
+    };
+
     Ok(ServiceOutcome {
         ret: prefix.ret,
-        extra,
+        extra_u32,
     })
 }
 
 enum ServiceResponseFailure {
-    Parse(ParseResponseError),
+    Parse(ParseRespBytesError),
     Service { ret: i32, errno: i32 },
 }
 
@@ -177,23 +191,26 @@ pub(crate) fn socket(
     type_: i32,
     protocol: i32,
 ) -> Result<BsdSockFd, SocketError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SOCKET)
-        .data_size(size_of::<SocketIn>())
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer; data_size matches SocketIn.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
     let payload = SocketIn {
         domain,
         type_,
         protocol,
     };
-    // SAFETY: req.data has data_size bytes reserved for SocketIn.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SocketIn>(), payload) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::SOCKET)
+            .data_size(size_of::<SocketIn>())
+            .send()
+            .map_err(SocketError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SocketIn.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SocketIn>(), payload) };
+    }
 
     ipc::send_sync_request(session).map_err(SocketError::SendRequest)?;
-    // SAFETY: response in TLS buffer; no command-specific extra payload.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SocketError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => SocketError::Service { ret, errno },
     })?;
@@ -202,18 +219,21 @@ pub(crate) fn socket(
 
 /// `bsdClose` (cmd 26).
 pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::CLOSE)
-        .data_size(size_of::<i32>())
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has 4 bytes reserved for the fd.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::CLOSE)
+            .data_size(size_of::<i32>())
+            .send()
+            .map_err(CloseError::BuildRequest)?;
+        // SAFETY: req.data has 4 bytes reserved for the fd.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+    }
 
     ipc::send_sync_request(session).map_err(CloseError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let _ = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => CloseError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => CloseError::Service { ret, errno },
     })?;
@@ -235,6 +255,7 @@ pub(crate) fn bind(
         cmds::BIND,
         sockfd,
         addr,
+        BindError::BuildRequest,
         BindError::SendRequest,
         BindError::ParseResponse,
         |ret, errno| BindError::Service { ret, errno },
@@ -253,6 +274,7 @@ pub(crate) fn connect(
         cmds::CONNECT,
         sockfd,
         addr,
+        ConnectError::BuildRequest,
         ConnectError::SendRequest,
         ConnectError::ParseResponse,
         |ret, errno| ConnectError::Service { ret, errno },
@@ -262,29 +284,33 @@ pub(crate) fn connect(
 
 /// Shared `bind`/`connect` body — sends `sockfd` plus an in-only sockaddr
 /// buffer, then drops the standard `{ ret; errno }` reply on the floor.
+#[allow(clippy::too_many_arguments)]
 fn bsd_send_recv_no_buffer_in<E>(
     session: SessionHandle,
     cmd_id: u32,
     sockfd: BsdSockFd,
     addr: &[u8],
+    mk_build: fn(cmif::RequestLayoutError) -> E,
     mk_send: fn(SendSyncError) -> E,
-    mk_parse: fn(ParseResponseError) -> E,
+    mk_parse: fn(ParseRespBytesError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<i32, E> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(size_of::<i32>())
-        .in_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has 4 bytes reserved for sockfd.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
-    req.add_in_auto_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(size_of::<i32>())
+            .add_in_auto_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
+            .send()
+            .map_err(mk_build)?;
+        // SAFETY: req.data has 4 bytes reserved for sockfd.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
+    }
 
     ipc::send_sync_request(session).map_err(mk_send)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => mk_parse(err),
         ServiceResponseFailure::Service { ret, errno } => mk_service(ret, errno),
     })?;
@@ -293,36 +319,38 @@ fn bsd_send_recv_no_buffer_in<E>(
 
 /// Shared `accept`/`getsockname`/`getpeername` body — sends `sockfd` and an
 /// out-only sockaddr buffer, then reads back the actual `socklen_t` length.
+#[allow(clippy::too_many_arguments)]
 fn bsd_cmd_in_sockfd_out_sockaddr<E>(
     session: SessionHandle,
     cmd_id: u32,
     sockfd: BsdSockFd,
     addr_buf: &mut [u8],
+    mk_build: fn(cmif::RequestLayoutError) -> E,
     mk_send: fn(SendSyncError) -> E,
-    mk_parse: fn(ParseResponseError) -> E,
+    mk_parse: fn(ParseRespBytesError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<(i32, u32), E> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmd_id)
-        .data_size(size_of::<i32>())
-        .out_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has 4 bytes reserved for sockfd.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
-    req.add_out_auto_buffer(addr_buf.as_mut_ptr(), addr_buf.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+            .data_size(size_of::<i32>())
+            .add_out_auto_buffer(addr_buf.as_mut_ptr(), addr_buf.len(), BufferMode::Normal)
+            .send()
+            .map_err(mk_build)?;
+        // SAFETY: req.data has 4 bytes reserved for sockfd.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
+    }
 
     ipc::send_sync_request(session).map_err(mk_send)?;
-    // SAFETY: response in TLS buffer; out_data carries one u32 with the addrlen.
-    let outcome =
-        unsafe { read_service_response(ipc_buf, size_of::<u32>()) }.map_err(|err| match err {
-            ServiceResponseFailure::Parse(err) => mk_parse(err),
-            ServiceResponseFailure::Service { ret, errno } => mk_service(ret, errno),
-        })?;
+    // SAFETY: the kernel populated the TLS IPC buffer; out_data carries one u32 with the addrlen.
+    let outcome = unsafe { read_service_response(true) }.map_err(|err| match err {
+        ServiceResponseFailure::Parse(err) => mk_parse(err),
+        ServiceResponseFailure::Service { ret, errno } => mk_service(ret, errno),
+    })?;
 
-    // SAFETY: read_service_response ensures `extra` is at least size_of::<u32>().
-    let addrlen = unsafe { ptr::read_unaligned(outcome.extra.as_ptr().cast::<u32>()) };
+    let addrlen = outcome.extra_u32.unwrap_or(0);
     Ok((outcome.ret, addrlen))
 }
 
@@ -338,6 +366,7 @@ pub(crate) fn accept(
         cmds::ACCEPT,
         sockfd,
         addr_buf,
+        AcceptError::BuildRequest,
         AcceptError::SendRequest,
         AcceptError::ParseResponse,
         |ret, errno| AcceptError::Service { ret, errno },
@@ -356,6 +385,7 @@ pub(crate) fn get_sock_name(
         cmds::GET_SOCK_NAME,
         sockfd,
         addr_buf,
+        GetSockNameError::BuildRequest,
         GetSockNameError::SendRequest,
         GetSockNameError::ParseResponse,
         |ret, errno| GetSockNameError::Service { ret, errno },
@@ -374,6 +404,7 @@ pub(crate) fn get_peer_name(
         cmds::GET_PEER_NAME,
         sockfd,
         addr_buf,
+        GetPeerNameError::BuildRequest,
         GetPeerNameError::SendRequest,
         GetPeerNameError::ParseResponse,
         |ret, errno| GetPeerNameError::Service { ret, errno },
@@ -391,26 +422,29 @@ pub(crate) fn listen(
     sockfd: BsdSockFd,
     backlog: i32,
 ) -> Result<(), ListenError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::LISTEN)
-        .data_size(size_of::<ListenIn>())
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for ListenIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<ListenIn>(),
-            ListenIn {
-                sockfd: sockfd.raw(),
-                backlog,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::LISTEN)
+            .data_size(size_of::<ListenIn>())
+            .send()
+            .map_err(ListenError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for ListenIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<ListenIn>(),
+                ListenIn {
+                    sockfd: sockfd.raw(),
+                    backlog,
+                },
+            );
+        }
     }
 
     ipc::send_sync_request(session).map_err(ListenError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let _ = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => ListenError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => ListenError::Service { ret, errno },
     })?;
@@ -423,26 +457,29 @@ pub(crate) fn shutdown(
     sockfd: BsdSockFd,
     how: i32,
 ) -> Result<(), ShutdownError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SHUTDOWN)
-        .data_size(size_of::<ShutdownIn>())
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for ShutdownIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<ShutdownIn>(),
-            ShutdownIn {
-                sockfd: sockfd.raw(),
-                how,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, cmds::SHUTDOWN)
+            .data_size(size_of::<ShutdownIn>())
+            .send()
+            .map_err(ShutdownError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for ShutdownIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<ShutdownIn>(),
+                ShutdownIn {
+                    sockfd: sockfd.raw(),
+                    how,
+                },
+            );
+        }
     }
 
     ipc::send_sync_request(session).map_err(ShutdownError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let _ = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => ShutdownError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => ShutdownError::Service { ret, errno },
     })?;
@@ -460,28 +497,30 @@ pub(crate) fn recv(
     buf: &mut [u8],
     flags: i32,
 ) -> Result<usize, RecvError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::RECV)
-        .data_size(size_of::<SockfdFlagsIn>())
-        .out_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
-            SockfdFlagsIn {
-                sockfd: sockfd.raw(),
-                flags,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::RECV)
+            .data_size(size_of::<SockfdFlagsIn>())
+            .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
+            .send()
+            .map_err(RecvError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                SockfdFlagsIn {
+                    sockfd: sockfd.raw(),
+                    flags,
+                },
+            );
+        }
     }
-    req.add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(RecvError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => RecvError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => RecvError::Service { ret, errno },
     })?;
@@ -496,35 +535,35 @@ pub(crate) fn recv_from(
     flags: i32,
     src_addr: &mut [u8],
 ) -> Result<(usize, u32), RecvFromError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::RECV_FROM)
-        .data_size(size_of::<SockfdFlagsIn>())
-        .out_auto_buffers(2)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
-            SockfdFlagsIn {
-                sockfd: sockfd.raw(),
-                flags,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::RECV_FROM)
+            .data_size(size_of::<SockfdFlagsIn>())
+            .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
+            .add_out_auto_buffer(src_addr.as_mut_ptr(), src_addr.len(), BufferMode::Normal)
+            .send()
+            .map_err(RecvFromError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                SockfdFlagsIn {
+                    sockfd: sockfd.raw(),
+                    flags,
+                },
+            );
+        }
     }
-    req.add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal);
-    req.add_out_auto_buffer(src_addr.as_mut_ptr(), src_addr.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(RecvFromError::SendRequest)?;
-    // SAFETY: response in TLS buffer; trailing payload is one u32 addrlen.
-    let outcome =
-        unsafe { read_service_response(ipc_buf, size_of::<u32>()) }.map_err(|err| match err {
-            ServiceResponseFailure::Parse(err) => RecvFromError::ParseResponse(err),
-            ServiceResponseFailure::Service { ret, errno } => RecvFromError::Service { ret, errno },
-        })?;
-    // SAFETY: outcome.extra is guaranteed >= size_of::<u32>().
-    let addrlen = unsafe { ptr::read_unaligned(outcome.extra.as_ptr().cast::<u32>()) };
+    // SAFETY: the kernel populated the TLS IPC buffer; trailing payload is one u32 addrlen.
+    let outcome = unsafe { read_service_response(true) }.map_err(|err| match err {
+        ServiceResponseFailure::Parse(err) => RecvFromError::ParseResponse(err),
+        ServiceResponseFailure::Service { ret, errno } => RecvFromError::Service { ret, errno },
+    })?;
+    let addrlen = outcome.extra_u32.unwrap_or(0);
     Ok((outcome.ret as usize, addrlen))
 }
 
@@ -535,28 +574,30 @@ pub(crate) fn send(
     buf: &[u8],
     flags: i32,
 ) -> Result<usize, SendError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SEND)
-        .data_size(size_of::<SockfdFlagsIn>())
-        .in_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
-            SockfdFlagsIn {
-                sockfd: sockfd.raw(),
-                flags,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SEND)
+            .data_size(size_of::<SockfdFlagsIn>())
+            .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
+            .send()
+            .map_err(SendError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                SockfdFlagsIn {
+                    sockfd: sockfd.raw(),
+                    flags,
+                },
+            );
+        }
     }
-    req.add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(SendError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SendError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => SendError::Service { ret, errno },
     })?;
@@ -571,29 +612,31 @@ pub(crate) fn send_to(
     flags: i32,
     dest_addr: &[u8],
 ) -> Result<usize, SendToError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SEND_TO)
-        .data_size(size_of::<SockfdFlagsIn>())
-        .in_auto_buffers(2)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
-            SockfdFlagsIn {
-                sockfd: sockfd.raw(),
-                flags,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SEND_TO)
+            .data_size(size_of::<SockfdFlagsIn>())
+            .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
+            .add_in_auto_buffer(dest_addr.as_ptr(), dest_addr.len(), BufferMode::Normal)
+            .send()
+            .map_err(SendToError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                SockfdFlagsIn {
+                    sockfd: sockfd.raw(),
+                    flags,
+                },
+            );
+        }
     }
-    req.add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal);
-    req.add_in_auto_buffer(dest_addr.as_ptr(), dest_addr.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(SendToError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SendToError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => SendToError::Service { ret, errno },
     })?;
@@ -606,20 +649,22 @@ pub(crate) fn read(
     fd: BsdSockFd,
     buf: &mut [u8],
 ) -> Result<usize, ReadError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::READ)
-        .data_size(size_of::<i32>())
-        .out_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has 4 bytes reserved for the fd.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
-    req.add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::READ)
+            .data_size(size_of::<i32>())
+            .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
+            .send()
+            .map_err(ReadError::BuildRequest)?;
+        // SAFETY: req.data has 4 bytes reserved for the fd.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+    }
 
     ipc::send_sync_request(session).map_err(ReadError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => ReadError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => ReadError::Service { ret, errno },
     })?;
@@ -632,20 +677,22 @@ pub(crate) fn write(
     fd: BsdSockFd,
     buf: &[u8],
 ) -> Result<usize, WriteError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::WRITE)
-        .data_size(size_of::<i32>())
-        .in_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has 4 bytes reserved for the fd.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
-    req.add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::WRITE)
+            .data_size(size_of::<i32>())
+            .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
+            .send()
+            .map_err(WriteError::BuildRequest)?;
+        // SAFETY: req.data has 4 bytes reserved for the fd.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+    }
 
     ipc::send_sync_request(session).map_err(WriteError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => WriteError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => WriteError::Service { ret, errno },
     })?;
@@ -664,37 +711,35 @@ pub(crate) fn get_sock_opt(
     optname: i32,
     optval: &mut [u8],
 ) -> Result<u32, GetSockOptError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::GET_SOCK_OPT)
-        .data_size(size_of::<SockOptIn>())
-        .out_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for SockOptIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<SockOptIn>(),
-            SockOptIn {
-                sockfd: sockfd.raw(),
-                level,
-                optname,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::GET_SOCK_OPT)
+            .data_size(size_of::<SockOptIn>())
+            .add_out_auto_buffer(optval.as_mut_ptr(), optval.len(), BufferMode::Normal)
+            .send()
+            .map_err(GetSockOptError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SockOptIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<SockOptIn>(),
+                SockOptIn {
+                    sockfd: sockfd.raw(),
+                    level,
+                    optname,
+                },
+            );
+        }
     }
-    req.add_out_auto_buffer(optval.as_mut_ptr(), optval.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(GetSockOptError::SendRequest)?;
-    // SAFETY: response in TLS buffer; one u32 socklen_t trails the prefix.
-    let outcome =
-        unsafe { read_service_response(ipc_buf, size_of::<u32>()) }.map_err(|err| match err {
-            ServiceResponseFailure::Parse(err) => GetSockOptError::ParseResponse(err),
-            ServiceResponseFailure::Service { ret, errno } => {
-                GetSockOptError::Service { ret, errno }
-            }
-        })?;
-    // SAFETY: outcome.extra is guaranteed >= size_of::<u32>().
-    let optlen = unsafe { ptr::read_unaligned(outcome.extra.as_ptr().cast::<u32>()) };
+    // SAFETY: the kernel populated the TLS IPC buffer; one u32 socklen_t trails the prefix.
+    let outcome = unsafe { read_service_response(true) }.map_err(|err| match err {
+        ServiceResponseFailure::Parse(err) => GetSockOptError::ParseResponse(err),
+        ServiceResponseFailure::Service { ret, errno } => GetSockOptError::Service { ret, errno },
+    })?;
+    let optlen = outcome.extra_u32.unwrap_or(0);
     Ok(optlen)
 }
 
@@ -706,29 +751,31 @@ pub(crate) fn set_sock_opt(
     optname: i32,
     optval: &[u8],
 ) -> Result<(), SetSockOptError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SET_SOCK_OPT)
-        .data_size(size_of::<SockOptIn>())
-        .in_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for SockOptIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<SockOptIn>(),
-            SockOptIn {
-                sockfd: sockfd.raw(),
-                level,
-                optname,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SET_SOCK_OPT)
+            .data_size(size_of::<SockOptIn>())
+            .add_in_auto_buffer(optval.as_ptr(), optval.len(), BufferMode::Normal)
+            .send()
+            .map_err(SetSockOptError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SockOptIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<SockOptIn>(),
+                SockOptIn {
+                    sockfd: sockfd.raw(),
+                    level,
+                    optname,
+                },
+            );
+        }
     }
-    req.add_in_auto_buffer(optval.as_ptr(), optval.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(SetSockOptError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let _ = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SetSockOptError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => SetSockOptError::Service { ret, errno },
     })?;
@@ -748,27 +795,30 @@ pub(crate) fn fcntl(
     cmd: i32,
     flags: i32,
 ) -> Result<i32, FcntlError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::FCNTL)
-        .data_size(size_of::<FcntlIn>())
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for FcntlIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<FcntlIn>(),
-            FcntlIn {
-                fd: fd.raw(),
-                cmd,
-                flags,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::FCNTL)
+            .data_size(size_of::<FcntlIn>())
+            .send()
+            .map_err(FcntlError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for FcntlIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<FcntlIn>(),
+                FcntlIn {
+                    fd: fd.raw(),
+                    cmd,
+                    flags,
+                },
+            );
+        }
     }
 
     ipc::send_sync_request(session).map_err(FcntlError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => FcntlError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => FcntlError::Service { ret, errno },
     })?;
@@ -804,35 +854,36 @@ pub(crate) fn ioctl(
         0
     };
 
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::IOCTL)
-        .data_size(size_of::<IoctlIn>())
-        .in_auto_buffers(if has_in { 1 } else { 0 })
-        .out_auto_buffers(if has_out { 1 } else { 0 })
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for IoctlIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<IoctlIn>(),
-            IoctlIn {
-                fd: fd.raw(),
-                request,
-                bufcount: if has_inout { 1 } else { 0 },
-            },
-        );
-    }
-    if has_in {
-        req.add_in_auto_buffer(data.as_ptr(), payload_len, BufferMode::Normal);
-    }
-    if has_out {
-        req.add_out_auto_buffer(data.as_mut_ptr(), payload_len, BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut builder =
+            cmif::CmifBuilder::new(&mut ipc_buf, cmds::IOCTL).data_size(size_of::<IoctlIn>());
+        if has_in {
+            builder = builder.add_in_auto_buffer(data.as_ptr(), payload_len, BufferMode::Normal);
+        }
+        if has_out {
+            builder =
+                builder.add_out_auto_buffer(data.as_mut_ptr(), payload_len, BufferMode::Normal);
+        }
+        let req = builder.send().map_err(IoctlError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for IoctlIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<IoctlIn>(),
+                IoctlIn {
+                    fd: fd.raw(),
+                    request,
+                    bufcount: if has_inout { 1 } else { 0 },
+                },
+            );
+        }
     }
 
     ipc::send_sync_request(session).map_err(IoctlError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => IoctlError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => IoctlError::Service { ret, errno },
     })?;
@@ -866,15 +917,6 @@ pub(crate) fn select(
     exceptfds: &mut [u8],
     timeout: Option<SelectTimeout>,
 ) -> Result<i32, SelectError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::SELECT)
-        .data_size(size_of::<SelectIn>())
-        .in_auto_buffers(3)
-        .out_auto_buffers(3)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
     let select_timeout = match timeout {
         Some(t) => SelectTimeval {
             tv: Timeval {
@@ -899,19 +941,28 @@ pub(crate) fn select(
         _pad: 0,
         timeout: select_timeout,
     };
-    // SAFETY: req.data has data_size bytes reserved for SelectIn.
-    unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SelectIn>(), payload) };
 
-    req.add_in_auto_buffer(readfds.as_ptr(), readfds.len(), BufferMode::Normal);
-    req.add_in_auto_buffer(writefds.as_ptr(), writefds.len(), BufferMode::Normal);
-    req.add_in_auto_buffer(exceptfds.as_ptr(), exceptfds.len(), BufferMode::Normal);
-    req.add_out_auto_buffer(readfds.as_mut_ptr(), readfds.len(), BufferMode::Normal);
-    req.add_out_auto_buffer(writefds.as_mut_ptr(), writefds.len(), BufferMode::Normal);
-    req.add_out_auto_buffer(exceptfds.as_mut_ptr(), exceptfds.len(), BufferMode::Normal);
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SELECT)
+            .data_size(size_of::<SelectIn>())
+            .add_in_auto_buffer(readfds.as_ptr(), readfds.len(), BufferMode::Normal)
+            .add_in_auto_buffer(writefds.as_ptr(), writefds.len(), BufferMode::Normal)
+            .add_in_auto_buffer(exceptfds.as_ptr(), exceptfds.len(), BufferMode::Normal)
+            .add_out_auto_buffer(readfds.as_mut_ptr(), readfds.len(), BufferMode::Normal)
+            .add_out_auto_buffer(writefds.as_mut_ptr(), writefds.len(), BufferMode::Normal)
+            .add_out_auto_buffer(exceptfds.as_mut_ptr(), exceptfds.len(), BufferMode::Normal)
+            .send()
+            .map_err(SelectError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for SelectIn.
+        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SelectIn>(), payload) };
+    }
 
     ipc::send_sync_request(session).map_err(SelectError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SelectError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => SelectError::Service { ret, errno },
     })?;
@@ -926,31 +977,32 @@ pub(crate) fn poll(
     nfds: u64,
     timeout: i32,
 ) -> Result<i32, PollError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-    let fmt = cmif::RequestFormatBuilder::new(cmds::POLL)
-        .data_size(size_of::<PollIn>())
-        .in_auto_buffers(1)
-        .out_auto_buffers(1)
-        .build();
-    // SAFETY: ipc_buf is the live TLS IPC buffer.
-    let mut req = unsafe { cmif::make_request(ipc_buf, fmt) };
-    // SAFETY: req.data has data_size bytes reserved for PollIn.
-    unsafe {
-        ptr::write_unaligned(
-            req.data.as_mut_ptr().cast::<PollIn>(),
-            PollIn {
-                nfds,
-                timeout,
-                _pad: 0,
-            },
-        );
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::POLL)
+            .data_size(size_of::<PollIn>())
+            .add_in_auto_buffer(fds.as_ptr(), fds.len(), BufferMode::Normal)
+            .add_out_auto_buffer(fds.as_mut_ptr(), fds.len(), BufferMode::Normal)
+            .send()
+            .map_err(PollError::BuildRequest)?;
+        // SAFETY: req.data has data_size bytes reserved for PollIn.
+        unsafe {
+            ptr::write_unaligned(
+                req.data.as_mut_ptr().cast::<PollIn>(),
+                PollIn {
+                    nfds,
+                    timeout,
+                    _pad: 0,
+                },
+            );
+        }
     }
-    req.add_in_auto_buffer(fds.as_ptr(), fds.len(), BufferMode::Normal);
-    req.add_out_auto_buffer(fds.as_mut_ptr(), fds.len(), BufferMode::Normal);
 
     ipc::send_sync_request(session).map_err(PollError::SendRequest)?;
-    // SAFETY: response in TLS buffer.
-    let outcome = unsafe { read_service_response(ipc_buf, 0) }.map_err(|err| match err {
+    // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
+    let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => PollError::ParseResponse(err),
         ServiceResponseFailure::Service { ret, errno } => PollError::Service { ret, errno },
     })?;
@@ -962,42 +1014,51 @@ pub(crate) fn poll(
 // ---------------------------------------------------------------------------
 //
 // One enum per fallible function (per `errors-reporting.md` §10). Each enum
-// carries three distinct sources: send failure, parse failure, and the
-// service-level POSIX errno.
+// carries three distinct sources: build failure, send failure, parse failure,
+// and the service-level POSIX errno.
 
 /// Error returned by [`register_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterClientError {
+    /// Failed to build the `RegisterClient` IPC request.
+    #[error("failed to build register_client request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the `RegisterClient` IPC request.
     #[error("failed to send register_client request")]
     SendRequest(#[source] SendSyncError),
     /// The CMIF response could not be parsed.
     #[error("failed to parse register_client response")]
-    ParseResponse(#[source] ParseResponseError),
+    ParseResponse(#[source] ParseRespBytesError),
 }
 
 /// Error returned by [`start_monitoring`].
 #[derive(Debug, thiserror::Error)]
 pub enum StartMonitoringError {
+    /// Failed to build the `StartMonitoring` IPC request.
+    #[error("failed to build start_monitoring request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the `StartMonitoring` IPC request.
     #[error("failed to send start_monitoring request")]
     SendRequest(#[source] SendSyncError),
     /// The CMIF response could not be parsed.
     #[error("failed to parse start_monitoring response")]
-    ParseResponse(#[source] ParseResponseError),
+    ParseResponse(#[source] ParseRespBytesError),
 }
 
 macro_rules! define_per_command_error {
-    ($name:ident, $send_msg:literal, $parse_msg:literal, $svc_msg:literal) => {
+    ($name:ident, $build_msg:literal, $send_msg:literal, $parse_msg:literal, $svc_msg:literal) => {
         #[doc = concat!("Error returned by the corresponding BSD command.")]
         #[derive(Debug, thiserror::Error)]
         pub enum $name {
+            /// Failed to build the IPC request.
+            #[error($build_msg)]
+            BuildRequest(#[source] cmif::RequestLayoutError),
             /// Failed to send the IPC request.
             #[error($send_msg)]
             SendRequest(#[source] SendSyncError),
             /// Failed to parse the CMIF response.
             #[error($parse_msg)]
-            ParseResponse(#[source] ParseResponseError),
+            ParseResponse(#[source] ParseRespBytesError),
             /// The service returned a POSIX-domain failure. `errno` is the libc
             /// errno; `ret` is the raw value returned (typically `-1`).
             #[error($svc_msg)]
@@ -1008,126 +1069,147 @@ macro_rules! define_per_command_error {
 
 define_per_command_error!(
     SocketError,
+    "failed to build socket request",
     "failed to send socket request",
     "failed to parse socket response",
     "bsd socket failed (errno={errno})"
 );
 define_per_command_error!(
     CloseError,
+    "failed to build close request",
     "failed to send close request",
     "failed to parse close response",
     "bsd close failed (errno={errno})"
 );
 define_per_command_error!(
     BindError,
+    "failed to build bind request",
     "failed to send bind request",
     "failed to parse bind response",
     "bsd bind failed (errno={errno})"
 );
 define_per_command_error!(
     ConnectError,
+    "failed to build connect request",
     "failed to send connect request",
     "failed to parse connect response",
     "bsd connect failed (errno={errno})"
 );
 define_per_command_error!(
     ListenError,
+    "failed to build listen request",
     "failed to send listen request",
     "failed to parse listen response",
     "bsd listen failed (errno={errno})"
 );
 define_per_command_error!(
     AcceptError,
+    "failed to build accept request",
     "failed to send accept request",
     "failed to parse accept response",
     "bsd accept failed (errno={errno})"
 );
 define_per_command_error!(
     GetSockNameError,
+    "failed to build getsockname request",
     "failed to send getsockname request",
     "failed to parse getsockname response",
     "bsd getsockname failed (errno={errno})"
 );
 define_per_command_error!(
     GetPeerNameError,
+    "failed to build getpeername request",
     "failed to send getpeername request",
     "failed to parse getpeername response",
     "bsd getpeername failed (errno={errno})"
 );
 define_per_command_error!(
     ShutdownError,
+    "failed to build shutdown request",
     "failed to send shutdown request",
     "failed to parse shutdown response",
     "bsd shutdown failed (errno={errno})"
 );
 define_per_command_error!(
     RecvError,
+    "failed to build recv request",
     "failed to send recv request",
     "failed to parse recv response",
     "bsd recv failed (errno={errno})"
 );
 define_per_command_error!(
     RecvFromError,
+    "failed to build recvfrom request",
     "failed to send recvfrom request",
     "failed to parse recvfrom response",
     "bsd recvfrom failed (errno={errno})"
 );
 define_per_command_error!(
     SendError,
+    "failed to build send request",
     "failed to send send request",
     "failed to parse send response",
     "bsd send failed (errno={errno})"
 );
 define_per_command_error!(
     SendToError,
+    "failed to build sendto request",
     "failed to send sendto request",
     "failed to parse sendto response",
     "bsd sendto failed (errno={errno})"
 );
 define_per_command_error!(
     ReadError,
+    "failed to build read request",
     "failed to send read request",
     "failed to parse read response",
     "bsd read failed (errno={errno})"
 );
 define_per_command_error!(
     WriteError,
+    "failed to build write request",
     "failed to send write request",
     "failed to parse write response",
     "bsd write failed (errno={errno})"
 );
 define_per_command_error!(
     GetSockOptError,
+    "failed to build getsockopt request",
     "failed to send getsockopt request",
     "failed to parse getsockopt response",
     "bsd getsockopt failed (errno={errno})"
 );
 define_per_command_error!(
     SetSockOptError,
+    "failed to build setsockopt request",
     "failed to send setsockopt request",
     "failed to parse setsockopt response",
     "bsd setsockopt failed (errno={errno})"
 );
 define_per_command_error!(
     FcntlError,
+    "failed to build fcntl request",
     "failed to send fcntl request",
     "failed to parse fcntl response",
     "bsd fcntl failed (errno={errno})"
 );
 define_per_command_error!(
     IoctlError,
+    "failed to build ioctl request",
     "failed to send ioctl request",
     "failed to parse ioctl response",
     "bsd ioctl failed (errno={errno})"
 );
 define_per_command_error!(
     SelectError,
+    "failed to build select request",
     "failed to send select request",
     "failed to parse select response",
     "bsd select failed (errno={errno})"
 );
 define_per_command_error!(
     PollError,
+    "failed to build poll request",
     "failed to send poll request",
     "failed to parse poll response",
     "bsd poll failed (errno={errno})"
