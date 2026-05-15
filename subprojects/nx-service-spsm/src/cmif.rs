@@ -9,45 +9,50 @@ use crate::proto;
 
 /// Initiates system shutdown or reboot.
 pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
     let in_data: u8 = u8::from(reboot);
 
-    let fmt = cmif::RequestFormatBuilder::new(proto::SHUTDOWN)
-        .data_size(1)
-        .build();
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let req = cmif::CmifBuilder::new(&mut buf, proto::SHUTDOWN)
+            .data_size(1)
+            .send()
+            .map_err(ShutdownError::BuildRequest)?;
 
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let req = unsafe { cmif::make_request(ipc_buf, fmt) };
-
-    // SAFETY: req.data points to valid payload area with space for u8.
-    unsafe {
-        ptr::write_unaligned(req.data.as_ptr().cast::<u8>().cast_mut(), in_data);
+        // SAFETY: `req.data` is exactly 1 byte.
+        unsafe {
+            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), in_data);
+        }
     }
 
     ipc::send_sync_request(session).map_err(ShutdownError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp =
-        unsafe { cmif::parse_response(ipc_buf, false, 0) }.map_err(ShutdownError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ShutdownError::ParseResponse)?;
 
     Ok(())
 }
 
 /// Puts the system into an error state.
 pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError> {
-    let ipc_buf = nx_sys_thread_tls::ipc_buffer_ptr();
-
-    let fmt = cmif::RequestFormatBuilder::new(proto::PUT_ERROR_STATE).build();
-
-    // SAFETY: `ipc_buf` is the live TLS IPC buffer for this thread.
-    let _req = unsafe { cmif::make_request(ipc_buf, fmt) };
+    {
+        // SAFETY: IPC operations are serialized on this thread, so no other
+        // borrow of the TLS IPC buffer is live.
+        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        cmif::CmifBuilder::new(&mut buf, proto::PUT_ERROR_STATE)
+            .send()
+            .map_err(PutErrorStateError::BuildRequest)?;
+    }
 
     ipc::send_sync_request(session).map_err(PutErrorStateError::SendRequest)?;
 
-    // SAFETY: response sits in the TLS buffer after a successful send.
-    let _resp = unsafe { cmif::parse_response(ipc_buf, false, 0) }
-        .map_err(PutErrorStateError::ParseResponse)?;
+    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
+    // no other borrow of the buffer is live on this thread.
+    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    cmif::parse_response_bytes(buf.as_array(), 0).map_err(PutErrorStateError::ParseResponse)?;
 
     Ok(())
 }
@@ -55,21 +60,27 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
 /// Error returned by [`shutdown`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShutdownError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
 /// Error returned by [`put_error_state`].
 #[derive(Debug, thiserror::Error)]
 pub enum PutErrorStateError {
+    /// Failed to build the CMIF request.
+    #[error("failed to build request")]
+    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseResponseError),
+    ParseResponse(#[source] cmif::ParseRespBytesError),
 }
