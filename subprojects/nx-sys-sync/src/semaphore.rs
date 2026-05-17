@@ -29,6 +29,13 @@ pub struct Semaphore {
 const_assert_eq!(size_of::<Semaphore>(), 16);
 const_assert_eq!(align_of::<Semaphore>(), align_of::<u64>());
 
+// SAFETY: `Semaphore`'s `count` cell is mutated only while its internal `Mutex`
+// is held, so concurrent access from multiple threads is serialized. Sharing
+// the semaphore across threads is therefore sound — as it must be for a
+// synchronization primitive.
+unsafe impl Send for Semaphore {}
+unsafe impl Sync for Semaphore {}
+
 impl Semaphore {
     /// Creates a new Semaphore with the specified initial count.
     ///

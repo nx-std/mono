@@ -26,6 +26,13 @@ pub struct RwLock {
 const_assert_eq!(size_of::<RwLock>(), 32);
 const_assert_eq!(align_of::<RwLock>(), align_of::<u32>());
 
+// SAFETY: `RwLock`'s `UnsafeCell` counters are mutated only while its internal
+// `Mutex` is held, so concurrent access from multiple threads is serialized.
+// Sharing the lock across threads is therefore sound — as it must be for a
+// synchronization primitive.
+unsafe impl Send for RwLock {}
+unsafe impl Sync for RwLock {}
+
 impl RwLock {
     /// Creates a new [`RwLock`] in an unlocked state.
     ///

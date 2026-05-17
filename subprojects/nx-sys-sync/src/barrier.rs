@@ -38,6 +38,13 @@ pub struct Barrier {
 const_assert_eq!(size_of::<Barrier>(), 24);
 const_assert_eq!(align_of::<Barrier>(), align_of::<u64>());
 
+// SAFETY: `Barrier`'s `count` cell is mutated only while its internal `Mutex`
+// is held, so concurrent access from multiple threads is serialized. Sharing
+// the barrier across threads is therefore sound — as it must be for a
+// synchronization primitive.
+unsafe impl Send for Barrier {}
+unsafe impl Sync for Barrier {}
+
 impl Barrier {
     /// Initializes a barrier and the number of threads to wait on.
     ///
