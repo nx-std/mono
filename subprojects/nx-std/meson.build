@@ -78,6 +78,17 @@ if get_option('use_nx_sys_thread_tls').enabled()
     deps_cargo_features += ['sys-thread-tls']
 endif
 
+# nx-sys-thread
+if get_option('use_nx_sys_thread').enabled()
+    nx_sys_thread_proj = subproject('nx-sys-thread')
+
+    deps += nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
+    deps_override_link_args += ['-T', nx_sys_thread_proj.get_variable('nx_sys_thread_ld_override')]
+
+    debug('sys-thread feature: enabled')
+    deps_cargo_features += ['sys-thread']
+endif
+
 # nx-sys-mem
 if get_option('use_nx_sys_mem').enabled()
     nx_sys_mem_proj = subproject('nx-sys-mem')
@@ -111,6 +122,21 @@ if get_option('use_nx_rt').enabled()
 
     debug('rt feature: enabled')
     deps_cargo_features += ['rt']
+endif
+
+# nx-alloc requires nx-rt for heap initialization
+#
+# `nx-alloc` replaces the global allocator but never initializes its heap —
+# that is wired by `nx-rt`'s `__libnx_initheap` override, which adopts the
+# homebrew loader's heap region. With `use_nx_alloc` enabled but `use_nx_rt`
+# disabled, the heap is never set up for a loader-hosted process and the build
+# faults at startup on its first allocation.
+if get_option('use_nx_alloc').enabled() and not get_option('use_nx_rt').enabled()
+    warning(
+        'use_nx_alloc is enabled without use_nx_rt: the nx-alloc heap is left '
+        + 'uninitialized under a homebrew loader (hbloader) and the build will '
+        + 'fault at startup on its first allocation. Enable use_nx_rt.',
+    )
 endif
 
 # nx-sf

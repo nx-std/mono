@@ -26,6 +26,8 @@ pub mod sys_mem {
 }
 #[cfg(feature = "sys-sync")]
 pub use nx_sys_sync::ffi as sys_sync;
+#[cfg(feature = "sys-thread")]
+pub use nx_sys_thread::ffi as sys_thread;
 #[cfg(feature = "sys-thread-tls")]
 pub use nx_sys_thread_tls::ffi as sys_thread_tls;
 #[cfg(feature = "time")]

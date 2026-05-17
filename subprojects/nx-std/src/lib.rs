@@ -77,6 +77,7 @@ pub mod services {
     feature = "svc",
     feature = "sys-mem",
     feature = "sys-sync",
+    feature = "sys-thread",
     feature = "sys-thread-tls"
 ))]
 pub mod sys {
@@ -88,6 +89,8 @@ pub mod sys {
     pub use nx_sys_mem as mem;
     #[cfg(any(feature = "sys", feature = "sys-sync"))]
     pub use nx_sys_sync as sync;
+    #[cfg(any(feature = "sys", feature = "sys-thread"))]
+    pub use nx_sys_thread as thread;
     #[cfg(any(feature = "sys", feature = "sys-thread-tls"))]
     pub use nx_sys_thread_tls as thread_tls;
 }

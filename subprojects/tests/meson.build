@@ -92,6 +92,9 @@ c_src = files(
     'source/sync/oneshot/test_0001_oneshot_two_threads_send_recv.c',
     'source/sync/oneshot/test_0002_oneshot_recv_sender_dropped.c',
     'source/sync/oneshot/test_0003_oneshot_send_receiver_dropped.c',
+    'source/thread/suite.h',
+    'source/thread/test_0001_detach_running_thread_self_reclaims.c',
+    'source/thread/test_0002_detach_after_exit_reclaims.c',
     'source/main.c',
 )
 

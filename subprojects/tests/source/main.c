@@ -5,6 +5,7 @@
 #include "harness.h"
 #include "rand/suite.h"
 #include "sync/suite.h"
+#include "thread/suite.h"
 
 /**
  * Test suites
@@ -20,6 +21,8 @@ static TestSuiteFn test_suites[] = {
     sync_rwlock_suite,
     sync_semaphore_suite,
     sync_oneshot_suite,
+    // thread
+    thread_suite,
 };
 
 int main()
