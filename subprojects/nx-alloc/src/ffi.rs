@@ -3,6 +3,16 @@ use core::{ffi::c_void, ptr};
 use self::meta::{Allocation, Layout};
 use crate::global as global_allocator;
 
+/// Allocates an uninitialized block of at least `size` bytes.
+///
+/// Mirrors C `malloc`. Returns a null pointer on failure or for a `size`
+/// that cannot be represented as a valid layout.
+///
+/// # Safety
+///
+/// A non-null return value must eventually be released with
+/// [`__nx_alloc__free`] or [`__nx_alloc__realloc`]; passing it to any other
+/// allocator is undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc__malloc(size: usize) -> *mut c_void {
     let Ok(layout) = Layout::from_size(size) else {
@@ -22,9 +32,19 @@ pub unsafe extern "C" fn __nx_alloc__malloc(size: usize) -> *mut c_void {
     };
 
     let allocation = unsafe { Allocation::new_with_metadata(alloc_ptr, layout) };
-    allocation.data_ptr() as *mut c_void
+    allocation.data_ptr()
 }
 
+/// Allocates an uninitialized block of at least `size` bytes aligned to `align`.
+///
+/// Mirrors C `aligned_alloc`. Returns a null pointer on failure or when
+/// `align` is not a power of two.
+///
+/// # Safety
+///
+/// A non-null return value must eventually be released with
+/// [`__nx_alloc__free`] or [`__nx_alloc__realloc`]; passing it to any other
+/// allocator is undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc__aligned_alloc(align: usize, size: usize) -> *mut c_void {
     let Ok(layout) = Layout::from_size_align(size, align) else {
@@ -44,9 +64,19 @@ pub unsafe extern "C" fn __nx_alloc__aligned_alloc(align: usize, size: usize) ->
     };
 
     let allocation = unsafe { Allocation::new_with_metadata(alloc_ptr, layout) };
-    allocation.data_ptr() as *mut c_void
+    allocation.data_ptr()
 }
 
+/// Releases a block previously returned by this allocator.
+///
+/// Mirrors C `free`. A null pointer is a no-op.
+///
+/// # Safety
+///
+/// `ptr` must be null or a pointer returned by [`__nx_alloc__malloc`],
+/// [`__nx_alloc__aligned_alloc`], [`__nx_alloc__calloc`], or
+/// [`__nx_alloc__realloc`] that has not already been freed. The pointer is
+/// dangling after this call and must not be used again.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc__free(ptr: *mut c_void) {
     let Some(alloc_ptr) = ptr::NonNull::new(ptr) else {
@@ -59,6 +89,16 @@ pub unsafe extern "C" fn __nx_alloc__free(ptr: *mut c_void) {
     unsafe { alloc.free(allocation.as_ptr(), allocation.size(), allocation.align()) }
 }
 
+/// Allocates a zero-initialized block of `nmemb * size` bytes.
+///
+/// Mirrors C `calloc`. Returns a null pointer on failure or when
+/// `nmemb * size` overflows.
+///
+/// # Safety
+///
+/// A non-null return value must eventually be released with
+/// [`__nx_alloc__free`] or [`__nx_alloc__realloc`]; passing it to any other
+/// allocator is undefined behaviour.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc__calloc(nmemb: usize, size: usize) -> *mut c_void {
     // Check for overflow
@@ -87,9 +127,19 @@ pub unsafe extern "C" fn __nx_alloc__calloc(nmemb: usize, size: usize) -> *mut c
     unsafe { ptr::write_bytes(alloc_ptr.as_ptr(), 0, layout.size()) };
 
     let allocation = unsafe { Allocation::new_with_metadata(alloc_ptr, layout) };
-    allocation.data_ptr() as *mut c_void
+    allocation.data_ptr()
 }
 
+/// Resizes a block previously returned by this allocator to `new_size` bytes.
+///
+/// Mirrors C `realloc`. A null `ptr` behaves like [`__nx_alloc__malloc`]; a
+/// `new_size` of zero frees `ptr` and returns null.
+///
+/// # Safety
+///
+/// `ptr` must be null or a pointer returned by this allocator family that has
+/// not already been freed. On a non-null return the original `ptr` is
+/// invalidated and must be replaced by the returned pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_alloc__realloc(ptr: *mut c_void, new_size: usize) -> *mut c_void {
     // If ptr is null, realloc is equivalent to malloc
@@ -139,7 +189,7 @@ pub unsafe extern "C" fn __nx_alloc__realloc(ptr: *mut c_void, new_size: usize) 
 
     // Write new metadata and return pointer to data
     let new_allocation = unsafe { Allocation::new_with_metadata(new_alloc_ptr, layout) };
-    new_allocation.data_ptr() as *mut c_void
+    new_allocation.data_ptr()
 }
 
 mod newlib {

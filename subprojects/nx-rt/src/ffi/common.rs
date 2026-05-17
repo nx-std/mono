@@ -2,8 +2,7 @@
 
 use core::cell::UnsafeCell;
 
-#[cfg(feature = "service-applet")]
-use nx_sf::cmif;
+use nx_sf::{cmif, tipc};
 
 /// Generic error code for FFI when no specific result code is available.
 pub const GENERIC_ERROR: u32 = 0xFFFF;
@@ -51,11 +50,9 @@ pub fn dispatch_error_to_rc(err: nx_sf::service::DispatchError) -> u32 {
     use nx_svc::error::ToRawResultCode;
 
     match err {
+        nx_sf::service::DispatchError::Layout(_) => GENERIC_ERROR,
         nx_sf::service::DispatchError::SendRequest(e) => e.to_rc(),
-        nx_sf::service::DispatchError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_sf::service::DispatchError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
     }
 }
 
@@ -65,10 +62,53 @@ pub fn convert_to_domain_error_to_rc(err: nx_sf::service::ConvertToDomainError) 
     use nx_svc::error::ToRawResultCode;
 
     match err {
+        nx_sf::service::ConvertToDomainError::Layout(_) => GENERIC_ERROR,
         nx_sf::service::ConvertToDomainError::SendRequest(e) => e.to_rc(),
-        nx_sf::service::ConvertToDomainError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_sf::service::ConvertToDomainError::ParseResponse(e) => parse_resp_error_to_rc(e),
+    }
+}
+
+/// Converts a CMIF [`cmif::ParseRespError`] to a raw result code.
+pub fn parse_resp_error_to_rc(err: cmif::ParseRespError) -> u32 {
+    match err {
+        cmif::ParseRespError::ServiceError(code) => code,
+        cmif::ParseRespError::InvalidMagic
+        | cmif::ParseRespError::Hipc(_)
+        | cmif::ParseRespError::TruncatedOutHeader
+        | cmif::ParseRespError::TruncatedDomainHeader
+        | cmif::ParseRespError::TruncatedPayload
+        | cmif::ParseRespError::TruncatedDomainObjects => GENERIC_ERROR,
+    }
+}
+
+/// Converts a CMIF [`cmif::ParseRespBytesError`] to a raw result code.
+#[cfg(any(
+    feature = "service-apm",
+    feature = "service-applet",
+    feature = "service-nv",
+    feature = "service-set",
+    feature = "service-time",
+    feature = "service-vi",
+))]
+pub fn parse_resp_bytes_error_to_rc(err: cmif::ParseRespBytesError) -> u32 {
+    match err {
+        cmif::ParseRespBytesError::ServiceError(code) => code,
+        cmif::ParseRespBytesError::InvalidMagic
+        | cmif::ParseRespBytesError::Hipc(_)
+        | cmif::ParseRespBytesError::TruncatedOutHeader
+        | cmif::ParseRespBytesError::TruncatedDomainHeader
+        | cmif::ParseRespBytesError::TruncatedPayload
+        | cmif::ParseRespBytesError::TruncatedDomainObjects => GENERIC_ERROR,
+    }
+}
+
+/// Converts a TIPC [`tipc::ParseResponseError`] to a raw result code.
+pub fn parse_tipc_resp_error_to_rc(err: tipc::ParseResponseError) -> u32 {
+    match err {
+        tipc::ParseResponseError::ServiceError(code) => code,
+        tipc::ParseResponseError::EmptyResponse
+        | tipc::ParseResponseError::Hipc(_)
+        | tipc::ParseResponseError::TruncatedResult
+        | tipc::ParseResponseError::TruncatedPayload => GENERIC_ERROR,
     }
 }

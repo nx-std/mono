@@ -3,10 +3,12 @@
 use core::mem::MaybeUninit;
 
 use nx_service_apm;
-use nx_sf::{cmif, ffi::Service};
+use nx_sf::ffi::Service;
 use nx_svc::error::ToRawResultCode;
 
-use super::common::{GENERIC_ERROR, SyncUnsafeCell};
+use super::common::{
+    GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
+};
 use crate::services::apm;
 
 /// Static buffer for APM IManager FFI session access. Written on
@@ -194,19 +196,15 @@ fn apm_connect_error_to_rc(err: apm::ConnectError) -> u32 {
         apm::ConnectError::Connect(e) => match e {
             nx_service_apm::ConnectError::GetService(e) => match e {
                 nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
+                nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
+                nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
                 nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
             },
         },
         apm::ConnectError::OpenSession(e) => match e {
             nx_service_apm::OpenSessionError::SendRequest(e) => e.to_rc(),
-            nx_service_apm::OpenSessionError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+            nx_service_apm::OpenSessionError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+            nx_service_apm::OpenSessionError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_apm::OpenSessionError::MissingHandle => GENERIC_ERROR,
         },
     }
@@ -215,10 +213,10 @@ fn apm_connect_error_to_rc(err: apm::ConnectError) -> u32 {
 fn apm_get_performance_mode_error_to_rc(err: nx_service_apm::GetPerformanceModeError) -> u32 {
     match err {
         nx_service_apm::GetPerformanceModeError::SendRequest(e) => e.to_rc(),
-        nx_service_apm::GetPerformanceModeError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_apm::GetPerformanceModeError::ParseResponse(e) => {
+            parse_resp_bytes_error_to_rc(e)
+        }
+        nx_service_apm::GetPerformanceModeError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_apm::GetPerformanceModeError::InvalidResponse => GENERIC_ERROR,
         nx_service_apm::GetPerformanceModeError::InvalidMode(_) => GENERIC_ERROR,
     }
@@ -229,10 +227,10 @@ fn apm_set_performance_configuration_error_to_rc(
 ) -> u32 {
     match err {
         nx_service_apm::SetPerformanceConfigurationError::SendRequest(e) => e.to_rc(),
-        nx_service_apm::SetPerformanceConfigurationError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_apm::SetPerformanceConfigurationError::ParseResponse(e) => {
+            parse_resp_bytes_error_to_rc(e)
+        }
+        nx_service_apm::SetPerformanceConfigurationError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
@@ -241,10 +239,10 @@ fn apm_get_performance_configuration_error_to_rc(
 ) -> u32 {
     match err {
         nx_service_apm::GetPerformanceConfigurationError::SendRequest(e) => e.to_rc(),
-        nx_service_apm::GetPerformanceConfigurationError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_apm::GetPerformanceConfigurationError::ParseResponse(e) => {
+            parse_resp_bytes_error_to_rc(e)
+        }
+        nx_service_apm::GetPerformanceConfigurationError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_apm::GetPerformanceConfigurationError::InvalidResponse => GENERIC_ERROR,
     }
 }

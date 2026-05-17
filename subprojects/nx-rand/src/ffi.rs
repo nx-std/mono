@@ -16,6 +16,11 @@ use super::sys;
 ///
 /// * `buf` - Pointer to the buffer to fill with random data
 /// * `len` - Size of the buffer in bytes
+///
+/// # Safety
+///
+/// `buf` must point to a writable region of at least `len` bytes that stays
+/// valid for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rand__random_get(buf: *mut c_void, len: usize) {
     let slice = unsafe { slice::from_raw_parts_mut(buf as *mut u8, len) };
@@ -30,6 +35,10 @@ pub unsafe extern "C" fn __nx_rand__random_get(buf: *mut c_void, len: usize) {
 /// # Returns
 ///
 /// A random 64-bit value
+///
+/// # Safety
+///
+/// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rand__random_get64() -> u64 {
     sys::next_u64()

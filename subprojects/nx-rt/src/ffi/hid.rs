@@ -3,10 +3,9 @@
 use core::ffi::c_void;
 
 use nx_service_hid;
-use nx_sf::cmif;
 use nx_svc::error::ToRawResultCode;
 
-use super::common::GENERIC_ERROR;
+use super::common::{GENERIC_ERROR, parse_resp_error_to_rc};
 
 /// Initializes the HID service.
 ///
@@ -25,18 +24,18 @@ pub unsafe extern "C" fn __nx_rt__hid_initialize() -> u32 {
                 },
                 nx_service_hid::ConnectError::CreateAppletResource(ar_err) => match ar_err {
                     nx_service_hid::CreateAppletResourceError::SendRequest(e) => e.to_rc(),
-                    nx_service_hid::CreateAppletResourceError::ParseResponse(e) => match e {
-                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                        cmif::ParseResponseError::ServiceError(code) => code,
-                    },
+                    nx_service_hid::CreateAppletResourceError::ParseResponse(e) => {
+                        parse_resp_error_to_rc(e)
+                    }
+                    nx_service_hid::CreateAppletResourceError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_hid::CreateAppletResourceError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_hid::ConnectError::GetSharedMemoryHandle(sh_err) => match sh_err {
                     nx_service_hid::GetSharedMemoryHandleError::SendRequest(e) => e.to_rc(),
-                    nx_service_hid::GetSharedMemoryHandleError::ParseResponse(e) => match e {
-                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                        cmif::ParseResponseError::ServiceError(code) => code,
-                    },
+                    nx_service_hid::GetSharedMemoryHandleError::ParseResponse(e) => {
+                        parse_resp_error_to_rc(e)
+                    }
+                    nx_service_hid::GetSharedMemoryHandleError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_hid::GetSharedMemoryHandleError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_hid::ConnectError::MapSharedMemory(_) => GENERIC_ERROR,
@@ -86,10 +85,10 @@ pub unsafe extern "C" fn __nx_rt__hid_set_supported_npad_style_set(style_set: u3
             Ok(()) => 0,
             Err(err) => match err {
                 nx_service_hid::SetSupportedNpadStyleSetError::SendRequest(e) => e.to_rc(),
-                nx_service_hid::SetSupportedNpadStyleSetError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
+                nx_service_hid::SetSupportedNpadStyleSetError::ParseResponse(e) => {
+                    parse_resp_error_to_rc(e)
+                }
+                nx_service_hid::SetSupportedNpadStyleSetError::BuildRequest(_) => GENERIC_ERROR,
             },
         },
         None => GENERIC_ERROR,
@@ -116,10 +115,10 @@ pub unsafe extern "C" fn __nx_rt__hid_set_supported_npad_id_type(
             Ok(()) => 0,
             Err(err) => match err {
                 nx_service_hid::SetSupportedNpadIdTypeError::SendRequest(e) => e.to_rc(),
-                nx_service_hid::SetSupportedNpadIdTypeError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
+                nx_service_hid::SetSupportedNpadIdTypeError::ParseResponse(e) => {
+                    parse_resp_error_to_rc(e)
+                }
+                nx_service_hid::SetSupportedNpadIdTypeError::BuildRequest(_) => GENERIC_ERROR,
             },
         },
         None => GENERIC_ERROR,

@@ -1,10 +1,9 @@
 //! Time service FFI
 
 use nx_service_time;
-use nx_sf::cmif;
 use nx_svc::error::ToRawResultCode;
 
-use super::common::GENERIC_ERROR;
+use super::common::{GENERIC_ERROR, parse_resp_bytes_error_to_rc};
 
 /// Initializes the Time service.
 ///
@@ -23,26 +22,26 @@ pub unsafe extern "C" fn __nx_rt__time_initialize() -> u32 {
                 },
                 nx_service_time::ConnectError::GetUserSystemClock(clock_err) => match clock_err {
                     nx_service_time::GetSystemClockError::SendRequest(e) => e.to_rc(),
-                    nx_service_time::GetSystemClockError::ParseResponse(e) => match e {
-                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                        cmif::ParseResponseError::ServiceError(code) => code,
-                    },
+                    nx_service_time::GetSystemClockError::ParseResponse(e) => {
+                        parse_resp_bytes_error_to_rc(e)
+                    }
+                    nx_service_time::GetSystemClockError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_time::GetSystemClockError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_time::ConnectError::GetSteadyClock(steady_err) => match steady_err {
                     nx_service_time::GetSteadyClockError::SendRequest(e) => e.to_rc(),
-                    nx_service_time::GetSteadyClockError::ParseResponse(e) => match e {
-                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                        cmif::ParseResponseError::ServiceError(code) => code,
-                    },
+                    nx_service_time::GetSteadyClockError::ParseResponse(e) => {
+                        parse_resp_bytes_error_to_rc(e)
+                    }
+                    nx_service_time::GetSteadyClockError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_time::GetSteadyClockError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_time::ConnectError::GetTimeZoneService(tz_err) => match tz_err {
                     nx_service_time::GetTimeZoneServiceError::SendRequest(e) => e.to_rc(),
-                    nx_service_time::GetTimeZoneServiceError::ParseResponse(e) => match e {
-                        cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                        cmif::ParseResponseError::ServiceError(code) => code,
-                    },
+                    nx_service_time::GetTimeZoneServiceError::ParseResponse(e) => {
+                        parse_resp_bytes_error_to_rc(e)
+                    }
+                    nx_service_time::GetTimeZoneServiceError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_time::GetTimeZoneServiceError::MissingHandle => GENERIC_ERROR,
                 },
             }
@@ -85,10 +84,10 @@ pub unsafe extern "C" fn __nx_rt__time_get_current_time(
             }
             Err(err) => match err {
                 nx_service_time::GetCurrentTimeError::SendRequest(e) => e.to_rc(),
-                nx_service_time::GetCurrentTimeError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
+                nx_service_time::GetCurrentTimeError::ParseResponse(e) => {
+                    parse_resp_bytes_error_to_rc(e)
+                }
+                nx_service_time::GetCurrentTimeError::BuildRequest(_) => GENERIC_ERROR,
                 nx_service_time::GetCurrentTimeError::NetworkClockUnavailable => GENERIC_ERROR,
                 nx_service_time::GetCurrentTimeError::LocalClockNotSupported => GENERIC_ERROR,
                 nx_service_time::GetCurrentTimeError::SourceIdMismatch => GENERIC_ERROR,
@@ -122,10 +121,10 @@ pub unsafe extern "C" fn __nx_rt__time_to_calendar_time_with_my_rule(
             }
             Err(err) => match err {
                 nx_service_time::ToCalendarTimeError::SendRequest(e) => e.to_rc(),
-                nx_service_time::ToCalendarTimeError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
+                nx_service_time::ToCalendarTimeError::ParseResponse(e) => {
+                    parse_resp_bytes_error_to_rc(e)
+                }
+                nx_service_time::ToCalendarTimeError::BuildRequest(_) => GENERIC_ERROR,
             },
         },
         None => GENERIC_ERROR,

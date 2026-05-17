@@ -2,10 +2,13 @@
 
 use core::mem::MaybeUninit;
 
-use nx_sf::{cmif, ffi::Service, tipc};
+use nx_sf::ffi::Service;
 use nx_svc::error::ToRawResultCode;
 
-use super::common::{GENERIC_ERROR, SyncUnsafeCell};
+use super::common::{
+    GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
+    parse_tipc_resp_error_to_rc,
+};
 use crate::services::set;
 
 /// Static buffer for set:sys FFI session access. Updated on `initialize()` and `exit()`.
@@ -101,18 +104,14 @@ fn setsys_connect_error_to_rc(err: set::ConnectError) -> u32 {
     match err {
         set::ConnectError::Cmif(e) => match e.0 {
             nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-            nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+            nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
+            nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
         set::ConnectError::Tipc(e) => match e.0 {
             nx_service_sm::GetServiceTipcError::SendRequest(e) => e.to_rc(),
-            nx_service_sm::GetServiceTipcError::ParseResponse(e) => match e {
-                tipc::ParseResponseError::EmptyResponse => GENERIC_ERROR,
-                tipc::ParseResponseError::ServiceError(code) => code,
-            },
+            nx_service_sm::GetServiceTipcError::ParseResponse(e) => parse_tipc_resp_error_to_rc(e),
+            nx_service_sm::GetServiceTipcError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::GetServiceTipcError::MissingHandle => GENERIC_ERROR,
         },
     }
@@ -123,9 +122,9 @@ fn setsys_get_firmware_version_error_to_rc(
 ) -> u32 {
     match err {
         nx_service_set::GetFirmwareVersionCmifError::SendRequest(e) => e.to_rc(),
-        nx_service_set::GetFirmwareVersionCmifError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_set::GetFirmwareVersionCmifError::ParseResponse(e) => {
+            parse_resp_bytes_error_to_rc(e)
+        }
+        nx_service_set::GetFirmwareVersionCmifError::BuildRequest(_) => GENERIC_ERROR,
     }
 }

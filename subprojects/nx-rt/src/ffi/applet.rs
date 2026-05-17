@@ -1,10 +1,11 @@
 //! Applet service FFI
 
-use nx_sf::cmif;
 use nx_svc::{process::Handle as ProcessHandle, raw::INVALID_HANDLE};
 
 use super::{
-    common::{GENERIC_ERROR, convert_to_domain_error_to_rc, dispatch_error_to_rc},
+    common::{
+        GENERIC_ERROR, convert_to_domain_error_to_rc, dispatch_error_to_rc, parse_resp_error_to_rc,
+    },
     env::get_applet_type,
 };
 use crate::{env, services::applet};
@@ -149,7 +150,7 @@ pub unsafe extern "C" fn __nx_rt__applet_get_message_event_handle() -> u32 {
 /// } Event;
 /// ```
 #[repr(C)]
-struct LibnxEvent {
+pub struct LibnxEvent {
     revent: u32,
     wevent: u32,
     autoclear: bool,
@@ -454,15 +455,11 @@ fn open_error_to_rc(err: nx_service_applet::proxy::OpenError) -> u32 {
         OpenError::Connect(e) => match e {
             nx_service_applet::ConnectError::GetService(e) => match e {
                 nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
-                    cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                    cmif::ParseResponseError::ServiceError(code) => code,
-                },
+                nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
+                nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
                 nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
             },
-            nx_service_applet::ConnectError::ConvertToDomain(e) => {
-                convert_to_domain_error_to_rc(e.0)
-            }
+            nx_service_applet::ConnectError::ConvertToDomain(e) => convert_to_domain_error_to_rc(e),
         },
         OpenError::NoneAppletType => GENERIC_ERROR,
         OpenError::OpenProxy(e) => match e {

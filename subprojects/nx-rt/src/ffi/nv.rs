@@ -6,9 +6,11 @@ use core::{
 };
 
 use nx_service_nv::fd::Fd;
-use nx_sf::{cmif, ffi::Service};
+use nx_sf::ffi::Service;
 
-use super::common::{GENERIC_ERROR, SyncUnsafeCell};
+use super::common::{
+    GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
+};
 
 /// Static buffer for NV FFI session access. Updated on `nv_initialize()` and `nv_exit()`.
 static NV_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
@@ -295,19 +297,15 @@ fn nv_connect_error_to_rc(err: crate::services::nv::ConnectError) -> u32 {
     match e {
         nx_service_nv::ConnectError::GetService(sm_err) => match sm_err {
             nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-            nx_service_sm::GetServiceCmifError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+            nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
+            nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
         nx_service_nv::ConnectError::CreateTransferMemory(_) => GENERIC_ERROR,
         nx_service_nv::ConnectError::Initialize(e) => match e {
             nx_service_nv::InitializeError::SendRequest(e) => e.to_rc(),
-            nx_service_nv::InitializeError::ParseResponse(e) => match e {
-                cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-                cmif::ParseResponseError::ServiceError(code) => code,
-            },
+            nx_service_nv::InitializeError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+            nx_service_nv::InitializeError::BuildRequest(_) => GENERIC_ERROR,
         },
         nx_service_nv::ConnectError::CloseTransferMemHandle(_) => GENERIC_ERROR,
         nx_service_nv::ConnectError::CloneSession(_) => GENERIC_ERROR,
@@ -352,10 +350,8 @@ fn nv_open_error_to_rc(err: nx_service_nv::OpenError) -> u32 {
 
     match err {
         nx_service_nv::OpenError::SendRequest(e) => e.to_rc(),
-        nx_service_nv::OpenError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_nv::OpenError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::OpenError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_nv::OpenError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
@@ -365,10 +361,8 @@ fn nv_ioctl_error_to_rc(err: nx_service_nv::IoctlError) -> u32 {
 
     match err {
         nx_service_nv::IoctlError::SendRequest(e) => e.to_rc(),
-        nx_service_nv::IoctlError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_nv::IoctlError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::IoctlError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_nv::IoctlError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
@@ -378,10 +372,8 @@ fn nv_ioctl2_error_to_rc(err: nx_service_nv::Ioctl2Error) -> u32 {
 
     match err {
         nx_service_nv::Ioctl2Error::SendRequest(e) => e.to_rc(),
-        nx_service_nv::Ioctl2Error::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_nv::Ioctl2Error::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::Ioctl2Error::BuildRequest(_) => GENERIC_ERROR,
         nx_service_nv::Ioctl2Error::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
@@ -391,10 +383,8 @@ fn nv_ioctl3_error_to_rc(err: nx_service_nv::Ioctl3Error) -> u32 {
 
     match err {
         nx_service_nv::Ioctl3Error::SendRequest(e) => e.to_rc(),
-        nx_service_nv::Ioctl3Error::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_nv::Ioctl3Error::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::Ioctl3Error::BuildRequest(_) => GENERIC_ERROR,
         nx_service_nv::Ioctl3Error::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
@@ -404,10 +394,8 @@ fn nv_close_error_to_rc(err: nx_service_nv::CloseError) -> u32 {
 
     match err {
         nx_service_nv::CloseError::SendRequest(e) => e.to_rc(),
-        nx_service_nv::CloseError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_nv::CloseError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::CloseError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_nv::CloseError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
@@ -417,10 +405,8 @@ fn nv_query_event_error_to_rc(err: nx_service_nv::QueryEventError) -> u32 {
 
     match err {
         nx_service_nv::QueryEventError::SendRequest(e) => e.to_rc(),
-        nx_service_nv::QueryEventError::ParseResponse(e) => match e {
-            cmif::ParseResponseError::InvalidMagic => GENERIC_ERROR,
-            cmif::ParseResponseError::ServiceError(code) => code,
-        },
+        nx_service_nv::QueryEventError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::QueryEventError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_nv::QueryEventError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
         nx_service_nv::QueryEventError::MissingHandle => GENERIC_ERROR,
     }
