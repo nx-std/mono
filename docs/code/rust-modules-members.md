@@ -61,7 +61,7 @@ use std::sync::Arc;
 ### Common Violations
 
 - Main public function (`run`, `main`, `execute`) buried after helper functions
-- Public error types at the end of the file instead of near the top
+- Error types collected in a distant section instead of following the function/method that returns them
 - Helper structs/functions appearing before the main types they support
 - Private implementation details scattered before public API
 
@@ -133,6 +133,51 @@ struct Data {
 }
 ```
 
+### Error Type Co-location
+
+**ALWAYS** place an error type immediately after the function or method that returns it. The error and the operation that produces it form a single unit — a reader looking at a fallible function finds its failure modes right below it, without scrolling to a distant error section.
+
+```rust
+// ✅ CORRECT - error type directly follows the function returning it
+/// Resolves a hostname to a set of addresses.
+pub fn resolve(host: &str) -> Result<Addrs, ResolveError> {
+    // ...
+}
+
+/// Errors returned by [`resolve`].
+#[derive(Debug, thiserror::Error)]
+pub enum ResolveError {
+    #[error("host not found")]
+    NotFound,
+}
+
+/// Opens a connection to a resolved address.
+pub fn connect(addr: Addr) -> Result<Connection, ConnectError> {
+    // ...
+}
+
+/// Errors returned by [`connect`].
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+    #[error("connection refused")]
+    Refused,
+}
+```
+
+```rust
+// ❌ WRONG - error types collected away from the functions that return them
+pub fn resolve(host: &str) -> Result<Addrs, ResolveError> { ... }
+pub fn connect(addr: Addr) -> Result<Connection, ConnectError> { ... }
+
+// Reader must jump here to learn how `resolve` can fail
+pub enum ResolveError { ... }
+pub enum ConnectError { ... }
+```
+
+Place the error type after the free function that returns it, or — when the producer is a method — after the `impl` block containing that method. Error types are never nested inside an `impl` block.
+
+**Exception:** Only when a single error type is genuinely shared across many functions throughout a crate does it belong alone in a dedicated `error` module. This is the exceptional case, not the default — do not create an `error` module to hold per-function error types that each have a single producer.
+
 ## 🚨 CHECKLIST
 
 Before committing Rust code, verify:
@@ -147,7 +192,7 @@ Before committing Rust code, verify:
 ### Module Member Ordering
 
 - [ ] Main public function (`run`, `execute`, etc.) appears early in the file
-- [ ] Public error types appear near the top, after main functions
+- [ ] Error types appear immediately after the function/method that returns them
 - [ ] Public structs/types appear before private helpers
 - [ ] Helper functions appear after the code that uses them
 - [ ] No private implementation details scattered before public API
