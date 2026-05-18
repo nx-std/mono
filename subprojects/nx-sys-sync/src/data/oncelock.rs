@@ -59,6 +59,18 @@ impl<T> OnceLock<T> {
         }
     }
 
+    /// Blocks the current thread until the cell is initialised, then returns a
+    /// shared reference to the stored value.
+    ///
+    /// Blocks indefinitely if the cell is never initialised.
+    #[inline]
+    pub fn wait(&self) -> &T {
+        self.once.wait();
+        // SAFETY: `once.wait()` only returns once initialisation has completed,
+        // so the value was fully written before this thread observed it.
+        unsafe { (*self.value.get()).assume_init_ref() }
+    }
+
     /// Sets the contents of the cell to `value`.
     ///
     /// Returns `Err(value)` if the cell had already been initialised by this or
@@ -135,6 +147,27 @@ impl<T> OnceLock<T> {
 
         // SAFETY: `call_once_try` returned `Ok`, so `slot` is initialised.
         Ok(unsafe { (*slot).assume_init_ref() })
+    }
+
+    /// Takes the value out of the cell, moving it back to the uninitialised
+    /// state. Returns `None` if the cell has not been initialised.
+    pub fn take(&mut self) -> Option<T> {
+        if self.is_initialised() {
+            // Reset the `Once` first so the cell reads as uninitialised; this
+            // also stops `Drop` from reading the value a second time.
+            self.once = Once::new();
+            // SAFETY: the cell was initialised and `&mut self` is unique
+            // access, so moving the value out is sound.
+            Some(unsafe { (*self.value.get()).assume_init_read() })
+        } else {
+            None
+        }
+    }
+
+    /// Consumes the cell, returning the stored value. Returns `None` if the
+    /// cell has not been initialised.
+    pub fn into_inner(mut self) -> Option<T> {
+        self.take()
     }
 
     /// Returns `true` once the cell has been initialised.
