@@ -21,7 +21,8 @@
 use core::{
     fmt::Write as _,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, Ordering},
+    ptr,
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 /// Maximum size for the panic message buffer.
@@ -37,10 +38,22 @@ const MSG_BUFFER_SIZE: usize = 512;
 /// This follows the same approach as libnx's `fatalThrow` and `diagAbortWithResult`,
 /// and uses Rust's standard panic message format for consistency.
 ///
-/// Concurrent panics from multiple threads are handled by a one-shot guard: only
-/// the first panicking thread formats a message into the shared buffer, while any
-/// thread that loses the race breaks with an empty buffer. This avoids aliasing
-/// `&mut MSG_BUFFER` across threads.
+/// # Concurrency
+///
+/// `MSG_BUFFER` is a single shared `static`, so two situations could otherwise
+/// race for `&mut` access to it: concurrent panics on separate threads, and a
+/// nested panic (one raised while this thread is still formatting a message).
+///
+/// A one-shot atomic claim elects exactly one **winner** — the thread whose
+/// `FORMATTER.swap` returns the non-null buffer pointer. Only the winner formats
+/// the panic message into `MSG_BUFFER`; holding the unique pointer *is* its
+/// exclusive-access token. Every **loser** (a concurrent or nested panic) reads
+/// back a null pointer, skips formatting, and breaks with an empty buffer.
+///
+/// Losers break immediately instead of waiting for the winner: a panic handler
+/// must never block, and a nested panic runs on the winner's own thread, so
+/// waiting would deadlock. The claim guarantees `&mut MSG_BUFFER` is never
+/// aliased across threads.
 #[panic_handler]
 fn panic_handler(info: &PanicInfo) -> ! {
     /// Static buffer for storing the formatted panic message.
@@ -49,23 +62,19 @@ fn panic_handler(info: &PanicInfo) -> ! {
     /// read for the duration of the break event.
     static mut MSG_BUFFER: [u8; MSG_BUFFER_SIZE] = [0; MSG_BUFFER_SIZE];
 
-    /// Guards `MSG_BUFFER` against concurrent access from simultaneous panics.
+    /// One-shot claim on `MSG_BUFFER`, guarding it against concurrent panics.
     ///
-    /// The first panicking thread wins the compare-exchange and gains exclusive
-    /// access to the buffer; later threads skip formatting entirely.
-    static FORMATTING: AtomicBool = AtomicBool::new(false);
+    /// Holds the buffer pointer until the first panic claims it, then null. The
+    /// first panicking thread swaps the pointer out and gains exclusive access;
+    /// later threads observe null and skip formatting entirely.
+    static FORMATTER: AtomicPtr<[u8; MSG_BUFFER_SIZE]> = AtomicPtr::new(&raw mut MSG_BUFFER);
 
-    // Only the thread that wins the guard may touch MSG_BUFFER. A losing thread
-    // (a concurrent or nested panic) breaks with an empty buffer instead.
-    let (msg_ptr, msg_len) = if FORMATTING
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_ok()
-    {
-        let buf_ptr = &raw mut MSG_BUFFER;
-        let msg_ptr = buf_ptr.cast::<u8>() as usize;
-
-        // SAFETY: Winning the `FORMATTING` compare-exchange grants this thread
-        // exclusive access to MSG_BUFFER; no other thread can take this branch.
+    // Only the thread that claims the buffer pointer may touch MSG_BUFFER. A
+    // losing thread (a concurrent or nested panic) breaks with an empty buffer.
+    let buf_ptr = FORMATTER.swap(ptr::null_mut(), Ordering::AcqRel);
+    let (msg_ptr, msg_len) = if !buf_ptr.is_null() {
+        // SAFETY: `swap` atomically transferred the unique non-null buffer
+        // pointer to this thread; no other thread can observe it again.
         let buf = unsafe { &mut *buf_ptr };
 
         // Write the panic info using Rust's standard Display format, which
@@ -73,8 +82,9 @@ fn panic_handler(info: &PanicInfo) -> ! {
         let mut writer = SliceWriter::new(buf);
         let _ = write!(writer, "{info}");
 
-        (msg_ptr, writer.position())
+        (buf_ptr as usize, writer.position())
     } else {
+        // Lost the claim — break with a null, zero-length message.
         (0, 0)
     };
 
