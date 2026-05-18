@@ -150,3 +150,15 @@ impl<T> Default for OnceLock<T> {
         Self::new()
     }
 }
+
+impl<T> Drop for OnceLock<T> {
+    /// Drops the contained value if the cell was initialised.
+    #[inline]
+    fn drop(&mut self) {
+        if self.is_initialised() {
+            // SAFETY: the cell is initialised, and `&mut self` makes this the
+            // unique reference to it, so dropping the value in place is sound.
+            unsafe { (*self.value.get()).assume_init_drop() };
+        }
+    }
+}

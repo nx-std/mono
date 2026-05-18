@@ -1,22 +1,18 @@
 //! # Once
 //!
-//! A synchronization primitive which can be used to run a one‐time global
+//! A synchronization primitive which can be used to run a one-time global
 //! initialization. Unlike the standard library version this implementation is
-//! **non-poisoning** – if the initialization routine panics the `Once` simply
-//! stays in the [`INCOMPLETE`] state and subsequent calls will endlessly spin
-//! trying to acquire it. This mirrors the behaviour of a panic in `no_std`
-//! environments where unwinding is typically disabled and the entire program
-//! aborts anyway.
+//! **non-poisoning**: it has no poisoned state. Because the workspace builds
+//! with `panic = "abort"`, a panic inside the initializer aborts the whole
+//! process, so a half-completed `Once` is never observable by another thread.
 //!
 //! The API is intentionally kept very close to the one used inside the Rust
 //! standard library's *platform layer* (see
 //! <https://doc.rust-lang.org/src/std/sys/sync/once/>). The main differences
 //! are:
 //!
-//! * The API has **no poisoning support** whatsoever – there is no error state
-//!   and the initializer closure is either executed successfully or, in the
-//!   rare case of a panic, leaves the program in an undefined state (typically
-//!   abort).
+//! * The API has **no poisoning support** whatsoever – the initializer closure
+//!   either runs to completion or panics, and a panic aborts the process.
 //! * No `OnceState`, no `poison` API surface and no `ignore_poisoning`
 //!   parameters.
 //!
@@ -40,9 +36,12 @@
 //! other threads once the `Once` transitions into the `COMPLETE` state because
 //! the store uses `Release` semantics and readers use `Acquire`.
 
-use core::sync::atomic::{
-    AtomicUsize,
-    Ordering::{Acquire, Relaxed, Release},
+use core::{
+    convert::Infallible,
+    sync::atomic::{
+        AtomicUsize,
+        Ordering::{Acquire, Relaxed, Release},
+    },
 };
 
 use super::{Condvar, Mutex};
@@ -59,7 +58,6 @@ const COMPLETE: usize = 2;
 ///
 /// A `Once` may be placed in static storage and safely used from multiple
 /// threads concurrently.
-#[repr(C)]
 pub struct Once {
     state: AtomicUsize,
     mutex: Mutex,
@@ -113,47 +111,21 @@ impl Once {
 
     /// Executes the given closure exactly **once**. Subsequent calls block
     /// until the first invocation completes (or has completed already).
+    ///
+    /// Calling `call_once` (or [`call_once_try`](Self::call_once_try))
+    /// reentrantly from within `f` deadlocks the calling thread.
     #[inline]
     pub fn call_once<F>(&self, f: F)
     where
         F: FnOnce(),
     {
-        // Fast-path: already initialised.
-        if self.is_completed() {
-            return;
-        }
-
-        // Slow path – coordinate through mutex + condvar.
-        self.mutex.lock();
-
-        match self.state.load(Relaxed) {
-            INCOMPLETE => {
-                // Become the initializer.
-                self.state.store(RUNNING, Relaxed);
-                self.mutex.unlock();
-
-                // Run user initialization code outside the critical section.
-                f();
-
-                // Mark as complete and wake waiters.
-                self.mutex.lock();
-                self.state.store(COMPLETE, Release);
-                self.cvar.wake_all();
-                self.mutex.unlock();
-            }
-            RUNNING => {
-                // Somebody else is running – wait until they are done.
-                while self.state.load(Relaxed) != COMPLETE {
-                    let _ = self.cvar.wait(&self.mutex);
-                }
-                self.mutex.unlock();
-            }
-            COMPLETE => {
-                // Became complete while we were locking.
-                self.mutex.unlock();
-            }
-            _ => unreachable!(),
-        }
+        // The infallible variant is the fallible one whose initializer never
+        // errors. Sharing the implementation keeps a single state machine, so
+        // the two entry points cannot drift apart in their waiter handling.
+        let _ = self.call_once_try(|| {
+            f();
+            Ok::<(), Infallible>(())
+        });
     }
 
     /// Executes the given fallible closure exactly **once**. If the
@@ -186,6 +158,9 @@ impl Once {
         loop {
             self.mutex.lock();
 
+            // Every state transition happens under `self.mutex`, so these
+            // `Relaxed` loads are ordered by the mutex acquire/release. The
+            // `Acquire` load in `is_completed` covers the lock-free fast path.
             match self.state.load(Relaxed) {
                 INCOMPLETE => {
                     // Become the initializer.
@@ -241,8 +216,3 @@ impl Once {
         }
     }
 }
-
-// SAFETY: `Once` can be safely shared between threads because all interior
-// mutability is guarded by atomic operations.
-unsafe impl Send for Once {}
-unsafe impl Sync for Once {}
