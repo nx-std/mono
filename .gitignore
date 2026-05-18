@@ -3,11 +3,11 @@
 /.vscode
 
 # Claude Code
-/.claude
+/.claude/*
 !/.claude/skills/
 
 # Agents (Codex)
-/.agents
+/.agents/*
 !/.agents/skills/
 
 /.codex

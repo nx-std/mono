@@ -6,6 +6,7 @@ Atmosphère's standalone `dmnt.gen2` GDB stub.
 ## Table of Contents
 
 - [Overview](#overview)
+- [Run Modes & Error Reporting](#run-modes--error-reporting)
 - [Console Setup](#console-setup)
 - [Toolchain Access](#toolchain-access)
 - [Critical Gotchas](#critical-gotchas)
@@ -13,6 +14,7 @@ Atmosphère's standalone `dmnt.gen2` GDB stub.
 - [Decoding a Crash PC to Source](#decoding-a-crash-pc-to-source)
 - [Reading the Backtrace — Caveats](#reading-the-backtrace--caveats)
 - [Decoding Atmosphère Fatal Codes](#decoding-atmosphère-fatal-codes)
+- [SD-Card Crash Reports](#sd-card-crash-reports)
 - [Quick Reference](#quick-reference)
 
 ## Overview
@@ -21,9 +23,12 @@ Atmosphère's standalone `dmnt.gen2` GDB stub lets you attach a host GDB to a cr
 and capture a live backtrace, register state, and module layout. It is the most reliable way to find
 out *where* a deployed build faulted.
 
-**When to use it**: a deployed `nx-tests.nro` (or other homebrew) faults on the console with an
-Atmosphère fatal screen showing a `2XXX-YYYY` result code. The fatal screen alone only tells you the
-*kind* of fault (e.g. DataAbort) — the GDB stub tells you the *location*.
+**When to use it**: a deployed `nx-tests.nro` (or other homebrew) faults on the console — whether it
+shows an Atmosphère fatal screen with a `2XXX-YYYY` result code or only a generic "software was
+closed" dialog (which it is depends on the run mode — see
+[Run Modes & Error Reporting](#run-modes--error-reporting)). The fatal screen alone only tells you
+the *kind* of fault (e.g. DataAbort) — the GDB stub tells you the *location*, and works regardless
+of mode.
 
 The stub:
 
@@ -31,6 +36,34 @@ The stub:
 - Allows **one** GDB client at a time (single-session).
 - Lets you `attach` to a running process, `continue` until it faults, and inspect registers,
   memory, threads, and module load addresses.
+
+## Run Modes & Error Reporting
+
+Switch software runs in one of several modes, and the mode the homebrew was launched in decides
+**what the console can tell you on a crash** — including whether a `2XXX-YYYY` fatal code is shown
+at all. The GDB stub is **mode-independent**: `dmnt.gen2` traps the fault at the process level, so
+the workflow below works identically in every mode. The mode only changes what the *on-screen*
+report is worth.
+
+| Run mode        | How the homebrew is launched                                         | On crash, the console shows…                                                                | `2XXX-YYYY`?        |
+|-----------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------|---------------------|
+| **Applet**      | hbmenu opened via the Album applet (the default)                     | Generic *"The software was closed because an error occurred"* — `qlaunch` closes the applet  | **No** (suppressed) |
+| **Application** | hbmenu opened by overriding a game title (hold **R**) or a forwarder | The full Atmosphère fatal screen with the `2XXX-YYYY` result code                            | **Yes**             |
+| **Sysmodule**   | Background module — no UI                                            | Nothing on screen                                                                            | No                  |
+
+Why it matters for debugging:
+
+- **Applet mode is the common case** — hbmenu launched from the Album applet — and it is exactly
+  where the GDB stub matters most. The applet host (`qlaunch`) closes the faulting applet with a
+  generic dialog *before* Atmosphère's fatal screen would appear, so there is no `2XXX-YYYY` code
+  to read. The stub capture is then your only reliable source of `pc`, registers, and module bases.
+- **To obtain a `2XXX-YYYY` code, run in application mode** — launch hbmenu by overriding a game
+  title so a crash surfaces the full fatal screen. This is optional: the GDB capture already
+  pinpoints the fault location without it.
+- **Applet mode also has a much smaller heap** than application mode. An out-of-memory fault that
+  only reproduces in applet mode may be a symptom of the reduced heap rather than a logic bug.
+- In every mode the homebrew runs inside the **`hbloader`** process, so the attach workflow is
+  unchanged.
 
 ## Console Setup
 
@@ -92,6 +125,11 @@ Read these before you start — every one of them will silently waste a debuggin
   before you ever see it.
 
 ## Step-by-Step Workflow
+
+**Before you start, triage.** Confirm how the homebrew was launched and what the console displayed
+(see [Run Modes & Error Reporting](#run-modes--error-reporting)). In applet mode there is no
+`2XXX-YYYY` code to decode — rely on the GDB capture. The capture steps below are identical in
+every mode.
 
 Throughout this section, substitute the placeholders:
 
@@ -272,6 +310,11 @@ x/32a $sp
 
 ## Decoding Atmosphère Fatal Codes
 
+This applies **only in application mode** — applet mode suppresses the fatal screen (see
+[Run Modes & Error Reporting](#run-modes--error-reporting)). If the console only showed a generic
+"software was closed" dialog, there is no code to decode; use the GDB capture above, or the
+[SD-Card Crash Reports](#sd-card-crash-reports) fallback.
+
 The fatal screen shows a code of the form `2XXX-YYYY`:
 
 - `2XXX` identifies the **result module** that raised the fault.
@@ -287,6 +330,20 @@ For example, `2168` is `ams::creport` (the crash-report module). Within `creport
 description `0002` corresponds to **DataAbort** — so a fatal `2168-0002` is a data abort caught by
 the crash reporter. Match the `YYYY` value against the result definitions in that header to get the
 exact fault description.
+
+## SD-Card Crash Reports
+
+Atmosphère's `creport` writes a crash report to the SD card on every process crash, **regardless of
+run mode** — including applet mode, where no fatal screen ever appears. It is the fallback when GDB
+was not attached in time, and a useful corroboration of a GDB capture:
+
+- Reports are written to `atmosphere/crash_reports/` on the SD card.
+- Each report is a text dump containing the faulting `pc`, the register state, and a stack trace.
+  Rebase and resolve its addresses exactly as in
+  [Decoding a Crash PC to Source](#decoding-a-crash-pc-to-source).
+
+The GDB stub remains preferred — it gives a live session and lets you inspect the stack manually
+(`x/32a $sp`) — but a crash report needs no attach race and survives across reboots.
 
 ## Quick Reference
 
@@ -310,3 +367,5 @@ exact fault description.
 - Always use a command file (`-x cmds.gdb`); never multi-word inline `-ex`.
 - Attach **before** `just deploy`; the NRO can fault in milliseconds.
 - Trust frame `#0` only — there is no unwind info on Switch homebrew threads.
+- Applet mode shows no `2XXX-YYYY` code — the stub works in any mode; `atmosphere/crash_reports/`
+  on the SD card is a no-GDB fallback.
