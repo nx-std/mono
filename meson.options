@@ -71,7 +71,7 @@ option(
 
 option(
     'use_nx_sys_thread',
-    type : 'feature', value : 'disabled', # Disable by default, WIP
+    type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-sys-thread functions',
     yield : true
 )
