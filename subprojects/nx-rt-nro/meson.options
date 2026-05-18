@@ -1,0 +1,55 @@
+option(
+    'link_pipeline',
+    type : 'combo', choices : ['gcc', 'rustc'], value : 'gcc',
+    description : 'Select the final-link pipeline: gcc drives the link via devkitA64, rustc drives it via the opt-in rustc-link pipeline',
+    yield : true
+)
+
+option(
+    'use_nx_service_apm',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-apm` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_applet',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-applet` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_hid',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-hid` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_nv',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-nv` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_set',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-set` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_time',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-time` feature',
+    yield : true
+)
+
+option(
+    'use_nx_service_vi',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-vi` feature',
+    yield : true
+)

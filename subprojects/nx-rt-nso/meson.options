@@ -1,0 +1,15 @@
+option(
+    'link_pipeline',
+    type : 'combo', choices : ['gcc', 'rustc'], value : 'gcc',
+    description : 'Select the final-link pipeline: gcc drives the link via devkitA64, rustc drives it via the opt-in rustc-link pipeline',
+    yield : true
+)
+
+option(
+    'nso_applet_type',
+    type : 'combo',
+    choices : ['application', 'system-applet', 'library-applet', 'overlay-applet', 'system-application', 'none'],
+    value : 'application',
+    description : 'Application Manager identity the nx-rt-nso NSO process registers as',
+    yield : true
+)

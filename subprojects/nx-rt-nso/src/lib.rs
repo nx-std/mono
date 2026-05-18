@@ -1,0 +1,161 @@
+//! # nx-rt-nso
+//!
+//! NSO-process entry crate for the Nintendo Switch runtime crate family.
+//!
+//! `nx-rt-nso` is the runtime for one output kind — the `NSO` process
+//! launched by the process manager (`pm`): installed applications, every
+//! system-applet kind, and background sysmodules. It stacks the NSO-specific
+//! startup on top of the kind-agnostic [`nx_rt_core`]: the `pm`-handoff
+//! bring-up (no homebrew-loader configuration block), the SVC-backed heap
+//! path, the `__argdata__` command-line (`argv`) reader, and the
+//! build-time-selected Application Manager (applet) handshake.
+//!
+//! ## Output-kind rows
+//!
+//! | App type / kind | Executable | Launched by | Applet type | Applet type sourced |
+//! |-----------------|-----------|-------------|-------------|---------------------|
+//! | Regular application | NSO | `pm` | `Application` | **Build time** |
+//! | System applet (qlaunch) | NSO | `pm` | `SystemApplet` | **Build time** |
+//! | Library applet (system) | NSO | `pm` | `LibraryApplet` | **Build time** |
+//! | Overlay applet | NSO | `pm` | `OverlayApplet` | **Build time** |
+//! | System application | NSO | `pm` | `SystemApplication` | **Build time** |
+//! | Background sysmodule | NSO | `pm` | `None` | **Build time** |
+//!
+//! Unlike a homebrew NRO — which receives its applet type at runtime from the
+//! homebrew loader's configuration block — every NSO selects its applet type
+//! at build time. All six Application Manager identities share the single NSO
+//! startup ABI; the build picks one, producing an applet-type *value* that
+//! flows into the applet handshake. A `None` background sysmodule skips the
+//! Application Manager entirely. See [`nx_rt_core`] for the full App-Type /
+//! Output-Kind matrix covering every Switch executable kind.
+//!
+//! ## Background sysmodule (`None`) profile
+//!
+//! Selecting `applet-none` builds the runtime for a background sysmodule — a
+//! `pm`-launched NSO that exists to provide a service and has no Application
+//! Manager identity. Its startup profile is deliberately minimal:
+//!
+//! - **Service set** — only the Service Manager (`sm`) is brought up. The
+//!   Application Manager handshake is skipped, so no `appletOE` / `appletAE`
+//!   proxy session is opened and no AM handle is held. A sysmodule that needs
+//!   a further service opens it explicitly; nothing else starts on its behalf.
+//! - **Applet identity** — the `__nx_applet_type` global reports `None`. That
+//!   value *is* the skip signal: the applet-init entry point returns before
+//!   contacting the Application Manager, and the libnx applet runtime likewise
+//!   treats `None` as "do not initialize".
+//!
+//! Every other `applet-*` selection registers one of the five Application
+//! Manager identities and runs its per-role handshake; see [`applet`] for that
+//! mapping.
+//!
+//! ## Startup capability fragment
+//!
+//! An NSO process declares the supervisor calls it may invoke and the system
+//! services it may reach in its NPDM. Those permissions are the union of what
+//! the application needs and what its runtime startup needs. [`caps`] owns the
+//! *runtime* half as inspectable data — a [`caps::CapabilityFragment`] keyed by
+//! applet identity — so a build tool can merge it with the application-declared
+//! capabilities instead of an NPDM being hand-written. The fragment varies with
+//! the build-time applet type: a background sysmodule needs no Application
+//! Manager service access; a foreground applet additionally needs the
+//! synchronization calls its focus-wait handshake invokes.
+//!
+//! # Cargo features
+//!
+//! - `ffi` — gates the [`ffi`] module: the `__nx_rt_nso__libnx_*` C-FFI symbols that
+//!   redirect the NSO-specific `libnx` runtime entry points (`envSetup`,
+//!   `argvSetup`, `appletInitialize`, `__nx_applet_type`). Without it no
+//!   override symbols are emitted and the linker fragments have nothing to
+//!   bind. The kind-agnostic runtime symbols are owned by [`nx_rt_core`]'s
+//!   FFI surface.
+//! - `applet-*` — the six mutually-exclusive build-time Application Manager
+//!   identity selectors (see above); exactly one is always active.
+//! - `rt-link` — emits this crate's `pm`-launch `.crt0` (the NSO process
+//!   `_start`) for the opt-in `rustc`-driven link pipeline. It is off on the
+//!   default GCC pipeline, where `_start` is supplied by libnx's
+//!   `switch_crt0.s`; enabling it there would collide with that `_start`.
+
+#![no_std]
+
+extern crate nx_alloc as _; // provides #[global_allocator]
+extern crate nx_panic_handler as _; // provides #[panic_handler]
+
+// `pm` process-launch `.crt0` startup section for the `rustc`-link pipeline.
+// Gated behind `rt-link` so the `_start` it defines is emitted only when
+// `rustc` drives the final link; on the GCC pipeline `_start` comes from
+// libnx's `switch_crt0.s`, and an unconditional `.crt0` would collide with it.
+#[cfg(feature = "rt-link")]
+core::arch::global_asm!(include_str!("crt0.s"));
+
+// Build-time Application Manager identity selection.
+//
+// Exactly one of the six mutually-exclusive `applet-*` features must be
+// enabled — each defines [`applet::APPLET_TYPE`] to one `AppletType` value.
+// The `nso_applet_type` Meson option drives the choice; these guards turn a
+// missing or ambiguous selection into a clear diagnostic instead of a cryptic
+// "`APPLET_TYPE` is not defined / defined multiple times".
+#[cfg(not(any(
+    feature = "applet-application",
+    feature = "applet-library-applet",
+    feature = "applet-none",
+    feature = "applet-overlay-applet",
+    feature = "applet-system-applet",
+    feature = "applet-system-application",
+)))]
+compile_error!(
+    "nx-rt-nso: no applet type selected — enable exactly one `applet-*` feature \
+     (set the `nso_applet_type` Meson option)"
+);
+
+#[cfg(any(
+    all(
+        feature = "applet-application",
+        any(
+            feature = "applet-library-applet",
+            feature = "applet-none",
+            feature = "applet-overlay-applet",
+            feature = "applet-system-applet",
+            feature = "applet-system-application",
+        ),
+    ),
+    all(
+        feature = "applet-library-applet",
+        any(
+            feature = "applet-none",
+            feature = "applet-overlay-applet",
+            feature = "applet-system-applet",
+            feature = "applet-system-application",
+        ),
+    ),
+    all(
+        feature = "applet-none",
+        any(
+            feature = "applet-overlay-applet",
+            feature = "applet-system-applet",
+            feature = "applet-system-application",
+        ),
+    ),
+    all(
+        feature = "applet-overlay-applet",
+        any(
+            feature = "applet-system-applet",
+            feature = "applet-system-application"
+        ),
+    ),
+    all(
+        feature = "applet-system-applet",
+        feature = "applet-system-application"
+    ),
+))]
+compile_error!(
+    "nx-rt-nso: multiple applet types selected — enable exactly one `applet-*` \
+     feature (the `nso_applet_type` Meson option selects one)"
+);
+
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
+pub mod applet;
+pub mod argv;
+pub mod caps;
+pub mod env;

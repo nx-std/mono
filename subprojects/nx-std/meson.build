@@ -116,12 +116,28 @@ if get_option('use_nx_time').enabled()
     deps_cargo_features += ['time']
 endif
 
-# nx-rt
+# nx-rt-core + nx-rt-nro
+#
+# The homebrew NRO runtime is split across two crates: the kind-agnostic
+# `nx-rt-core` (heap init, env state, HOS version, Service Manager) and the
+# homebrew-NRO entry crate `nx-rt-nro` (loader-config parser, argv, applet
+# dispatch). `nx-rt-core`'s `rt_core_libnx_core.ld` owns the shared `libnx` symbols and
+# is linked first so the foundation overrides precede the kind-specific ones.
 if get_option('use_nx_rt').enabled()
-    nx_rt_proj = subproject('nx-rt')
+    nx_rt_core_proj = subproject('nx-rt-core')
+    nx_rt_nro_proj = subproject('nx-rt-nro')
 
-    deps += nx_rt_proj.get_variable('nx_rt_dep')
-    foreach script : nx_rt_proj.get_variable('nx_rt_ld_overrides')
+    deps += nx_rt_core_proj.get_variable('nx_rt_core_dep')
+    deps += nx_rt_nro_proj.get_variable('nx_rt_nro_dep')
+
+    # `nx-rt-core`'s fragments are linked first so the foundation overrides
+    # precede the NRO-specific ones. The applet-accessor fragment is included
+    # in `nx_rt_core_ld_overrides` only when `use_nx_service_applet` is enabled
+    # (mirroring the `rt_nro_libnx_service_applet.ld` fragment in the NRO list).
+    foreach script : nx_rt_core_proj.get_variable('nx_rt_core_ld_overrides')
+        deps_override_link_args += ['-T', script]
+    endforeach
+    foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
         deps_override_link_args += ['-T', script]
     endforeach
 
@@ -129,10 +145,10 @@ if get_option('use_nx_rt').enabled()
     deps_cargo_features += ['rt']
 endif
 
-# nx-alloc requires nx-rt for heap initialization
+# nx-alloc requires the nx-rt runtime for heap initialization
 #
 # `nx-alloc` replaces the global allocator but never initializes its heap —
-# that is wired by `nx-rt`'s `__libnx_initheap` override, which adopts the
+# that is wired by `nx-rt-core`'s `__libnx_initheap` override, which adopts the
 # homebrew loader's heap region. With `use_nx_alloc` enabled but `use_nx_rt`
 # disabled, the heap is never set up for a loader-hosted process and the build
 # faults at startup on its first allocation.

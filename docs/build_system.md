@@ -417,3 +417,26 @@ custom_target('@0@.nro'.format(name),
     build_by_default : true,
 )
 ```
+
+## Link Pipeline
+
+The final executable link can be driven by one of two pipelines, selected by the
+`link_pipeline` combo option:
+
+- **`gcc`** (default) — the link is driven by the devkitA64 GCC toolchain, using
+  libnx's `switch.ld` linker script and `switch_crt0.s` startup object.
+- **`rustc`** — the opt-in rustc-driven link pipeline: a custom
+  `aarch64-nintendo-horizon.json` target embeds the section layout, and each
+  runtime entry crate (`nx-rt-nro`, `nx-rt-nso`, `nx-rt-kip`) supplies its own
+  per-kind `.crt0` via the `rt-link` Cargo feature.
+
+```bash
+just configure -Dlink_pipeline=rustc
+```
+
+The rustc pipeline has no implicit `-T` step, so `aarch64-nintendo-horizon.json`
+must embed `switch.ld`'s section layout verbatim in its `link-script` field.
+`just check-target-json` verifies the two stay in sync.
+
+See [rustc-link-pipeline.md](rustc-link-pipeline.md) for the full pipeline and
+[crt0-and-mod0.md](crt0-and-mod0.md) for the `.crt0` / MOD0 startup mechanism.

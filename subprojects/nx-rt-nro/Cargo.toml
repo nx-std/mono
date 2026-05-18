@@ -1,0 +1,62 @@
+[package]
+name = "nx-rt-nro"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt_nro"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Master switch for the C-FFI surface (`__nx_rt_nro__*` symbols). Required for any libnx override.
+# Pulls `nx-rt-core/ffi`: the NRO FFI re-exports the shared helpers from `nx_rt_core::ffi::common`.
+ffi = ["nx-sf/ffi", "nx-rt-core/ffi"]
+# Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
+# crate's own `_start` (the homebrew-loader startup ABI). Leave it off on the
+# GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
+rt-link = []
+# Application Performance Management — gates `services::apm` + `ffi::apm`.
+service-apm = ["dep:nx-service-apm"]
+# Applet (am) service — gates `services::applet` + `ffi::applet`.
+# Pulls `nx-rt-core/service-applet`: the shared applet manager lives in the core.
+service-applet = ["dep:nx-service-applet", "nx-rt-core/service-applet"]
+# Human Input Device service — gates `services::hid` + `ffi::hid`. Pulls `service-applet` (aruid lookup).
+service-hid = ["dep:nx-service-hid", "service-applet"]
+# NVIDIA driver service — gates `services::nv` + `ffi::nv`. Pulls `service-applet` (aruid lookup).
+service-nv = ["dep:nx-service-nv", "service-applet"]
+# System Settings (set:sys) service — gates `services::set` + `ffi::setsys`.
+service-set = ["dep:nx-service-set"]
+# Time service — gates `services::time` + `ffi::time`.
+service-time = ["dep:nx-service-time"]
+# Visual Interface (display/layer) service — gates `services::vi` + `ffi::vi`.
+# Pulls `service-applet` (the managed-display-layer fallback in `viCreateLayer`
+# and ARUID lookup in `viGetIndirectLayerImageMap` both reach into the applet
+# service).
+service-vi = ["dep:nx-service-vi", "service-applet"]
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
+nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
+nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
+nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
+nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = true }
+nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+thiserror = { version = "2", default-features = false }
+
+# `nx-sys-mem` and `nx-sys-thread-tls` are linked via meson for FFI symbol
+# re-export; not `use`d in Rust source.
+[package.metadata.cargo-machete]
+ignored = ["nx-sys-mem", "nx-sys-thread-tls"]

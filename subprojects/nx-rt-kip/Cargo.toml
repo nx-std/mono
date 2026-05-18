@@ -1,0 +1,27 @@
+[package]
+name = "nx-rt-kip"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt_kip"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Per-kind kernel-launch `.crt0` for the opt-in `rustc`-link pipeline. Emits
+# this crate's own `_start` (the KIP kernel-launch startup ABI). Leave it off
+# on the GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
+rt-link = []
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+
+# `nx-rt-core` is linked via meson for FFI symbol re-export; not `use`d in
+# Rust source.
+[package.metadata.cargo-machete]
+ignored = ["nx-rt-core"]

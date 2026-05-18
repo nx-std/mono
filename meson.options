@@ -14,6 +14,13 @@ option(
 )
 
 option(
+    'link_pipeline',
+    type : 'combo', choices : ['gcc', 'rustc'], value : 'gcc',
+    description : 'Select the final-link pipeline: gcc drives the link via devkitA64, rustc drives it via the opt-in rustc-link pipeline',
+    yield : true
+)
+
+option(
     'use_nx',
     type : 'feature', value : 'disabled',
     description : 'Override all libnx functions with nx- functions',
@@ -86,7 +93,7 @@ option(
 option(
     'use_nx_rt',
     type : 'feature', value : 'auto',
-    description : 'Override libnx runtime functions with nx-rt',
+    description : 'Override libnx runtime functions with the nx-rt runtime (nx-rt-core + nx-rt-nro)',
     yield : true
 )
 

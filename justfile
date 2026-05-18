@@ -90,6 +90,49 @@ alias check-deps := check-unused-deps
 check-unused-deps:
     cargo machete
 
+# Verify the rustc-pipeline target JSON's link-script matches switch.ld
+[group: 'check']
+check-target-json:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    linker_script='subprojects/libnx/src/nx/switch.ld'
+    target_json='aarch64-nintendo-horizon.json'
+
+    command -v jq >/dev/null || { >&2 echo "error: 'jq' not found on PATH"; exit 1; }
+    [[ -f "$linker_script" ]] || { >&2 echo "error: $linker_script not found (is the libnx submodule checked out?)"; exit 1; }
+    [[ -f "$target_json" ]] || { >&2 echo "error: $target_json not found"; exit 1; }
+
+    # switch.ld is the single source of truth for the section layout. The rustc
+    # link pipeline has no implicit `-T` step, so that layout must ride verbatim
+    # in the target JSON's `link-script` field. `--rawfile` reads switch.ld as a
+    # single string; jq handles the JSON escaping.
+    generated="$(jq --indent 2 --rawfile ls "$linker_script" '.["link-script"] = $ls' "$target_json")"
+
+    if [[ "$(cat "$target_json")" == "$generated" ]]; then
+        echo "target JSON's link-script is in sync with switch.ld"
+        exit 0
+    fi
+
+    cat >&2 <<'MSG'
+    error: aarch64-nintendo-horizon.json is out of sync with switch.ld
+
+      The rustc-pipeline target JSON embeds switch.ld's section layout verbatim
+      in its `link-script` field, because the rustc link has no implicit `-T`
+      step. switch.ld has changed since that field was last embedded.
+
+      switch.ld is a vendored libnx file, so this should be very rare. To
+      resync, re-embed switch.ld into the JSON and commit both files together:
+
+        jq --indent 2 --rawfile ls subprojects/libnx/src/nx/switch.ld \
+          '.["link-script"] = $ls' aarch64-nintendo-horizon.json \
+          > aarch64-nintendo-horizon.json.tmp
+        mv aarch64-nintendo-horizon.json.tmp aarch64-nintendo-horizon.json
+
+      Then review the diff and rebuild the rustc pipeline before committing.
+    MSG
+    exit 1
+
 
 ## Build (Meson)
 

@@ -332,6 +332,7 @@ The proposed structure follows the workspace principles directly:
 
 Internal:
 
+- [`docs/crt0-and-mod0.md`](crt0-and-mod0.md) — startup mechanics: `_start`, `.crt0`, MOD0
 - [`docs/build_system.md`](build_system.md) — current hybrid Meson + Cargo build system
 - [`docs/libnx_overrides.md`](libnx_overrides.md) — current link-time symbol override mechanism
 - [`docs/code/meson-linker-script.md`](code/meson-linker-script.md) — linker script wiring in Meson

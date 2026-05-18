@@ -1,0 +1,20 @@
+[package]
+name = "nx-rt-module"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt_module"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
+
+# `nx-rt-core` is linked via meson for FFI symbol re-export; not `use`d in
+# Rust source.
+[package.metadata.cargo-machete]
+ignored = ["nx-rt-core"]

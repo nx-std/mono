@@ -13,7 +13,9 @@ pub use nx_pm::ffi as pm;
 #[cfg(feature = "rand")]
 pub use nx_rand::ffi as rand;
 #[cfg(feature = "rt")]
-pub use nx_rt::ffi as rt;
+pub use nx_rt_core::ffi as rt_core;
+#[cfg(feature = "rt")]
+pub use nx_rt_nro::ffi as rt;
 #[cfg(feature = "sf")]
 pub use nx_sf::ffi as sf;
 #[cfg(feature = "sync")]
@@ -30,7 +32,7 @@ pub use nx_sys_sync::ffi as sys_sync;
 pub use nx_sys_thread::ffi as sys_thread;
 #[cfg(feature = "sys-thread-tls")]
 pub use nx_sys_thread_tls::ffi as sys_thread_tls;
-// `virtmem` was extracted into the `nx-sys-virtmem` crate (SPEC Task 5.3/5.4);
+// `virtmem` lives in the `nx-sys-virtmem` crate (the heap-free page substrate);
 // its `__nx_sys_virtmem__virtmem_*` FFI rides along with the `sys-mem` feature.
 #[cfg(feature = "sys-mem")]
 pub use nx_sys_virtmem::virtmem::ffi as sys_virtmem;

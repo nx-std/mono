@@ -28,7 +28,7 @@ pub mod time {
 }
 #[cfg(feature = "rt")]
 pub mod rt {
-    pub use nx_rt::*;
+    pub use nx_rt_nro::*;
 }
 #[cfg(feature = "display")]
 pub mod display {

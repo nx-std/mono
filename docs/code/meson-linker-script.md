@@ -61,7 +61,7 @@ Add an `<aspect>_override.ld` **only** when the crate replaces one or more symbo
 | Higher-level (`nx-alloc`, `nx-rand`, ...)  | YES — typically `libnx`, `nx-alloc` also `newlib` |
 | Service framework (`nx-sf`)                | YES                                               |
 | Service IPC client (`nx-service-*`)        | NO (pure Rust API, no upstream replacement)       |
-| Runtime (`nx-rt`)                          | YES — split under `overrides/` (Section 6)        |
+| Runtime family (`nx-rt-*`)                 | YES — split under `overrides/` (Section 6)        |
 
 If a crate has no override script, omit both the `.ld` file and the `<crate>_ld_override` Meson variable. The corresponding Rust crate should also omit the `ffi` Cargo feature (see [rust-ffi](rust-ffi.md#6-crates-without-an-ffi-surface)).
 
@@ -200,39 +200,43 @@ The umbrella aggregates multiple `<crate>_ld_override` paths into a single list 
 
 ## 6. Multi-Fragment Overrides (`overrides/` Layout)
 
-When a crate's override surface is partitioned along an orthogonal axis (e.g., per-service fragments in `nx-rt`), use an `overrides/` subdirectory and expose a **list** of paths instead of a single variable:
+When a crate's override surface is partitioned — by override target and/or an orthogonal per-feature axis — use an `overrides/` subdirectory and expose a **list** of paths instead of a single variable. Name each fragment `<crate>_<archive>_<axis>.ld`: the leading segment is the owning crate (so fragments stay unambiguous once several crates' `overrides/` directories are aggregated into one final link), the middle segment is the override target (matching the `__nx_<aspect>__<archive>_*` symbol prefix and the `src/ffi/<archive>/` submodule — see [rust-ffi](rust-ffi.md)), the trailing segment is the partition axis (`core` for the always-linked fragment, `service_<name>` for a per-feature one).
+
+The `nx-rt-*` runtime family uses this layout. Every fragment targets `libnx`, so each crate's `overrides/` holds one `<crate>_libnx_*.ld` family, mirrored by a single `src/ffi/libnx/` submodule tree:
 
 ```
-subprojects/nx-rt/
+subprojects/nx-rt-nro/
 ├── Cargo.toml
 ├── meson.build
 ├── overrides/
-│   ├── rt_core.ld                 # always present
-│   ├── rt_service_apm.ld
-│   ├── rt_service_applet.ld
-│   └── rt_service_<name>.ld       # one per service feature
+│   ├── rt_nro_libnx_core.ld              # always present
+│   ├── rt_nro_libnx_service_apm.ld
+│   ├── rt_nro_libnx_service_applet.ld
+│   └── rt_nro_libnx_service_<name>.ld    # one per service feature
 └── src/
+    └── ffi/
+        └── libnx/                        # FFI symbols grouped by the same target
 ```
 
 The Meson wiring conditionally appends fragments based on setup-time options and exposes them as a list:
 
 ```meson
-ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_core.ld']
+ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_core.ld']
 
 if get_option('use_nx_service_apm').enabled()
     # ... subproject + deps wiring ...
-    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_service_apm.ld'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_apm.ld'
 endif
 
 # ... one block per service feature ...
 
-nx_rt_ld_overrides = ld_overrides   # plural variable: list of paths
+nx_rt_nro_ld_overrides = ld_overrides   # plural variable: list of paths
 ```
 
 Downstream consumers iterate the list when building `-T` arguments:
 
 ```meson
-foreach script : nx_rt_proj.get_variable('nx_rt_ld_overrides')
+foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
     deps_override_link_args += ['-T', script]
 endforeach
 ```

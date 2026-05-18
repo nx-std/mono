@@ -94,11 +94,45 @@ dependencies = [
 ]
 
 [[package]]
-name = "nx-rt"
+name = "nx-rt-core"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-panic-handler",
+ "nx-service-applet",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
+ "nx-sys-sync",
+ "nx-sys-thread-tls",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-rt-kip"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-rt-core",
+ "nx-svc",
+]
+
+[[package]]
+name = "nx-rt-module"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-rt-core",
+]
+
+[[package]]
+name = "nx-rt-nro"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-rt-core",
  "nx-service-apm",
  "nx-service-applet",
  "nx-service-hid",
@@ -111,9 +145,19 @@ dependencies = [
  "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",
- "nx-sys-sync",
  "nx-sys-thread-tls",
  "thiserror",
+]
+
+[[package]]
+name = "nx-rt-nso"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-rt-core",
+ "nx-service-applet",
+ "nx-svc",
 ]
 
 [[package]]
@@ -1246,7 +1290,8 @@ dependencies = [
  "nx-panic-handler",
  "nx-pm",
  "nx-rand",
- "nx-rt",
+ "nx-rt-core",
+ "nx-rt-nro",
  "nx-service-apm",
  "nx-service-applet",
  "nx-service-hid",

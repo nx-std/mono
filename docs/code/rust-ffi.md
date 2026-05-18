@@ -80,6 +80,8 @@ pub extern "C" fn __nx_<aspect>__<symbol>(/* ... */) -> u32 {
 
 Keep all `extern "C"` exports inside `src/ffi.rs` (or submodules under `src/ffi/` for larger surfaces). Do NOT scatter `#[cfg(feature = "ffi")]` `pub extern "C" fn` definitions across other modules — the linker-override authors need a single place to look.
 
+When a crate's override surface spans more than one upstream archive — or is organized that way for clarity — group the `ffi` submodules by **override target**: one submodule per archive, `src/ffi/<archive>.rs` (or `src/ffi/<archive>/` for a larger per-target surface). Target-agnostic FFI helpers stay in a sibling `src/ffi/common.rs`, not under a target submodule. This mirrors the override-script fragment families one-for-one ([Section 4](#4-symbol-naming), [meson-linker-script](meson-linker-script.md)). The `nx-rt-*` runtime family uses this layout — every override targets `libnx` today, so each crate exposes a single `src/ffi/libnx/` submodule tree.
+
 ---
 
 ## 4. Symbol Naming
@@ -99,7 +101,8 @@ pub extern "C" fn __nx_alloc__newlib_malloc_r(/* ... */) -> *mut c_void { /* ...
 ### Rules
 
 - Prefix with `__nx_<aspect>__` where `<aspect>` is the crate's snake_case slug — the trailing segment of the crate name with hyphens flattened (e.g., `nx-svc` → `svc`, `nx-sys-mem` → `sys_mem`, `nx-sys-thread-tls` → `thread_tls`, `nx-alloc` → `alloc`).
-- Preserve the original upstream name (case and all) after the prefix so the linker alias side ([meson-linker-script](meson-linker-script.md)) is mechanical: `<symbol> = __nx_<aspect>__<symbol>;`. When the same crate may eventually override symbols from multiple archives, include the archive in the suffix (e.g., `__nx_alloc__newlib_*`).
+- Preserve the original upstream name (case and all) after the prefix so the linker alias side ([meson-linker-script](meson-linker-script.md)) is mechanical: `<symbol> = __nx_<aspect>__<symbol>;`.
+- **Group by override target.** When a crate's override surface spans more than one upstream archive — or is organized that way for clarity — insert the archive as a segment: `__nx_<aspect>__<archive>_<symbol>` (e.g., `__nx_alloc__newlib_malloc_r`, `__nx_rt_core__libnx_env_get_loader_info`). The archive segment matches the `src/ffi/<archive>/` submodule ([Section 3](#3-source-gating)) and the `<archive>_<axis>.ld` override-script fragment family ([meson-linker-script](meson-linker-script.md)). The `nx-rt-*` runtime family follows this layout — every fragment targets `libnx` today, so its symbols are `__nx_rt_<kind>__libnx_*` and its fragments `libnx_*.ld`.
 - Apply `#[unsafe(no_mangle)]` so the symbol survives mangling.
 - Apply `extern "C"` so the function uses the C ABI expected by the upstream callers.
 - Use integer types that match the upstream prototype exactly (width, signedness, pointer mutability). Audit each signature against the upstream archive's headers (e.g., `subprojects/libnx/nx/include/switch/.../` for libnx) rather than guessing.
@@ -110,6 +113,7 @@ pub extern "C" fn __nx_alloc__newlib_malloc_r(/* ... */) -> *mut c_void { /* ...
 |------------------------|--------------------|-----------------------------------------|
 | `nx-svc`               | `svc`              | `__nx_svc__svc_set_heap_size`           |
 | `nx-alloc`             | `alloc`            | `__nx_alloc__newlib_malloc_r`           |
+| `nx-rt-core`           | `rt_core`          | `__nx_rt_core__libnx_initheap`          |
 | `nx-sys-mem`           | `sys_mem`          | `__nx_sys_mem__virtmem_reserve`         |
 | `nx-sys-thread-tls`    | `thread_tls`       | `__nx_thread_tls__get_thread_vars`      |
 | `nx-std-sync`          | `std_sync`         | `__nx_std_sync__mutex_lock`             |

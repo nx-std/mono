@@ -45,12 +45,15 @@ __{{ crate-name | snake_case }}__{{ fn-name | snake_case }}
 
 ### Special Case: `__libnx_*` Functions
 
-For functions starting with `__libnx_`, strip the prefix and keep the rest as-is:
+`libnx`'s internal `__libnx_*` runtime hooks are owned by whichever crate
+implements them, so the Rust symbol is prefixed with that crate's name. The
+`__libnx_` prefix is dropped when the remainder is already descriptive and
+kept when it disambiguates:
 
 | libnx Function | Rust FFI Function |
 |---|---|
-| `__libnx_initheap` | `__nx_alloc__initheap` |
-| `__libnx_exception_entry` | `__nx_rt__exception_entry` |
+| `__libnx_initheap` | `__nx_rt_core__initheap` |
+| `__libnx_init_thread` | `__nx_sys_thread__libnx_init_thread` |
 
 ## Rust Crate Structure
 

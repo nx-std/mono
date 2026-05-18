@@ -1,0 +1,42 @@
+[package]
+name = "nx-rt-nso"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt_nso"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Build-time Application Manager identity: regular application (`appletOE`).
+# The default NSO applet identity; `nso_applet_type=application` selects it.
+default = ["applet-application"]
+# Application Manager identity: regular application — `AppletType::Application`.
+applet-application = []
+# Application Manager identity: library applet — `AppletType::LibraryApplet`.
+applet-library-applet = []
+# Application Manager identity: background sysmodule — `AppletType::None`; the AM handshake is skipped.
+applet-none = []
+# Application Manager identity: overlay applet — `AppletType::OverlayApplet`.
+applet-overlay-applet = []
+# Application Manager identity: system applet, e.g. qlaunch — `AppletType::SystemApplet`.
+applet-system-applet = []
+# Application Manager identity: system application — `AppletType::SystemApplication`.
+applet-system-application = []
+# Enable the C-FFI surface — the `__nx_rt_nso__*` libnx-override symbols.
+# Pulls `nx-rt-core/ffi`: the NSO applet FFI re-uses `nx_rt_core::ffi::common`.
+ffi = ["nx-rt-core/ffi"]
+# Per-kind `pm`-launch `.crt0` for the opt-in `rustc`-link pipeline. Emits this
+# crate's own `_start` (the NSO process-launch startup ABI). Leave it off on
+# the GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
+rt-link = []
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", features = ["service-applet"] }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }

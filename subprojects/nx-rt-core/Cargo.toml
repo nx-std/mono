@@ -1,0 +1,30 @@
+[package]
+name = "nx-rt-core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_rt_core"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_rt_core FFI
+ffi = ["nx-sf/ffi"]
+# Application Manager (am) manager — gates the shared `services::applet`
+# applet handshake. Entry crates enable it and source the applet-type value.
+service-applet = ["dep:nx-service-applet"]
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+thiserror = { version = "2", default-features = false }
