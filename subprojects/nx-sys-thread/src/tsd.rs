@@ -23,10 +23,10 @@
 //!
 //! # Locking
 //!
-//! [`TSD_KEY_LOCK`] guards the global key table; key deletion ([`free`]) also
-//! walks the live-thread registry, which takes its own `THREAD_MUTEX`. When
-//! both are needed the order is always [`TSD_KEY_LOCK`] first, then the
-//! registry lock.
+//! [`TSD_KEYS`] is an [`RwLock`] over the global key table; key deletion
+//! ([`free`]) also walks the live-thread registry, which takes its own
+//! `THREAD_MUTEX`. When both are needed the order is always [`TSD_KEYS`] first,
+//! then the registry lock.
 
 use core::{
     ffi::c_void,
@@ -35,7 +35,7 @@ use core::{
 
 #[cfg(feature = "ffi")]
 use nx_svc::error::{KernelError, ResultCode, ToRawResultCode};
-use nx_sys_sync::RwLock;
+use nx_sys_sync::data::RwLock;
 
 use crate::{thread::ThreadControl, thread_list};
 
@@ -126,89 +126,42 @@ pub struct ThreadRuntime {
 #[derive(Clone, Copy)]
 struct DestructorEntry(Destructor);
 
-/// Process-global lock guarding the runtime TSD key table.
-///
-/// A thin newtype over [`RwLock`] whose sole purpose is to hand out the RAII
-/// [`KeyReadGuard`]/[`KeyWriteGuard`] guards: `nx-sys-sync`'s [`RwLock`] exposes
-/// only bare `*_lock`/`*_unlock` calls, so the guards are what keep a key-table
-/// critical section from leaking the lock across an early return. `KeyLock` is
-/// `Sync` by auto-derivation — `RwLock` itself declares `Send + Sync`.
-struct KeyLock(RwLock);
-
-impl KeyLock {
-    /// Creates an unlocked key lock.
-    const fn new() -> Self {
-        Self(RwLock::new())
-    }
-
-    /// Acquires the lock for a destructor-table read (key-table snapshot),
-    /// returning a guard that releases it on drop.
-    fn read(&self) -> KeyReadGuard<'_> {
-        self.0.read_lock();
-        KeyReadGuard { lock: self }
-    }
-
-    /// Acquires the lock for key allocation or deletion, returning a guard that
-    /// releases it on drop.
-    fn write(&self) -> KeyWriteGuard<'_> {
-        self.0.write_lock();
-        KeyWriteGuard { lock: self }
-    }
-}
-
-/// RAII guard for a read-side acquisition of [`KeyLock`].
-///
-/// Holding the guard is the evidence the read lock is held; dropping it
-/// releases the lock, so a key-table read section cannot leak the lock across
-/// an early return.
-#[must_use = "the key lock is released as soon as the guard is dropped"]
-struct KeyReadGuard<'a> {
-    lock: &'a KeyLock,
-}
-
-impl Drop for KeyReadGuard<'_> {
-    fn drop(&mut self) {
-        self.lock.0.read_unlock();
-    }
-}
-
-/// RAII guard for a write-side acquisition of [`KeyLock`].
-///
-/// Holding the guard is the evidence the write lock is held; dropping it
-/// releases the lock, so key allocation and deletion cannot leak the lock
-/// across an early return.
-#[must_use = "the key lock is released as soon as the guard is dropped"]
-struct KeyWriteGuard<'a> {
-    lock: &'a KeyLock,
-}
-
-impl Drop for KeyWriteGuard<'_> {
-    fn drop(&mut self) {
-        self.lock.0.write_unlock();
-    }
-}
-
 /// Process-global runtime TSD key table.
 ///
-/// One entry per key: `None` marks a free slot, `Some` an allocated one. Only
-/// ever accessed while [`TSD_KEY_LOCK`] is held.
-static mut TSD_KEYS: [Option<DestructorEntry>; NUM_TSD_KEYS] = [None; NUM_TSD_KEYS];
+/// Mirrors musl libc's destructor metadata: one entry per key — `None` marks a
+/// free slot, `Some` an allocated one — paired with a rotating scan hint.
+struct TsdKeyTable {
+    /// One [`DestructorEntry`] slot per key.
+    keys: [Option<DestructorEntry>; NUM_TSD_KEYS],
+    /// Rotating start index for the next free-slot scan.
+    ///
+    /// Mirrors musl libc's `__pthread_key_next`: [`alloc`] begins its scan here
+    /// so a freshly freed key is not immediately handed back out.
+    next: usize,
+}
 
-/// Rotating search hint for the next key-allocation scan.
+impl TsdKeyTable {
+    /// Creates an empty key table with every slot free.
+    const fn new() -> Self {
+        Self {
+            keys: [None; NUM_TSD_KEYS],
+            next: 0,
+        }
+    }
+}
+
+/// Process-global runtime TSD key table, guarded against concurrent key
+/// allocation, deletion, and destructor scans.
 ///
-/// Mirrors musl libc's `__pthread_key_next`: [`alloc`] starts its free-slot
-/// scan here so a freshly freed key is not immediately handed back out. Only
-/// ever accessed while [`TSD_KEY_LOCK`] is held.
-static mut NEXT_TSD_KEY: usize = 0;
-
-/// Guards [`TSD_KEYS`] and [`NEXT_TSD_KEY`] against concurrent key allocation,
-/// deletion, and destructor scans.
-static TSD_KEY_LOCK: KeyLock = KeyLock::new();
+/// [`RwLock`] is the data-protecting wrapper from `nx-sys-sync`: its read and
+/// write guards bundle the [`TsdKeyTable`] with the lock, so a critical section
+/// can neither leak the lock nor touch the table unsynchronised.
+static TSD_KEYS: RwLock<TsdKeyTable> = RwLock::new(TsdKeyTable::new());
 
 /// Allocates a runtime TSD key, returning its [`TsdKey`].
 ///
-/// Scans the global key table from the rotating [`NEXT_TSD_KEY`] hint and
-/// claims the first free slot. When `destructor` is `None` the slot stores the
+/// Scans the global key table from its rotating next-key hint and claims the
+/// first free slot. When `destructor` is `None` the slot stores the
 /// [`noop_destructor`] sentinel, so the slot still reads as allocated.
 ///
 /// Returns [`TsdAllocError::NoSlotsAvailable`] when every slot is in use.
@@ -217,28 +170,21 @@ pub fn alloc(destructor: Option<Destructor>) -> Result<TsdKey, TsdAllocError> {
     // no-op sentinel keeps `Some`/`None` meaning allocated/free.
     let entry = DestructorEntry(destructor.unwrap_or(noop_destructor));
 
+    // Scan for a free slot under the write lock. The guard is dropped at the
+    // end of this block, so the lock is not held across the `match` below.
     let claimed = {
-        let _guard = TSD_KEY_LOCK.write();
-
-        // SAFETY: the write lock is held for `_guard`'s scope, so `TSD_KEYS`
-        // and `NEXT_TSD_KEY` are ours exclusively. The scan only reads and
-        // writes in-bounds slot indices.
-        unsafe {
-            let mut claimed = None;
-            for offset in 0..NUM_TSD_KEYS {
-                let idx = (NEXT_TSD_KEY + offset) % NUM_TSD_KEYS;
-                // Read the slot by value (it is `Copy`) to avoid taking a
-                // reference into the mutable static.
-                let current = TSD_KEYS[idx];
-                if current.is_none() {
-                    TSD_KEYS[idx] = Some(entry);
-                    NEXT_TSD_KEY = (idx + 1) % NUM_TSD_KEYS;
-                    claimed = Some(idx);
-                    break;
-                }
+        let mut table = TSD_KEYS.write();
+        let mut claimed = None;
+        for offset in 0..NUM_TSD_KEYS {
+            let idx = (table.next + offset) % NUM_TSD_KEYS;
+            if table.keys[idx].is_none() {
+                table.keys[idx] = Some(entry);
+                table.next = (idx + 1) % NUM_TSD_KEYS;
+                claimed = Some(idx);
+                break;
             }
-            claimed
         }
+        claimed
     };
 
     match claimed {
@@ -313,7 +259,7 @@ pub fn set(key: TsdKey, value: *mut c_void) {
 /// Mirrors musl libc's `pthread_key_delete`: under the key write lock it walks
 /// the live-thread registry, zeroes this slot in every registered thread's TSD
 /// array, then drops the global key entry. Walking the registry takes
-/// `THREAD_MUTEX`, keeping the [`TSD_KEY_LOCK`]-then-`THREAD_MUTEX` lock order.
+/// `THREAD_MUTEX`, keeping the [`TSD_KEYS`]-then-`THREAD_MUTEX` lock order.
 ///
 /// Returns [`TsdFreeError::UnallocatedSlot`] for a slot that is not currently
 /// allocated.
@@ -324,7 +270,7 @@ pub fn set(key: TsdKey, value: *mut c_void) {
 /// [`set`] the key, or run thread-exit destructors for it. The registry walk
 /// above zeroes the key's slot in every live thread's array, but [`get`],
 /// [`set`], and [`run_destructors`] touch a thread's slot array *without*
-/// [`TSD_KEY_LOCK`] held — only [`TSD_KEYS`]/[`NEXT_TSD_KEY`] are lock-guarded.
+/// [`TSD_KEYS`]'s lock held — only the key table itself is lock-guarded.
 /// So `free` on one thread can write `tsd[idx]` of a second thread while that
 /// second thread concurrently reads or writes the same slot: a data race, and
 /// undefined behavior under the Rust memory model even though aligned
@@ -339,26 +285,23 @@ pub fn set(key: TsdKey, value: *mut c_void) {
 pub fn free(key: TsdKey) -> Result<(), TsdFreeError> {
     let idx = key.index();
 
-    let _guard = TSD_KEY_LOCK.write();
+    let mut table = TSD_KEYS.write();
 
-    // SAFETY: the write lock is held for `_guard`'s scope, so reading the key
-    // entry is exclusive.
-    let allocated = unsafe { TSD_KEYS[idx] }.is_some();
-    if !allocated {
+    if table.keys[idx].is_none() {
         return Err(TsdFreeError::UnallocatedSlot);
     }
 
     // Clear this slot in every live thread, then drop the global key entry.
-    // SAFETY: the write lock is held. `for_each` walks the registry under
-    // `THREAD_MUTEX`; the closure only zeroes one in-bounds TSD slot per thread
-    // and never re-enters the registry, satisfying `for_each`'s contract.
+    // SAFETY: `for_each` walks the registry under `THREAD_MUTEX`; the closure
+    // only zeroes one in-bounds TSD slot per thread and never re-enters the
+    // registry, satisfying `for_each`'s contract.
     unsafe {
         thread_list::for_each(|thread| {
             let runtime = (*thread).runtime().as_ptr();
             *(*runtime).tsd.add(idx) = null_mut();
         });
-        TSD_KEYS[idx] = None;
     }
+    table.keys[idx] = None;
 
     Ok(())
 }
@@ -429,13 +372,11 @@ pub unsafe fn run_destructors(runtime: *mut ThreadRuntime) {
         // SAFETY: `tsd_used` points into the live runtime record (see above).
         unsafe { *tsd_used = false };
 
-        // Snapshot the global key table under a brief read lock so destructors
-        // are free to call `alloc`/`free` without deadlocking on the lock.
+        // Snapshot the key entries under a brief read lock so destructors are
+        // free to call `alloc`/`free` without deadlocking on the lock.
         let keys = {
-            let _guard = TSD_KEY_LOCK.read();
-            // SAFETY: the read lock is held for `_guard`'s scope; the table is
-            // copied out by value.
-            unsafe { TSD_KEYS }
+            let table = TSD_KEYS.read();
+            table.keys
         };
 
         for (idx, key) in keys.iter().enumerate() {
