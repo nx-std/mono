@@ -13,9 +13,9 @@
 //!     [`nx_svc::mem::shmem`], drastically reducing the amount of `unsafe`
 //!     scattered throughout the code-base.
 //! 2.  Virtual-address allocation is handled by the cross-crate virtual memory
-//!     manager [`vmm`]. The classic `virtmemLock()` /
+//!     manager [`virtmem`]. The classic `virtmemLock()` /
 //!     `virtmemUnlock()` pair is therefore expressed with the RAII guard
-//!     returned by [`vmm::lock`].
+//!     returned by [`virtmem::lock`].
 //! 3.  Instead of a single mutable C struct, the state of a shared-memory
 //!     object is encoded in the type system via the zero-cost phantom-type
 //!     wrapper [`SharedMemory<S>`], where the type parameter captures whether
@@ -28,8 +28,7 @@ use core::{ffi::c_void, ptr::NonNull};
 use nx_svc::mem::shmem::{
     self as svc, Handle, LocalShmemPermission, MemoryPermission, RemoteShmemPermission,
 };
-
-use crate::vmm;
+use nx_sys_virtmem::virtmem;
 
 /// Size of the guard region for shared memory mappings (4 KiB).
 ///
@@ -123,8 +122,8 @@ pub fn load_remote(handle: Handle, size: usize, perm: Permissions) -> SharedMemo
 pub unsafe fn map(shm: SharedMemory<Unmapped>) -> Result<SharedMemory<Mapped>, MapError> {
     let SharedMemory(Unmapped { handle, size, perm }) = shm;
 
-    // Ask the VMM for a free slice of ASLR address-space.
-    let Some(addr) = vmm::lock().find_aslr(size, GUARD_SIZE) else {
+    // Ask the virtmem manager for a free slice of ASLR address-space.
+    let Some(addr) = virtmem::lock().find_aslr(size, GUARD_SIZE) else {
         return Err(MapError::VirtAddressAllocFailed);
     };
 

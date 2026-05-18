@@ -22,7 +22,7 @@ pub use nx_std_sync::ffi as sync;
 pub use nx_svc::ffi as svc;
 #[cfg(feature = "sys-mem")]
 pub mod sys_mem {
-    pub use nx_sys_mem::{shmem::ffi as shmem, tmem::ffi as tmem, vmm::ffi as vmm};
+    pub use nx_sys_mem::{shmem::ffi as shmem, tmem::ffi as tmem};
 }
 #[cfg(feature = "sys-sync")]
 pub use nx_sys_sync::ffi as sys_sync;
@@ -30,6 +30,10 @@ pub use nx_sys_sync::ffi as sys_sync;
 pub use nx_sys_thread::ffi as sys_thread;
 #[cfg(feature = "sys-thread-tls")]
 pub use nx_sys_thread_tls::ffi as sys_thread_tls;
+// `virtmem` was extracted into the `nx-sys-virtmem` crate (SPEC Task 5.3/5.4);
+// its `__nx_sys_virtmem__virtmem_*` FFI rides along with the `sys-mem` feature.
+#[cfg(feature = "sys-mem")]
+pub use nx_sys_virtmem::virtmem::ffi as sys_virtmem;
 #[cfg(feature = "time")]
 pub use nx_time::ffi as time;
 #[cfg(feature = "wlaninf")]

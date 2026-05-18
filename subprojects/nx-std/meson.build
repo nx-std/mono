@@ -92,9 +92,14 @@ endif
 # nx-sys-mem
 if get_option('use_nx_sys_mem').enabled()
     nx_sys_mem_proj = subproject('nx-sys-mem')
+    nx_sys_virtmem_proj = subproject('nx-sys-virtmem')
 
     deps += nx_sys_mem_proj.get_variable('nx_sys_mem_dep')
     deps_override_link_args += ['-T', nx_sys_mem_proj.get_variable('nx_sys_mem_ld_override')]
+    # The heap-free `virtmem` substrate lives in `nx-sys-virtmem`; it rides
+    # along with `use_nx_sys_mem` since `nx-sys-mem` depends on it and the
+    # `sys-mem` cargo feature pulls it in (no independent toggle).
+    deps_override_link_args += ['-T', nx_sys_virtmem_proj.get_variable('nx_sys_virtmem_ld_override')]
 
     debug('sys-mem feature: enabled')
     deps_cargo_features += ['sys-mem']

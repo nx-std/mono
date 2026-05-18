@@ -1,25 +1,5 @@
-/* Static linker script for thread function symbols redirection */
-/* Redirects libnx thread functions to nx-sys-mem __nx_sys_mem_* implementations */
-
-/* Virtual Memory Management (VMM) */
-EXTERN(__nx_sys_mem__virtmem_lock);
-EXTERN(__nx_sys_mem__virtmem_unlock);
-EXTERN(__nx_sys_mem__virtmem_find_aslr);
-EXTERN(__nx_sys_mem__virtmem_find_stack);
-EXTERN(__nx_sys_mem__virtmem_find_code_memory);
-EXTERN(__nx_sys_mem__virtmem_add_reservation);
-EXTERN(__nx_sys_mem__virtmem_remove_reservation);
-
-virtmemLock              = __nx_sys_mem__virtmem_lock;
-virtmemUnlock            = __nx_sys_mem__virtmem_unlock;
-virtmemFindAslr          = __nx_sys_mem__virtmem_find_aslr;
-virtmemFindStack         = __nx_sys_mem__virtmem_find_stack;
-virtmemFindCodeMemory    = __nx_sys_mem__virtmem_find_code_memory;
-virtmemAddReservation    = __nx_sys_mem__virtmem_add_reservation;
-virtmemRemoveReservation = __nx_sys_mem__virtmem_remove_reservation;
-
-EXTERN(__nx_sys_mem__virtmem_setup);
-virtmemSetup = __nx_sys_mem__virtmem_setup;
+/* Static linker script for shared/transfer memory symbols redirection */
+/* Redirects libnx shmem/tmem functions to nx-sys-mem __nx_sys_mem__* implementations */
 
 /* Shared Memory (Shmem) */
 EXTERN(__nx_sys_mem__shmem_create);

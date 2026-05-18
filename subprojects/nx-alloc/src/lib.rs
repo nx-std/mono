@@ -8,4 +8,3 @@ pub mod ffi;
 
 pub mod global;
 pub mod llffalloc;
-mod sync;

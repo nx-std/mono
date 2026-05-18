@@ -31,6 +31,7 @@ ffi = [
     "nx-sys-sync?/ffi",
     "nx-sys-thread?/ffi",
     "nx-sys-thread-tls?/ffi",
+    "nx-sys-virtmem?/ffi",
     "nx-time?/ffi",
     "nx-wlaninf?/ffi",
 ]
@@ -56,7 +57,7 @@ service-vi = ["dep:nx-service-vi", "nx-rt?/service-vi"]
 sf = ["dep:nx-sf"]
 svc = ["dep:nx-svc"]
 sync = ["dep:nx-std-sync", "alloc"]
-sys-mem = ["dep:nx-sys-mem", "alloc"]
+sys-mem = ["dep:nx-sys-mem", "dep:nx-sys-virtmem", "alloc"]
 sys-sync = ["dep:nx-sys-sync"]
 sys-thread = ["dep:nx-sys-thread"]
 sys-thread-tls = ["dep:nx-sys-thread-tls"]
@@ -86,6 +87,7 @@ nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls", optional = true }
+nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
 nx-wlaninf = { version = "0.1.0", path = "../nx-wlaninf", optional = true }
 

@@ -1,0 +1,21 @@
+[package]
+name = "nx-sys-virtmem"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_sys_virtmem"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_sys_virtmem FFI
+ffi = []
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rand = { version = "0.1.0", path = "../nx-rand" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }

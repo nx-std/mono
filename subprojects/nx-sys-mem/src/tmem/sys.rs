@@ -12,9 +12,9 @@
 //!     `TransferMemory<S>` wrapper (where `S` is one of [`Unmapped`] or
 //!     [`Mapped`]).  This prevents common misuse such as double-mapping or
 //!     closing a handle while still mapped.
-//! 3.  Virtual-memory management is delegated to [`vmm`], so explicit
+//! 3.  Virtual-memory management is delegated to [`virtmem`], so explicit
 //!     `virtmemLock()`/`virtmemUnlock()` calls are replaced by the RAII guard
-//!     returned from [`vmm::lock`].
+//!     returned from [`virtmem::lock`].
 //!
 //! Only the low-level kernel resources are managed here; the C-compatible FFI
 //! layer (`crate::tmem::ffi`) is a thin shim translating between the C structs
@@ -30,8 +30,7 @@ use nx_svc::{
     },
     thread,
 };
-
-use crate::vmm;
+use nx_sys_virtmem::virtmem;
 
 /// Guard region size (0x1000), per libnx.
 const GUARD_SIZE: usize = 0x1000;
@@ -156,8 +155,8 @@ pub unsafe fn map(tm: TransferMemory<Unmapped>) -> Result<TransferMemory<Mapped>
         src,
     }) = tm;
 
-    // Lock the VMM and reserve a virtual address range in the ASLR address space.
-    let Some(addr) = vmm::lock().find_aslr(size, GUARD_SIZE) else {
+    // Lock the virtmem manager and reserve a virtual address range in the ASLR address space.
+    let Some(addr) = virtmem::lock().find_aslr(size, GUARD_SIZE) else {
         return Err(MapError {
             kind: MapErrorKind::VirtAddressAllocFailed,
             tm,

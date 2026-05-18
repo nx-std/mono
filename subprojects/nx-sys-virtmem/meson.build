@@ -1,4 +1,4 @@
-project('nx-sys-mem', version : '0.1.0')
+project('nx-sys-virtmem', version : '0.1.0')
 
 cargo = find_program('cargo', required : true)
 
@@ -10,24 +10,24 @@ cargo = find_program('cargo', required : true)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-alloc
-nx_alloc_proj = subproject('nx-alloc')
-nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
+# nx-rand
+nx_rand_proj = subproject('nx-rand')
+nx_rand_dep = nx_rand_proj.get_variable('nx_rand_dep')
 
 # nx-svc
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
-# nx-sys-virtmem
-nx_sys_virtmem_proj = subproject('nx-sys-virtmem')
-nx_sys_virtmem_dep = nx_sys_virtmem_proj.get_variable('nx_sys_virtmem_dep')
+# nx-sys-sync
+nx_sys_sync_proj = subproject('nx-sys-sync')
+nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
-    nx_alloc_dep,
+    nx_rand_dep,
     nx_svc_dep,
-    nx_sys_virtmem_dep,
+    nx_sys_sync_dep,
 ]
 
 #---------------------------------------------------------------------------------
@@ -37,8 +37,8 @@ deps = [
 inc = include_directories('include')
 
 # Target
-nx_sys_mem_tgt = custom_target(
-    'nx-sys-mem',
+nx_sys_virtmem_tgt = custom_target(
+    'nx-sys-virtmem',
     command : [
         cargo, 'build',
         '--package', meson.project_name(),
@@ -46,7 +46,7 @@ nx_sys_mem_tgt = custom_target(
         '--target-dir', meson.global_build_root() / 'cargo-target',
         '--artifact-dir', '@OUTDIR@',
     ],
-    output : ['libnx_sys_mem.rlib'],
+    output : ['libnx_sys_virtmem.rlib'],
     console : true,
     build_by_default : true,
     build_always_stale : true,
@@ -56,10 +56,10 @@ nx_sys_mem_tgt = custom_target(
 # Dependency declaration
 #---------------------------------------------------------------------------------
 # Linker script for overriding libnx functions
-nx_sys_mem_ld_override = meson.current_source_dir() / 'sys_mem_override.ld'
+nx_sys_virtmem_ld_override = meson.current_source_dir() / 'sys_virtmem_override.ld'
 
-nx_sys_mem_dep = declare_dependency(
+nx_sys_virtmem_dep = declare_dependency(
     include_directories : inc,
-    sources : nx_sys_mem_tgt,
+    sources : nx_sys_virtmem_tgt,
     dependencies : deps,
 )

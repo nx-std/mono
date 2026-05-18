@@ -3,24 +3,24 @@
 //! This module provides C-compatible virtual memory management functions
 //! that match the original libnx virtmem API.
 
-extern crate alloc;
-
-use alloc::boxed::Box;
 use core::{ffi::c_void, ptr::NonNull};
 
-use intrusive_collections::{LinkedList, LinkedListLink, intrusive_adapter};
 use nx_rand::sys::next_u64;
-use nx_std_sync::mutex::{Mutex, MutexGuard};
 use nx_svc::mem::{self, MemoryType, UnmapMemoryError};
+use nx_sys_sync::data::{Mutex, MutexGuard};
+
+use super::reservation::{
+    MANAGED_PAGES, RADIX, RadixBacking, RadixReservationMap, Reservation, ReservationMap,
+};
 
 /// Global virtual memory manager
-pub(super) static VMM: Mutex<VirtmemManager> = Mutex::new(VirtmemManager::new_uninit());
+pub(super) static VIRTMEM: Mutex<VirtmemManager> = Mutex::new(VirtmemManager::new_uninit());
 
 /// Lock the virtual memory manager
 ///
 /// This function is equivalent to the C `virtmemLock()` function.
 pub fn lock() -> MutexGuard<'static, VirtmemManager> {
-    VMM.lock()
+    VIRTMEM.lock()
 }
 
 /// Virtual memory manager state
@@ -104,44 +104,46 @@ impl VirtmemManager {
         state.find_random(RegionType::CodeMemory, size, guard_size)
     }
 
-    /// Reserves a range of memory address space.
-    pub fn add_reservation(
-        &mut self,
-        mem: *mut c_void,
-        size: usize,
-    ) -> Option<*mut VirtmemReservation> {
-        if mem.is_null() || size == 0 {
+    /// Reserves a range of virtual address space, returning the recorded
+    /// [`Reservation`].
+    ///
+    /// Returns `None` when `mem` is null, when `[mem, mem + size)` is not a
+    /// non-empty page-aligned range, when the range falls outside the managed
+    /// span, or when it overlaps an existing reservation.
+    pub fn add_reservation(&mut self, mem: *mut c_void, size: usize) -> Option<Reservation> {
+        if mem.is_null() {
             return None;
         }
 
+        // Parse the raw FFI arguments into a page-aligned value handle.
+        let range = Reservation::new(mem as usize, size)?;
+
         let state = self.0.get_or_insert_with(init_state);
 
-        // SAFETY: We allocate the node on the heap; its address remains stable
-        // while it is linked in `state.reservations`.
-        let mut node = Box::new(VirtmemReservation::new(mem as usize, size));
-        let ptr: *mut VirtmemReservation = &mut *node;
+        // Reject out-of-span requests (D-3): every in-tree caller reserves an
+        // address obtained from `find_*`, which always lies in the managed
+        // span — anything else cannot be tracked by the bitmap.
+        if !state.reservations.contains(range) {
+            return None;
+        }
 
-        // Insert at the front of the intrusive list.
-        state.reservations.push_front(node);
+        // Validate the non-overlap invariant at the boundary (IC-3): the
+        // one-bit-per-page bitmap is correct only while reservations are
+        // disjoint page ranges.
+        if state.reservations.is_reserved(range) {
+            return None;
+        }
 
-        Some(ptr)
+        state.reservations.reserve(range);
+        Some(range)
     }
 
-    /// Releases a memory address space reservation.
-    pub fn remove_reservation(&mut self, rv: *mut VirtmemReservation) {
-        if rv.is_null() {
-            return;
-        }
-
+    /// Releases a previously recorded virtual address space reservation.
+    ///
+    /// Releasing a range that is not currently reserved is a safe no-op.
+    pub fn remove_reservation(&mut self, range: Reservation) {
         let state = self.0.get_or_insert_with(init_state);
-
-        unsafe {
-            // Obtain a cursor pointing at the requested node and unlink it.
-            let mut cursor = state.reservations.cursor_mut_from_ptr(rv as *const _);
-            if let Some(_boxed) = cursor.remove() {
-                // `_boxed` is dropped here, freeing the reservation.
-            }
-        }
+        state.reservations.release(range);
     }
 }
 
@@ -158,7 +160,7 @@ pub struct VirtmemState {
     heap_region: MemRegion,
     aslr_region: MemRegion,
     stack_region: MemRegion,
-    reservations: LinkedList<ReservationAdapter>,
+    reservations: RadixReservationMap,
     is_legacy_kernel: bool,
 }
 
@@ -278,15 +280,18 @@ impl VirtmemState {
     /// Otherwise, return false.
     #[inline]
     pub fn is_reserved(&self, region: &MemRegion, guard: usize) -> bool {
-        // Adjust start/end by the desired guard size
-        let query_start = region.start.saturating_sub(guard);
-        let query_end = region.end.saturating_add(guard);
+        // Guard-expand the query, then snap it to page granularity: round the
+        // start down and the end up so the bitmap test covers every page the
+        // guarded range touches.
+        let query_start = region.start.saturating_sub(guard) & !PAGE_MASK;
+        let query_end = (region.end.saturating_add(guard) + PAGE_MASK) & !PAGE_MASK;
 
-        let query_region = MemRegion::new(query_start, query_end);
-
-        self.reservations
-            .iter()
-            .any(|rsv| rsv.region.overlaps_with(&query_region))
+        // The expanded range is non-empty and page-aligned, so construction
+        // succeeds; a degenerate range would simply reserve nothing.
+        match Reservation::new(query_start, query_end - query_start) {
+            Some(range) => self.reservations.is_reserved(range),
+            None => false,
+        }
     }
 }
 
@@ -368,39 +373,33 @@ fn init_state() -> VirtmemState {
         }
     };
 
+    // The reservation bitmap spans a single contiguous range covering both the
+    // ASLR and stack regions (D-3): one map naturally handles the legacy-kernel
+    // case where the stack region nests inside the ASLR region.
+    let span_start = aslr_region.start.min(stack_region.start);
+    let span_end = aslr_region.end.max(stack_region.end);
+    // Page count is clamped to `MANAGED_PAGES`: the `RADIX` directory covers
+    // exactly the 64 GiB worst case, so a span wider than that (no supported
+    // kernel reports one) tracks fewer pages rather than indexing past it.
+    let pages = ((span_end - span_start) >> 12).min(MANAGED_PAGES);
+
+    // SAFETY: `init_state` runs at most once per process — `init` and
+    // `get_or_insert_with` only call it while `VirtmemManager`'s state is
+    // `None` — so exactly one `&'static mut` to `RADIX` is ever created. The
+    // borrow then lives inside `VirtmemState` behind the `VIRTMEM` mutex, which
+    // serialises every later access to the backing.
+    let backing: &'static mut RadixBacking = unsafe { &mut *RADIX.get() };
+    let reservations = RadixReservationMap::new(span_start, pages, backing);
+
     VirtmemState {
         alias_region,
         heap_region,
         aslr_region,
         stack_region,
         is_legacy_kernel,
-        reservations: LinkedList::new(ReservationAdapter::new()),
+        reservations,
     }
 }
-
-/// Intrusive linked-list node representing a memory reservation.
-///
-/// The layout is compatible with the C `VirtmemReservation` struct so that the
-/// returned raw pointer can be passed back to `remove_reservation` unchanged.
-pub struct VirtmemReservation {
-    /// Link used by the intrusive linked list.
-    link: LinkedListLink,
-    /// Reserved virtual‐memory range.
-    pub(super) region: MemRegion,
-}
-
-impl VirtmemReservation {
-    fn new(start: usize, size: usize) -> Self {
-        Self {
-            link: LinkedListLink::new(),
-            region: MemRegion::new(start, start + size),
-        }
-    }
-}
-
-// Generate the intrusive-collections adapter so the list knows how to obtain
-// the link inside `VirtmemReservation`.
-intrusive_adapter!(ReservationAdapter = Box<VirtmemReservation>: VirtmemReservation { link: LinkedListLink });
 
 /// Virtual memory region types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

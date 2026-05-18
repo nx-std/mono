@@ -111,10 +111,11 @@ nx-std (umbrella crate)
 ├── nx-std-sync  - High-level sync primitives (Mutex, RwLock, etc.)
 ├── nx-time      - Time utilities
 └── sys/
-    ├── nx-svc        - Supervisor calls (SVC) interface to Horizon OS
-    ├── nx-cpu        - CPU utilities
-    ├── nx-sys-mem    - Low-level memory management
-    └── nx-sys-sync   - Low-level synchronization primitives
+    ├── nx-svc         - Supervisor calls (SVC) interface to Horizon OS
+    ├── nx-cpu         - CPU utilities
+    ├── nx-sys-mem     - Low-level memory management
+    ├── nx-sys-sync    - Low-level synchronization primitives
+    └── nx-sys-virtmem - Heap-free virtual-memory page substrate (reservation bitmap)
 ```
 
 ### Dependency Flow
@@ -122,7 +123,9 @@ nx-std (umbrella crate)
 `nx-svc` is the foundation — it provides raw SVC bindings. Higher-level crates build on it:
 
 - `nx-alloc` depends on `nx-svc`, `nx-sys-sync`
-- `nx-sys-mem` depends on `nx-alloc`, `nx-svc`, `nx-rand`, `nx-std-sync`
+- `nx-sys-virtmem` depends on `nx-svc`, `nx-rand`, `nx-sys-sync` — the heap-free page substrate; `nx-alloc` is deliberately absent from its graph so heap-freedom is compiler-enforced
+- `nx-sys-mem` depends on `nx-alloc`, `nx-svc`, `nx-sys-virtmem`
+- `nx-std` optionally depends on `nx-sys-virtmem` (folded into its `sys-mem` feature) to re-export the `virtmem` FFI directly
 
 ### FFI Integration
 

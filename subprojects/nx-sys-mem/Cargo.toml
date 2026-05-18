@@ -15,10 +15,8 @@ bench = false
 ffi = []
 
 [dependencies]
-intrusive-collections = "0.9.7"
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
-nx-rand = { version = "0.1.0", path = "../nx-rand" }
-nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem" }
 thiserror = { version = "2.0.12", default-features = false }

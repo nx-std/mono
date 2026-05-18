@@ -20,8 +20,9 @@
 use core::{ffi::c_void, ptr::NonNull};
 
 use nx_svc::mem::core as svc;
+use nx_sys_virtmem::virtmem;
 
-use crate::{buf::Buf, vmm};
+use crate::buf::Buf;
 
 /// Size of the guard region for stack overflow protection (16 KiB).
 ///
@@ -60,8 +61,8 @@ pub unsafe fn map<B>(buffer: B) -> Result<MappedStackMemory<B>, MapError>
 where
     B: Buf,
 {
-    // Lock the VMM and reserve a virtual address range for the stack memory.
-    let Some(ptr) = vmm::lock().find_stack(buffer.size(), GUARD_SIZE) else {
+    // Lock the virtmem manager and reserve a virtual address range for the stack memory.
+    let Some(ptr) = virtmem::lock().find_stack(buffer.size(), GUARD_SIZE) else {
         return Err(MapError::VirtAddrAllocFailed);
     };
 

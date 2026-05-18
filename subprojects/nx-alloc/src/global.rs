@@ -9,10 +9,9 @@ use core::{
     ptr::NonNull,
 };
 
-use crate::{
-    llffalloc,
-    sync::{Mutex, MutexGuard},
-};
+use nx_sys_sync::data::{Mutex, MutexGuard};
+
+use crate::llffalloc;
 
 /// The global allocator instance.
 #[cfg_attr(feature = "global-allocator", global_allocator)]
