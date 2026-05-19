@@ -41,7 +41,7 @@ pub fn throw_fatal_with_policy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ThrowFatalError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(ThrowFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -83,7 +83,7 @@ pub fn throw_fatal_with_context(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ThrowFatalError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(ThrowFatalError::ParseResponse)?;
 
     Ok(())
 }

@@ -40,7 +40,7 @@ fn dispatch_in_u32_out_bool(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(DispatchInU32OutBoolError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -91,7 +91,7 @@ fn dispatch_in_two_u32s_out_bool(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(DispatchInTwoU32sOutBoolError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -125,7 +125,7 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(DispatchOutU64Error::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u64.
@@ -220,8 +220,8 @@ pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSession
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(CreatePortSessionError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 0).map_err(CreatePortSessionError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.move_handles.first() else {
         return Err(CreatePortSessionError::MissingHandle);

@@ -29,7 +29,7 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(GetLastTickError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.
@@ -77,8 +77,7 @@ pub fn get_readable_event(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetReadableEventError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetReadableEventError::ParseResponse)?;
 
     let handle = resp
         .copy_handles
@@ -118,8 +117,7 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetWritableEventError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetWritableEventError::ParseResponse)?;
 
     let handle = resp
         .copy_handles

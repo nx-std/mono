@@ -43,7 +43,7 @@ pub fn request_initialize(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestInitializeError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
@@ -100,7 +100,7 @@ pub fn request_initialize_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestInitializeError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
@@ -139,7 +139,7 @@ pub fn request_finalize(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RequestFinalizeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(RequestFinalizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -184,7 +184,7 @@ pub fn request_finalize_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RequestFinalizeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(RequestFinalizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -223,7 +223,7 @@ pub fn request_set_and_wait(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RequestSetAndWaitError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(RequestSetAndWaitError::ParseResponse)?;
 
     Ok(())
 }
@@ -273,7 +273,7 @@ pub fn request_set_and_wait_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RequestSetAndWaitError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(RequestSetAndWaitError::ParseResponse)?;
 
     Ok(())
 }
@@ -304,7 +304,7 @@ pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, Reque
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestGetError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
@@ -354,7 +354,7 @@ pub fn request_get_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestGetError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size

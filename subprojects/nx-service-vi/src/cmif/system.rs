@@ -52,8 +52,7 @@ pub fn get_z_order_count_min(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
-        .map_err(GetZOrderCountError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 8).map_err(GetZOrderCountError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly 8 bytes; reading it as i64 is sound.
     let z = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i64>()) };
@@ -86,8 +85,7 @@ pub fn get_z_order_count_max(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
-        .map_err(GetZOrderCountError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 8).map_err(GetZOrderCountError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly 8 bytes; reading it as i64 is sound.
     let z = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i64>()) };
@@ -129,7 +127,7 @@ pub fn get_display_logical_resolution(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
+    let resp = cmif::parse_response_bytes(&buf, 8)
         .map_err(GetDisplayLogicalResolutionError::ParseResponse)?;
 
     #[repr(C)]
@@ -192,8 +190,7 @@ pub fn set_display_magnification(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetDisplayMagnificationError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayMagnificationError::ParseResponse)?;
 
     Ok(())
 }
@@ -237,7 +234,7 @@ pub fn set_layer_position(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetLayerPositionError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerPositionError::ParseResponse)?;
 
     Ok(())
 }
@@ -281,7 +278,7 @@ pub fn set_layer_size(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetLayerSizeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerSizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -322,7 +319,7 @@ pub fn set_layer_z(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetLayerZError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerZError::ParseResponse)?;
 
     Ok(())
 }
@@ -365,8 +362,7 @@ pub fn set_layer_visibility(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetLayerVisibilityError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerVisibilityError::ParseResponse)?;
 
     Ok(())
 }

@@ -36,8 +36,8 @@ pub fn get_audio_device_service(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetAudioDeviceServiceError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 0).map_err(GetAudioDeviceServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetAudioDeviceServiceError::MissingHandle);
@@ -90,7 +90,7 @@ pub fn list_audio_device_name(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(ListAudioDeviceNameError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<i32>()` bytes.
@@ -129,7 +129,7 @@ pub fn list_audio_device_name_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(ListAudioDeviceNameError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<i32>()` bytes.
@@ -182,8 +182,7 @@ pub fn set_audio_device_output_volume(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -221,8 +220,7 @@ pub fn set_audio_device_output_volume_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -266,7 +264,7 @@ pub fn get_audio_device_output_volume(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(GetAudioDeviceOutputVolumeError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
@@ -303,7 +301,7 @@ pub fn get_audio_device_output_volume_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(GetAudioDeviceOutputVolumeError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
@@ -351,8 +349,7 @@ pub fn get_active_audio_device_name(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
 
     Ok(())
 }
@@ -385,8 +382,7 @@ pub fn get_active_audio_device_name_legacy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
 
     Ok(())
 }

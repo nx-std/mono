@@ -65,7 +65,7 @@ pub fn transact_parcel(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(TransactParcelError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(TransactParcelError::ParseResponse)?;
 
     Ok(())
 }
@@ -113,7 +113,7 @@ pub fn adjust_refcount(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(AdjustRefcountError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(AdjustRefcountError::ParseResponse)?;
 
     Ok(())
 }
@@ -154,8 +154,7 @@ pub fn get_native_handle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetNativeHandleError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetNativeHandleError::ParseResponse)?;
 
     let Some(&handle) = resp.copy_handles.first() else {
         return Err(GetNativeHandleError::MissingHandle);

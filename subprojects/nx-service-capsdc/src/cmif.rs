@@ -49,7 +49,7 @@ pub fn decode_jpeg(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DecodeJpegError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DecodeJpegError::ParseResponse)?;
 
     Ok(())
 }
@@ -89,7 +89,7 @@ pub fn shrink_jpeg(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(ShrinkJpegError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.
@@ -136,7 +136,7 @@ pub fn shrink_jpeg_ex(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(ShrinkJpegExError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.

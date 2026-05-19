@@ -43,7 +43,7 @@ pub fn set_shim_library_version(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetShimVersionError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetShimVersionError::ParseResponse)?;
 
     Ok(())
 }
@@ -83,7 +83,7 @@ pub fn save_screen_shot_ex0(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<ApplicationAlbumEntry>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<ApplicationAlbumEntry>())
         .map_err(SaveScreenShotEx0Error::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
@@ -133,7 +133,7 @@ pub fn save_screen_shot_ex1(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<ApplicationAlbumEntry>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<ApplicationAlbumEntry>())
         .map_err(SaveScreenShotEx1Error::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
@@ -182,7 +182,7 @@ pub fn save_screen_shot_ex2(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<ApplicationAlbumEntry>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<ApplicationAlbumEntry>())
         .map_err(SaveScreenShotEx2Error::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.

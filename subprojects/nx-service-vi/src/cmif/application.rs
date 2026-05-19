@@ -59,8 +59,7 @@ fn get_sub_service_no_params(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(GetSubServiceError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSubServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetSubServiceError::MissingHandle);
@@ -102,8 +101,7 @@ pub fn open_display(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 8).map_err(OpenDisplayError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 8).map_err(OpenDisplayError::ParseResponse)?;
 
     // Output: display_id (u64)
     // SAFETY: `resp.data` is exactly 8 bytes; reading it as u64 is sound.
@@ -137,7 +135,7 @@ pub fn close_display(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CloseDisplayError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(CloseDisplayError::ParseResponse)?;
 
     Ok(())
 }
@@ -176,8 +174,8 @@ pub fn get_display_resolution(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 16)
-        .map_err(GetDisplayResolutionError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 16).map_err(GetDisplayResolutionError::ParseResponse)?;
 
     #[repr(C)]
     struct Output {
@@ -254,8 +252,7 @@ pub fn open_layer(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 8).map_err(OpenLayerError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 8).map_err(OpenLayerError::ParseResponse)?;
 
     // Output: native_window_size (u64)
     // SAFETY: `resp.data` is exactly 8 bytes; reading it as u64 is sound.
@@ -289,7 +286,7 @@ pub fn close_layer(session: SessionHandle, layer_id: LayerId) -> Result<(), Clos
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CloseLayerError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(CloseLayerError::ParseResponse)?;
 
     Ok(())
 }
@@ -375,8 +372,8 @@ pub(crate) fn create_stray_layer_dispatch(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 16)
-        .map_err(CreateStrayLayerError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 16).map_err(CreateStrayLayerError::ParseResponse)?;
 
     #[repr(C)]
     struct Output {
@@ -419,7 +416,7 @@ pub fn destroy_stray_layer(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DestroyStrayLayerError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DestroyStrayLayerError::ParseResponse)?;
 
     Ok(())
 }
@@ -462,8 +459,7 @@ pub fn set_layer_scaling_mode(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetLayerScalingModeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerScalingModeError::ParseResponse)?;
 
     Ok(())
 }
@@ -524,7 +520,7 @@ pub fn get_indirect_layer_image_map(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 16)
+    let resp = cmif::parse_response_bytes(&buf, 16)
         .map_err(GetIndirectLayerImageMapError::ParseResponse)?;
 
     #[repr(C)]
@@ -588,7 +584,7 @@ pub fn get_indirect_layer_image_required_memory_info(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 16)
+    let resp = cmif::parse_response_bytes(&buf, 16)
         .map_err(GetIndirectLayerImageRequiredMemoryInfoError::ParseResponse)?;
 
     #[repr(C)]
@@ -631,8 +627,8 @@ pub fn get_display_vsync_event(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetDisplayVsyncEventError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 0).map_err(GetDisplayVsyncEventError::ParseResponse)?;
 
     let Some(&event_handle) = resp.copy_handles.first() else {
         return Err(GetDisplayVsyncEventError::MissingHandle);

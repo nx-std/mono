@@ -371,7 +371,7 @@ impl<'a> Dispatch<'a> {
         // operation on this thread.
         let ipc_buf: &'static [u8; IPC_BUFFER_SIZE] = unsafe {
             let buf = nx_sys_thread_tls::ipc_buffer();
-            &*(buf.as_array() as *const [u8; IPC_BUFFER_SIZE])
+            &*(&*buf as *const [u8; IPC_BUFFER_SIZE])
         };
         let resp = if is_domain {
             cmif::parse_response_bytes_domain(ipc_buf, self.out_data_size)

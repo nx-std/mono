@@ -23,7 +23,7 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(EnableFanControlError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(EnableFanControlError::ParseResponse)?;
 
     Ok(())
 }
@@ -44,7 +44,7 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DisableFanControlError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DisableFanControlError::ParseResponse)?;
 
     Ok(())
 }
@@ -65,7 +65,7 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(IsFanControlEnabledError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -92,7 +92,7 @@ pub fn get_skin_temperature_milli_c(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetSkinTemperatureMilliCError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for i32.

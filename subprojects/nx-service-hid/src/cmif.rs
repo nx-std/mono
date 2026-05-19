@@ -43,8 +43,8 @@ pub fn create_applet_resource(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response::<()>(buf.as_array())
-        .map_err(CreateAppletResourceError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<()>(&buf).map_err(CreateAppletResourceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(CreateAppletResourceError::MissingHandle);
@@ -74,8 +74,8 @@ pub fn get_shared_memory_handle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response::<()>(buf.as_array())
-        .map_err(GetSharedMemoryHandleError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryHandleError::ParseResponse)?;
 
     let Some(&handle) = resp.copy_handles.first() else {
         return Err(GetSharedMemoryHandleError::MissingHandle);
@@ -132,7 +132,7 @@ pub fn activate_npad(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateNpadError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ActivateNpadError::ParseResponse)?;
 
     Ok(())
 }
@@ -180,8 +180,7 @@ pub fn set_supported_npad_style_set(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array())
-        .map_err(SetSupportedNpadStyleSetError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadStyleSetError::ParseResponse)?;
 
     Ok(())
 }
@@ -218,8 +217,7 @@ pub fn set_supported_npad_id_type(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array())
-        .map_err(SetSupportedNpadIdTypeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadIdTypeError::ParseResponse)?;
 
     Ok(())
 }
@@ -253,7 +251,7 @@ pub fn activate_touch_screen(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateTouchScreenError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ActivateTouchScreenError::ParseResponse)?;
 
     Ok(())
 }
@@ -287,7 +285,7 @@ pub fn activate_keyboard(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateKeyboardError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ActivateKeyboardError::ParseResponse)?;
 
     Ok(())
 }
@@ -321,7 +319,7 @@ pub fn activate_mouse(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateMouseError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ActivateMouseError::ParseResponse)?;
 
     Ok(())
 }
@@ -368,7 +366,7 @@ pub fn activate_gesture(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(ActivateGestureError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ActivateGestureError::ParseResponse)?;
 
     Ok(())
 }

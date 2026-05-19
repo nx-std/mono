@@ -46,7 +46,7 @@ pub fn register_process(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    tipc::parse_response(buf.as_array(), 0).map_err(RegisterProcessError::ParseResponse)?;
+    tipc::parse_response(&buf, 0).map_err(RegisterProcessError::ParseResponse)?;
 
     Ok(())
 }
@@ -90,7 +90,7 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    tipc::parse_response(buf.as_array(), 0).map_err(UnregisterProcessError::ParseResponse)?;
+    tipc::parse_response(&buf, 0).map_err(UnregisterProcessError::ParseResponse)?;
 
     Ok(())
 }

@@ -23,7 +23,7 @@ pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), Ge
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(GetRandomBytesError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(GetRandomBytesError::ParseResponse)?;
 
     Ok(())
 }

@@ -176,7 +176,7 @@ fn dispatch_pid_delay(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SuspendResumeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SuspendResumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -200,7 +200,7 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(GetVolumeError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
@@ -241,7 +241,7 @@ fn dispatch_set_volume(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetVolumeError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetVolumeError::ParseResponse)?;
 
     Ok(())
 }

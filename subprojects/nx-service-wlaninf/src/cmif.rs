@@ -55,8 +55,8 @@ fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispat
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
-        .map_err(DispatchError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(DispatchError::ParseResponse)?;
 
     // SAFETY: resp.data is at least size_of::<u32>() bytes as requested above.
     Ok(unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) })

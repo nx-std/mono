@@ -56,7 +56,7 @@ pub fn capture_raw_image_with_timeout(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CaptureRawImageError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(CaptureRawImageError::ParseResponse)?;
 
     Ok(())
 }
@@ -101,7 +101,7 @@ pub fn open_raw_screen_shot_read_stream(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<OpenReadStreamOut>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<OpenReadStreamOut>())
         .map_err(OpenReadStreamError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<OpenReadStreamOut>()` bytes.
@@ -132,7 +132,7 @@ pub fn close_raw_screen_shot_read_stream(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CloseReadStreamError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(CloseReadStreamError::ParseResponse)?;
 
     Ok(())
 }
@@ -164,7 +164,7 @@ pub fn read_raw_screen_shot_read_stream(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(ReadStreamError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<u64>()` bytes.
@@ -207,7 +207,7 @@ pub fn capture_jpeg_screen_shot(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(CaptureJpegError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<u64>()` bytes.

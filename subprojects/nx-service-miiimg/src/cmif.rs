@@ -31,7 +31,7 @@ pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeErro
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(InitializeError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u8>()` bytes per the size
@@ -57,7 +57,7 @@ pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ReloadError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(ReloadError::ParseResponse)?;
 
     Ok(())
 }
@@ -78,8 +78,8 @@ pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
-        .map_err(GetCountError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, size_of::<i32>()).map_err(GetCountError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<i32>()` bytes per the size
     // argument passed to `parse_response_bytes`.
@@ -104,8 +104,8 @@ pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
-        .map_err(IsEmptyError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, size_of::<u8>()).map_err(IsEmptyError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u8>()` bytes per the size
     // argument passed to `parse_response_bytes`.
@@ -130,8 +130,8 @@ pub fn is_full(session: SessionHandle) -> Result<bool, IsFullError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
-        .map_err(IsFullError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, size_of::<u8>()).map_err(IsFullError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u8>()` bytes per the size
     // argument passed to `parse_response_bytes`.
@@ -165,7 +165,7 @@ pub fn get_attribute(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<MiiimgImageAttribute>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<MiiimgImageAttribute>())
         .map_err(GetAttributeError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<MiiimgImageAttribute>()` bytes
@@ -205,7 +205,7 @@ pub fn load_image(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(LoadImageError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(LoadImageError::ParseResponse)?;
 
     Ok(())
 }

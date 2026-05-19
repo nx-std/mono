@@ -34,7 +34,7 @@ pub fn get_temperature_range(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<[i32; 2]>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
         .map_err(GetTemperatureRangeError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for two i32.
@@ -65,7 +65,7 @@ pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetT
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetTemperatureError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for i32.
@@ -99,7 +99,7 @@ pub fn get_temperature_milli_c(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetTemperatureMilliCError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for i32.
@@ -135,8 +135,7 @@ pub fn open_session(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenSessionError::MissingHandle);
@@ -162,7 +161,7 @@ pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGet
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(SessionGetTemperatureError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for f32.

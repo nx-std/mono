@@ -41,8 +41,7 @@ pub fn open_session(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response::<()>(buf.as_array()).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenSessionError::MissingHandle);
@@ -72,7 +71,7 @@ pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRat
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(SetClockRateError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetClockRateError::ParseResponse)?;
 
     Ok(())
 }
@@ -93,7 +92,7 @@ pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetClockRateError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes.
@@ -144,7 +143,7 @@ pub fn get_possible_clock_rates(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<[i32; 2]>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
         .map_err(GetPossibleClockRatesError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<[i32; 2]>()` bytes.

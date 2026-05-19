@@ -45,7 +45,7 @@ fn dispatch_in_with_pid<T>(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -80,7 +80,7 @@ fn dispatch_in_with_pid_and_pointer<T>(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -342,7 +342,7 @@ pub fn get_le_event_info(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetLeEventInfoError::ParseResponse)?;
 
     // SAFETY: parse_response_bytes guarantees at least size_of::<u32>() bytes in resp.data.
@@ -406,8 +406,7 @@ pub fn register_ble_event(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(RegisterBleEventError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(RegisterBleEventError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.copy_handles.first() else {
         return Err(RegisterBleEventError::MissingHandle);

@@ -54,8 +54,7 @@ pub fn get_standard_steady_clock(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetSteadyClockError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSteadyClockError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetSteadyClockError::MissingHandle);
@@ -85,8 +84,8 @@ pub fn get_time_zone_service(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetTimeZoneServiceError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 0).map_err(GetTimeZoneServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetTimeZoneServiceError::MissingHandle);
@@ -119,8 +118,7 @@ pub fn get_shared_memory_native_handle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetSharedMemoryError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSharedMemoryError::ParseResponse)?;
 
     let Some(&handle) = resp.copy_handles.first() else {
         return Err(GetSharedMemoryError::MissingHandle);
@@ -148,8 +146,7 @@ pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeErr
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetCurrentTimeError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetCurrentTimeError::ParseResponse)?;
 
     // Read u64 timestamp from response data
     // SAFETY: resp.data contains at least 8 bytes for u64.
@@ -188,8 +185,7 @@ pub fn to_calendar_time_with_my_rule(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(ToCalendarTimeError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(ToCalendarTimeError::ParseResponse)?;
 
     // Read output structure
     // SAFETY: resp.data contains TimeCalendarTime + TimeCalendarAdditionalInfo.
@@ -223,8 +219,7 @@ fn get_clock_session(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetSystemClockError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSystemClockError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetSystemClockError::MissingHandle);

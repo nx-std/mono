@@ -31,7 +31,7 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ShutdownError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(ShutdownError::ParseResponse)?;
 
     Ok(())
 }
@@ -52,7 +52,7 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(PutErrorStateError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(PutErrorStateError::ParseResponse)?;
 
     Ok(())
 }

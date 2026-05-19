@@ -29,7 +29,7 @@ fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoI
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchNoIoError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchNoIoError::ParseResponse)?;
 
     Ok(())
 }
@@ -60,7 +60,7 @@ fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispatch
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(DispatchOutU32Error::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u32.
@@ -95,7 +95,7 @@ fn dispatch_out_f64(session: SessionHandle, cmd_id: u32) -> Result<f64, Dispatch
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f64>())
         .map_err(DispatchOutF64Error::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for f64.
@@ -130,7 +130,7 @@ fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, Dispat
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(DispatchOutBoolError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u8.
@@ -173,7 +173,7 @@ fn dispatch_in_bool(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchInBoolError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInBoolError::ParseResponse)?;
 
     Ok(())
 }
@@ -204,8 +204,7 @@ fn dispatch_event(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchEv
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchEventError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(DispatchEventError::ParseResponse)?;
 
     if resp.copy_handles.is_empty() {
         return Err(DispatchEventError::MissingHandle);
@@ -245,7 +244,7 @@ fn dispatch_out_struct<T: Copy>(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<T>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<T>())
         .map_err(DispatchOutStructError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for T.
@@ -280,8 +279,7 @@ fn dispatch_open_session(session: SessionHandle) -> Result<SessionHandle, OpenSe
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
 
     let raw_handle = resp
         .move_handles

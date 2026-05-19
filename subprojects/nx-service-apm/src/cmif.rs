@@ -31,8 +31,7 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenSessionError::MissingHandle);
@@ -62,7 +61,7 @@ pub fn get_performance_mode(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetPerformanceModeError::ParseResponse)?;
 
     if resp.data.len() < 4 {
@@ -112,8 +111,7 @@ pub fn set_performance_configuration(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetPerformanceConfigurationError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetPerformanceConfigurationError::ParseResponse)?;
 
     Ok(())
 }
@@ -145,7 +143,7 @@ pub fn get_performance_configuration(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetPerformanceConfigurationError::ParseResponse)?;
 
     if resp.data.len() < 4 {

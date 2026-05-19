@@ -37,7 +37,7 @@ fn dispatch_in<T: Copy>(session: Handle, cmd_id: u32, value: &T) -> Result<(), D
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchInError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInError::ParseResponse)?;
 
     Ok(())
 }
@@ -70,7 +70,7 @@ fn dispatch_out<T: Copy>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutE
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<T>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<T>())
         .map_err(DispatchOutError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<T>()` bytes.
@@ -112,8 +112,7 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenReceiverError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenReceiverError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.move_handles.first() else {
         return Err(OpenReceiverError::MissingHandle);
@@ -177,8 +176,8 @@ pub fn receiver_get_receive_event_handle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetReceiveEventHandleError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 0).map_err(GetReceiveEventHandleError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.copy_handles.first() else {
         return Err(GetReceiveEventHandleError::MissingHandle);
@@ -255,8 +254,7 @@ pub fn snd_open_sender(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(OpenSenderError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSenderError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.move_handles.first() else {
         return Err(OpenSenderError::MissingHandle);

@@ -43,7 +43,7 @@ fn dispatch_in<T: Copy>(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -74,8 +74,8 @@ fn dispatch_in_out<T: Copy, U: Copy>(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<U>())
-        .map_err(DispatchError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, size_of::<U>()).map_err(DispatchError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<U>()` bytes.
     let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<U>()) };
@@ -199,7 +199,7 @@ pub fn send_command_async(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -231,7 +231,7 @@ pub fn get_send_command_async_result(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetSendCommandAsyncResultError::ParseResponse)?;
 
     // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes.
@@ -276,8 +276,7 @@ pub fn set_event_for_send_command_async_result(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetEventError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(SetEventError::ParseResponse)?;
 
     resp.copy_handles
         .first()
@@ -314,8 +313,7 @@ pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetShared
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetSharedMemoryError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSharedMemoryError::ParseResponse)?;
 
     resp.copy_handles
         .first()
@@ -377,7 +375,7 @@ pub fn enable_joy_polling_receive_mode(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(EnableJoyPollingError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(EnableJoyPollingError::ParseResponse)?;
 
     Ok(())
 }

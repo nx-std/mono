@@ -81,7 +81,7 @@ pub(crate) fn register_client(
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     // The reply is a CMIF `u64 pid` payload — no extra `{ ret; errno; }` prefix here
     // because cmd 0 / cmd 1 don't use the dispatch path that adds it.
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u64>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(RegisterClientError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least size_of::<u64>() bytes.
@@ -112,7 +112,7 @@ pub(crate) fn start_monitoring(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(StartMonitoringError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(StartMonitoringError::ParseResponse)?;
     Ok(())
 }
 
@@ -147,7 +147,7 @@ unsafe fn read_service_response(
     // SAFETY: caller upholds preconditions — no other borrow is live and the
     // kernel has populated the TLS IPC buffer during the SVC.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<CallResponse>() + extra_size)
+    let resp = cmif::parse_response_bytes(&buf, size_of::<CallResponse>() + extra_size)
         .map_err(ServiceResponseFailure::Parse)?;
 
     // SAFETY: parse_response_bytes guaranteed at least size_of::<CallResponse>()

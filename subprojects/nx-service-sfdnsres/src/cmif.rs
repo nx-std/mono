@@ -80,7 +80,7 @@ pub fn get_host_by_name(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<GetHostByNameOut>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<GetHostByNameOut>())
         .map_err(GetHostByNameError::ParseResponse)?;
 
     // SAFETY: resp.data points to a GetHostByNameOut-sized payload.
@@ -160,7 +160,7 @@ pub fn get_host_by_addr(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<GetHostByAddrOut>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<GetHostByAddrOut>())
         .map_err(GetHostByAddrError::ParseResponse)?;
 
     // SAFETY: resp.data points to a GetHostByAddrOut-sized payload.
@@ -304,7 +304,7 @@ pub fn get_addr_info(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<GetAddrInfoOut>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<GetAddrInfoOut>())
         .map_err(GetAddrInfoError::ParseResponse)?;
 
     // SAFETY: resp.data points to a GetAddrInfoOut-sized payload.
@@ -379,7 +379,7 @@ pub fn get_name_info(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<GetNameInfoOut>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<GetNameInfoOut>())
         .map_err(GetNameInfoError::ParseResponse)?;
 
     // SAFETY: resp.data points to a GetNameInfoOut-sized payload.
@@ -430,7 +430,7 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetCancelHandleError::ParseResponse)?;
 
     // SAFETY: resp.data points to a u32 payload.
@@ -482,7 +482,7 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(CancelError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(CancelError::ParseResponse)?;
 
     Ok(())
 }
@@ -550,7 +550,7 @@ fn string_error_impl(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(StringErrorError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(StringErrorError::ParseResponse)?;
 
     Ok(())
 }

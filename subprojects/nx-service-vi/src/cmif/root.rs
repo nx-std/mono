@@ -50,8 +50,8 @@ pub fn get_display_service(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(GetDisplayServiceError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 0).map_err(GetDisplayServiceError::ParseResponse)?;
 
     // Sub-service is returned via move handle
     let Some(&handle) = resp.move_handles.first() else {
@@ -84,7 +84,7 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(PrepareFatalError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(PrepareFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -107,7 +107,7 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ShowFatalError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(ShowFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -161,8 +161,7 @@ pub fn draw_fatal_rectangle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(DrawFatalRectangleError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DrawFatalRectangleError::ParseResponse)?;
 
     Ok(())
 }
@@ -241,8 +240,7 @@ pub fn draw_fatal_text32(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 4)
-        .map_err(DrawFatalText32Error::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 4).map_err(DrawFatalText32Error::ParseResponse)?;
 
     // Output: advance (i32)
     // SAFETY: `resp.data` is exactly 4 bytes; reading it as i32 is sound.

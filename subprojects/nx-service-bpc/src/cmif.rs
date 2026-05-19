@@ -23,7 +23,7 @@ pub fn shutdown_system(session: SessionHandle) -> Result<(), ShutdownSystemError
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(ShutdownSystemError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(ShutdownSystemError::ParseResponse)?;
 
     Ok(())
 }
@@ -44,7 +44,7 @@ pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RebootSystemError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(RebootSystemError::ParseResponse)?;
 
     Ok(())
 }
@@ -70,7 +70,7 @@ pub fn get_sleep_button_state(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(GetSleepButtonStateError::ParseResponse)?;
 
     // SAFETY: parse_response_bytes guarantees at least size_of::<u8>() bytes in resp.data.
@@ -98,7 +98,7 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(GetPowerButtonError::ParseResponse)?;
 
     // SAFETY: parse_response_bytes guarantees at least size_of::<u8>() bytes in resp.data.

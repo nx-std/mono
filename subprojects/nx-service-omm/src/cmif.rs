@@ -30,7 +30,7 @@ pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationMode
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(GetOperationModeError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<u8>()` bytes.
@@ -80,8 +80,7 @@ pub fn set_operation_mode_policy(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetOperationModePolicyError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetOperationModePolicyError::ParseResponse)?;
 
     Ok(())
 }
@@ -124,7 +123,7 @@ pub fn get_default_display_resolution(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<[i32; 2]>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
         .map_err(GetDefaultDisplayResolutionError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<[i32; 2]>()` bytes.

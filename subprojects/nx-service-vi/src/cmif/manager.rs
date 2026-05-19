@@ -54,8 +54,8 @@ pub fn create_managed_layer(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 8)
-        .map_err(CreateManagedLayerError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, 8).map_err(CreateManagedLayerError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly 8 bytes; reading it as u64 is sound.
     let layer_id = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
@@ -88,8 +88,7 @@ pub fn destroy_managed_layer(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(DestroyManagedLayerError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DestroyManagedLayerError::ParseResponse)?;
 
     Ok(())
 }
@@ -146,7 +145,7 @@ pub fn set_display_alpha(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(SetDisplayAlphaError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayAlphaError::ParseResponse)?;
 
     Ok(())
 }
@@ -189,8 +188,7 @@ pub fn set_display_layer_stack(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetDisplayLayerStackError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayLayerStackError::ParseResponse)?;
 
     Ok(())
 }
@@ -233,8 +231,7 @@ pub fn set_display_power_state(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetDisplayPowerStateError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayPowerStateError::ParseResponse)?;
 
     Ok(())
 }
@@ -278,7 +275,7 @@ pub fn add_to_layer_stack(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(AddToLayerStackError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(AddToLayerStackError::ParseResponse)?;
 
     Ok(())
 }
@@ -308,8 +305,7 @@ pub fn set_content_visibility(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetContentVisibilityError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetContentVisibilityError::ParseResponse)?;
 
     Ok(())
 }

@@ -29,7 +29,7 @@ fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoI
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchNoIoError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchNoIoError::ParseResponse)?;
 
     Ok(())
 }
@@ -68,7 +68,7 @@ fn dispatch_in_u32(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchInU32Error::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInU32Error::ParseResponse)?;
 
     Ok(())
 }
@@ -107,7 +107,7 @@ fn dispatch_in_bool(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchInBoolError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInBoolError::ParseResponse)?;
 
     Ok(())
 }
@@ -146,7 +146,7 @@ fn dispatch_in_f32(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchInF32Error::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInF32Error::ParseResponse)?;
 
     Ok(())
 }
@@ -185,7 +185,7 @@ fn dispatch_in_struct<T: Copy>(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchInStructError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInStructError::ParseResponse)?;
 
     Ok(())
 }
@@ -216,7 +216,7 @@ fn dispatch_out_i32(session: SessionHandle, cmd_id: u32) -> Result<i32, Dispatch
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(DispatchOutI32Error::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<i32>()` bytes.
@@ -251,7 +251,7 @@ fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispatch
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(DispatchOutU32Error::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<u32>()` bytes.
@@ -286,7 +286,7 @@ fn dispatch_out_f32(session: SessionHandle, cmd_id: u32) -> Result<f32, Dispatch
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(DispatchOutF32Error::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
@@ -329,7 +329,7 @@ fn dispatch_in_u32_out_i32(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<i32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(DispatchInU32OutI32Error::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<i32>()` bytes.
@@ -372,7 +372,7 @@ fn dispatch_in_u32_out_u32(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(DispatchInU32OutU32Error::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<u32>()` bytes.
@@ -415,7 +415,7 @@ fn dispatch_in_u32_out_bool(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u8>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(DispatchInU32OutBoolError::ParseResponse)?;
 
     // SAFETY: resp.data points to at least `size_of::<u8>()` bytes.
@@ -450,8 +450,7 @@ fn dispatch_event(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchEv
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response_bytes(buf.as_array(), 0).map_err(DispatchEventError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(DispatchEventError::ParseResponse)?;
 
     let Some(&handle) = resp.copy_handles.first() else {
         return Err(DispatchEventError::MissingHandle);

@@ -27,7 +27,7 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0).map_err(RequestLoadError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(RequestLoadError::ParseResponse)?;
 
     Ok(())
 }
@@ -54,7 +54,7 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetLoadStateError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u32.
@@ -83,8 +83,8 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
-        .map_err(GetSizeError::ParseResponse)?;
+    let resp =
+        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(GetSizeError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u32.
     let size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
@@ -115,7 +115,7 @@ pub fn get_shared_memory_address_offset(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<u32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetSharedMemoryAddressOffsetError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for u32.
@@ -142,7 +142,7 @@ pub fn get_shared_memory_native_handle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
+    let resp = cmif::parse_response_bytes(&buf, 0)
         .map_err(GetSharedMemoryNativeHandleError::ParseResponse)?;
 
     let handle = resp
@@ -202,7 +202,7 @@ pub fn get_shared_font(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<GetSharedFontOut>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<GetSharedFontOut>())
         .map_err(GetSharedFontError::ParseResponse)?;
 
     // SAFETY: resp.data points to valid payload area with space for GetSharedFontOut.

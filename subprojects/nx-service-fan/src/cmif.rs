@@ -30,8 +30,7 @@ pub fn open_controller(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(OpenControllerError::ParseResponse)?;
+    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenControllerError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenControllerError::MissingHandle);
@@ -64,8 +63,7 @@ pub fn set_rotation_speed_level(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response_bytes(buf.as_array(), 0)
-        .map_err(SetRotationSpeedLevelError::ParseResponse)?;
+    cmif::parse_response_bytes(&buf, 0).map_err(SetRotationSpeedLevelError::ParseResponse)?;
 
     Ok(())
 }
@@ -87,7 +85,7 @@ pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotati
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<f32>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(GetRotationSpeedLevelError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<f32>()` bytes.

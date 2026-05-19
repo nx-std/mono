@@ -446,6 +446,40 @@ impl<'a, const N: usize> CmifBuilder<'a, N> {
         self
     }
 
+    /// Adds a mapped input buffer (Type A) from a byte slice.
+    ///
+    /// Slice-typed wrapper over [`add_in_buffer`](Self::add_in_buffer): the
+    /// caller passes a borrowed buffer instead of a raw pointer and length. An
+    /// empty slice encodes a null descriptor, so no pointer is taken from a
+    /// zero-length slice. The buffer must stay valid until the request
+    /// completes; the borrow itself only spans request construction.
+    #[inline]
+    pub fn add_in_slice(self, buffer: &[u8], mode: BufferMode) -> Self {
+        let ptr = if buffer.is_empty() {
+            ptr::null()
+        } else {
+            buffer.as_ptr()
+        };
+        self.add_in_buffer(ptr, buffer.len(), mode)
+    }
+
+    /// Adds a mapped output buffer (Type B) from a mutable byte slice.
+    ///
+    /// Slice-typed wrapper over [`add_out_buffer`](Self::add_out_buffer): the
+    /// caller passes a borrowed buffer instead of a raw pointer and length. An
+    /// empty slice encodes a null descriptor. The buffer must stay valid until
+    /// the request completes; the borrow itself only spans request
+    /// construction.
+    #[inline]
+    pub fn add_out_slice(self, buffer: &mut [u8], mode: BufferMode) -> Self {
+        let ptr = if buffer.is_empty() {
+            ptr::null_mut()
+        } else {
+            buffer.as_mut_ptr()
+        };
+        self.add_out_buffer(ptr, buffer.len(), mode)
+    }
+
     /// Adds an exchange (in/out) buffer (Type W).
     #[inline]
     pub fn add_inout_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {

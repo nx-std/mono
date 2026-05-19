@@ -34,8 +34,7 @@ pub fn get_service_handle(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response::<()>(buf.as_array()).map_err(GetServiceError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetServiceError::MissingHandle);
@@ -103,8 +102,7 @@ pub fn register_service(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp =
-        cmif::parse_response::<()>(buf.as_array()).map_err(RegisterServiceError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(RegisterServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(RegisterServiceError::MissingHandle);
@@ -155,7 +153,7 @@ pub fn unregister_service(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(UnregisterServiceError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(UnregisterServiceError::ParseResponse)?;
 
     Ok(())
 }
@@ -198,7 +196,7 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(DetachClientError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DetachClientError::ParseResponse)?;
 
     Ok(())
 }
@@ -241,7 +239,7 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    cmif::parse_response::<()>(buf.as_array()).map_err(RegisterClientError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RegisterClientError::ParseResponse)?;
 
     Ok(())
 }

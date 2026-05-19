@@ -59,7 +59,7 @@ pub fn pull_context(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response_bytes(buf.as_array(), size_of::<Output>())
+    let resp = cmif::parse_response_bytes(&buf, size_of::<Output>())
         .map_err(PullContextError::ParseResponse)?;
 
     // SAFETY: `resp.data` is exactly `size_of::<Output>()` bytes.
