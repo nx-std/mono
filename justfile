@@ -144,12 +144,12 @@ alias build := meson-compile
 # Configure meson build directory (meson setup)
 [group: 'build']
 meson-configure *EXTRA_FLAGS:
-    meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}}
+    meson setup --cross-file devkitpro.txt --cross-file cross.txt --cross-file cargo-nx.txt {{builddir}} {{EXTRA_FLAGS}}
 
 # Reconfigure meson build directory (meson setup --reconfigure)
 [group: 'build']
 meson-reconfigure *EXTRA_FLAGS:
-    meson setup --cross-file devkitpro.txt --cross-file cross.txt {{builddir}} {{EXTRA_FLAGS}} --reconfigure
+    meson setup --cross-file devkitpro.txt --cross-file cross.txt --cross-file cargo-nx.txt {{builddir}} {{EXTRA_FLAGS}} --reconfigure
 
 # Ensure build directory is configured (idempotent)
 [group: 'build']
@@ -328,15 +328,16 @@ remove-git-hooks HOOKS=PRECOMMIT_DEFAULT_HOOKS:
 install-cargo-machete:
     cargo install --locked cargo-machete
 
-# Pinned cargo-nx revision from nx-std/tools (main @ 2026-05-09)
-CARGO_NX_REV := "28bd4fa21d70afede7cb25aaf3e271d920a43e44"
+# Pinned cargo-nx revision from nx-std/tools (main @ 2026-05-19)
+CARGO_NX_REV := "905708c97b1827cee93f455518b029e3d9296419"
 
-# Install cargo-nx from the nx-std/tools repository
+# Install cargo-nx; pass --latest to install from the tip of main instead of the pinned revision.
 [group: 'misc']
-install-cargo-nx:
+[arg("latest", long="latest", value="true")]
+install-cargo-nx latest="false":
     cargo +stable install \
         --git https://github.com/nx-std/tools.git \
-        --rev {{CARGO_NX_REV}} \
+        {{ if latest == "true" { "--branch main" } else { "--rev " + CARGO_NX_REV } }} \
         --locked \
         --target host-tuple \
         cargo-nx
