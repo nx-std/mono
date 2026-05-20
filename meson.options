@@ -106,7 +106,7 @@ option(
 
 option(
     'use_nx_service_apm',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-apm (Application Performance Management)',
     yield : true
 )
@@ -120,35 +120,35 @@ option(
 
 option(
     'use_nx_service_hid',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-hid (Human Input Device service)',
     yield : true
 )
 
 option(
     'use_nx_service_set',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-set (System Settings service)',
     yield : true
 )
 
 option(
     'use_nx_service_sfdnsres',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-sfdnsres (DNS resolver service)',
     yield : true
 )
 
 option(
     'use_nx_service_sm',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-sm (Service Manager protocol)',
     yield : true
 )
 
 option(
     'use_nx_service_time',
-    type : 'feature', value : 'auto',
+    type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-time (Time service)',
     yield : true
 )
