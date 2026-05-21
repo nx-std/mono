@@ -593,11 +593,12 @@ fn dispatch_in_buf_out_bool<T>(
     // SAFETY: `buf` is a valid reference; viewing it as bytes is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u8>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least 1 byte.
     let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(out & 1 != 0)
@@ -624,6 +625,7 @@ fn dispatch_in_u64_in_buf_fixed<T>(
     // SAFETY: `buf` is a valid reference; viewing it as bytes is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -631,7 +633,7 @@ fn dispatch_in_u64_in_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -647,6 +649,7 @@ fn dispatch_in_u64_out_buf_fixed<T>(
     // SAFETY: `buf` is a valid mutable reference; viewing it as mutable bytes is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -654,7 +657,7 @@ fn dispatch_in_u64_out_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -670,6 +673,7 @@ fn dispatch_in_u32_in_buf_fixed<T>(
     // SAFETY: `buf` is a valid reference; viewing it as bytes is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -677,7 +681,7 @@ fn dispatch_in_u32_in_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -693,6 +697,7 @@ fn dispatch_in_u32_out_buf_fixed<T>(
     // SAFETY: `buf` is a valid mutable reference; viewing it as mutable bytes is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -700,7 +705,7 @@ fn dispatch_in_u32_out_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -719,6 +724,7 @@ fn dispatch_in_u32_out_buf_fixed_out_ptr_fixed<T, U>(
         unsafe { core::slice::from_raw_parts_mut((buf0 as *mut T).cast::<u8>(), size_of::<T>()) };
     let buf1_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf1 as *mut U).cast::<u8>(), size_of::<U>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -730,7 +736,7 @@ fn dispatch_in_u32_out_buf_fixed_out_ptr_fixed<T, U>(
             buf1_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -749,6 +755,7 @@ fn dispatch_in_u32_in_buf_fixed_in_ptr_fixed<T, U>(
         unsafe { core::slice::from_raw_parts((buf0 as *const T).cast::<u8>(), size_of::<T>()) };
     let buf1_bytes =
         unsafe { core::slice::from_raw_parts((buf1 as *const U).cast::<u8>(), size_of::<U>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -760,6 +767,6 @@ fn dispatch_in_u32_in_buf_fixed_in_ptr_fixed<T, U>(
             buf1_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }

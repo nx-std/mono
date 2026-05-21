@@ -41,6 +41,7 @@ extern crate nx_panic_handler;
 
 pub mod cmif;
 pub mod hipc;
+pub mod ipc;
 pub mod service;
 mod service_name;
 pub mod tipc;

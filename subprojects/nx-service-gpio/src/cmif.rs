@@ -384,10 +384,11 @@ pub fn pad_get_value(session: Handle) -> Result<u32, DispatchOutU32Error> {
 
 /// Binds the interrupt and returns the event handle.
 pub fn pad_bind_interrupt(service: &Session) -> Result<u32, BindInterruptError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PAD_BIND_INTERRUPT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(BindInterruptError::Dispatch)?;
 
     if result.copy_handles.is_empty() {

@@ -319,13 +319,14 @@ pub fn port_open_legacy(
             size_of::<OpenPortLegacyIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_OPEN)
         .in_raw(in_bytes)
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -366,13 +367,14 @@ pub fn port_open_v6(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_OPEN)
         .in_raw(in_bytes)
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -416,13 +418,14 @@ pub fn port_open_v7(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_OPEN)
         .in_raw(in_bytes)
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -459,13 +462,14 @@ pub fn port_open_for_dev_legacy(
             size_of::<OpenPortLegacyIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
         .in_raw(in_bytes)
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -506,13 +510,14 @@ pub fn port_open_for_dev_v6(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
         .in_raw(in_bytes)
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -556,13 +561,14 @@ pub fn port_open_for_dev_v7(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
         .in_raw(in_bytes)
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -576,11 +582,12 @@ pub fn port_get_writable_length(session: Handle) -> Result<u64, DispatchOutU64Er
 
 /// Sends data through the port (HipcAutoSelect in-buffer).
 pub fn port_send(service: &Session, data: &[u8]) -> Result<u64, PortSendError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_SEND)
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(PortSendError::Dispatch)?;
 
     let bytes_written = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -594,11 +601,12 @@ pub fn port_get_readable_length(session: Handle) -> Result<u64, DispatchOutU64Er
 
 /// Receives data from the port (HipcAutoSelect out-buffer).
 pub fn port_receive(service: &Session, buf: &mut [u8]) -> Result<u64, PortReceiveError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_RECEIVE)
         .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(PortReceiveError::Dispatch)?;
 
     let bytes_read = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
@@ -626,12 +634,13 @@ pub fn port_bind_port_event(
             size_of::<BindPortEventIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PORT_BIND_PORT_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<u8>())
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(BindPortEventError::Dispatch)?;
 
     let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };

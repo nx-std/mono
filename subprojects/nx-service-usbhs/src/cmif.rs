@@ -24,10 +24,11 @@ pub(crate) fn bind_client_process(
     service: &Session,
     proc_handle: u32,
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::BIND_CLIENT_PROCESS)
         .in_handle(proc_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -50,12 +51,13 @@ pub(crate) fn query_interfaces_with_filter(
         )
     };
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(interfaces, interfaces_size) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<i32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let count = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
@@ -74,11 +76,12 @@ pub(crate) fn query_acquired_interfaces(
     // SAFETY: `interfaces` is a valid mutable pointer for `interfaces_size`
     // bytes provided by the caller.
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(interfaces, interfaces_size) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<i32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let count = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
@@ -107,10 +110,11 @@ pub(crate) fn create_interface_available_event(
             size_of::<CreateInterfaceAvailableEventIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -131,9 +135,10 @@ pub(crate) fn destroy_interface_available_event(
 
 /// GetInterfaceStateChangeEvent. Out: copy-handle.
 pub(crate) fn get_event(service: &Session, cmd_id: u32) -> Result<u32, GetEventError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -159,11 +164,12 @@ pub(crate) fn acquire_usb_if_legacy(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::ACQUIRE_USB_IF_LEGACY)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireIfError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -192,12 +198,13 @@ pub(crate) fn acquire_usb_if(
     let out_info_bytes = unsafe {
         core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::ACQUIRE_USB_IF)
         .in_raw(in_bytes)
         .out_buffer(out_data_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(out_info_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireIfError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -225,11 +232,12 @@ pub(crate) fn if_set_interface(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::IF_SET_INTERFACE)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -243,10 +251,11 @@ pub(crate) fn if_get_interface(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::IF_GET_INTERFACE)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -263,11 +272,12 @@ pub(crate) fn if_get_alternate_interface(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(info_out.cast::<u8>(), size_of::<UsbHsInterfaceInfo>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::IF_GET_ALTERNATE_INTERFACE)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -313,20 +323,21 @@ pub(crate) fn if_submit_control_request(
     };
     let buf_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
 
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = if is_in {
         service
             .dispatch(cmd_id)
             .in_raw(in_bytes)
             .out_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
             .out_size(size_of::<u32>())
-            .send()?
+            .send(&mut ipc_buf)?
     } else {
         service
             .dispatch(cmd_id)
             .in_raw(in_bytes)
             .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
             .out_size(size_of::<u32>())
-            .send()?
+            .send(&mut ipc_buf)?
     };
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -367,10 +378,11 @@ pub(crate) fn if_get_ctrl_xfer_report(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(report_out.cast::<u8>(), size_of::<UsbHsXferReport>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::IF_GET_CTRL_XFER_REPORT)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -398,11 +410,12 @@ pub(crate) fn if_open_usb_ep(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenUsbEpIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<UsbEndpointDescriptor>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenEpError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -447,20 +460,21 @@ pub(crate) fn ep_submit_request(
     };
     let buf_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
 
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = if is_in {
         service
             .dispatch(cmd_id)
             .in_raw(in_bytes)
             .out_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
             .out_size(size_of::<u32>())
-            .send()?
+            .send(&mut ipc_buf)?
     } else {
         service
             .dispatch(cmd_id)
             .in_raw(in_bytes)
             .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
             .out_size(size_of::<u32>())
-            .send()?
+            .send(&mut ipc_buf)?
     };
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -501,12 +515,13 @@ pub(crate) fn ep_get_xfer_report(
         core::slice::from_raw_parts((&raw const max_reports).cast::<u8>(), size_of::<u32>())
     };
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(reports, reports_size) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::EP_GET_XFER_REPORT)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, buf_attr)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let count = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -547,12 +562,13 @@ pub(crate) fn ep_batch_buffer_async(
         )
     };
     let urbs_bytes = unsafe { core::slice::from_raw_parts(urbs, urbs_size) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::EP_BATCH_BUFFER_ASYNC)
         .in_raw(in_bytes)
         .in_buffer(urbs_bytes, buf_attr)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let xfer_id = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -585,11 +601,12 @@ pub(crate) fn ep_share_report_ring(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const size).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::EP_SHARE_REPORT_RING)
         .in_raw(in_bytes)
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

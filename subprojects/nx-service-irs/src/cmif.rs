@@ -57,12 +57,13 @@ pub(crate) fn get_irsensor_shared_memory_handle(
             size_of::<u64>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_IRSENSOR_SHARED_MEMORY_HANDLE)
         .in_raw(in_bytes)
         .send_pid()
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetSharedMemoryError::Dispatch)?;
 
     result
@@ -156,12 +157,13 @@ pub(crate) fn run_image_transfer_processor(
             size_of::<RunImageTransferProcessorIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::RUN_IMAGE_TRANSFER_PROCESSOR)
         .in_raw(in_bytes)
         .send_pid()
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -187,13 +189,14 @@ pub(crate) fn get_image_transfer_processor_state(
             size_of::<GetImageTransferProcessorStateIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_IMAGE_TRANSFER_PROCESSOR_STATE)
         .in_raw(in_bytes)
         .send_pid()
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<ImageTransferProcessorState>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least `size_of::<ImageTransferProcessorState>()`.
     let state = unsafe {
@@ -297,12 +300,13 @@ pub(crate) fn run_image_transfer_ex_processor(
             size_of::<RunImageTransferExProcessorIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::RUN_IMAGE_TRANSFER_EX_PROCESSOR)
         .in_raw(in_bytes)
         .send_pid()
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

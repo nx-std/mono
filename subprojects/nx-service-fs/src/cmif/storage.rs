@@ -23,6 +23,7 @@ pub(crate) fn read(
         offset,
         size: read_size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::STORAGE_READ)
         .context(ctx)
@@ -31,7 +32,7 @@ pub(crate) fn read(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -46,6 +47,7 @@ pub(crate) fn write(
         offset,
         size: write_size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::STORAGE_WRITE)
         .context(ctx)
@@ -54,7 +56,7 @@ pub(crate) fn write(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

@@ -185,6 +185,7 @@ pub(crate) fn save_album_screenshot_file(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE)
         .in_raw(in_bytes)
@@ -192,7 +193,7 @@ pub(crate) fn save_album_screenshot_file(
             buffer,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SaveScreenShotError)
 }
@@ -221,6 +222,7 @@ pub(crate) fn save_album_screenshot_file_ex(
             size_of::<SaveScreenShotFileExIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE_EX)
         .in_raw(in_bytes)
@@ -228,7 +230,7 @@ pub(crate) fn save_album_screenshot_file_ex(
             buffer,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SaveScreenShotError)
 }
@@ -245,6 +247,7 @@ pub(crate) fn set_overlay_thumbnail_data(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -252,7 +255,7 @@ pub(crate) fn set_overlay_thumbnail_data(
             image,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SetOverlayThumbnailError)
 }
@@ -274,11 +277,12 @@ pub(crate) fn open_control_session(
             size_of::<OpenControlSessionIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_CONTROL_SESSION)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenControlSessionError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -341,12 +345,13 @@ pub(crate) fn ctrl_read_movie_data(
             size_of::<StreamReadDataIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::CTRL_READ_MOVIE_DATA_FROM_READ_STREAM)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -396,12 +401,13 @@ pub(crate) fn ctrl_read_image_data(
             size_of::<StreamReadDataIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::CTRL_READ_IMAGE_DATA_FROM_READ_STREAM)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -523,12 +529,13 @@ pub(crate) fn ctrl_read_data_from_write_stream(
             size_of::<StreamReadDataIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::CTRL_READ_DATA_FROM_WRITE_STREAM)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -554,11 +561,12 @@ pub(crate) fn ctrl_write_data_to_write_stream(
             size_of::<StreamWriteDataIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CTRL_WRITE_DATA_TO_WRITE_STREAM)
         .in_raw(in_bytes)
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(WriteStreamDataError)
 }
@@ -580,11 +588,12 @@ pub(crate) fn ctrl_write_meta_to_write_stream(
             size_of::<StreamWriteDataIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CTRL_WRITE_META_TO_WRITE_STREAM)
         .in_raw(in_bytes)
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(WriteStreamDataError)
 }

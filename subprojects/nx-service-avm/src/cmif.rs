@@ -22,11 +22,12 @@ pub(crate) fn get_highest_available_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_HIGHEST_AVAILABLE_VERSION)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: the response payload is at least `size_of::<u32>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
@@ -43,11 +44,12 @@ pub(crate) fn get_highest_required_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_HIGHEST_REQUIRED_VERSION)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: the response payload is at least `size_of::<u32>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
@@ -62,11 +64,12 @@ pub(crate) fn get_version_list_entry(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_VERSION_LIST_ENTRY)
         .in_raw(in_bytes)
         .out_size(size_of::<AvmVersionListEntry>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: the response payload is at least `size_of::<AvmVersionListEntry>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<AvmVersionListEntry>()) })
 }
@@ -75,10 +78,11 @@ pub(crate) fn get_version_list_entry(
 pub(crate) fn get_version_list_importer<'d>(
     domain: &'d Domain,
 ) -> Result<DomainObject<'d>, GetVersionListImporterError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::GET_VERSION_LIST_IMPORTER)
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetVersionListImporterError::Dispatch)?;
 
     result
@@ -96,11 +100,12 @@ pub(crate) fn get_launch_required_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_LAUNCH_REQUIRED_VERSION)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: the response payload is at least `size_of::<u32>()` bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
@@ -120,10 +125,11 @@ pub(crate) fn upgrade_launch_required_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::UPGRADE_LAUNCH_REQUIRED_VERSION)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -142,10 +148,11 @@ pub(crate) fn push_launch_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::PUSH_LAUNCH_VERSION)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -162,11 +169,12 @@ pub(crate) fn list_version_list(
             core::mem::size_of_val(buffer),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::LIST_VERSION_LIST)
         .out_size(size_of::<u32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -189,11 +197,12 @@ pub(crate) fn list_required_version(
             core::mem::size_of_val(buffer),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::LIST_REQUIRED_VERSION)
         .out_size(size_of::<u32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -226,10 +235,11 @@ pub(crate) fn importer_set_data(
             core::mem::size_of_val(entries),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::IMPORTER_SET_DATA)
         .in_buffer(in_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

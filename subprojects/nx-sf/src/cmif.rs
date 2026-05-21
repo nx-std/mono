@@ -962,6 +962,7 @@ pub struct InHeader {
     /// Context token for versioning (non-domain only).
     pub token: u32,
 }
+
 const_assert_eq!(size_of::<InHeader>(), 16);
 
 /// CMIF output header (16 bytes).
@@ -988,6 +989,7 @@ pub struct OutHeader {
     /// Echo of request token.
     pub token: u32,
 }
+
 const_assert_eq!(size_of::<OutHeader>(), 16);
 
 /// Domain input header (16 bytes).

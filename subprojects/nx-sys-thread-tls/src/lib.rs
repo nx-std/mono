@@ -205,11 +205,11 @@
 
 extern crate nx_panic_handler; // Provides #[panic_handler]
 
-use core::{ffi::c_void, marker::PhantomData, mem::offset_of, ptr, ptr::NonNull};
+use core::{cell::UnsafeCell, ffi::c_void, mem::offset_of, ptr, ptr::NonNull};
 
 use nx_cpu::control_regs;
 use nx_svc::thread::Handle as ThreadHandle;
-use static_assertions::const_assert_eq;
+use static_assertions::{assert_not_impl_any, const_assert_eq};
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
@@ -314,65 +314,164 @@ pub fn ipc_buffer_ptr() -> NonNull<u8> {
 ///
 /// # Safety
 ///
-/// 1. No other live borrow of the TLS IPC buffer (via [`ipc_buffer_ptr`]
-///    or another `IpcBuffer`) may exist on this thread for the lifetime
-///    of the returned value.
-/// 2. The returned `IpcBuffer` must be dropped before any operation that
-///    causes the kernel to mutate the buffer (`svcSendSyncRequest` etc.).
+/// No other [`IpcBuffer`] may be live on this thread for the lifetime of
+/// the returned value. Two live tokens on the same thread would allow
+/// aliased `&mut [u8; IPC_BUFFER_SIZE]` to be constructed via
+/// [`IpcBuffer::as_array_mut`], which is undefined behavior.
+///
+/// Note that — unlike earlier revisions of this API — the token itself
+/// may legally outlive a kernel write to the buffer (e.g. across
+/// `svcSendSyncRequest`). See [`IpcBuffer`] for the model.
 #[inline]
-pub unsafe fn ipc_buffer() -> IpcBuffer<'static> {
+pub unsafe fn ipc_buffer() -> IpcBuffer {
     // SAFETY: ipc_buffer_ptr always points to a valid IPC_BUFFER_SIZE-byte
-    // region in the current thread's TLS; caller upholds the aliasing contract.
-    let ptr = ipc_buffer_ptr().as_ptr() as *mut [u8; IPC_BUFFER_SIZE];
-    IpcBuffer {
-        bytes: unsafe { &mut *ptr },
-        _marker: PhantomData,
-    }
+    // region in the current thread's TLS. Reinterpreting that pointer as
+    // `*mut UnsafeCell<[u8; N]>` is layout-compatible because `UnsafeCell`
+    // is `#[repr(transparent)]` over its inner type. Caller upholds the
+    // singleton-per-thread contract documented above.
+    let ptr = ipc_buffer_ptr().cast::<UnsafeCell<[u8; IPC_BUFFER_SIZE]>>();
+    IpcBuffer { ptr }
 }
 
-/// Borrowed exclusive view of the current thread's IPC buffer.
+/// Thread-affine token granting access to the current thread's IPC buffer.
 ///
 /// Constructed via [`ipc_buffer`]; flowed into IPC marshaling code
 /// (`nx-sf`) so the rest of the IPC layer operates on a typed, sized
 /// view and never re-derives the buffer.
 ///
-/// `IpcBuffer` is intentionally neither [`Send`] nor [`Sync`]: it references
-/// thread-local storage owned by the thread that constructed it, and may
-/// not be moved to or shared with another thread.
-pub struct IpcBuffer<'a> {
-    bytes: &'a mut [u8; IPC_BUFFER_SIZE],
-    // `*const ()` is neither `Send` nor `Sync`; this opts the whole struct
-    // out of both auto-traits to enforce thread-affinity.
-    _marker: PhantomData<*const ()>,
+/// # Soundness model
+///
+/// The IPC buffer is a 0x100-byte region in this thread's TLS that the
+/// **kernel mutates** during syscalls such as `svcSendSyncRequest`. That
+/// makes its memory model fundamentally different from ordinary Rust
+/// storage and requires careful type-level encoding:
+///
+/// 1. **Thread affinity.** The buffer lives in this thread's TLS only.
+///    `IpcBuffer`'s sole field is a [`NonNull`], which wraps a raw
+///    pointer and therefore inherits `!Send + !Sync` via auto-trait
+///    inference. The compiler prevents the token from being moved to or
+///    shared with another thread. A static assertion below pins this
+///    guarantee so an accidental future field cannot silently restore
+///    [`Send`] or [`Sync`].
+///
+/// 2. **Singleton per thread.** Constructing two tokens on one thread
+///    would allow aliased `&mut [u8; IPC_BUFFER_SIZE]` references to the
+///    same memory — instant UB. This invariant is delegated to the
+///    `unsafe` constructor [`ipc_buffer`]; the type cannot enforce it
+///    without runtime tracking.
+///
+/// 3. **Kernel writes do not break the `&` contract.** A plain
+///    `&[u8; N]` (or `&mut`) promises the compiler that the bytes are
+///    stable for the borrow's lifetime — nothing else, anywhere, will
+///    read or write them. The kernel's store during a syscall violates
+///    that promise, so naively holding `&self.bytes` across the syscall
+///    would be UB even though no Rust code runs in the meantime.
+///
+///    To express "these bytes may be mutated through paths other than
+///    this reference," the underlying array is wrapped in
+///    [`UnsafeCell`]. `UnsafeCell` is the *only* language-level mechanism
+///    that lifts the stability promise from a shared reference; every
+///    interior-mutability primitive (`Cell`, `Mutex`, atomics, …) is
+///    built on it. Because `UnsafeCell` is layout-transparent, the TLS
+///    pointer can be reinterpreted as `*mut UnsafeCell<[u8; N]>` even
+///    though Rust does not own the underlying memory.
+///
+///    Consequently, `&IpcBuffer` (and `&mut IpcBuffer`) **may legally
+///    outlive a kernel write to the buffer**. The plumbing the token
+///    holds — a `NonNull` to an `UnsafeCell` — makes no promise the
+///    kernel would falsify.
+///
+/// 4. **Short-lived `&[u8; N]` borrows still must not span a kernel
+///    write.** [`as_array`], [`as_array_mut`], and the [`Deref`] /
+///    [`DerefMut`] impls hand out plain references to the array. Those
+///    references *do* carry the standard stability/exclusivity promise
+///    and would be UB if held across a syscall that mutates the buffer.
+///    In practice the IPC syscall wrapper takes `&mut IpcBuffer`, which
+///    reborrows the token uniquely and statically invalidates any
+///    outstanding `as_array`/`Deref` borrow at the call site — so this
+///    obligation is discharged by the borrow checker, not by hand.
+///
+/// # Summary of obligations
+///
+/// | Concern                              | Discharged by                                       |
+/// |--------------------------------------|-----------------------------------------------------|
+/// | Thread affinity                      | `NonNull` field → `!Send + !Sync` (asserted below)  |
+/// | Single token per thread              | `unsafe fn ipc_buffer()` precondition               |
+/// | Token may outlive a kernel write     | `UnsafeCell<[u8; N]>` interior (no stability promise) |
+/// | No `&[u8; N]` borrow across syscall  | syscall wrapper takes `&mut IpcBuffer`              |
+pub struct IpcBuffer {
+    // `UnsafeCell` is what tells the compiler the bytes here may be mutated
+    // through paths other than any live `&` to them — specifically, the
+    // kernel during an IPC syscall. Without it, holding `&IpcBuffer` across
+    // such a syscall would violate the shared-reference stability promise.
+    //
+    // The pointee lives in TLS (not in this struct); `NonNull` is just the
+    // handle. `UnsafeCell` is `#[repr(transparent)]`, so reinterpreting the
+    // raw TLS address as `*mut UnsafeCell<[u8; N]>` is layout-correct.
+    // `NonNull` wraps a raw pointer, so it is neither `Send` nor `Sync`;
+    // that auto-trait blocking propagates to `IpcBuffer` and enforces
+    // thread-affinity without a dedicated `PhantomData` marker. The
+    // `assert_not_impl_any!` below pins the guarantee.
+    ptr: NonNull<UnsafeCell<[u8; IPC_BUFFER_SIZE]>>,
 }
 
-impl<'a> IpcBuffer<'a> {
+// Thread-affinity guard: if a future field accidentally restores `Send`
+// or `Sync` (e.g. wrapping `ptr` in an `Arc`), this assertion fails at
+// compile time. See the type docs for why both must remain blocked.
+assert_not_impl_any!(IpcBuffer: Send, Sync);
+
+impl IpcBuffer {
     /// Borrowed view of the underlying fixed-size array.
+    ///
+    /// The returned reference carries the standard `&T` stability promise
+    /// and therefore **must not be held across an operation that lets the
+    /// kernel mutate the buffer**. In normal use this is enforced
+    /// automatically: the IPC syscall wrapper takes `&mut IpcBuffer`,
+    /// which invalidates this `&self`-derived borrow at the call site.
     #[inline]
     pub fn as_array(&self) -> &[u8; IPC_BUFFER_SIZE] {
-        self.bytes
+        // SAFETY:
+        // - `ptr` references the current thread's TLS IPC buffer, valid
+        //   for the thread's lifetime (`!Send`/`!Sync` confines use to it).
+        // - The `UnsafeCell` interior makes the conversion to `&` sound
+        //   even though the kernel may write the bytes through a side
+        //   channel; only the returned reference's *own* lifetime carries
+        //   the stability promise, and the caller-side borrow-check
+        //   prevents that lifetime from spanning a syscall (see doc above).
+        // - `&self` excludes a concurrent `as_array_mut`/`DerefMut`, so
+        //   no aliased `&mut` to the same bytes can exist.
+        unsafe { &*self.ptr.as_ref().get() }
     }
 
     /// Borrowed mutable view of the underlying fixed-size array.
+    ///
+    /// The returned reference carries the standard `&mut T`
+    /// exclusivity/stability promise. The same "must not span a kernel
+    /// write" obligation as [`as_array`] applies, and is enforced the
+    /// same way at IPC call sites.
     #[inline]
     pub fn as_array_mut(&mut self) -> &mut [u8; IPC_BUFFER_SIZE] {
-        self.bytes
+        // SAFETY: Validity argument as in `as_array`. `&mut self` provides
+        // unique access to the token, and the singleton-per-thread
+        // invariant on `ipc_buffer()` ensures no other token can hand out
+        // an overlapping borrow.
+        unsafe { &mut *self.ptr.as_ref().get() }
     }
 }
 
-impl core::ops::Deref for IpcBuffer<'_> {
+impl core::ops::Deref for IpcBuffer {
     type Target = [u8; IPC_BUFFER_SIZE];
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.bytes
+        self.as_array()
     }
 }
 
-impl core::ops::DerefMut for IpcBuffer<'_> {
+impl core::ops::DerefMut for IpcBuffer {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.bytes
+        self.as_array_mut()
     }
 }
 

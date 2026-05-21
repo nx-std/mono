@@ -31,11 +31,12 @@ pub(crate) fn set_program_arguments(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::SET_PROGRAM_ARGUMENTS)
         .in_raw(in_bytes)
         .in_buffer(args, BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -61,11 +62,12 @@ pub(crate) fn set_program_arguments_legacy(
             size_of::<SetProgramArgumentsLegacyIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::SET_PROGRAM_ARGUMENTS)
         .in_raw(in_bytes)
         .in_buffer(args, BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -96,12 +98,13 @@ pub(crate) fn get_process_module_info(
             core::mem::size_of_val(out_modules),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DMNT_GET_PROCESS_MODULE_INFO)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
         .out_size(size_of::<i32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
@@ -135,12 +138,13 @@ pub(crate) fn create_process_legacy(
             size_of::<CreateProcessLegacyIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PM_CREATE_PROCESS)
         .in_raw(in_bytes)
         .in_handle(reslimit_handle)
         .out_handle(0, OutHandleAttr::Move)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(result.move_handles[0])
 }
@@ -171,12 +175,13 @@ pub(crate) fn create_process(
             size_of::<CreateProcessIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PM_CREATE_PROCESS)
         .in_raw(in_bytes)
         .in_handle(reslimit_handle)
         .out_handle(0, OutHandleAttr::Move)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(result.move_handles[0])
 }
@@ -204,6 +209,7 @@ pub(crate) fn get_program_info_v1(
             size_of::<LoaderProgramInfoV1>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::PM_GET_PROGRAM_INFO)
         .in_raw(in_bytes)
@@ -211,7 +217,7 @@ pub(crate) fn get_program_info_v1(
             out_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -247,6 +253,7 @@ pub(crate) fn get_program_info(
             size_of::<LoaderProgramInfo>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::PM_GET_PROGRAM_INFO)
         .in_raw(in_bytes)
@@ -254,7 +261,7 @@ pub(crate) fn get_program_info(
             out_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -270,11 +277,12 @@ pub(crate) fn pin_program(
             size_of::<NcmProgramLocation>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PM_PIN_PROGRAM)
         .in_raw(in_bytes)
         .out_size(size_of::<u64>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<u64>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })

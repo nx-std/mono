@@ -73,13 +73,14 @@ pub(crate) fn get_and_clear_storage_error_info(
     size: i64,
     dst: &mut [u8],
 ) -> Result<GetAndClearStorageErrorInfoOut, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(as_in_bytes(&size))
         .out_size(size_of::<GetAndClearStorageErrorInfoOut>())
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(unsafe {
         core::ptr::read_unaligned(
             result
@@ -179,12 +180,13 @@ pub(crate) fn get_game_card_device_certificate_legacy(
         handle: *handle,
         buffer_size: size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
         .context(ctx)
         .in_raw(as_in_bytes(&input))
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| 0x200)
 }
 
@@ -199,13 +201,14 @@ pub(crate) fn get_game_card_device_certificate(
         handle: *handle,
         buffer_size: size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
         .context(ctx)
         .in_raw(as_in_bytes(&input))
         .out_size(size_of::<i64>())
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })
 }
 
@@ -258,6 +261,7 @@ pub(crate) fn challenge_card_existence(
     seed: &[u8],
     value: &[u8],
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::DEVICE_OPERATOR_CHALLENGE_CARD_EXISTENCE)
         .context(ctx)
@@ -265,6 +269,6 @@ pub(crate) fn challenge_card_existence(
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(seed, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(value, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }

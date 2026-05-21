@@ -349,6 +349,7 @@ fn dispatch_in_u64_in_buf_fixed<T>(
     // buffer is sound and the slice borrows `buf`.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -356,7 +357,7 @@ fn dispatch_in_u64_in_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -373,6 +374,7 @@ fn dispatch_in_u64_out_buf_fixed<T>(
     // for the OUT buffer is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -380,7 +382,7 @@ fn dispatch_in_u64_out_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -389,13 +391,14 @@ fn dispatch_in_buf_fixed<T>(service: &Session, buf: &T, cmd_id: u32) -> Result<(
     // buffer is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_buffer(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -408,13 +411,14 @@ fn dispatch_out_buf_fixed<T>(
     // for the OUT buffer is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .out_buffer(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -432,6 +436,7 @@ fn dispatch_in_addr_in_buf_fixed<T>(
     // buffer is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -439,7 +444,7 @@ fn dispatch_in_addr_in_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -457,6 +462,7 @@ fn dispatch_in_addr_out_buf_fixed<T>(
     // for the OUT buffer is sound.
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -464,6 +470,6 @@ fn dispatch_in_addr_out_buf_fixed<T>(
             buf_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }

@@ -22,9 +22,10 @@ use crate::{
 
 /// Gets the IBtmUserCore sub-object (cmd 0).
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_CORE)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetCoreError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -201,13 +202,14 @@ pub(crate) fn ble_get_connection_state(
             core::mem::size_of_val(info),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::BLE_GET_CONNECTION_STATE)
         .in_raw(in_bytes)
         .out_size(size_of::<u8>())
         .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -285,12 +287,13 @@ pub(crate) fn ble_get_paired_devices(
             core::mem::size_of_val(addrs),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::BLE_GET_PAIRED_DEVICES)
         .in_raw(in_bytes)
         .out_size(size_of::<u8>())
         .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -336,13 +339,14 @@ pub(crate) fn get_gatt_services(
             core::mem::size_of_val(services),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_GATT_SERVICES)
         .in_raw(in_bytes)
         .out_size(size_of::<u8>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -378,6 +382,7 @@ pub(crate) fn get_gatt_service(
             size_of::<BtmGattService>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_GATT_SERVICE)
         .in_raw(in_bytes)
@@ -387,7 +392,7 @@ pub(crate) fn get_gatt_service(
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -444,6 +449,7 @@ pub(crate) fn get_belonging_gatt_service(
             size_of::<BtmGattService>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_BELONGING_GATT_SERVICE)
         .in_raw(in_bytes)
@@ -453,7 +459,7 @@ pub(crate) fn get_belonging_gatt_service(
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -542,12 +548,13 @@ pub(crate) fn get_ble_mtu(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetBleMtuIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_BLE_MTU)
         .in_raw(in_bytes)
         .out_size(size_of::<u16>())
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<u16>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u16>()) })
@@ -611,13 +618,14 @@ fn get_ble_scan_results(
             core::mem::size_of_val(results),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<u8>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -652,13 +660,14 @@ fn get_gatt_service_data(
     // SAFETY: `buffer` is a valid pointer to `buffer_size` writable bytes,
     // exclusively borrowed for the duration of this call.
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<u8>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
@@ -670,11 +679,12 @@ fn acquire_event_with_flag(
     service: &Session,
     cmd_id: u32,
 ) -> Result<u32, AcquireEventWithFlagError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireEventWithFlagError::Dispatch)?;
 
     // SAFETY: response payload is at least 1 byte.

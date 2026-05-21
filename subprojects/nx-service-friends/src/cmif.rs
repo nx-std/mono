@@ -17,10 +17,11 @@ use crate::{
 /// the same id per request via [`Domain::open_object_raw`]. The kernel-side
 /// object is reclaimed when the pool's domain sessions close.
 pub(crate) fn create_friend_service(domain: &Domain) -> Result<u32, CreateFriendServiceError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::CREATE_FRIEND_SERVICE)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(CreateFriendServiceError::Dispatch)?;
 
     let object = result
@@ -51,6 +52,7 @@ pub(crate) fn get_user_setting(
             size_of::<FriendsUserSetting>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::GET_USER_SETTING)
         .in_raw(in_bytes)
@@ -58,7 +60,7 @@ pub(crate) fn get_user_setting(
             out_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 

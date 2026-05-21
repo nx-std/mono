@@ -43,13 +43,14 @@ pub(crate) fn get_client_id(object: &DomainObject<'_>) -> Result<NifmClientId, D
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<NifmClientId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(CMD_IGS_GET_CLIENT_ID)
         .out_buffer(
             out_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| out)
 }
 
@@ -68,11 +69,12 @@ pub(crate) fn create_request(object: &DomainObject<'_>) -> Result<u32, CreateReq
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const selector).cast::<u8>(), size_of::<i32>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = object
         .dispatch(CMD_IGS_CREATE_REQUEST)
         .in_raw(in_bytes)
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(CreateRequestError::Dispatch)?;
 
     let new_object = result
@@ -113,13 +115,14 @@ pub(crate) fn get_current_network_profile(
             size_of::<NifmSfNetworkProfileData>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(CMD_IGS_GET_CURRENT_NETWORK_PROFILE)
         .out_buffer(
             sf_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()?;
+        .send(&mut ipc_buf)?;
     sf_to_network_profile_data(&sf, out);
     Ok(())
 }
@@ -149,12 +152,13 @@ pub(crate) fn enumerate_network_profiles(
             size_of::<NifmSfNetworkProfileBasicInfo>() * buffer.len(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(CMD_IGS_ENUMERATE_NETWORK_PROFILES)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     let total_entries = i32::from_le_bytes([
         result.data[0],
@@ -215,6 +219,7 @@ pub(crate) fn get_network_profile(
             size_of::<NifmSfNetworkProfileData>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(CMD_IGS_GET_NETWORK_PROFILE)
         .in_raw(in_bytes)
@@ -222,7 +227,7 @@ pub(crate) fn get_network_profile(
             sf_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()?;
+        .send(&mut ipc_buf)?;
     sf_to_network_profile_data(&sf, out);
     Ok(())
 }
@@ -247,6 +252,7 @@ pub(crate) fn set_network_profile(
             size_of::<NifmSfNetworkProfileData>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(CMD_IGS_SET_NETWORK_PROFILE)
         .in_buffer(
@@ -254,7 +260,7 @@ pub(crate) fn set_network_profile(
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_size(size_of::<Uuid>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<Uuid>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<Uuid>()) })
@@ -395,6 +401,7 @@ pub(crate) fn is_any_internet_request_accepted(
     let id_bytes = unsafe {
         core::slice::from_raw_parts((&raw const id).cast::<u8>(), size_of::<NifmClientId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(CMD_IGS_IS_ANY_INTERNET_REQUEST_ACCEPTED)
         .in_buffer(
@@ -402,7 +409,7 @@ pub(crate) fn is_any_internet_request_accepted(
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_size(size_of::<u8>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok((result.data[0] & 1) != 0)
 }
 

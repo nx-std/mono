@@ -22,10 +22,11 @@ use crate::{
 pub(crate) fn acquire_unique_pad_connection_event_handle(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::ACQUIRE_UNIQUE_PAD_CONNECTION_EVENT_HANDLE)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -48,11 +49,12 @@ pub(crate) fn get_unique_pad_ids(
             core::mem::size_of_val(out_pads),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_UNIQUE_PAD_IDS)
         .out_buffer(buf_bytes, BufferAttr::HIPC_POINTER)
         .out_size(size_of::<i64>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 8 bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })
@@ -67,12 +69,13 @@ pub(crate) fn acquire_joy_detach_on_bluetooth_off_event_handle(
     // SAFETY: `aruid` is a `Copy` value on the stack, valid until `.send()`.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::ACQUIRE_JOY_DETACH_ON_BLUETOOTH_OFF_EVENT_HANDLE)
         .in_raw(in_bytes)
         .send_pid()
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {

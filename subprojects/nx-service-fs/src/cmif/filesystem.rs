@@ -24,12 +24,13 @@ pub(crate) fn create_file(
         _pad: 0,
         size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::FS_CREATE_FILE)
         .context(ctx)
         .in_raw(as_in_bytes(&input))
         .in_buffer(path, BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -39,11 +40,12 @@ pub(crate) fn cmd_with_path(
     cmd_id: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(cmd_id)
         .context(ctx)
         .in_buffer(path, BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -54,12 +56,13 @@ pub(crate) fn cmd_with_two_paths(
     cur_path: &[u8; FS_MAX_PATH],
     new_path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(cmd_id)
         .context(ctx)
         .in_buffer(cur_path, BufferAttr::HIPC_POINTER)
         .in_buffer(new_path, BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -68,12 +71,13 @@ pub(crate) fn get_entry_type(
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::FS_GET_ENTRY_TYPE)
         .context(ctx)
         .out_size(size_of::<u32>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
 }
 
@@ -83,13 +87,14 @@ pub(crate) fn open_file(
     path: &[u8; FS_MAX_PATH],
     mode: u32,
 ) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = object
         .dispatch(proto::FS_OPEN_FILE)
         .context(ctx)
         .in_raw(as_in_bytes(&mode))
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
-        .send()?;
+        .send(&mut ipc_buf)?;
     let obj = result.take_object(0).expect("server returned file object");
     Ok(ManuallyDrop::new(obj).object_id().to_raw())
 }
@@ -100,13 +105,14 @@ pub(crate) fn open_directory(
     path: &[u8; FS_MAX_PATH],
     mode: u32,
 ) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = object
         .dispatch(proto::FS_OPEN_DIRECTORY)
         .context(ctx)
         .in_raw(as_in_bytes(&mode))
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
-        .send()?;
+        .send(&mut ipc_buf)?;
     let obj = result
         .take_object(0)
         .expect("server returned directory object");
@@ -126,12 +132,13 @@ pub(crate) fn get_space(
     cmd_id: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<i64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })
 }
 
@@ -140,12 +147,13 @@ pub(crate) fn get_file_time_stamp_raw(
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<TimeStampRaw, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::FS_GET_FILE_TIME_STAMP_RAW)
         .context(ctx)
         .out_size(size_of::<TimeStampRaw>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<TimeStampRaw>()) })
 }
 
@@ -157,6 +165,7 @@ pub(crate) fn query_entry(
     in_buf: &[u8],
     out_buf: &mut [u8],
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::FS_QUERY_ENTRY)
         .context(ctx)
@@ -170,7 +179,7 @@ pub(crate) fn query_entry(
             out_buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

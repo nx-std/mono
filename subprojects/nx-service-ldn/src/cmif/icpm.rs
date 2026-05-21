@@ -21,10 +21,12 @@ pub(crate) fn register_client(object: &DomainObject<'_>) -> Result<(), DispatchE
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
     };
+    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(CMD_ICPM_REGISTER_CLIENT)
         .send_pid()
         .in_raw(in_bytes)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }

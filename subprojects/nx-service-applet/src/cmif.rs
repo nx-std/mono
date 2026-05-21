@@ -94,6 +94,7 @@ pub fn open_proxy(
     };
 
     let mut attempts: u32 = 0;
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = loop {
         // Dispatch builders are consumed by send(); rebuild each iteration.
         let mut dispatch = domain
@@ -116,7 +117,7 @@ pub fn open_proxy(
             dispatch = dispatch.in_buffer(attr_bytes, BufferAttr::HIPC_MAP_ALIAS);
         }
 
-        match dispatch.send() {
+        match dispatch.send(&mut buf) {
             Ok(r) => break r,
             Err(DispatchError::ParseResponse(ParseRespBytesError::ServiceError(AM_BUSY_ERROR))) => {
                 attempts += 1;
@@ -165,10 +166,11 @@ pub enum OpenProxyError {
 pub fn get_common_state_getter(
     proxy: &DomainObject<'_>,
 ) -> Result<CommonStateGetter, GetCommonStateGetterError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = proxy
         .dispatch(CMD_GET_COMMON_STATE_GETTER)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(GetCommonStateGetterError::Dispatch)?;
 
     let object = result
@@ -197,10 +199,11 @@ pub enum GetCommonStateGetterError {
 pub fn get_self_controller(
     proxy: &DomainObject<'_>,
 ) -> Result<SelfController, GetSelfControllerError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = proxy
         .dispatch(CMD_GET_SELF_CONTROLLER)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(GetSelfControllerError::Dispatch)?;
 
     let object = result
@@ -229,10 +232,11 @@ pub enum GetSelfControllerError {
 pub fn get_window_controller(
     proxy: &DomainObject<'_>,
 ) -> Result<WindowController, GetWindowControllerError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = proxy
         .dispatch(CMD_GET_WINDOW_CONTROLLER)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(GetWindowControllerError::Dispatch)?;
 
     let object = result
@@ -261,9 +265,10 @@ pub enum GetWindowControllerError {
 pub fn acquire_foreground_rights(
     window_controller: &DomainObject<'_>,
 ) -> Result<(), AcquireForegroundRightsError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     window_controller
         .dispatch(CMD_WC_ACQUIRE_FOREGROUND_RIGHTS)
-        .send()
+        .send(&mut buf)
         .map_err(AcquireForegroundRightsError::Dispatch)?;
 
     Ok(())
@@ -315,10 +320,11 @@ pub fn set_focus_handling_mode(
         suspend_on_background as u8,
     ];
 
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     self_controller
         .dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE)
         .in_raw(&input)
-        .send()
+        .send(&mut buf)
         .map_err(SetFocusHandlingModeError::Dispatch)?;
 
     // cmd 16: SetOutOfFocusSuspendingEnabled — single bool. Required for AlwaysSuspend
@@ -348,10 +354,11 @@ pub fn set_out_of_focus_suspending_enabled(
 ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
     let input: u8 = enabled as u8;
 
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     self_controller
         .dispatch(CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED)
         .in_raw(core::slice::from_ref(&input))
-        .send()
+        .send(&mut buf)
         .map_err(SetOutOfFocusSuspendingEnabledError::Dispatch)?;
 
     Ok(())
@@ -386,10 +393,11 @@ pub fn set_operation_mode_changed_notification(
 ) -> Result<(), SetOperationModeChangedNotificationError> {
     let input: u8 = enabled as u8;
 
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     self_controller
         .dispatch(CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION)
         .in_raw(core::slice::from_ref(&input))
-        .send()
+        .send(&mut buf)
         .map_err(SetOperationModeChangedNotificationError::Dispatch)?;
 
     Ok(())
@@ -413,10 +421,11 @@ pub fn set_performance_mode_changed_notification(
 ) -> Result<(), SetPerformanceModeChangedNotificationError> {
     let input: u8 = enabled as u8;
 
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     self_controller
         .dispatch(CMD_SC_SET_PERFORMANCE_MODE_CHANGED_NOTIFICATION)
         .in_raw(core::slice::from_ref(&input))
-        .send()
+        .send(&mut buf)
         .map_err(SetPerformanceModeChangedNotificationError::Dispatch)?;
 
     Ok(())
@@ -439,10 +448,11 @@ pub enum SetPerformanceModeChangedNotificationError {
 pub fn get_applet_resource_user_id(
     window_controller: &DomainObject<'_>,
 ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = window_controller
         .dispatch(CMD_WC_GET_APPLET_RESOURCE_USER_ID)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(GetAppletResourceUserIdError::Dispatch)?;
 
     if result.data.len() < size_of::<u64>() {
@@ -470,10 +480,11 @@ pub enum GetAppletResourceUserIdError {
 pub fn get_application_functions(
     proxy: &DomainObject<'_>,
 ) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = proxy
         .dispatch(CMD_GET_APPLICATION_FUNCTIONS)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(GetApplicationFunctionsError::Dispatch)?;
 
     let object = result
@@ -503,10 +514,11 @@ pub enum GetApplicationFunctionsError {
 /// This should be called after waiting for InFocus state, acquiring foreground rights,
 /// and setting up focus handling mode.
 pub fn notify_running(app_funcs: &DomainObject<'_>) -> Result<bool, NotifyRunningError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = app_funcs
         .dispatch(CMD_AF_NOTIFY_RUNNING)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(NotifyRunningError::Dispatch)?;
 
     if result.data.is_empty() {
@@ -533,10 +545,11 @@ pub enum NotifyRunningError {
 pub fn create_managed_display_layer(
     self_controller: &DomainObject<'_>,
 ) -> Result<u64, CreateManagedDisplayLayerError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = self_controller
         .dispatch(CMD_SC_CREATE_MANAGED_DISPLAY_LAYER)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(CreateManagedDisplayLayerError::Dispatch)?;
 
     if result.data.len() < size_of::<u64>() {
@@ -584,10 +597,11 @@ fn get_sub_interface_object_id(
     proxy: &DomainObject<'_>,
     cmd_id: u32,
 ) -> Result<u32, GetSubInterfaceError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = proxy
         .dispatch(cmd_id)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(GetSubInterfaceError::Dispatch)?;
 
     let object = result

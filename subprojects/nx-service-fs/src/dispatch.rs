@@ -12,7 +12,12 @@ pub(crate) fn dispatch_no_io(
     cmd_id: u32,
     ctx: u32,
 ) -> Result<(), DispatchError> {
-    object.dispatch(cmd_id).context(ctx).send().map(|_| ())
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    object
+        .dispatch(cmd_id)
+        .context(ctx)
+        .send(&mut buf)
+        .map(|_| ())
 }
 
 pub(crate) fn dispatch_in<I: Copy>(
@@ -21,11 +26,12 @@ pub(crate) fn dispatch_in<I: Copy>(
     ctx: u32,
     input: I,
 ) -> Result<(), DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(as_in_bytes(&input))
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -34,11 +40,12 @@ pub(crate) fn dispatch_out<O: Copy>(
     cmd_id: u32,
     ctx: u32,
 ) -> Result<O, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
         .out_size(size_of::<O>())
-        .send()?;
+        .send(&mut buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }
 
@@ -48,12 +55,13 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
     ctx: u32,
     input: I,
 ) -> Result<O, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(as_in_bytes(&input))
         .out_size(size_of::<O>())
-        .send()?;
+        .send(&mut buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }
 
@@ -96,11 +104,12 @@ pub(crate) fn dispatch_in_size_out_buffer(
     size: i64,
     dst: &mut [u8],
 ) -> Result<(), DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(as_in_bytes(&size))
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }

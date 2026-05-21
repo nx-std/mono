@@ -36,12 +36,13 @@ pub(crate) fn create_network_service(
             size_of::<CreateNetworkServiceIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::CREATE_NETWORK_SERVICE)
         .in_raw(in_bytes)
         .send_pid()
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(CreateNetworkServiceError::Dispatch)?;
 
     let object = result
@@ -61,11 +62,12 @@ pub(crate) fn create_network_service_monitor(session: &Session) -> Result<u32, C
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::CREATE_NETWORK_SERVICE_MONITOR)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut buf)
         .map_err(CreateMonitorError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -94,6 +96,7 @@ pub(crate) fn scan(
             core::mem::size_of_val(results),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SCAN)
         .out_size(size_of::<i32>())
@@ -102,7 +105,7 @@ pub(crate) fn scan(
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_buffer(out_bytes, BufferAttr::HIPC_AUTO_SELECT)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let total_out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
@@ -119,19 +122,24 @@ pub(crate) fn create_group(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::CREATE_GROUP)
         .in_buffer(
             in_bytes,
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_AUTO_SELECT),
         )
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
 /// Destroys the current group (cmd 776).
 pub(crate) fn destroy_group(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    object.dispatch(proto::DESTROY_GROUP).send().map(|_| ())
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    object
+        .dispatch(proto::DESTROY_GROUP)
+        .send(&mut buf)
+        .map(|_| ())
 }
 
 /// Sets advertise data (cmd 784).
@@ -139,10 +147,11 @@ pub(crate) fn set_advertise_data(
     object: &DomainObject<'_>,
     data: &[u8],
 ) -> Result<(), DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::SET_ADVERTISE_DATA)
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -173,11 +182,12 @@ pub(crate) fn send_to_other_group(
             size_of::<SendToOtherGroupIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::SEND_TO_OTHER_GROUP)
         .in_raw(in_bytes)
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -191,12 +201,13 @@ pub(crate) fn recv_from_other_group(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::RECV_FROM_OTHER_GROUP)
         .in_raw(in_bytes)
         .out_size(size_of::<RecvFromOtherGroupOut>())
         .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<RecvFromOtherGroupOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<RecvFromOtherGroupOut>()) };
@@ -213,18 +224,20 @@ pub(crate) fn add_acceptable_group_id(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const group_id).cast::<u8>(), size_of::<Lp2pGroupId>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::ADD_ACCEPTABLE_GROUP_ID)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
 /// Removes the acceptable group ID (cmd 1560).
 pub(crate) fn remove_acceptable_group_id(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::REMOVE_ACCEPTABLE_GROUP_ID)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -232,10 +245,11 @@ pub(crate) fn remove_acceptable_group_id(object: &DomainObject<'_>) -> Result<()
 pub(crate) fn attach_network_interface_state_change_event(
     session: &Session,
 ) -> Result<u32, AttachEventError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::ATTACH_NETWORK_INTERFACE_STATE_CHANGE_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(AttachEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -247,18 +261,20 @@ pub(crate) fn attach_network_interface_state_change_event(
 
 /// Gets the last network interface error (cmd 264).
 pub(crate) fn get_network_interface_last_error(session: &Session) -> Result<(), DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     session
         .dispatch(proto::GET_NETWORK_INTERFACE_LAST_ERROR)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
 /// Gets the current role (cmd 272).
 pub(crate) fn get_role(session: &Session) -> Result<u8, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::GET_ROLE)
         .out_size(size_of::<u8>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<u8>().
     let role = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
@@ -271,11 +287,12 @@ pub(crate) fn get_advertise_data(
     cmd_id: u32,
     buffer: &mut [u8],
 ) -> Result<GetAdvertiseDataOut, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(cmd_id)
         .out_size(size_of::<GetAdvertiseDataOut>())
         .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<GetAdvertiseDataOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetAdvertiseDataOut>()) };
@@ -295,13 +312,14 @@ pub(crate) fn get_group_info(
             size_of::<Lp2pGroupInfo>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     session
         .dispatch(proto::GET_GROUP_INFO)
         .out_buffer(
             out_bytes,
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_AUTO_SELECT),
         )
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -324,6 +342,7 @@ pub(crate) fn join(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     session
         .dispatch(proto::JOIN)
         .out_buffer(
@@ -334,16 +353,17 @@ pub(crate) fn join(
             in_bytes,
             BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
 /// Gets the group owner (cmd 304).
 pub(crate) fn get_group_owner(session: &Session) -> Result<Lp2pNodeInfo, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::GET_GROUP_OWNER)
         .out_size(size_of::<Lp2pNodeInfo>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<Lp2pNodeInfo>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<Lp2pNodeInfo>()) };
@@ -363,22 +383,24 @@ pub(crate) fn get_ip_config(
             size_of::<Lp2pIpConfig>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     session
         .dispatch(proto::GET_IP_CONFIG)
         .out_buffer(
             out_bytes,
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
 /// Leaves the current group (cmd 320).
 pub(crate) fn leave(session: &Session) -> Result<u32, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::LEAVE)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -387,10 +409,11 @@ pub(crate) fn leave(session: &Session) -> Result<u32, DispatchError> {
 
 /// Attaches the join event (cmd 328).
 pub(crate) fn attach_join_event(session: &Session) -> Result<u32, AttachEventError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::ATTACH_JOIN_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(AttachEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -413,11 +436,12 @@ pub(crate) fn get_members(
             core::mem::size_of_val(members),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = session
         .dispatch(proto::GET_MEMBERS)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_AUTO_SELECT)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let total_out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };

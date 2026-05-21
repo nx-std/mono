@@ -21,12 +21,13 @@ pub(crate) fn initialize(service: &Session) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::INITIALIZE)
         .in_raw(in_bytes)
         .send_pid()
         .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -53,12 +54,13 @@ pub(crate) fn load_nro(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<LoadNroIn>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::LOAD_NRO)
         .in_raw(in_bytes)
         .send_pid()
         .out_size(size_of::<u64>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<u64>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
@@ -131,12 +133,13 @@ pub(crate) fn get_process_module_info(
             core::mem::size_of_val(out_modules),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_PROCESS_MODULE_INFO)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<i32>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })

@@ -15,11 +15,12 @@ pub(crate) fn dispatch_in_pid_no_out<T>(
     // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -34,11 +35,12 @@ pub(crate) fn dispatch_in_out<T, U: Copy>(
     // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<U>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<U>().
     let val = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<U>()) };

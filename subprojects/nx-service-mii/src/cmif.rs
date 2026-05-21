@@ -19,10 +19,12 @@ pub(crate) fn open_database(service: &Session, key_code: u32) -> Result<u32, Ope
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const key_code).cast::<u8>(), size_of::<u32>())
     };
+    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_DATABASE)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut buf)
         .map_err(OpenDatabaseError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -71,12 +73,14 @@ pub(crate) fn db_get1(
             core::mem::size_of_val(buffer),
         )
     };
+    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_GET1)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut buf)?;
 
     Ok(i32::from_le_bytes([
         result.data[0],

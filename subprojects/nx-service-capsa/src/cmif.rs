@@ -39,12 +39,13 @@ pub(crate) fn get_album_file_list(
     // returns; viewing its 1 byte as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST)
         .in_raw(in_bytes)
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -64,12 +65,13 @@ pub(crate) fn load_album_file(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::LOAD_ALBUM_FILE)
         .in_raw(in_bytes)
         .out_buffer(filebuf, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(LoadAlbumFileError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -133,12 +135,13 @@ pub(crate) fn load_album_file_thumbnail(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::LOAD_ALBUM_FILE_THUMBNAIL)
         .in_raw(in_bytes)
         .out_buffer(image, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(LoadAlbumFileError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -160,6 +163,7 @@ pub(crate) fn load_album_screen_shot_image(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -169,7 +173,7 @@ pub(crate) fn load_album_screen_shot_image(
         )
         .out_buffer(workbuf, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<LoadScreenShotOut>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(LoadScreenShotError)?;
 
     // SAFETY: response payload is at least size_of::<LoadScreenShotOut>().
@@ -217,6 +221,7 @@ pub(crate) fn load_album_screen_shot_image_ex(
             size_of::<LoadScreenShotExIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -226,7 +231,7 @@ pub(crate) fn load_album_screen_shot_image_ex(
         )
         .out_buffer(workbuf, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<LoadScreenShotOut>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(LoadScreenShotError)?;
 
     // SAFETY: response payload is at least size_of::<LoadScreenShotOut>().
@@ -257,6 +262,7 @@ pub(crate) fn load_album_screen_shot_image_ex0(
             size_of::<LoadScreenShotExIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -266,7 +272,7 @@ pub(crate) fn load_album_screen_shot_image_ex0(
         )
         .out_buffer(workbuf, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<LoadScreenShotEx0Out>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(LoadScreenShotError)?;
 
     // SAFETY: response payload is at least size_of::<LoadScreenShotEx0Out>().
@@ -315,6 +321,7 @@ pub(crate) fn get_album_usage16(
             size_of::<AlbumUsage16>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::GET_ALBUM_USAGE16)
         .in_raw(in_bytes)
@@ -322,7 +329,7 @@ pub(crate) fn get_album_usage16(
             out_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(GetAlbumUsage16Error)
 }
@@ -337,6 +344,7 @@ pub(crate) fn get_min_max_applet_id(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(app_ids.as_mut_ptr().cast::<u8>(), size_of::<[u64; 2]>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_MIN_MAX_APPLET_ID)
         .out_buffer(
@@ -344,7 +352,7 @@ pub(crate) fn get_min_max_applet_id(
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
         .out_size(size_of::<GetMinMaxAppletIdOut>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetMinMaxAppletIdError)?;
 
     // SAFETY: response payload is at least size_of::<GetMinMaxAppletIdOut>().
@@ -387,12 +395,13 @@ pub(crate) fn get_album_file_list_ex0(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<StorageFlagsIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST_EX0)
         .in_raw(in_bytes)
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -407,11 +416,12 @@ pub(crate) fn get_last_overlay_thumbnail(
     cmd_id: u32,
     image: &mut [u8],
 ) -> Result<GetLastOverlayThumbnailOut, GetOverlayThumbnailError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_buffer(image, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<GetLastOverlayThumbnailOut>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetOverlayThumbnailError)?;
 
     // SAFETY: response payload is at least size_of::<GetLastOverlayThumbnailOut>().
@@ -474,6 +484,7 @@ pub(crate) fn load_album_screen_shot_image_ex1(
             size_of::<LoadAlbumScreenShotImageOutput>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -486,7 +497,7 @@ pub(crate) fn load_album_screen_shot_image_ex1(
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
         )
         .out_buffer(workbuf, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(LoadScreenShotError)
 }
@@ -550,11 +561,12 @@ pub(crate) fn open_accessor_session(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_ACCESSOR_SESSION)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenAccessorSessionError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -606,12 +618,13 @@ pub(crate) fn read_movie_data_from_stream(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ReadStreamIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -658,12 +671,13 @@ pub(crate) fn read_image_data_from_stream(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ReadStreamIn>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::READ_IMAGE_DATA_FROM_STREAM)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().

@@ -31,10 +31,11 @@ pub(crate) fn list_all_users(
             size_of::<[AccountUid; USER_LIST_SIZE]>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::LIST_ALL_USERS)
         .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -50,10 +51,11 @@ pub(crate) fn get_profile(service: &Session, uid: AccountUid) -> Result<u32, Get
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_PROFILE)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetProfileError::Dispatch)?;
 
     let Some(&handle) = result.move_handles.first() else {
@@ -73,11 +75,12 @@ pub(crate) fn initialize_application_info_legacy(service: &Session) -> Result<()
             size_of::<InitializeApplicationInfoIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::INITIALIZE_APPLICATION_INFO_LEGACY)
         .in_raw(in_bytes)
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -92,11 +95,12 @@ pub(crate) fn initialize_application_info(service: &Session) -> Result<(), Dispa
             size_of::<InitializeApplicationInfoIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::INITIALIZE_APPLICATION_INFO)
         .in_raw(in_bytes)
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -139,6 +143,7 @@ pub(crate) fn profile_get(
             size_of::<AccountUserData>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PROFILE_GET)
         .out_size(size_of::<AccountProfileBase>())
@@ -146,7 +151,7 @@ pub(crate) fn profile_get(
             out_bytes,
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: the response payload is at least `size_of::<AccountProfileBase>()` bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<AccountProfileBase>()) })
@@ -164,11 +169,12 @@ pub(crate) fn profile_get_image_size(service: &Session) -> Result<u32, DispatchE
 
 /// Loads the JPEG profile icon image. Returns bytes written.
 pub(crate) fn profile_load_image(service: &Session, buf: &mut [u8]) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PROFILE_LOAD_IMAGE)
         .out_size(size_of::<u32>())
         .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(u32::from_le_bytes([
         result.data[0],
@@ -193,12 +199,13 @@ fn dispatch_in_out_with_pid<I: Copy, O: Copy>(
     // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<O>())
         .send_pid()
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: the response payload is at least `size_of::<O>()` bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }

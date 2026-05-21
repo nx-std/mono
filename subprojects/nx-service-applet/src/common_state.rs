@@ -27,10 +27,11 @@ use crate::proto::{
 /// the signal manually (e.g. via [`nx_svc::sync::reset_signal`]) or subsequent
 /// waits will return immediately and busy-loop.
 pub fn get_event_handle(csg: &DomainObject<'_>) -> Result<EventHandle, GetEventHandleError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = csg
         .dispatch(CMD_CSG_GET_EVENT_HANDLE)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(GetEventHandleError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -58,10 +59,11 @@ pub enum GetEventHandleError {
 pub fn receive_message(
     csg: &DomainObject<'_>,
 ) -> Result<Option<AppletMessage>, ReceiveMessageError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = csg
         .dispatch(CMD_CSG_RECEIVE_MESSAGE)
         .out_size(size_of::<u32>())
-        .send();
+        .send(&mut buf);
 
     match result {
         Ok(resp) => {
@@ -104,10 +106,11 @@ pub enum ReceiveMessageError {
 pub fn get_operation_mode(
     csg: &DomainObject<'_>,
 ) -> Result<AppletOperationMode, GetOperationModeError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = csg
         .dispatch(CMD_CSG_GET_OPERATION_MODE)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(GetOperationModeError::Dispatch)?;
 
     if result.data.is_empty() {
@@ -136,10 +139,11 @@ pub enum GetOperationModeError {
 pub fn get_performance_mode(
     csg: &DomainObject<'_>,
 ) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = csg
         .dispatch(CMD_CSG_GET_PERFORMANCE_MODE)
         .out_size(size_of::<u32>())
-        .send()
+        .send(&mut buf)
         .map_err(GetPerformanceModeError::Dispatch)?;
 
     if result.data.len() < size_of::<u32>() {
@@ -169,10 +173,11 @@ pub enum GetPerformanceModeError {
 pub fn get_current_focus_state(
     csg: &DomainObject<'_>,
 ) -> Result<AppletFocusState, GetCurrentFocusStateError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = csg
         .dispatch(CMD_CSG_GET_CURRENT_FOCUS_STATE)
         .out_size(size_of::<u8>())
-        .send()
+        .send(&mut buf)
         .map_err(GetCurrentFocusStateError::Dispatch)?;
 
     if result.data.is_empty() {

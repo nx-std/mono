@@ -14,11 +14,12 @@ pub(crate) fn initialize(domain: &Domain) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::INITIALIZE)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -39,12 +40,13 @@ pub(crate) fn register_alarm_setting(
             size_of::<AlarmSetting>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::REGISTER_ALARM_SETTING)
         .in_buffer(setting_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(app_param, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u16>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload contains the u16 alarm_setting_id.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u16>()) })
@@ -66,11 +68,12 @@ pub(crate) fn update_alarm_setting(
             size_of::<AlarmSetting>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::UPDATE_ALARM_SETTING)
         .in_buffer(setting_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(app_param, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -87,11 +90,12 @@ pub(crate) fn list_alarm_settings(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::LIST_ALARM_SETTINGS)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<i32>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload contains the i32 total count.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
@@ -110,12 +114,13 @@ pub(crate) fn load_application_parameter(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const alarm_setting_id).cast::<u8>(), size_of::<u16>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::LOAD_APPLICATION_PARAMETER)
         .in_raw(in_bytes)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload contains the u32 actual size.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })

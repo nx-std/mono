@@ -96,11 +96,12 @@ pub(crate) fn write_placeholder(
             size_of::<WritePlaceHolderIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CS_WRITE_PLACEHOLDER)
         .in_raw(in_bytes)
         .in_buffer(data, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -161,6 +162,7 @@ pub(crate) fn get_path(
             size_of::<NcmContentId>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CS_GET_PATH)
         .in_raw(in_bytes)
@@ -168,7 +170,7 @@ pub(crate) fn get_path(
             out_path.as_mut_slice(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -186,6 +188,7 @@ pub(crate) fn get_placeholder_path(
             size_of::<NcmPlaceHolderId>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CS_GET_PLACEHOLDER_PATH)
         .in_raw(in_bytes)
@@ -193,7 +196,7 @@ pub(crate) fn get_placeholder_path(
             out_path.as_mut_slice(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -215,11 +218,12 @@ pub(crate) fn list_placeholder(
             core::mem::size_of_val(out_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::CS_LIST_PLACEHOLDER)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
 }
@@ -248,12 +252,13 @@ pub(crate) fn list_content_id(
             core::mem::size_of_val(out_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::CS_LIST_CONTENT_ID)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
 }
@@ -342,11 +347,12 @@ pub(crate) fn read_content_id_file(
             size_of::<ReadContentIdFileIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CS_READ_CONTENT_ID_FILE)
         .in_raw(in_bytes)
         .out_buffer(out_data, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -423,11 +429,12 @@ pub(crate) fn write_content_for_debug(
             size_of::<WriteContentForDebugIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CS_WRITE_CONTENT_FOR_DEBUG)
         .in_raw(in_bytes)
         .in_buffer(data, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -511,11 +518,12 @@ pub(crate) fn register_path(
             size_of::<NcmContentId>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::CS_REGISTER_PATH)
         .in_raw(in_bytes)
         .in_buffer(path.as_slice(), BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 

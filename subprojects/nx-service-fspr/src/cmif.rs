@@ -48,12 +48,13 @@ pub fn register_program(
             size_of::<RegisterProgramIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::REGISTER_PROGRAM)
         .in_raw(in_bytes)
         .in_buffer(fs_access_header, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(fs_access_control, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -63,10 +64,11 @@ pub fn unregister_program(domain: &Domain, pid: u64) -> Result<(), DispatchError
     // returns; viewing its `size_of::<u64>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const pid).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::UNREGISTER_PROGRAM)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -79,11 +81,12 @@ pub fn set_current_process(domain: &Domain) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::SET_CURRENT_PROCESS)
         .send_pid()
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -97,9 +100,10 @@ pub fn set_enabled_program_verification(
     // returns; viewing its `size_of::<u8>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u8>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::SET_ENABLED_PROGRAM_VERIFICATION)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }

@@ -7,7 +7,8 @@ use nx_sf::service::{DispatchError, Session};
 /// CMIF domain request with no input, no output.
 #[inline]
 pub(crate) fn dispatch_domain_no_io(service: &Session, cmd_id: u32) -> Result<(), DispatchError> {
-    service.dispatch(cmd_id).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    service.dispatch(cmd_id).send(&mut ipc_buf).map(|_| ())
 }
 
 /// CMIF domain request with a raw input payload, no output.
@@ -21,7 +22,12 @@ pub(crate) fn dispatch_domain_in_no_out<T>(
     // as a slice is sound, and the slice borrows `input`.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
-    service.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send(&mut ipc_buf)
+        .map(|_| ())
 }
 
 /// CMIF domain request with a raw input payload and raw output.
@@ -35,11 +41,12 @@ pub(crate) fn dispatch_domain_in_out<T, U: Copy>(
     // as a slice is sound, and the slice borrows `input`.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<U>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<U>().
     let val = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<U>()) };
@@ -53,7 +60,11 @@ pub(crate) fn dispatch_domain_out<U: Copy>(
     service: &Session,
     cmd_id: u32,
 ) -> Result<U, DispatchError> {
-    let result = service.dispatch(cmd_id).out_size(size_of::<U>()).send()?;
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let result = service
+        .dispatch(cmd_id)
+        .out_size(size_of::<U>())
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<U>().
     let val = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<U>()) };

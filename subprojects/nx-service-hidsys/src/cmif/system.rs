@@ -94,12 +94,13 @@ pub(crate) fn get_unique_pads_from_npad(
             core::mem::size_of_val(out_pads),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_UNIQUE_PADS_FROM_NPAD)
         .in_raw(in_bytes)
         .out_buffer(buf_bytes, BufferAttr::HIPC_POINTER)
         .out_size(size_of::<i64>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 8 bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })

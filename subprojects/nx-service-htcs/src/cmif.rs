@@ -24,11 +24,12 @@ pub(crate) fn manager_pid_init(domain: &Domain) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::MANAGER_PID_INIT)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
@@ -40,20 +41,22 @@ pub(crate) fn monitor_pid_init(session: &Session) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     session
         .dispatch(proto::MONITOR_PID_INIT)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 
 /// Gets a peer name (shared implementation for cmds 10 and 11).
 pub(crate) fn get_peer_name(domain: &Domain, cmd_id: u32) -> Result<HtcsPeerName, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(cmd_id)
         .out_size(size_of::<HtcsPeerName>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<HtcsPeerName>().
     let name = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<HtcsPeerName>()) };
@@ -73,12 +76,13 @@ pub(crate) fn create_socket(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u8>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::CREATE_SOCKET)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(CreateSocketError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
@@ -128,6 +132,7 @@ pub(crate) fn start_select(
             core::mem::size_of_val(except_fds),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::START_SELECT)
         .in_raw(in_bytes)
@@ -136,7 +141,7 @@ pub(crate) fn start_select(
         .in_buffer(write_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(except_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(StartSelectError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -181,6 +186,7 @@ pub(crate) fn end_select(
             core::mem::size_of_val(except_fds),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::END_SELECT)
         .in_raw(in_bytes)
@@ -188,7 +194,7 @@ pub(crate) fn end_select(
         .out_buffer(read_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(write_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(except_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<EndSelectOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<EndSelectOut>()) };
@@ -201,10 +207,11 @@ pub(crate) fn end_select(
 
 /// Socket close (cmd 0).
 pub(crate) fn socket_close(object: &DomainObject<'_>) -> Result<SocketResult, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_CLOSE)
         .out_size(size_of::<SocketResult>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -225,11 +232,12 @@ pub(crate) fn socket_cmd_in_address(
             size_of::<HtcsSockAddr>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<SocketResult>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -246,11 +254,12 @@ pub(crate) fn socket_cmd_in_i32(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<i32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<SocketResult>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -270,11 +279,12 @@ pub(crate) fn socket_fcntl(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<FcntlIn>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_FCNTL)
         .in_raw(in_bytes)
         .out_size(size_of::<SocketResult>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<SocketResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SocketResult>()) };
@@ -287,11 +297,12 @@ pub(crate) fn socket_fcntl(
 pub(crate) fn socket_accept_start(
     object: &DomainObject<'_>,
 ) -> Result<(u32, u32), AcceptStartError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_ACCEPT_START)
         .out_size(size_of::<u32>())
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(AcceptStartError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -315,12 +326,13 @@ pub(crate) fn socket_accept_results(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = object
         .dispatch(proto::SOCKET_ACCEPT_RESULTS)
         .in_raw(in_bytes)
         .out_size(size_of::<AcceptResultsOut>())
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(AcceptResultsError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<AcceptResultsOut>().
@@ -350,12 +362,13 @@ pub(crate) fn socket_recv_start(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<RecvStartIn>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_RECV_START)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(RecvStartError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -378,12 +391,13 @@ pub(crate) fn socket_recv_results(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_RECV_RESULTS)
         .in_raw(in_bytes)
         .out_size(size_of::<TransferResult>())
         .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<TransferResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) };
@@ -400,11 +414,12 @@ pub(crate) fn socket_cmd_in_u32_out_transfer(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<TransferResult>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<TransferResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) };
@@ -429,12 +444,13 @@ pub(crate) fn socket_start_send(
             size_of::<StartTransferIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_START_SEND)
         .in_raw(in_bytes)
         .out_size(size_of::<StartSendOut>())
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(StartSendError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<StartSendOut>().
@@ -465,12 +481,13 @@ pub(crate) fn socket_start_recv(
             size_of::<StartTransferIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_START_RECV)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(StartRecvError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -493,12 +510,13 @@ pub(crate) fn socket_end_recv(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_END_RECV)
         .in_raw(in_bytes)
         .out_size(size_of::<TransferResult>())
         .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<TransferResult>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<TransferResult>()) };
@@ -517,6 +535,7 @@ pub(crate) fn socket_send_start(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<i32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_SEND_START)
         .in_raw(in_bytes)
@@ -526,7 +545,7 @@ pub(crate) fn socket_send_start(
             BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut buf)
         .map_err(SendStartError::Dispatch)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
@@ -549,6 +568,7 @@ pub(crate) fn socket_continue_send(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_CONTINUE_SEND)
         .in_raw(in_bytes)
@@ -557,7 +577,7 @@ pub(crate) fn socket_continue_send(
             buffer,
             BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<ContinueSendOut>().
     let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<ContinueSendOut>()) };
@@ -566,10 +586,11 @@ pub(crate) fn socket_continue_send(
 
 /// Socket get_primitive (cmd 130).
 pub(crate) fn socket_get_primitive(object: &DomainObject<'_>) -> Result<i32, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SOCKET_GET_PRIMITIVE)
         .out_size(size_of::<i32>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<i32>().
     let fd = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };

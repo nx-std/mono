@@ -41,13 +41,14 @@ pub(crate) fn open_audio_renderer(
             size_of::<OpenAudioRendererIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_AUDIO_RENDERER)
         .in_raw(in_bytes)
         .send_pid()
         .in_handle(tmem_handle)
         .in_handle(process_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenAudioRendererError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -70,11 +71,12 @@ pub(crate) fn get_work_buffer_size(
             size_of::<AudioRendererParameter>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE)
         .in_raw(in_bytes)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetWorkBufferSizeError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -89,10 +91,11 @@ pub(crate) fn get_work_buffer_size(
 
 /// Gets the current renderer state (cmd 3).
 pub(crate) fn renderer_get_state(service: &Session) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::RENDERER_GET_STATE)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     let state = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
@@ -142,12 +145,13 @@ fn renderer_request_update_impl(
     perf_buf: &mut [u8],
     transfer_attr: BufferAttr,
 ) -> Result<(), RequestUpdateError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .out_buffer(out_param_buf, transfer_attr)
         .out_buffer(perf_buf, transfer_attr)
         .in_buffer(in_param_buf, transfer_attr)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(RequestUpdateError)
 }
@@ -164,10 +168,11 @@ pub(crate) fn renderer_stop(service: &Session) -> Result<(), DispatchError> {
 
 /// Queries the system event (cmd 7, copy handle output).
 pub(crate) fn renderer_query_system_event(service: &Session) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::RENDERER_QUERY_SYSTEM_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(result.copy_handles[0])
 }
@@ -181,10 +186,11 @@ pub(crate) fn renderer_set_rendering_time_limit(
     // returns; viewing its `size_of::<i32>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const percent).cast::<u8>(), size_of::<i32>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::RENDERER_SET_RENDERING_TIME_LIMIT)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

@@ -17,10 +17,11 @@ use crate::{
 /// `DomainObject` is wrapped in `ManuallyDrop` so the server-side object
 /// outlives this call; the service wrapper re-opens it per request.
 pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(CreateInterfaceError::Dispatch)?;
 
     let object = result
@@ -58,18 +59,23 @@ pub(crate) fn initialize(
             core::mem::size_of_val(version_data),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::MF_INITIALIZE)
         .in_raw(in_bytes)
         .in_buffer(version_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 /// Finalize.
 pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    object.dispatch(proto::MF_FINALIZE).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    object
+        .dispatch(proto::MF_FINALIZE)
+        .send(&mut ipc_buf)
+        .map(|_| ())
 }
 
 /// ListDevices.
@@ -82,11 +88,12 @@ pub(crate) fn list_devices(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::MF_LIST_DEVICES)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(i32::from_le_bytes([
         result.data[0],
@@ -143,12 +150,13 @@ pub(crate) fn read_mifare(
             core::mem::size_of_val(read_block_parameter),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::MF_READ_MIFARE)
         .in_raw(in_bytes)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(param_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -174,11 +182,12 @@ pub(crate) fn write_mifare(
             core::mem::size_of_val(write_block_parameter),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::MF_WRITE_MIFARE)
         .in_raw(in_bytes)
         .in_buffer(param_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -204,6 +213,7 @@ pub(crate) fn get_tag_info(
             size_of::<NfcTagInfo>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::MF_GET_TAG_INFO)
         .in_raw(in_bytes)
@@ -211,7 +221,7 @@ pub(crate) fn get_tag_info(
             out_bytes,
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -228,11 +238,12 @@ pub(crate) fn attach_activate_event(
             size_of::<NfcDeviceHandle>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::MF_ATTACH_ACTIVATE_EVENT)
         .in_raw(in_bytes)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(result.copy_handles[0])
 }
 
@@ -249,11 +260,12 @@ pub(crate) fn attach_deactivate_event(
             size_of::<NfcDeviceHandle>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::MF_ATTACH_DEACTIVATE_EVENT)
         .in_raw(in_bytes)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(result.copy_handles[0])
 }
 
@@ -261,10 +273,11 @@ pub(crate) fn attach_deactivate_event(
 pub(crate) fn attach_availability_change_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::MF_ATTACH_AVAILABILITY_CHANGE_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(result.copy_handles[0])
 }
 

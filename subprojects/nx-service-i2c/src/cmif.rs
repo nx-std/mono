@@ -62,11 +62,12 @@ pub fn send_auto(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::SEND_AUTO)
         .in_raw(in_bytes)
         .in_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SendAutoError)
 }
@@ -84,11 +85,12 @@ pub fn receive_auto(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::RECEIVE_AUTO)
         .in_raw(in_bytes)
         .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(ReceiveAutoError)
 }
@@ -99,11 +101,12 @@ pub fn execute_command_list(
     dst: &mut [u8],
     cmd_list: &[u8],
 ) -> Result<(), ExecuteCommandListError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::EXECUTE_COMMAND_LIST)
         .out_buffer(dst, BufferAttr::HIPC_AUTO_SELECT)
         .in_buffer(cmd_list, BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(ExecuteCommandListError)
 }

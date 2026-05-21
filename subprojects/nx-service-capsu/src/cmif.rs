@@ -60,13 +60,14 @@ pub(crate) fn get_album_file_list_deprecated0(
             size_of::<GetAlbumFileListDeprecated0In>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST_DEPRECATED0)
         .in_raw(in_bytes)
         .send_pid()
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -138,6 +139,7 @@ pub(crate) fn load_album_screenshot_image(
             size_of::<LoadAlbumScreenShotImageOutputForApplication>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -148,7 +150,7 @@ pub(crate) fn load_album_screenshot_image(
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
         )
         .out_buffer(workbuf, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
         .map_err(LoadScreenShotImageError)
 }
@@ -197,13 +199,14 @@ pub(crate) fn get_album_file_list_aae(
             size_of::<GetAlbumFileListAaeIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .send_pid()
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -242,13 +245,14 @@ pub(crate) fn get_album_file_list_aae_uid(
             size_of::<GetAlbumFileListAaeUidIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .send_pid()
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(GetAlbumFileListError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().
@@ -276,11 +280,12 @@ pub(crate) fn open_accessor_session(
             size_of::<OpenAccessorSessionIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_ACCESSOR_SESSION)
         .in_raw(in_bytes)
         .send_pid()
-        .send()
+        .send(&mut buf)
         .map_err(OpenAccessorSessionError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -344,12 +349,13 @@ pub(crate) fn read_movie_data(
             size_of::<ReadMovieDataIn>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
-        .send()
+        .send(&mut buf)
         .map_err(ReadMovieDataError)?;
 
     // SAFETY: response payload is at least size_of::<u64>().

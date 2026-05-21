@@ -28,11 +28,12 @@ pub(crate) fn set(
             size_of::<NcmContentMetaKey>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::DB_SET)
         .in_raw(key_bytes)
         .in_buffer(data, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -50,12 +51,13 @@ pub(crate) fn get(
             size_of::<NcmContentMetaKey>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_GET)
         .in_raw(key_bytes)
         .out_size(size_of::<u64>())
         .out_buffer(out_data, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<u64>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -110,12 +112,13 @@ pub(crate) fn list_content_info(
             core::mem::size_of_val(out_info),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_LIST_CONTENT_INFO)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
 }
@@ -151,12 +154,13 @@ pub(crate) fn list(
             core::mem::size_of_val(out_keys),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_LIST)
         .in_raw(in_bytes)
         .out_size(size_of::<ListOut>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<ListOut>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<ListOut>()) })
 }
@@ -188,12 +192,13 @@ pub(crate) fn list_application(
             core::mem::size_of_val(out_keys),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_LIST_APPLICATION)
         .in_raw(in_bytes)
         .out_size(size_of::<ListOut>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<ListOut>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<ListOut>()) })
 }
@@ -214,11 +219,12 @@ pub(crate) fn has_all(
     let in_bytes = unsafe {
         core::slice::from_raw_parts(keys.as_ptr().cast::<u8>(), core::mem::size_of_val(keys))
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_HAS_ALL)
         .out_size(size_of::<u8>())
         .in_buffer(in_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<u8>() bytes.
     let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
     Ok(out & 1 != 0)
@@ -264,11 +270,12 @@ pub(crate) fn lookup_orphan_content(
             core::mem::size_of_val(content_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::DB_LOOKUP_ORPHAN_CONTENT)
         .out_buffer(out_orphaned, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(in_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(())
 }
 
@@ -322,12 +329,13 @@ pub(crate) fn list_content_meta_info(
             core::mem::size_of_val(out_meta_info),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::DB_LIST_CONTENT_META_INFO)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     // SAFETY: response payload is at least size_of::<i32>() bytes.
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
 }

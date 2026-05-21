@@ -36,12 +36,13 @@ pub(crate) fn is_firmware_update_needed_for_notification(
             size_of::<IsFirmwareUpdateNeededIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::IS_FIRMWARE_UPDATE_NEEDED_FOR_NOTIFICATION)
         .in_raw(in_bytes)
         .send_pid()
         .out_size(size_of::<u8>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least 1 byte.
     let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };

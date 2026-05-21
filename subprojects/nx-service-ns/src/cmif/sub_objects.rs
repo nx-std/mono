@@ -19,10 +19,11 @@ use crate::{
 pub(crate) fn progress_monitor_get_system_event(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::PROGRESS_MONITOR_GET_SYSTEM_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
 
     let Some(handle) = result.copy_handles.first().copied() else {
@@ -74,10 +75,11 @@ pub(crate) fn progress_async_get_progress(
     service: &Session,
     out: &mut [u8],
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::PROGRESS_ASYNC_GET_PROGRESS)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -92,10 +94,11 @@ pub(crate) fn progress_async_get_error_context(
     service: &Session,
     out: &mut [u8],
 ) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::PROGRESS_ASYNC_GET_ERROR_CONTEXT)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 

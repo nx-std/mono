@@ -15,10 +15,11 @@ use crate::proto::{CMD_CREATE_GENERAL_SERVICE, CMD_CREATE_GENERAL_SERVICE_OLD};
 pub(crate) fn create_general_service_old(
     creator: &Domain,
 ) -> Result<u32, CreateGeneralServiceError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = creator
         .dispatch(CMD_CREATE_GENERAL_SERVICE_OLD)
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(CreateGeneralServiceError::Dispatch)?;
 
     let object = result
@@ -39,12 +40,13 @@ pub(crate) fn create_general_service(creator: &Domain) -> Result<u32, CreateGene
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = creator
         .dispatch(CMD_CREATE_GENERAL_SERVICE)
         .send_pid()
         .in_raw(in_bytes)
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(CreateGeneralServiceError::Dispatch)?;
 
     let object = result

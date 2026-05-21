@@ -57,13 +57,15 @@ pub(crate) fn get_network_info(
             size_of::<LdnNetworkInfo>(),
         )
     };
+    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     session
         .dispatch(CMD_MON_GET_NETWORK_INFO)
         .out_buffer(
             out_bytes,
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut buf)
         .map(|_| ())
 }
 

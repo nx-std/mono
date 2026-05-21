@@ -29,12 +29,13 @@ pub(crate) fn open_final_output_recorder(
             size_of::<OpenRecorderIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_FINAL_OUTPUT_RECORDER)
         .in_raw(in_bytes)
         .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
         .out_size(size_of::<FinalOutputRecorderParameterInternal>())
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenRecorderError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -66,10 +67,11 @@ pub(crate) fn recorder_stop(service: &Session) -> Result<(), DispatchError> {
 
 /// Registers the buffer event (returns copy handle).
 pub(crate) fn recorder_register_buffer_event(service: &Session) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::RECORDER_REGISTER_BUFFER_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(result.copy_handles[0])
 }
@@ -96,11 +98,12 @@ pub(crate) fn recorder_append_buffer(
             size_of::<FinalOutputRecorderBuffer>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::RECORDER_APPEND_BUFFER)
         .in_raw(in_bytes)
         .in_buffer(param_bytes, BufferAttr::HIPC_AUTO_SELECT)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(AppendBufferError)
 }
@@ -127,11 +130,12 @@ pub(crate) fn recorder_append_buffer_legacy(
             size_of::<FinalOutputRecorderBuffer>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::RECORDER_APPEND_BUFFER_LEGACY)
         .in_raw(in_bytes)
         .in_buffer(param_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(AppendBufferError)
 }
@@ -183,11 +187,12 @@ fn get_released_impl(
         )
     };
 
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<GetReleasedBuffersOut>())
         .out_buffer(out_bytes, transfer_attr)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetReleasedBuffersError)?;
 
     // SAFETY: response payload is at least size_of::<GetReleasedBuffersOut>().

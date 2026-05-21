@@ -26,7 +26,7 @@ pub(crate) fn create_context(
     } else {
         proto::CREATE_CONTEXT
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its `size_of::<CreateContextIn>()` bytes as a slice is sound.
     let in_bytes = unsafe {
         core::slice::from_raw_parts(
@@ -34,12 +34,13 @@ pub(crate) fn create_context(
             size_of::<CreateContextIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .send_pid()
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(CreateContextError::Dispatch)?;
     let object = result
         .take_object(0)
@@ -60,10 +61,11 @@ pub enum CreateContextError {
 
 /// Gets the context count.
 pub(crate) fn get_context_count(domain: &Domain) -> Result<u32, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_CONTEXT_COUNT)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(u32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -86,11 +88,12 @@ pub(crate) fn get_certificates_legacy(
             core::mem::size_of_val(ca_cert_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::GET_CERTIFICATES)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(ca_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -108,12 +111,13 @@ pub(crate) fn get_certificates(
             core::mem::size_of_val(ca_cert_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_CERTIFICATES)
         .out_size(size_of::<u32>())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(ca_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(u32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -135,11 +139,12 @@ pub(crate) fn get_certificate_buf_size(
             core::mem::size_of_val(ca_cert_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_CERTIFICATE_BUF_SIZE)
         .out_size(size_of::<u32>())
         .in_buffer(ca_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(u32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -150,14 +155,15 @@ pub(crate) fn get_certificate_buf_size(
 
 /// Sets the interface version (3.0.0+, internal).
 pub(crate) fn set_interface_version(domain: &Domain, version: u32) -> Result<(), DispatchError> {
-    // SAFETY: `version` is a `Copy` value on the stack, valid until `.send()`
+    // SAFETY: `version` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const version).cast::<u8>(), size_of::<u32>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::SET_INTERFACE_VERSION)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -167,17 +173,18 @@ pub(crate) fn flush_session_cache(
     hostname: &[u8],
     option_type: u32,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `option_type` is a `Copy` value on the stack, valid until `.send()`
+    // SAFETY: `option_type` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const option_type).cast::<u8>(), size_of::<u32>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::FLUSH_SESSION_CACHE)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
         .in_buffer(hostname, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(u32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -192,16 +199,17 @@ pub(crate) fn set_debug_option(
     debug_type: u32,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `debug_type` is a `Copy` value on the stack, valid until `.send()`
+    // SAFETY: `debug_type` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::SET_DEBUG_OPTION)
         .in_raw(in_bytes)
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -211,46 +219,50 @@ pub(crate) fn get_debug_option(
     debug_type: u32,
     buffer: &mut [u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `debug_type` is a `Copy` value on the stack, valid until `.send()`
+    // SAFETY: `debug_type` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::GET_DEBUG_OPTION)
         .in_raw(in_bytes)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 /// Clears TLS 1.2 fallback flag (14.0.0+).
 pub(crate) fn clear_tls12_fallback_flag(domain: &Domain) -> Result<(), DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::CLEAR_TLS12_FALLBACK_FLAG)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 /// Sets the thread core mask (15.0.0+, system only).
 pub(crate) fn set_thread_core_mask(domain: &Domain, mask: u64) -> Result<(), DispatchError> {
-    // SAFETY: `mask` is a `Copy` value on the stack, valid until `.send()`
+    // SAFETY: `mask` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const mask).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     domain
         .dispatch(proto::SET_THREAD_CORE_MASK)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 /// Gets the thread core mask (15.0.0+, system only).
 pub(crate) fn get_thread_core_mask(domain: &Domain) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = domain
         .dispatch(proto::GET_THREAD_CORE_MASK)
         .out_size(size_of::<u64>())
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(u64::from_le_bytes([
         result.data[0],
         result.data[1],

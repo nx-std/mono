@@ -24,13 +24,13 @@
 
 use core::ptr;
 
-use nx_svc::ipc::{self, Handle as SessionHandle};
-use nx_sys_thread_tls::IPC_BUFFER_SIZE;
+use nx_svc::ipc::Handle as SessionHandle;
+use nx_sys_thread_tls::IpcBuffer;
 
 use super::domain::{Domain, DomainObject};
 use crate::{
     cmif::{self, ObjectId},
-    hipc,
+    hipc, ipc,
 };
 
 /// Maximum number of buffers in a single dispatch.
@@ -263,10 +263,13 @@ impl<'a> Dispatch<'a> {
 
     /// Sends the dispatch request and parses the response.
     ///
-    /// The returned [`DispatchResult`] borrows from the per-thread IPC TLS
-    /// buffer; it is valid until the next IPC call on this thread.
-    pub fn send(self) -> Result<DispatchResult<'static>, DispatchError> {
-        let resp = self.send_response()?;
+    /// The returned [`DispatchResult`] borrows from `buf` (the per-thread
+    /// IPC TLS buffer). The borrow's lifetime ties response references to
+    /// the caller-provided token, so the borrow checker enforces that the
+    /// response is fully consumed before the next IPC operation reuses
+    /// `buf`.
+    pub fn send<'b>(self, buf: &'b mut IpcBuffer) -> Result<DispatchResult<'b>, DispatchError> {
+        let resp = self.send_response(buf)?;
         Ok(DispatchResult {
             data: resp.data,
             copy_handles: resp.copy_handles,
@@ -279,14 +282,14 @@ impl<'a> Dispatch<'a> {
     /// Crate-internal: used by [`Dispatch::send`] for the non-domain path and
     /// by [`DomainDispatch::send`] to wrap the response's raw object ids into
     /// [`DomainObject`] instances before exposing them to callers.
-    pub(crate) fn send_response(self) -> Result<cmif::ResponseBytes<'static>, DispatchError> {
+    pub(crate) fn send_response<'b>(
+        self,
+        buf: &'b mut IpcBuffer,
+    ) -> Result<cmif::ResponseBytes<'b>, DispatchError> {
         let is_domain = self.object_id.is_some();
 
         {
-            // SAFETY: IPC operations are serialized on this thread.
-            let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-            let mut cb = cmif::CmifBuilder::new(&mut buf, self.request_id)
+            let mut cb = cmif::CmifBuilder::new(buf, self.request_id)
                 .pointer_buffer_size(self.pointer_buffer_size as usize)
                 .context(self.context)
                 .data_size(self.in_data_size);
@@ -361,22 +364,19 @@ impl<'a> Dispatch<'a> {
             }
         }
 
-        ipc::send_sync_request(self.session).map_err(DispatchError::SendRequest)?;
+        // Reborrows `buf` uniquely: the borrow checker invalidates any
+        // outstanding `&[u8; N]` derived from `buf` (e.g. from the request
+        // builder above) before the syscall runs. After this call returns,
+        // fresh borrows from `buf` observe the kernel-written response.
+        ipc::send_sync_request(buf, self.session).map_err(DispatchError::SendRequest)?;
 
-        // SAFETY: The kernel populated the TLS IPC buffer during the SVC above
-        // and there is no other live borrow of the buffer on this thread. We
-        // launder the `IpcBuffer`'s borrow to `'static` so the returned
-        // `Response` can outlive the local `IpcBuffer` guard; callers of
-        // `Dispatch::send` must consume the response before the next IPC
-        // operation on this thread.
-        let ipc_buf: &'static [u8; IPC_BUFFER_SIZE] = unsafe {
-            let buf = nx_sys_thread_tls::ipc_buffer();
-            &*(&*buf as *const [u8; IPC_BUFFER_SIZE])
-        };
+        // Response bytes borrow from `buf`; lifetime `'b` propagates to the
+        // caller, who must consume the response before the next IPC
+        // operation reuses the token.
         let resp = if is_domain {
-            cmif::parse_response_bytes_domain(ipc_buf, self.out_data_size)
+            cmif::parse_response_bytes_domain(buf.as_array(), self.out_data_size)
         } else {
-            cmif::parse_response_bytes(ipc_buf, self.out_data_size)
+            cmif::parse_response_bytes(buf.as_array(), self.out_data_size)
         }
         .map_err(DispatchError::ParseResponse)?;
 
@@ -392,7 +392,7 @@ pub enum DispatchError {
     Layout(#[source] cmif::RequestLayoutError),
     /// The kernel rejected the underlying `SendSyncRequest`.
     #[error("failed to send IPC request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] nx_svc::ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseRespBytesError),
@@ -543,9 +543,12 @@ impl<'d> DomainDispatch<'d> {
     /// [`DomainObject<'d>`] instances bound to the originating
     /// [`Domain`]. Each server-emitted [`ObjectId`] becomes exactly one
     /// [`DomainObject`].
-    pub fn send(self) -> Result<DomainDispatchResult<'d>, DispatchError> {
+    pub fn send<'b>(
+        self,
+        buf: &'b mut IpcBuffer,
+    ) -> Result<DomainDispatchResult<'d, 'b>, DispatchError> {
         let domain = self.domain;
-        let resp = self.inner.send_response()?;
+        let resp = self.inner.send_response(buf)?;
 
         // `resp.objects.len()` is bounded by the server's response, which
         // honors the request's `out_object_count` (capped at
@@ -580,18 +583,18 @@ impl<'d> DomainDispatch<'d> {
 /// [`into_objects`](Self::into_objects) to consume them in order;
 /// objects left in the result at drop time are closed normally.
 #[derive(Debug)]
-pub struct DomainDispatchResult<'d> {
-    /// Response payload data.
-    pub data: &'d [u8],
-    /// Returned copy handles.
-    pub copy_handles: &'d [u32],
-    /// Returned move handles.
-    pub move_handles: &'d [u32],
+pub struct DomainDispatchResult<'d, 'b> {
+    /// Response payload data. Borrows from the IPC TLS buffer (`'b`).
+    pub data: &'b [u8],
+    /// Returned copy handles. Borrows from the IPC TLS buffer (`'b`).
+    pub copy_handles: &'b [u32],
+    /// Returned move handles. Borrows from the IPC TLS buffer (`'b`).
+    pub move_handles: &'b [u32],
     objects: [Option<DomainObject<'d>>; MAX_OUT_OBJECTS],
     object_count: usize,
 }
 
-impl<'d> DomainDispatchResult<'d> {
+impl<'d, 'b> DomainDispatchResult<'d, 'b> {
     /// Number of [`DomainObject`]s the server emitted in this response.
     #[inline]
     pub fn object_count(&self) -> usize {

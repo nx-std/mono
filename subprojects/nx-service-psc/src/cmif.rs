@@ -12,10 +12,11 @@ use crate::{
 
 /// Gets a PM module sub-object from the root domain service.
 pub(crate) fn get_pm_module<'d>(domain: &'d Domain) -> Result<DomainObject<'d>, GetPmModuleError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::GET_PM_MODULE)
         .out_objects(1)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetPmModuleError::Dispatch)?;
 
     result.take_object(0).ok_or(GetPmModuleError::MissingObject)
@@ -43,12 +44,13 @@ pub(crate) fn module_initialize(
             core::mem::size_of_val(dependencies),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::MODULE_INITIALIZE)
         .in_raw(in_bytes)
         .in_buffer(dep_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(ModuleInitializeError::Dispatch)?;
 
     if result.copy_handles.is_empty() {
@@ -61,10 +63,11 @@ pub(crate) fn module_initialize(
 pub(crate) fn module_get_request(
     object: &DomainObject<'_>,
 ) -> Result<GetRequestOut, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::MODULE_GET_REQUEST)
         .out_size(size_of::<GetRequestOut>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     // SAFETY: response payload is at least size_of::<GetRequestOut>() bytes.
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetRequestOut>()) })

@@ -48,12 +48,13 @@ pub(crate) fn query_applet_event_v1_legacy(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_APPLET_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -92,12 +93,13 @@ pub(crate) fn query_applet_event_v1(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_APPLET_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -136,12 +138,13 @@ pub(crate) fn query_applet_event(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_APPLET_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -291,12 +294,13 @@ pub(crate) fn query_last_play_time_legacy(
             count * size_of::<u64>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_LAST_PLAY_TIME_LEGACY)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(in_buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -340,13 +344,14 @@ pub(crate) fn query_last_play_time(
             count * size_of::<u64>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_LAST_PLAY_TIME)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(in_buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -378,12 +383,13 @@ pub(crate) fn query_play_event(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_PLAY_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -431,12 +437,13 @@ pub(crate) fn query_account_event_v3(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -464,12 +471,13 @@ pub(crate) fn query_account_event_v10(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -497,12 +505,13 @@ pub(crate) fn query_account_event(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -543,12 +552,13 @@ pub(crate) fn query_account_play_event(
             core::mem::size_of_val(events),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_PLAY_EVENT)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -603,12 +613,13 @@ pub(crate) fn query_recently_played_application_legacy(
             core::mem::size_of_val(application_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -646,12 +657,13 @@ pub(crate) fn query_recently_played_application(
             core::mem::size_of_val(application_ids),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
         .in_raw(in_bytes)
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(i32::from_le_bytes([
         result.data[0],
         result.data[1],
@@ -670,9 +682,10 @@ pub(crate) fn query_recently_played_application(
 pub(crate) fn get_recently_played_application_update_event(
     service: &Session,
 ) -> Result<u32, GetUpdateEventError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_RECENTLY_PLAYED_APPLICATION_UPDATE_EVENT)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(GetUpdateEventError::Dispatch)?;
 
     if result.copy_handles.is_empty() {

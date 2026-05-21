@@ -36,10 +36,11 @@ pub(crate) fn terminate_program(service: &Session, tid: u64) -> Result<(), Dispa
 
 /// GetShellEvent (cmd 4) — returns copy handle.
 pub(crate) fn get_shell_event(service: &Session) -> Result<u32, AcquireEventError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSDEV_GET_SHELL_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
 
     let Some(handle) = result.copy_handles.first().copied() else {
@@ -66,11 +67,12 @@ pub(crate) fn prepare_launch_program_from_host(
     service: &Session,
     path: &[u8],
 ) -> Result<LaunchProperties, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSDEV_PREPARE_LAUNCH_PROGRAM_FROM_HOST)
         .out_size(size_of::<LaunchProperties>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<LaunchProperties>()) })
 }
@@ -92,12 +94,13 @@ pub(crate) fn launch_application_from_host(
 ) -> Result<u64, DispatchError> {
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSDEV_LAUNCH_APPLICATION_FROM_HOST)
         .in_raw(in_bytes)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }

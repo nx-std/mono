@@ -9,7 +9,8 @@ use crate::types::LR_MAX_PATH;
 /// CMIF request with no input payload and no output payload.
 #[inline]
 pub(crate) fn dispatch_no_io(service: &Session, cmd_id: u32) -> Result<(), DispatchError> {
-    service.dispatch(cmd_id).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    service.dispatch(cmd_id).send(&mut ipc_buf).map(|_| ())
 }
 
 /// Resolves a path: sends a `u64` title ID and receives a fixed-size path
@@ -24,6 +25,7 @@ pub(crate) fn resolve_path(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const tid).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -31,7 +33,7 @@ pub(crate) fn resolve_path(
             out.as_mut_slice(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -47,11 +49,12 @@ pub(crate) fn redirect_path(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const tid).cast::<u8>(), size_of::<u64>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .in_buffer(path.as_slice(), BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -76,11 +79,12 @@ pub(crate) fn redirect_application_path(
             size_of::<RedirectApplicationIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .in_buffer(path.as_slice(), BufferAttr::HIPC_POINTER)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -94,5 +98,10 @@ pub(crate) fn dispatch_in_u64(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u64>()) };
-    service.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send(&mut ipc_buf)
+        .map(|_| ())
 }

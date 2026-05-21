@@ -17,10 +17,11 @@ pub(crate) fn open_location_resolver(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_LOCATION_RESOLVER)
         .in_raw(in_bytes)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenLocationResolverError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -35,9 +36,10 @@ pub(crate) fn open_location_resolver(
 pub(crate) fn open_registered_location_resolver(
     service: &Session,
 ) -> Result<u32, OpenRegisteredLocationResolverError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_REGISTERED_LOCATION_RESOLVER)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenRegisteredLocationResolverError::Dispatch)?;
 
     if result.move_handles.is_empty() {

@@ -12,10 +12,11 @@ use crate::{
 
 /// Opens a session sub-object on the root domain service.
 pub(crate) fn open_session<'d>(domain: &'d Domain) -> Result<DomainObject<'d>, OpenSessionError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let mut result = domain
         .dispatch(proto::OPEN_SESSION)
         .out_objects(1)
-        .send()
+        .send(&mut buf)
         .map_err(OpenSessionError::Dispatch)?;
 
     result.take_object(0).ok_or(OpenSessionError::MissingObject)
@@ -53,12 +54,13 @@ pub(crate) fn session_open(
             core::mem::size_of_val(name_utf16),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::SESSION_OPEN)
         .in_raw(in_bytes)
         .in_buffer(name_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut buf)
         .map(|_| ())
         .map_err(SessionOpenError)
 }
@@ -90,10 +92,11 @@ pub(crate) fn session_is_running(object: &DomainObject<'_>) -> Result<bool, Disp
 pub(crate) fn session_get_connection_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SESSION_GET_CONNECTION_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut buf)?;
 
     Ok(result.copy_handles[0])
 }
@@ -108,10 +111,11 @@ pub(crate) fn session_is_connected(object: &DomainObject<'_>) -> Result<bool, Di
 pub(crate) fn session_get_scan_error_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::SESSION_GET_SCAN_ERROR_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()?;
+        .send(&mut buf)?;
 
     Ok(result.copy_handles[0])
 }

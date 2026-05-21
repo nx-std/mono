@@ -25,9 +25,10 @@ pub(crate) fn get_background_network_update_state(service: &Session) -> Result<u
 pub(crate) fn open_system_update_control(
     service: &Session,
 ) -> Result<u32, OpenSystemUpdateControlError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_OPEN_SYSTEM_UPDATE_CONTROL)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(OpenSystemUpdateControlError::Dispatch)?;
 
     let Some(handle) = result.move_handles.first().copied() else {
@@ -79,10 +80,11 @@ pub(crate) fn notify_exfat_driver_downloaded_for_debug(
 pub(crate) fn get_system_update_notification_event(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_GET_SYSTEM_UPDATE_NOTIFICATION_EVENT_FOR_CONTENT_DELIVERY)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
 
     let Some(handle) = result.copy_handles.first().copied() else {
@@ -127,12 +129,13 @@ pub(crate) fn request_send_system_update(
             size_of::<RequestSendReceiveSystemUpdateIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_REQUEST_SEND_SYSTEM_UPDATE)
         .in_raw(in_bytes)
         .out_handle(0, OutHandleAttr::Copy)
         .in_buffer(system_delivery_info, BufferAttr::HIPC_MAP_ALIAS)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AsyncCommandError::Dispatch)?;
 
     super::app_manager::extract_async_out(&result)
@@ -218,11 +221,12 @@ pub(crate) fn ctrl_get_downloaded_eula_data_size(
     service: &Session,
     path: &[u8],
 ) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_DOWNLOADED_EULA_DATA_SIZE)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -233,12 +237,13 @@ pub(crate) fn ctrl_get_downloaded_eula_data(
     path: &[u8],
     out: &mut [u8],
 ) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_DOWNLOADED_EULA_DATA)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -252,11 +257,12 @@ pub(crate) fn ctrl_setup_card_update(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::NSSU_CTRL_SETUP_CARD_UPDATE)
         .in_raw(in_bytes)
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -265,11 +271,12 @@ pub(crate) fn ctrl_get_prepared_card_update_eula_data_size(
     service: &Session,
     path: &[u8],
 ) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_PREPARED_CARD_UPDATE_EULA_DATA_SIZE)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -280,12 +287,13 @@ pub(crate) fn ctrl_get_prepared_card_update_eula_data(
     path: &[u8],
     out: &mut [u8],
 ) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_PREPARED_CARD_UPDATE_EULA_DATA)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -299,11 +307,12 @@ pub(crate) fn ctrl_setup_card_update_via_system_updater(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     service
         .dispatch(proto::NSSU_CTRL_SETUP_CARD_UPDATE_VIA_SYSTEM_UPDATER)
         .in_raw(in_bytes)
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -325,11 +334,12 @@ pub(crate) fn ctrl_request_receive_system_update(
             size_of::<RequestSendReceiveSystemUpdateIn>(),
         )
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_REQUEST_RECEIVE_SYSTEM_UPDATE)
         .in_raw(in_bytes)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AsyncCommandError::Dispatch)?;
 
     super::app_manager::extract_async_out(&result)
@@ -354,11 +364,12 @@ pub(crate) fn ctrl_get_received_eula_data_size(
     service: &Session,
     path: &[u8],
 ) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_RECEIVED_EULA_DATA_SIZE)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -369,12 +380,13 @@ pub(crate) fn ctrl_get_received_eula_data(
     path: &[u8],
     out: &mut [u8],
 ) -> Result<u64, DispatchError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_RECEIVED_EULA_DATA)
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
@@ -404,10 +416,11 @@ fn dispatch_ctrl_async_no_in(
     service: &Session,
     cmd_id: u32,
 ) -> Result<AsyncOut, AsyncCommandError> {
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_handle(0, OutHandleAttr::Copy)
-        .send()
+        .send(&mut ipc_buf)
         .map_err(AsyncCommandError::Dispatch)?;
 
     super::app_manager::extract_async_out(&result)

@@ -168,6 +168,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -192,6 +193,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -203,6 +205,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
 ]
 
@@ -253,6 +256,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -265,6 +269,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -277,6 +282,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -289,6 +295,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -300,6 +307,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -352,6 +360,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -364,6 +373,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -376,6 +386,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -388,6 +399,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -399,6 +411,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -421,6 +434,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -434,6 +448,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -488,6 +503,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -562,6 +578,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -575,6 +592,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -586,6 +604,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -597,6 +616,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "thiserror",
 ]
 
@@ -621,6 +641,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -660,6 +681,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -672,6 +694,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -685,6 +708,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -697,6 +721,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -746,6 +771,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -771,6 +797,7 @@ dependencies = [
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -782,6 +809,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -795,6 +823,7 @@ dependencies = [
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -807,6 +836,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -820,6 +850,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -858,6 +889,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -870,6 +902,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -883,6 +916,7 @@ dependencies = [
  "nx-service-mii",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -895,6 +929,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -919,6 +954,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -931,6 +967,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -981,6 +1018,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -993,6 +1031,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1005,6 +1044,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1043,6 +1083,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1054,6 +1095,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "thiserror",
 ]
 
@@ -1078,6 +1120,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1138,6 +1181,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1163,6 +1207,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1226,6 +1271,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]
@@ -1239,6 +1285,7 @@ dependencies = [
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
+ "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
 ]

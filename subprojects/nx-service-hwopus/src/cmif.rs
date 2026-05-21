@@ -33,11 +33,12 @@ pub(crate) fn open_hardware_opus_decoder(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenDecoderIn>())
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER)
         .in_raw(in_bytes)
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut buf)
         .map_err(OpenDecoderError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -58,11 +59,12 @@ pub(crate) fn get_work_buffer_size(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u64>()) };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE)
         .in_raw(in_bytes)
         .out_size(size_of::<u32>())
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
@@ -92,12 +94,13 @@ pub(crate) fn open_hardware_opus_decoder_for_multi_stream(
             size_of::<HwopusMultistreamState>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER_FOR_MULTI_STREAM)
         .in_raw(in_bytes)
         .in_buffer(state_bytes, BufferAttr::HIPC_POINTER)
         .in_handle(tmem_handle)
-        .send()
+        .send(&mut buf)
         .map_err(OpenDecoderError::Dispatch)?;
 
     if result.move_handles.is_empty() {
@@ -119,11 +122,12 @@ pub(crate) fn get_work_buffer_size_for_multi_stream(
             size_of::<HwopusMultistreamState>(),
         )
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE_FOR_MULTI_STREAM)
         .out_size(size_of::<u32>())
         .in_buffer(state_bytes, BufferAttr::HIPC_POINTER)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<u32>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
@@ -147,12 +151,13 @@ pub(crate) fn decode_interleaved_legacy(
     let pcm_bytes = unsafe {
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<DecodeResult>())
         .in_buffer(opusin, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(pcm_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<DecodeResult>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<DecodeResult>()) })
@@ -172,6 +177,7 @@ pub(crate) fn decode_interleaved_with_perf(
     let pcm_bytes = unsafe {
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<DecodeResultWithPerf>())
@@ -180,7 +186,7 @@ pub(crate) fn decode_interleaved_with_perf(
             pcm_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<DecodeResultWithPerf>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<DecodeResultWithPerf>()) })
@@ -209,6 +215,7 @@ pub(crate) fn decode_interleaved_ex(
     let pcm_bytes = unsafe {
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -218,7 +225,7 @@ pub(crate) fn decode_interleaved_ex(
             pcm_bytes,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()?;
+        .send(&mut buf)?;
 
     // SAFETY: response payload is at least size_of::<DecodeResultWithPerf>().
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<DecodeResultWithPerf>()) })

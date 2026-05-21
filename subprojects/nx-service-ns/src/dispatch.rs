@@ -6,12 +6,17 @@ use nx_sf::service::{DispatchError, Session};
 
 #[inline]
 pub(crate) fn dispatch_no_io(service: &Session, cmd_id: u32) -> Result<(), DispatchError> {
-    service.dispatch(cmd_id).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    service.dispatch(cmd_id).send(&mut ipc_buf).map(|_| ())
 }
 
 #[inline]
 pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O, DispatchError> {
-    let result = service.dispatch(cmd_id).out_size(size_of::<O>()).send()?;
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let result = service
+        .dispatch(cmd_id)
+        .out_size(size_of::<O>())
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }
@@ -24,7 +29,12 @@ pub(crate) fn dispatch_in<I: Copy>(
 ) -> Result<(), DispatchError> {
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
-    service.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    service
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send(&mut ipc_buf)
+        .map(|_| ())
 }
 
 #[inline]
@@ -35,11 +45,12 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
 ) -> Result<O, DispatchError> {
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_size(size_of::<O>())
-        .send()?;
+        .send(&mut ipc_buf)?;
 
     Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
 }

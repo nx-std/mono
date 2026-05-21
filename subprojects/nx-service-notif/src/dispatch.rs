@@ -15,5 +15,10 @@ pub(crate) fn dispatch_in<I: Copy>(
     // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((input as *const I).cast::<u8>(), size_of::<I>()) };
-    domain.dispatch(cmd_id).in_raw(in_bytes).send().map(|_| ())
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    domain
+        .dispatch(cmd_id)
+        .in_raw(in_bytes)
+        .send(&mut buf)
+        .map(|_| ())
 }

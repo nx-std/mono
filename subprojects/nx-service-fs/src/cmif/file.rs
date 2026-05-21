@@ -26,6 +26,7 @@ pub(crate) fn read(
         offset,
         read_size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let result = object
         .dispatch(proto::FILE_READ)
         .context(ctx)
@@ -35,7 +36,7 @@ pub(crate) fn read(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()?;
+        .send(&mut ipc_buf)?;
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
 }
 
@@ -53,6 +54,7 @@ pub(crate) fn write(
         offset,
         write_size,
     };
+    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     object
         .dispatch(proto::FILE_WRITE)
         .context(ctx)
@@ -61,7 +63,7 @@ pub(crate) fn write(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
-        .send()
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
