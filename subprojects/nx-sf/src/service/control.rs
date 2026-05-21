@@ -9,12 +9,11 @@
 //! releasing its resources. Drop impls and the FFI close symbols both invoke
 //! these.
 
+use core::{mem::size_of, ptr};
+
 use nx_svc::ipc::{self, Handle as SessionHandle};
 
-use crate::{
-    cmif::{self, CmifClosePayload, CmifControlPayload, ObjectId},
-    hipc,
-};
+use crate::cmif::{self, CmifCloseRequest, CmifControlRequestBuilder, ObjectId};
 
 /// Control request: convert session to domain.
 const CTRL_CONVERT_TO_DOMAIN: u32 = 0;
@@ -34,11 +33,8 @@ pub fn query_pointer_buffer_size(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _: &mut () = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
-            .payload(
-                &mut buf,
-                CmifControlPayload::<()>::new(CTRL_QUERY_POINTER_BUFFER_SIZE),
-            )
+        let req = CmifControlRequestBuilder::new(CTRL_QUERY_POINTER_BUFFER_SIZE).build();
+        req.write_to(&mut buf)
             .map_err(QueryPointerBufferSizeError::Layout)?;
     }
 
@@ -71,9 +67,8 @@ pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, Clo
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _: &mut () = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
-            .payload(&mut buf, CmifControlPayload::<()>::new(CTRL_CLONE_OBJECT))
-            .map_err(CloneObjectError::Layout)?;
+        let req = CmifControlRequestBuilder::new(CTRL_CLONE_OBJECT).build();
+        req.write_to(&mut buf).map_err(CloneObjectError::Layout)?;
     }
 
     ipc::send_sync_request(session).map_err(CloneObjectError::SendRequest)?;
@@ -116,13 +111,13 @@ pub fn clone_current_object_ex(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let payload = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
-            .payload(
-                &mut buf,
-                CmifControlPayload::<u32>::new(CTRL_CLONE_OBJECT_EX),
-            )
-            .map_err(CloneObjectExError::Layout)?;
-        *payload = tag;
+        let mut payload = [0u8; size_of::<u32>()];
+        // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), tag) };
+        let req = CmifControlRequestBuilder::new(CTRL_CLONE_OBJECT_EX)
+            .data(&payload)
+            .build();
+        req.write_to(&mut buf).map_err(CloneObjectExError::Layout)?;
     }
 
     ipc::send_sync_request(session).map_err(CloneObjectExError::SendRequest)?;
@@ -164,11 +159,8 @@ pub fn convert_current_object_to_domain(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _: &mut () = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
-            .payload(
-                &mut buf,
-                CmifControlPayload::<()>::new(CTRL_CONVERT_TO_DOMAIN),
-            )
+        let req = CmifControlRequestBuilder::new(CTRL_CONVERT_TO_DOMAIN).build();
+        req.write_to(&mut buf)
             .map_err(ConvertToDomainError::Layout)?;
     }
 
@@ -204,13 +196,14 @@ pub fn copy_from_current_domain(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let payload = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
-            .payload(
-                &mut buf,
-                CmifControlPayload::<u32>::new(CTRL_COPY_FROM_DOMAIN),
-            )
+        let mut payload = [0u8; size_of::<u32>()];
+        // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), object_id.to_raw()) };
+        let req = CmifControlRequestBuilder::new(CTRL_COPY_FROM_DOMAIN)
+            .data(&payload)
+            .build();
+        req.write_to(&mut buf)
             .map_err(CopyFromDomainError::Layout)?;
-        *payload = object_id.to_raw();
     }
 
     ipc::send_sync_request(session).map_err(CopyFromDomainError::SendRequest)?;
@@ -253,8 +246,7 @@ pub(crate) fn close_session(handle: SessionHandle) {
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _ = hipc::HipcRequestBuilder::new(cmif::CommandType::Close)
-            .payload(&mut buf, CmifClosePayload::session());
+        let _ = CmifCloseRequest::session().write_to(&mut buf);
     }
 
     let _ = ipc::send_sync_request(handle);
@@ -270,8 +262,7 @@ pub(crate) fn close_object(session: SessionHandle, object_id: ObjectId) {
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _ = hipc::HipcRequestBuilder::new(cmif::CommandType::Request)
-            .payload(&mut buf, CmifClosePayload::domain_object(object_id));
+        let _ = CmifCloseRequest::domain_object(object_id).write_to(&mut buf);
     }
 
     let _ = ipc::send_sync_request(session);

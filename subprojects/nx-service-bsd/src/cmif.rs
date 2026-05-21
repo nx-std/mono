@@ -68,13 +68,13 @@ pub(crate) fn register_client(
             .add_copy_handle(tmem_handle.to_raw())
             .send(&mut buf)
             .map_err(RegisterClientError::BuildRequest)?;
-        // SAFETY: `req.data` is exactly `size_of::<RegisterClientIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<RegisterClientIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<RegisterClientIn>(), payload);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<RegisterClientIn>(), payload);
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(RegisterClientError::SendRequest)?;
+    .map_err(RegisterClientError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -103,8 +103,8 @@ pub(crate) fn start_monitoring(
             .send_pid()
             .send(&mut buf)
             .map_err(StartMonitoringError::BuildRequest)?;
-        // SAFETY: req.data has 8 bytes reserved for the pid payload.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid) };
+        // SAFETY: req has 8 bytes reserved for the pid payload.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), pid) };
     }
 
     ipc::send_sync_request(monitor_session).map_err(StartMonitoringError::SendRequest)?;
@@ -204,11 +204,11 @@ pub(crate) fn socket(
             .data_size(size_of::<SocketIn>())
             .send(&mut buf)
             .map_err(SocketError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SocketIn.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SocketIn>(), payload) };
+        // SAFETY: req has data_size bytes reserved for SocketIn.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SocketIn>(), payload) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(SocketError::SendRequest)?;
+    .map_err(SocketError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SocketError::ParseResponse(err),
@@ -227,11 +227,11 @@ pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseEr
             .data_size(size_of::<i32>())
             .send(&mut buf)
             .map_err(CloseError::BuildRequest)?;
-        // SAFETY: req.data has 4 bytes reserved for the fd.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+        // SAFETY: req has 4 bytes reserved for the fd.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), fd.raw()) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(CloseError::SendRequest)?;
+    .map_err(CloseError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => CloseError::ParseResponse(err),
@@ -304,11 +304,11 @@ fn bsd_send_recv_no_buffer_in<E>(
             .add_in_auto_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
             .send(&mut buf)
             .map_err(mk_build)?;
-        // SAFETY: req.data has 4 bytes reserved for sockfd.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
+        // SAFETY: req has 4 bytes reserved for sockfd.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(mk_send)?;
+    .map_err(mk_send)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => mk_parse(err),
@@ -339,11 +339,11 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
             .add_out_auto_buffer(addr_buf.as_mut_ptr(), addr_buf.len(), BufferMode::Normal)
             .send(&mut buf)
             .map_err(mk_build)?;
-        // SAFETY: req.data has 4 bytes reserved for sockfd.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
+        // SAFETY: req has 4 bytes reserved for sockfd.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(mk_send)?;
+    .map_err(mk_send)?;
     // SAFETY: the kernel populated the TLS IPC buffer; out_data carries one u32 with the addrlen.
     let outcome = unsafe { read_service_response(true) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => mk_parse(err),
@@ -430,19 +430,19 @@ pub(crate) fn listen(
             .data_size(size_of::<ListenIn>())
             .send(&mut buf)
             .map_err(ListenError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for ListenIn.
+        // SAFETY: req has data_size bytes reserved for ListenIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<ListenIn>(),
+                req.as_mut_ptr().cast::<ListenIn>(),
                 ListenIn {
                     sockfd: sockfd.raw(),
                     backlog,
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(ListenError::SendRequest)?;
+    .map_err(ListenError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => ListenError::ParseResponse(err),
@@ -465,19 +465,19 @@ pub(crate) fn shutdown(
             .data_size(size_of::<ShutdownIn>())
             .send(&mut buf)
             .map_err(ShutdownError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for ShutdownIn.
+        // SAFETY: req has data_size bytes reserved for ShutdownIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<ShutdownIn>(),
+                req.as_mut_ptr().cast::<ShutdownIn>(),
                 ShutdownIn {
                     sockfd: sockfd.raw(),
                     how,
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(ShutdownError::SendRequest)?;
+    .map_err(ShutdownError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => ShutdownError::ParseResponse(err),
@@ -506,19 +506,19 @@ pub(crate) fn recv(
             .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(RecvError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        // SAFETY: req has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                req.as_mut_ptr().cast::<SockfdFlagsIn>(),
                 SockfdFlagsIn {
                     sockfd: sockfd.raw(),
                     flags,
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(RecvError::SendRequest)?;
+    .map_err(RecvError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => RecvError::ParseResponse(err),
@@ -545,19 +545,19 @@ pub(crate) fn recv_from(
             .add_out_auto_buffer(src_addr.as_mut_ptr(), src_addr.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(RecvFromError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        // SAFETY: req has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                req.as_mut_ptr().cast::<SockfdFlagsIn>(),
                 SockfdFlagsIn {
                     sockfd: sockfd.raw(),
                     flags,
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(RecvFromError::SendRequest)?;
+    .map_err(RecvFromError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; trailing payload is one u32 addrlen.
     let outcome = unsafe { read_service_response(true) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => RecvFromError::ParseResponse(err),
@@ -583,19 +583,19 @@ pub(crate) fn send(
             .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(SendError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        // SAFETY: req has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                req.as_mut_ptr().cast::<SockfdFlagsIn>(),
                 SockfdFlagsIn {
                     sockfd: sockfd.raw(),
                     flags,
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(SendError::SendRequest)?;
+    .map_err(SendError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SendError::ParseResponse(err),
@@ -622,19 +622,19 @@ pub(crate) fn send_to(
             .add_in_auto_buffer(dest_addr.as_ptr(), dest_addr.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(SendToError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
+        // SAFETY: req has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<SockfdFlagsIn>(),
+                req.as_mut_ptr().cast::<SockfdFlagsIn>(),
                 SockfdFlagsIn {
                     sockfd: sockfd.raw(),
                     flags,
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(SendToError::SendRequest)?;
+    .map_err(SendToError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SendToError::ParseResponse(err),
@@ -658,11 +658,11 @@ pub(crate) fn read(
             .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(ReadError::BuildRequest)?;
-        // SAFETY: req.data has 4 bytes reserved for the fd.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+        // SAFETY: req has 4 bytes reserved for the fd.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), fd.raw()) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(ReadError::SendRequest)?;
+    .map_err(ReadError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => ReadError::ParseResponse(err),
@@ -686,11 +686,11 @@ pub(crate) fn write(
             .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(WriteError::BuildRequest)?;
-        // SAFETY: req.data has 4 bytes reserved for the fd.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
+        // SAFETY: req has 4 bytes reserved for the fd.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), fd.raw()) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(WriteError::SendRequest)?;
+    .map_err(WriteError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => WriteError::ParseResponse(err),
@@ -720,10 +720,10 @@ pub(crate) fn get_sock_opt(
             .add_out_auto_buffer(optval.as_mut_ptr(), optval.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(GetSockOptError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SockOptIn.
+        // SAFETY: req has data_size bytes reserved for SockOptIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<SockOptIn>(),
+                req.as_mut_ptr().cast::<SockOptIn>(),
                 SockOptIn {
                     sockfd: sockfd.raw(),
                     level,
@@ -731,9 +731,9 @@ pub(crate) fn get_sock_opt(
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSockOptError::SendRequest)?;
+    .map_err(GetSockOptError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; one u32 socklen_t trails the prefix.
     let outcome = unsafe { read_service_response(true) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => GetSockOptError::ParseResponse(err),
@@ -760,10 +760,10 @@ pub(crate) fn set_sock_opt(
             .add_in_auto_buffer(optval.as_ptr(), optval.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(SetSockOptError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SockOptIn.
+        // SAFETY: req has data_size bytes reserved for SockOptIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<SockOptIn>(),
+                req.as_mut_ptr().cast::<SockOptIn>(),
                 SockOptIn {
                     sockfd: sockfd.raw(),
                     level,
@@ -771,9 +771,9 @@ pub(crate) fn set_sock_opt(
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(SetSockOptError::SendRequest)?;
+    .map_err(SetSockOptError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let _ = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SetSockOptError::ParseResponse(err),
@@ -803,10 +803,10 @@ pub(crate) fn fcntl(
             .data_size(size_of::<FcntlIn>())
             .send(&mut ipc_buf)
             .map_err(FcntlError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for FcntlIn.
+        // SAFETY: req has data_size bytes reserved for FcntlIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<FcntlIn>(),
+                req.as_mut_ptr().cast::<FcntlIn>(),
                 FcntlIn {
                     fd: fd.raw(),
                     cmd,
@@ -814,9 +814,9 @@ pub(crate) fn fcntl(
                 },
             );
         }
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(FcntlError::SendRequest)?;
+    .map_err(FcntlError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => FcntlError::ParseResponse(err),
@@ -870,10 +870,10 @@ pub(crate) fn ioctl(
         let req = builder
             .send(&mut ipc_buf)
             .map_err(IoctlError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for IoctlIn.
+        // SAFETY: req has data_size bytes reserved for IoctlIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<IoctlIn>(),
+                req.as_mut_ptr().cast::<IoctlIn>(),
                 IoctlIn {
                     fd: fd.raw(),
                     request,
@@ -881,9 +881,8 @@ pub(crate) fn ioctl(
                 },
             );
         }
+        ipc::send_sync_request(session).map_err(IoctlError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(IoctlError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => IoctlError::ParseResponse(err),
@@ -958,11 +957,11 @@ pub(crate) fn select(
             .add_out_auto_buffer(exceptfds.as_mut_ptr(), exceptfds.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(SelectError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for SelectIn.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SelectIn>(), payload) };
+        // SAFETY: req has data_size bytes reserved for SelectIn.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SelectIn>(), payload) };
+        ipc::send_sync_request(session)
     }
-
-    ipc::send_sync_request(session).map_err(SelectError::SendRequest)?;
+    .map_err(SelectError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => SelectError::ParseResponse(err),
@@ -989,10 +988,10 @@ pub(crate) fn poll(
             .add_out_auto_buffer(fds.as_mut_ptr(), fds.len(), BufferMode::Normal)
             .send(&mut ipc_buf)
             .map_err(PollError::BuildRequest)?;
-        // SAFETY: req.data has data_size bytes reserved for PollIn.
+        // SAFETY: req has data_size bytes reserved for PollIn.
         unsafe {
             ptr::write_unaligned(
-                req.data.as_mut_ptr().cast::<PollIn>(),
+                req.as_mut_ptr().cast::<PollIn>(),
                 PollIn {
                     nfds,
                     timeout,
@@ -1000,9 +999,8 @@ pub(crate) fn poll(
                 },
             );
         }
+        ipc::send_sync_request(session).map_err(PollError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(PollError::SendRequest)?;
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(false) }.map_err(|err| match err {
         ServiceResponseFailure::Parse(err) => PollError::ParseResponse(err),

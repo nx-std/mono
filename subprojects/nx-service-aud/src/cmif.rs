@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 use static_assertions::const_assert_eq;
 
 use crate::proto;
@@ -167,11 +169,11 @@ fn dispatch_pid_delay(
             .send(&mut buf)
             .map_err(SuspendResumeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<PidDelayIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<PidDelayIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<PidDelayIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<PidDelayIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SuspendResumeError::SendRequest)?;
+    .map_err(SuspendResumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -191,11 +193,11 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
             .send(&mut buf)
             .map_err(GetVolumeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), pid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetVolumeError::SendRequest)?;
+    .map_err(GetVolumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -232,11 +234,11 @@ fn dispatch_set_volume(
             .send(&mut buf)
             .map_err(SetVolumeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<SetVolumeIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SetVolumeIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<SetVolumeIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SetVolumeIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetVolumeError::SendRequest)?;
+    .map_err(SetVolumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

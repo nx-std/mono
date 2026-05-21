@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, service::Session};
-use nx_svc::ipc::{self, Handle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle},
+    service::Session,
+};
 
 use crate::{
     proto,
@@ -26,13 +29,13 @@ fn dispatch_in<T: Copy>(session: Handle, cmd_id: u32, value: &T) -> Result<(), D
             .send(&mut buf)
             .map_err(DispatchInError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<T>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<T>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<T>(), *value);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<T>(), *value);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchInError::SendRequest)?;
+    .map_err(DispatchInError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -63,9 +66,9 @@ fn dispatch_out<T: Copy>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutE
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchOutError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchOutError::SendRequest)?;
+    .map_err(DispatchOutError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -105,9 +108,9 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
         cmif::CmifRequestBuilder::new(proto::RCV_OPEN_RECEIVER)
             .send(&mut buf)
             .map_err(OpenReceiverError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(OpenReceiverError::SendRequest)?;
+    .map_err(OpenReceiverError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -169,9 +172,9 @@ pub fn receiver_get_receive_event_handle(
         cmif::CmifRequestBuilder::new(proto::RECEIVER_GET_RECEIVE_EVENT_HANDLE)
             .send(&mut buf)
             .map_err(GetReceiveEventHandleError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetReceiveEventHandleError::SendRequest)?;
+    .map_err(GetReceiveEventHandleError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -243,13 +246,13 @@ pub fn snd_open_sender(
             .send(&mut buf)
             .map_err(OpenSenderError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<OpenSenderIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<OpenSenderIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<OpenSenderIn>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<OpenSenderIn>(), input);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(OpenSenderError::SendRequest)?;
+    .map_err(OpenSenderError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

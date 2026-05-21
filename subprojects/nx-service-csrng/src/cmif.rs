@@ -1,7 +1,10 @@
 //! CMIF protocol operations for the csrng service.
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -16,9 +19,9 @@ pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), Ge
             .add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal)
             .send(&mut buf)
             .map_err(GetRandomBytesError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetRandomBytesError::SendRequest)?;
+    .map_err(GetRandomBytesError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

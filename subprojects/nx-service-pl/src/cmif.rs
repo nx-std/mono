@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{proto, types::GetSharedFontOut};
 
@@ -18,11 +21,11 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
             .send(&mut buf)
             .map_err(RequestLoadError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), font_type) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), font_type) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(RequestLoadError::SendRequest)?;
+    .map_err(RequestLoadError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -45,11 +48,11 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
             .send(&mut buf)
             .map_err(GetLoadStateError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), font_type) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), font_type) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetLoadStateError::SendRequest)?;
+    .map_err(GetLoadStateError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -74,11 +77,11 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
             .send(&mut buf)
             .map_err(GetSizeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), font_type) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), font_type) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSizeError::SendRequest)?;
+    .map_err(GetSizeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -106,11 +109,11 @@ pub fn get_shared_memory_address_offset(
             .send(&mut buf)
             .map_err(GetSharedMemoryAddressOffsetError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), font_type) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), font_type) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSharedMemoryAddressOffsetError::SendRequest)?;
+    .map_err(GetSharedMemoryAddressOffsetError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -135,9 +138,9 @@ pub fn get_shared_memory_native_handle(
         cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_NATIVE_HANDLE)
             .send(&mut buf)
             .map_err(GetSharedMemoryNativeHandleError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSharedMemoryNativeHandleError::SendRequest)?;
+    .map_err(GetSharedMemoryNativeHandleError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -193,11 +196,11 @@ pub fn get_shared_font(
             .send(&mut buf)
             .map_err(GetSharedFontError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), language_code) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), language_code) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSharedFontError::SendRequest)?;
+    .map_err(GetSharedFontError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{
     proto,
@@ -34,11 +37,11 @@ pub fn set_shim_library_version(
             applet_resource_user_id,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<SetShimVersionIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SetShimVersionIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<SetShimVersionIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SetShimVersionIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetShimVersionError::SendRequest)?;
+    .map_err(SetShimVersionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -74,11 +77,11 @@ pub fn save_screen_shot_ex0(
             applet_resource_user_id,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<SaveScreenShotIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<SaveScreenShotIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SaveScreenShotEx0Error::SendRequest)?;
+    .map_err(SaveScreenShotEx0Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -124,11 +127,11 @@ pub fn save_screen_shot_ex1(
             applet_resource_user_id,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<SaveScreenShotIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<SaveScreenShotIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SaveScreenShotEx1Error::SendRequest)?;
+    .map_err(SaveScreenShotEx1Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -173,11 +176,11 @@ pub fn save_screen_shot_ex2(
             applet_resource_user_id,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<SaveScreenShotIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<SaveScreenShotIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SaveScreenShotIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SaveScreenShotEx2Error::SendRequest)?;
+    .map_err(SaveScreenShotEx2Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

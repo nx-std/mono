@@ -2,8 +2,10 @@
 
 use core::ptr;
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -20,13 +22,12 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
             .send(&mut buf)
             .map_err(ShutdownError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly 1 byte.
+        // SAFETY: `req` is exactly 1 byte.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), in_data);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), in_data);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(ShutdownError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(ShutdownError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -45,9 +46,9 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
         cmif::CmifRequestBuilder::new(proto::PUT_ERROR_STATE)
             .send(&mut buf)
             .map_err(PutErrorStateError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(PutErrorStateError::SendRequest)?;
+    .map_err(PutErrorStateError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

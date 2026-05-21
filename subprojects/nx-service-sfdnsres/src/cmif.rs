@@ -7,8 +7,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto::{
     CMD_CANCEL, CMD_GET_ADDR_INFO, CMD_GET_CANCEL_HANDLE, CMD_GET_GAI_STRING_ERROR,
@@ -69,13 +72,13 @@ pub fn get_host_by_name(
             .send(&mut buf)
             .map_err(GetHostByNameError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<GetHostByNameIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<GetHostByNameIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<GetHostByNameIn>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<GetHostByNameIn>(), input);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetHostByNameError::SendRequest)?;
+    .map_err(GetHostByNameError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -149,13 +152,13 @@ pub fn get_host_by_addr(
             .send(&mut buf)
             .map_err(GetHostByAddrError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<GetHostByAddrIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<GetHostByAddrIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<GetHostByAddrIn>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<GetHostByAddrIn>(), input);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetHostByAddrError::SendRequest)?;
+    .map_err(GetHostByAddrError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -293,13 +296,13 @@ pub fn get_addr_info(
             .send(&mut buf)
             .map_err(GetAddrInfoError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<GetAddrInfoIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<GetAddrInfoIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<GetAddrInfoIn>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<GetAddrInfoIn>(), input);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetAddrInfoError::SendRequest)?;
+    .map_err(GetAddrInfoError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -368,13 +371,13 @@ pub fn get_name_info(
             .send(&mut buf)
             .map_err(GetNameInfoError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<GetNameInfoIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<GetNameInfoIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<GetNameInfoIn>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<GetNameInfoIn>(), input);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetNameInfoError::SendRequest)?;
+    .map_err(GetNameInfoError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -419,13 +422,13 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
             .send(&mut buf)
             .map_err(GetCancelHandleError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), 0u64);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), 0u64);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetCancelHandleError::SendRequest)?;
+    .map_err(GetCancelHandleError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -471,13 +474,12 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
             .send(&mut buf)
             .map_err(CancelError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<CancelIn>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<CancelIn>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<CancelIn>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<CancelIn>(), input);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(CancelError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(CancelError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -539,13 +541,12 @@ fn string_error_impl(
             .send(&mut buf)
             .map_err(StringErrorError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), err);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), err);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(StringErrorError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(StringErrorError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

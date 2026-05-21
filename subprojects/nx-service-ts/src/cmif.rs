@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -23,13 +25,13 @@ pub fn get_temperature_range(
             .send(&mut buf)
             .map_err(GetTemperatureRangeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), location);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), location);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetTemperatureRangeError::SendRequest)?;
+    .map_err(GetTemperatureRangeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -54,13 +56,12 @@ pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetT
             .send(&mut buf)
             .map_err(GetTemperatureError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), location);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), location);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(GetTemperatureError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -88,13 +89,13 @@ pub fn get_temperature_milli_c(
             .send(&mut buf)
             .map_err(GetTemperatureMilliCError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), location);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), location);
         }
+        ipc::send_sync_request(&mut buf, session)
+            .map_err(GetTemperatureMilliCError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(GetTemperatureMilliCError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -124,13 +125,12 @@ pub fn open_session(
             .send(&mut buf)
             .map_err(OpenSessionError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), device_code);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), device_code);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -154,9 +154,9 @@ pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGet
         cmif::CmifRequestBuilder::new(proto::SESSION_GET_TEMPERATURE)
             .send(&mut buf)
             .map_err(SessionGetTemperatureError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SessionGetTemperatureError::SendRequest)?;
+    .map_err(SessionGetTemperatureError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

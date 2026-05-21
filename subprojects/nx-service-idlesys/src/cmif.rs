@@ -1,7 +1,9 @@
 //! CMIF protocol operations for the idle:sys service.
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -15,9 +17,9 @@ pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsA
         cmif::CmifRequestBuilder::new(proto::REPORT_USER_IS_ACTIVE)
             .send(&mut buf)
             .map_err(ReportUserIsActiveError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ReportUserIsActiveError::SendRequest)?;
+    .map_err(ReportUserIsActiveError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

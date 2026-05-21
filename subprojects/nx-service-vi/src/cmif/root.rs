@@ -5,8 +5,11 @@
 
 use core::ptr;
 
-use nx_sf::{cmif, service::Session};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+    service::Session,
+};
 
 use crate::proto::root_cmds;
 
@@ -39,13 +42,13 @@ pub fn get_display_service(
             .map_err(GetDisplayServiceError::BuildRequest)?;
 
         // Write inval
-        // SAFETY: `req.data` is exactly 4 bytes; writing inval as u32 is sound.
+        // SAFETY: `req` is exactly 4 bytes; writing inval as u32 is sound.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), inval);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), inval);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetDisplayServiceError::SendRequest)?;
+    .map_err(GetDisplayServiceError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -77,9 +80,9 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
         cmif::CmifRequestBuilder::new(root_cmds::PREPARE_FATAL)
             .send(&mut buf)
             .map_err(PrepareFatalError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(PrepareFatalError::SendRequest)?;
+    .map_err(PrepareFatalError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -100,9 +103,9 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
         cmif::CmifRequestBuilder::new(root_cmds::SHOW_FATAL)
             .send(&mut buf)
             .map_err(ShowFatalError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ShowFatalError::SendRequest)?;
+    .map_err(ShowFatalError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -152,11 +155,11 @@ pub fn draw_fatal_rectangle(
             .send(&mut buf)
             .map_err(DrawFatalRectangleError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DrawFatalRectangleError::SendRequest)?;
+    .map_err(DrawFatalRectangleError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -231,11 +234,11 @@ pub fn draw_fatal_text32(
             .send(&mut buf)
             .map_err(DrawFatalText32Error::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DrawFatalText32Error::SendRequest)?;
+    .map_err(DrawFatalText32Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

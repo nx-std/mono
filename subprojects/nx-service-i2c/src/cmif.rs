@@ -4,9 +4,9 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
+    ipc::{self, Handle},
     service::{BufferAttr, Session},
 };
-use nx_svc::ipc::{self, Handle};
 
 use crate::{proto, types::I2cTransactionOption};
 
@@ -23,13 +23,12 @@ pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSession
             .send(&mut buf)
             .map_err(OpenSessionError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), device);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), device);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

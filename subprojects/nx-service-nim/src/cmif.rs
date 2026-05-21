@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{proto, types::SystemUpdateTaskId};
 
@@ -21,13 +24,13 @@ pub fn destroy_system_update_task(
             .send(&mut buf)
             .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<SystemUpdateTaskId>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<SystemUpdateTaskId>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<SystemUpdateTaskId>(), *task_id);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<SystemUpdateTaskId>(), *task_id);
         }
+        ipc::send_sync_request(&mut buf, session)
+            .map_err(DestroySystemUpdateTaskError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(DestroySystemUpdateTaskError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -61,9 +64,9 @@ pub fn list_system_update_task(
             .add_out_buffer(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
             .send(&mut buf)
             .map_err(ListSystemUpdateTaskError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ListSystemUpdateTaskError::SendRequest)?;
+    .map_err(ListSystemUpdateTaskError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

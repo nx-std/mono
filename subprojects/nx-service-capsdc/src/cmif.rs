@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{
     proto,
@@ -40,11 +43,11 @@ pub fn decode_jpeg(
             opts: *opts,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<DecodeJpegIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<DecodeJpegIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<DecodeJpegIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<DecodeJpegIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DecodeJpegError::SendRequest)?;
+    .map_err(DecodeJpegError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -80,11 +83,11 @@ pub fn shrink_jpeg(
             opts: *opts,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<DecodeJpegIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<DecodeJpegIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<DecodeJpegIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<DecodeJpegIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ShrinkJpegError::SendRequest)?;
+    .map_err(ShrinkJpegError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -127,11 +130,11 @@ pub fn shrink_jpeg_ex(
             opts: *opts,
         };
 
-        // SAFETY: `req.data` is exactly `size_of::<ShrinkJpegExIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ShrinkJpegExIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<ShrinkJpegExIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<ShrinkJpegExIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ShrinkJpegExError::SendRequest)?;
+    .map_err(ShrinkJpegExError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

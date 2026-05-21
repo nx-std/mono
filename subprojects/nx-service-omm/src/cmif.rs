@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -23,9 +25,9 @@ pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationMode
         cmif::CmifRequestBuilder::new(proto::GET_OPERATION_MODE)
             .send(&mut buf)
             .map_err(GetOperationModeError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetOperationModeError::SendRequest)?;
+    .map_err(GetOperationModeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -71,11 +73,11 @@ pub fn set_operation_mode_policy(
             .send(&mut buf)
             .map_err(SetOperationModePolicyError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u8>(), policy) };
+        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), policy) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetOperationModePolicyError::SendRequest)?;
+    .map_err(SetOperationModePolicyError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -116,9 +118,9 @@ pub fn get_default_display_resolution(
         cmif::CmifRequestBuilder::new(proto::GET_DEFAULT_DISPLAY_RESOLUTION)
             .send(&mut buf)
             .map_err(GetDefaultDisplayResolutionError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetDefaultDisplayResolutionError::SendRequest)?;
+    .map_err(GetDefaultDisplayResolutionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

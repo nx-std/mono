@@ -1310,7 +1310,6 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
- "nx-svc",
  "nx-sys-thread-tls",
  "thiserror",
 ]

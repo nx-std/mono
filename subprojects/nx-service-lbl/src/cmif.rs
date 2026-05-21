@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -19,9 +21,9 @@ fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoI
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchNoIoError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchNoIoError::SendRequest)?;
+    .map_err(DispatchNoIoError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -56,11 +58,11 @@ fn dispatch_in_u64(
             .send(&mut buf)
             .map_err(DispatchInU64Error::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), value) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), value) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchInU64Error::SendRequest)?;
+    .map_err(DispatchInU64Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -95,11 +97,11 @@ fn dispatch_in_f32(
             .send(&mut buf)
             .map_err(DispatchInF32Error::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<f32>(), value) };
+        // SAFETY: `req` is exactly `size_of::<f32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<f32>(), value) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchInF32Error::SendRequest)?;
+    .map_err(DispatchInF32Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -128,9 +130,9 @@ fn dispatch_out_f32(session: SessionHandle, cmd_id: u32) -> Result<f32, Dispatch
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchOutF32Error::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchOutF32Error::SendRequest)?;
+    .map_err(DispatchOutF32Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -164,9 +166,9 @@ fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, Dispat
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchOutBoolError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchOutBoolError::SendRequest)?;
+    .map_err(DispatchOutBoolError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -200,9 +202,9 @@ fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispatch
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchOutU32Error::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchOutU32Error::SendRequest)?;
+    .map_err(DispatchOutU32Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -327,9 +329,9 @@ pub fn get_ambient_light_sensor_value(
         cmif::CmifRequestBuilder::new(proto::GET_AMBIENT_LIGHT_SENSOR_VALUE)
             .send(&mut buf)
             .map_err(GetAmbientLightSensorValueError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetAmbientLightSensorValueError::SendRequest)?;
+    .map_err(GetAmbientLightSensorValueError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

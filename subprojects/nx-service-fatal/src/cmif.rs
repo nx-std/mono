@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{
     proto,
@@ -32,11 +35,11 @@ pub fn throw_fatal_with_policy(
             .send(&mut buf)
             .map_err(ThrowFatalError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<ThrowFatalIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ThrowFatalIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<ThrowFatalIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<ThrowFatalIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ThrowFatalError::SendRequest)?;
+    .map_err(ThrowFatalError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -74,11 +77,11 @@ pub fn throw_fatal_with_context(
             .send(&mut buf)
             .map_err(ThrowFatalError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<ThrowFatalIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<ThrowFatalIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<ThrowFatalIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<ThrowFatalIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ThrowFatalError::SendRequest)?;
+    .map_err(ThrowFatalError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

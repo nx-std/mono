@@ -141,10 +141,10 @@ mod request;
 mod response;
 mod wire;
 
+pub(crate) use self::array_vec::ArrayVec;
 pub use self::{
     request::{
-        BuildError, HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequestBuilder,
-        Request,
+        BuildError, HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcRequest, HipcRequestBuilder,
     },
     response::{Response, ResponseParseError, parse_response},
     wire::{

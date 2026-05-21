@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, WlanInfState};
 
@@ -48,9 +50,9 @@ fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispat
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchError::SendRequest)?;
+    .map_err(DispatchError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

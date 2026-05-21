@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -16,9 +18,9 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
         cmif::CmifRequestBuilder::new(proto::ENABLE_FAN_CONTROL)
             .send(&mut buf)
             .map_err(EnableFanControlError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(EnableFanControlError::SendRequest)?;
+    .map_err(EnableFanControlError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -37,9 +39,9 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
         cmif::CmifRequestBuilder::new(proto::DISABLE_FAN_CONTROL)
             .send(&mut buf)
             .map_err(DisableFanControlError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DisableFanControlError::SendRequest)?;
+    .map_err(DisableFanControlError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -58,9 +60,9 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
         cmif::CmifRequestBuilder::new(proto::IS_FAN_CONTROL_ENABLED)
             .send(&mut buf)
             .map_err(IsFanControlEnabledError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(IsFanControlEnabledError::SendRequest)?;
+    .map_err(IsFanControlEnabledError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -85,9 +87,9 @@ pub fn get_skin_temperature_milli_c(
         cmif::CmifRequestBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C)
             .send(&mut buf)
             .map_err(GetSkinTemperatureMilliCError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSkinTemperatureMilliCError::SendRequest)?;
+    .map_err(GetSkinTemperatureMilliCError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

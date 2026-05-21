@@ -5,8 +5,8 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode, tipc};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{cmif, hipc::BufferMode, ipc, tipc};
+use nx_svc::ipc::Handle as SessionHandle;
 
 use crate::proto;
 
@@ -24,24 +24,20 @@ pub fn register_process(
     acid_sac: &[u8],
     aci0_sac: &[u8],
 ) -> Result<(), RegisterProcessError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = tipc::TipcRequestBuilder::new(proto::REGISTER_PROCESS)
-            .data_size(size_of::<u64>())
-            .add_in_buffer(acid_sac.as_ptr(), acid_sac.len(), BufferMode::Normal)
-            .add_in_buffer(aci0_sac.as_ptr(), aci0_sac.len(), BufferMode::Normal)
-            .send(&mut buf)
-            .map_err(RegisterProcessError::BuildRequest)?;
-
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid);
-        }
-    }
-
-    ipc::send_sync_request(session).map_err(RegisterProcessError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut payload = [0u8; size_of::<u64>()];
+    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
+    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
+    let req = tipc::TipcRequestBuilder::new(proto::REGISTER_PROCESS)
+        .data(&payload)
+        .add_in_buffer(acid_sac.as_ptr(), acid_sac.len(), BufferMode::Normal)
+        .add_in_buffer(aci0_sac.as_ptr(), aci0_sac.len(), BufferMode::Normal)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RegisterProcessError::BuildRequest)?;
+    ipc::send_sync_request(&mut buf, session).map_err(RegisterProcessError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -70,22 +66,18 @@ pub enum RegisterProcessError {
 /// Requires HOS 12.0.0+ or Atmosphere.
 #[inline]
 pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), UnregisterProcessError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_PROCESS)
-            .data_size(size_of::<u64>())
-            .send(&mut buf)
-            .map_err(UnregisterProcessError::BuildRequest)?;
-
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid);
-        }
-    }
-
-    ipc::send_sync_request(session).map_err(UnregisterProcessError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut payload = [0u8; size_of::<u64>()];
+    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
+    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
+    let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_PROCESS)
+        .data(&payload)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(UnregisterProcessError::BuildRequest)?;
+    ipc::send_sync_request(&mut buf, session).map_err(UnregisterProcessError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

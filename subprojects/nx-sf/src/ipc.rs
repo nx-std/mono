@@ -46,7 +46,7 @@
 //! [`IpcBuffer::as_array_mut`]: nx_sys_thread_tls::IpcBuffer::as_array_mut
 //! [`ipc_buffer`]: nx_sys_thread_tls::ipc_buffer
 
-use nx_svc::ipc::{Handle as SessionHandle, SendSyncError};
+pub use nx_svc::ipc::{Handle, Handle as SessionHandle, SendSyncError};
 use nx_sys_thread_tls::IpcBuffer;
 
 /// Sends a synchronous IPC request on `session`, using `buf` as the

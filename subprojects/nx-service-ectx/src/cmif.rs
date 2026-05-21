@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -50,11 +53,11 @@ pub fn pull_context(
             .send(&mut buf)
             .map_err(PullContextError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(PullContextError::SendRequest)?;
+    .map_err(PullContextError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

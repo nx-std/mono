@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{proto, types::SleepButtonState};
 
@@ -16,9 +18,9 @@ pub fn shutdown_system(session: SessionHandle) -> Result<(), ShutdownSystemError
         cmif::CmifRequestBuilder::new(proto::SHUTDOWN_SYSTEM)
             .send(&mut buf)
             .map_err(ShutdownSystemError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ShutdownSystemError::SendRequest)?;
+    .map_err(ShutdownSystemError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -37,9 +39,9 @@ pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
         cmif::CmifRequestBuilder::new(proto::REBOOT_SYSTEM)
             .send(&mut buf)
             .map_err(RebootSystemError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(RebootSystemError::SendRequest)?;
+    .map_err(RebootSystemError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -63,9 +65,9 @@ pub fn get_sleep_button_state(
         cmif::CmifRequestBuilder::new(proto::GET_SLEEP_BUTTON_STATE)
             .send(&mut buf)
             .map_err(GetSleepButtonStateError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSleepButtonStateError::SendRequest)?;
+    .map_err(GetSleepButtonStateError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -91,9 +93,9 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
         cmif::CmifRequestBuilder::new(proto::GET_POWER_BUTTON)
             .send(&mut buf)
             .map_err(GetPowerButtonError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetPowerButtonError::SendRequest)?;
+    .map_err(GetPowerButtonError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

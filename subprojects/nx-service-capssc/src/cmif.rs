@@ -3,8 +3,11 @@
 use core::ptr;
 
 use nx_service_vi::ViLayerStack;
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{
     proto,
@@ -47,11 +50,11 @@ pub fn capture_raw_image_with_timeout(
             .send(&mut buf)
             .map_err(CaptureRawImageError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<CaptureRawImageIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<CaptureRawImageIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<CaptureRawImageIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<CaptureRawImageIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(CaptureRawImageError::SendRequest)?;
+    .map_err(CaptureRawImageError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -92,11 +95,11 @@ pub fn open_raw_screen_shot_read_stream(
             .send(&mut buf)
             .map_err(OpenReadStreamError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<LayerStackTimeoutIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<LayerStackTimeoutIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(OpenReadStreamError::SendRequest)?;
+    .map_err(OpenReadStreamError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -125,9 +128,9 @@ pub fn close_raw_screen_shot_read_stream(
         cmif::CmifRequestBuilder::new(proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM)
             .send(&mut buf)
             .map_err(CloseReadStreamError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(CloseReadStreamError::SendRequest)?;
+    .map_err(CloseReadStreamError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -155,11 +158,11 @@ pub fn read_raw_screen_shot_read_stream(
             .send(&mut buf)
             .map_err(ReadStreamError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), offset) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), offset) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ReadStreamError::SendRequest)?;
+    .map_err(ReadStreamError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -198,11 +201,11 @@ pub fn capture_jpeg_screen_shot(
             .send(&mut buf)
             .map_err(CaptureJpegError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<LayerStackTimeoutIn>(), input) };
+        // SAFETY: `req` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<LayerStackTimeoutIn>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(CaptureJpegError::SendRequest)?;
+    .map_err(CaptureJpegError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

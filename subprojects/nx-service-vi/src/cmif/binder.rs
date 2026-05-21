@@ -4,11 +4,12 @@
 
 use core::ptr;
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::{
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
     ipc::{self, Handle as SessionHandle},
-    raw::Handle as RawHandle,
 };
+use nx_svc::raw::Handle as RawHandle;
 
 use crate::{proto::binder_cmds, types::BinderObjectId};
 
@@ -56,11 +57,11 @@ pub fn transact_parcel(
             .send(&mut buf)
             .map_err(TransactParcelError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(TransactParcelError::SendRequest)?;
+    .map_err(TransactParcelError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -104,11 +105,11 @@ pub fn adjust_refcount(
             .send(&mut buf)
             .map_err(AdjustRefcountError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(AdjustRefcountError::SendRequest)?;
+    .map_err(AdjustRefcountError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -145,11 +146,11 @@ pub fn get_native_handle(
             .send(&mut buf)
             .map_err(GetNativeHandleError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetNativeHandleError::SendRequest)?;
+    .map_err(GetNativeHandleError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

@@ -291,8 +291,16 @@ impl<'a> Dispatch<'a> {
         {
             let mut cb = cmif::CmifRequestBuilder::new(self.request_id)
                 .pointer_buffer_size(self.pointer_buffer_size as usize)
-                .context(self.context)
-                .data_size(self.in_data_size);
+                .context(self.context);
+
+            let in_slice: &[u8] = if !self.in_data.is_null() && self.in_data_size > 0 {
+                // SAFETY: caller of `in_raw` guarantees `in_data` is valid for
+                // `in_data_size` bytes.
+                unsafe { core::slice::from_raw_parts(self.in_data, self.in_data_size) }
+            } else {
+                &[]
+            };
+            cb = cb.data(in_slice);
 
             if let Some(object_id) = self.object_id {
                 cb = cb.object_id(object_id);
@@ -353,15 +361,8 @@ impl<'a> Dispatch<'a> {
                 cb = cb.add_copy_handle(self.in_handles[i]);
             }
 
-            let req = cb.send(buf).map_err(DispatchError::Layout)?;
-
-            if !self.in_data.is_null() && self.in_data_size > 0 {
-                // SAFETY: caller of `in_raw` guarantees `in_data` is valid for
-                // `in_data_size` bytes.
-                let in_slice =
-                    unsafe { core::slice::from_raw_parts(self.in_data, self.in_data_size) };
-                req.data[..self.in_data_size].copy_from_slice(in_slice);
-            }
+            let req = cb.build();
+            req.write_to(buf).map_err(DispatchError::Layout)?;
         }
 
         // Reborrows `buf` uniquely: the borrow checker invalidates any

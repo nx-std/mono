@@ -4,8 +4,10 @@
 
 use core::ptr;
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{
     cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
@@ -41,13 +43,13 @@ pub fn get_z_order_count_min(
             .send(&mut buf)
             .map_err(GetZOrderCountError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
+        // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), display_id.to_raw());
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), display_id.to_raw());
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetZOrderCountError::SendRequest)?;
+    .map_err(GetZOrderCountError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -74,13 +76,13 @@ pub fn get_z_order_count_max(
             .send(&mut buf)
             .map_err(GetZOrderCountError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
+        // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), display_id.to_raw());
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), display_id.to_raw());
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetZOrderCountError::SendRequest)?;
+    .map_err(GetZOrderCountError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -116,13 +118,13 @@ pub fn get_display_logical_resolution(
             .send(&mut buf)
             .map_err(GetDisplayLogicalResolutionError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
+        // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), display_id.to_raw());
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), display_id.to_raw());
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetDisplayLogicalResolutionError::SendRequest)?;
+    .map_err(GetDisplayLogicalResolutionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -181,11 +183,11 @@ pub fn set_display_magnification(
             .send(&mut buf)
             .map_err(SetDisplayMagnificationError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetDisplayMagnificationError::SendRequest)?;
+    .map_err(SetDisplayMagnificationError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -225,11 +227,11 @@ pub fn set_layer_position(
             .send(&mut buf)
             .map_err(SetLayerPositionError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetLayerPositionError::SendRequest)?;
+    .map_err(SetLayerPositionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -269,11 +271,11 @@ pub fn set_layer_size(
             .send(&mut buf)
             .map_err(SetLayerSizeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetLayerSizeError::SendRequest)?;
+    .map_err(SetLayerSizeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -310,11 +312,11 @@ pub fn set_layer_z(
             .send(&mut buf)
             .map_err(SetLayerZError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetLayerZError::SendRequest)?;
+    .map_err(SetLayerZError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -353,11 +355,11 @@ pub fn set_layer_visibility(
             .send(&mut buf)
             .map_err(SetLayerVisibilityError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetLayerVisibilityError::SendRequest)?;
+    .map_err(SetLayerVisibilityError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

@@ -5,8 +5,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto::{
     CMD_GET_PERFORMANCE_CONFIGURATION, CMD_GET_PERFORMANCE_MODE, CMD_OPEN_SESSION,
@@ -24,9 +26,9 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
         cmif::CmifRequestBuilder::new(CMD_OPEN_SESSION)
             .send(&mut buf)
             .map_err(OpenSessionError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(OpenSessionError::SendRequest)?;
+    .map_err(OpenSessionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -54,9 +56,9 @@ pub fn get_performance_mode(
         cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_MODE)
             .send(&mut buf)
             .map_err(GetPerformanceModeError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetPerformanceModeError::SendRequest)?;
+    .map_err(GetPerformanceModeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -102,11 +104,11 @@ pub fn set_performance_configuration(
             .send(&mut buf)
             .map_err(SetPerformanceConfigurationError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<InData>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<InData>(), in_data) };
+        // SAFETY: `req` is exactly `size_of::<InData>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<InData>(), in_data) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetPerformanceConfigurationError::SendRequest)?;
+    .map_err(SetPerformanceConfigurationError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -134,11 +136,11 @@ pub fn get_performance_configuration(
             .send(&mut buf)
             .map_err(GetPerformanceConfigurationError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), in_data) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), in_data) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetPerformanceConfigurationError::SendRequest)?;
+    .map_err(GetPerformanceConfigurationError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

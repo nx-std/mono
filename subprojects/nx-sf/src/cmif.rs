@@ -58,19 +58,26 @@
 //! [`CmifRequestBuilder`] is the high-level entry point for full CMIF
 //! requests. It wraps a [`hipc::HipcRequestBuilder`], absorbs both HIPC
 //! descriptor management and CMIF in-band state, and finalizes via
-//! [`send`](CmifRequestBuilder::send), which takes the destination buffer.
+//! [`send`](CmifRequestBuilder::send), which takes the destination buffer
+//! and returns the carved-out payload data slice ready to be filled.
 //! The builder itself holds no buffer reference, so descriptor accumulation
-//! does not lock any borrow on the destination buffer. For control requests
-//! use [`CmifControlPayload`]; for close requests use [`CmifClosePayload`].
-//! Both implement [`hipc::HipcPayload`] and can be passed directly to
-//! [`hipc::HipcRequestBuilder::payload`].
+//! does not lock any borrow on the destination buffer.
+//!
+//! The underlying value-type description is [`CmifRequest`]: a plain struct
+//! with no lifetime that describes the request body and knows how to write
+//! itself into a byte buffer via [`CmifRequest::write_to`]. It also
+//! implements [`hipc::HipcPayload`] so it can be handed to a
+//! [`hipc::HipcRequestBuilder`] directly when callers want custom descriptor
+//! management. For control requests use [`CmifControlPayload`]; for close
+//! requests use [`CmifClosePayload`]. Both also implement
+//! [`hipc::HipcPayload`].
 //!
 //! # References
 //!
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/cmif.h` (fincs, SciresM)
 
-use core::{convert::Infallible, marker::PhantomData, mem::size_of, ptr};
+use core::{convert::Infallible, mem::size_of, ptr};
 
 use nx_svc::raw::Handle as RawHandle;
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
@@ -78,8 +85,8 @@ use static_assertions::const_assert_eq;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::hipc::{
-    self, BufferDescriptor, BufferMode, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequestBuilder,
-    RecvListEntry, StaticDescriptor,
+    self, ArrayVec, BufferDescriptor, BufferMode, HIPC_MAX_RECV_LIST, HipcRequest,
+    HipcRequestBuilder, RecvListEntry, StaticDescriptor,
 };
 
 /// Magic number for CMIF input headers ("SFCI" - Service Framework Command Input).
@@ -98,45 +105,67 @@ pub const CMIF_MAX_OBJECTS: usize = 8;
 /// by the underlying HIPC builder.
 pub type RequestLayoutError = hipc::BuildError<Infallible>;
 
-/// [`HipcPayload`] writer for a full CMIF request.
+/// Value-type description of a full CMIF request body.
 ///
-/// Encodes the optional [`DomainInHeader`], the [`InHeader`], the payload
-/// data area (caller fills via [`CmifRequest::data`] after `send`), the
-/// optional domain objects array, and the out-pointer-size table (OPT).
+/// Holds no buffer reference: it describes the optional [`DomainInHeader`],
+/// the [`InHeader`], the payload data area size, the optional domain objects
+/// array, and the out-pointer-size table (OPT). Encodes itself into a
+/// destination byte buffer via [`write_to`](Self::write_to), returning the
+/// carved-out payload data slice for the caller to fill.
 ///
 /// Most callers construct this indirectly via [`CmifRequestBuilder`], which
-/// absorbs HIPC descriptor management. Use [`CmifPayload`] directly when
-/// driving a [`HipcRequestBuilder`] with custom descriptors.
-#[derive(Debug, Clone, Copy)]
-pub struct CmifPayload {
+/// absorbs HIPC descriptor management. Use `CmifRequest` directly when
+/// driving a [`HipcRequestBuilder`] with custom descriptors — it also
+/// implements [`HipcPayload`].
+///
+/// # Why not `zerocopy::IntoBytes`?
+///
+/// A CMIF request has a variable on-wire layout: the optional
+/// `DomainInHeader`, the domain objects array, the payload data area and the
+/// OPT all have caller-determined sizes. That violates the fixed-layout
+/// invariants `zerocopy::IntoBytes` requires. The fixed sub-headers
+/// ([`InHeader`], [`DomainInHeader`]) implement `IntoBytes` and remain
+/// available for callers that want raw byte access to those parts.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct CmifRequest<'a> {
+    hipc: HipcRequest,
     request_id: u32,
     context: u32,
     object_id: Option<ObjectId>,
-    data_size: usize,
+    data: RequestData<'a>,
     num_in_auto_buffers: u32,
     num_out_auto_buffers: u32,
     num_in_pointers: u32,
     num_out_pointers: u32,
     num_out_fixed_pointers: u32,
-    objects: [u32; CMIF_MAX_OBJECTS],
-    object_count: u8,
-    out_pointer_sizes: [u16; HIPC_MAX_RECV_LIST],
-    out_pointer_size_count: u8,
+    objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
+    out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
 }
 
-impl CmifPayload {
-    /// Returns the bytes occupied by the out-pointer-size table.
+impl<'a> CmifRequest<'a> {
+    fn data_len(&self) -> usize {
+        match self.data {
+            RequestData::Borrowed(data) => data.len(),
+            RequestData::Sized(size) => size,
+        }
+    }
+
+    fn data_bytes(&self) -> &[u8] {
+        match self.data {
+            RequestData::Borrowed(data) => data,
+            RequestData::Sized(_) => &[],
+        }
+    }
+
     fn opt_size(&self) -> usize {
         size_of::<u16>() * (self.num_out_auto_buffers + self.num_out_pointers) as usize
     }
 
-    /// CMIF version byte for the InHeader.
     fn cmif_version(&self) -> u32 {
         if self.context != 0 { 1 } else { 0 }
     }
 
-    /// Token for the InHeader. Domain requests carry the context token in the
-    /// [`DomainInHeader`], so the InHeader token field stays zero in that case.
     fn in_header_token(&self) -> u32 {
         if self.object_id.is_some() {
             0
@@ -144,51 +173,52 @@ impl CmifPayload {
             self.context
         }
     }
-}
-
-impl HipcPayload for CmifPayload {
-    type Output<'a> = CmifRequest<'a>;
-    type Error = Infallible;
 
     fn encoded_len(&self) -> usize {
-        let mut n: usize = 16; // alignment padding to reach 16-byte boundary
+        let mut n: usize = 16;
         if self.object_id.is_some() {
-            n += size_of::<DomainInHeader>() + (self.object_count as usize) * size_of::<u32>();
+            n += size_of::<DomainInHeader>() + self.objects.len() * size_of::<u32>();
         }
-        n += size_of::<InHeader>() + self.data_size;
-        n = (n + 1) & !1; // half-word align before OPT
+        n += size_of::<InHeader>() + self.data_len();
+        n = (n + 1) & !1;
         n += self.opt_size();
         n
     }
 
-    fn encode<'a>(
-        self,
-        hipc: hipc::Request<'a>,
-        dst: &'a mut [u8],
-    ) -> Result<CmifRequest<'a>, Infallible> {
-        // Carve OPT from the tail of the payload region.
+    /// Writes the CMIF request into `dst`.
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+        self.hipc.write_to(dst)?;
+
+        let body_len = self.encoded_len();
+        let data_words = self.hipc.data_words_size();
+        if body_len > data_words {
+            return Err(hipc::BuildError::TooLarge {
+                needed: body_len,
+                limit: data_words,
+            });
+        }
+
+        let start = self.hipc.data_words_offset();
+        let cmif_region = &mut dst[start..start + body_len];
+
         let opt_len = self.opt_size();
-        let split = dst.len() - opt_len;
-        let (cmif_region, opt_bytes) = dst.split_at_mut(split);
+        let split = cmif_region.len() - opt_len;
+        let (cmif_region, opt_bytes) = cmif_region.split_at_mut(split);
         let (out_pointer_sizes, _) =
             <[u16]>::mut_from_prefix_with_elems(opt_bytes, opt_len / size_of::<u16>())
                 .expect("internal: encoded_len guarantees fit");
-        out_pointer_sizes
-            .copy_from_slice(&self.out_pointer_sizes[..self.out_pointer_size_count as usize]);
+        out_pointer_sizes.copy_from_slice(self.out_pointer_sizes.as_slice());
 
-        // Skip up to 16 bytes of padding so the CMIF header lands on a
-        // 16-byte boundary inside the IPC buffer.
         let pad = cmif_region.as_ptr().align_offset(16);
         let (_padding, aligned) = cmif_region.split_at_mut(pad);
 
-        // Optional DomainInHeader.
         let aligned = if let Some(object_id) = self.object_id {
-            let payload_size = size_of::<InHeader>() as u16 + self.data_size as u16;
+            let payload_size = size_of::<InHeader>() as u16 + self.data_len() as u16;
             let (dom_hdr, rest) = DomainInHeader::mut_from_prefix(aligned)
                 .expect("internal: encoded_len guarantees fit");
             *dom_hdr = DomainInHeader {
                 request_type: DomainRequestType::SendMessage as u8,
-                num_in_objects: self.object_count,
+                num_in_objects: self.objects.len() as u8,
                 data_size: payload_size,
                 object_id: object_id.to_raw(),
                 _padding: 0,
@@ -199,7 +229,6 @@ impl HipcPayload for CmifPayload {
             aligned
         };
 
-        // InHeader.
         let (in_hdr, rest) =
             InHeader::mut_from_prefix(aligned).expect("internal: encoded_len guarantees fit");
         *in_hdr = InHeader {
@@ -209,64 +238,63 @@ impl HipcPayload for CmifPayload {
             token: self.in_header_token(),
         };
 
-        // Payload data area (caller fills).
-        let (data, rest) = rest.split_at_mut(self.data_size);
+        let (data, rest) = rest.split_at_mut(self.data_len());
+        data.copy_from_slice(self.data_bytes());
 
-        // Domain objects array (after data).
         if self.object_id.is_some() {
-            let count = self.object_count as usize;
-            let (objects, _) = <[u32]>::mut_from_prefix_with_elems(rest, count)
+            let (objects, _) = <[u32]>::mut_from_prefix_with_elems(rest, self.objects.len())
                 .expect("internal: encoded_len guarantees fit");
-            objects.copy_from_slice(&self.objects[..count]);
+            objects.copy_from_slice(self.objects.as_slice());
         }
 
-        Ok(CmifRequest { hipc, data })
+        Ok(())
     }
 }
 
-/// [`HipcPayload`] writer for a CMIF control request.
-///
-/// Control requests carry only an [`InHeader`] followed by a typed payload
-/// `T` and are used for session-management operations (`ConvertToDomain`,
-/// `CloneObject`, `QueryPointerBufferSize`, …). Use `T = ()` for control
-/// requests with no payload.
-///
-/// The output of `encode` is a `&'a mut T` — the caller assigns through it
-/// before sending the request.
-pub struct CmifControlPayload<T> {
+/// CMIF control request DTO.
+#[derive(Debug, Clone)]
+pub struct CmifControlRequest<'a> {
+    hipc: HipcRequest,
     request_id: u32,
-    _phantom: PhantomData<fn() -> T>,
+    data: RequestData<'a>,
 }
 
-impl<T> CmifControlPayload<T> {
-    /// Creates a control-request writer for the given control request ID.
-    #[inline]
-    pub const fn new(request_id: u32) -> Self {
-        Self {
-            request_id,
-            _phantom: PhantomData,
+impl<'a> CmifControlRequest<'a> {
+    fn encoded_len(&self) -> usize {
+        16 + size_of::<InHeader>() + self.data_len()
+    }
+
+    fn data_len(&self) -> usize {
+        match self.data {
+            RequestData::Borrowed(data) => data.len(),
+            RequestData::Sized(size) => size,
         }
     }
-}
 
-impl<T> HipcPayload for CmifControlPayload<T>
-where
-    T: FromBytes + IntoBytes + Immutable + KnownLayout + 'static,
-{
-    type Output<'a> = &'a mut T;
-    type Error = Infallible;
-
-    fn encoded_len(&self) -> usize {
-        16 + size_of::<InHeader>() + size_of::<T>()
+    fn data_bytes(&self) -> &[u8] {
+        match self.data {
+            RequestData::Borrowed(data) => data,
+            RequestData::Sized(_) => &[],
+        }
     }
 
-    fn encode<'a>(
-        self,
-        _hipc: hipc::Request<'a>,
-        dst: &'a mut [u8],
-    ) -> Result<&'a mut T, Infallible> {
-        let pad = dst.as_ptr().align_offset(16);
-        let (_padding, aligned) = dst.split_at_mut(pad);
+    /// Writes the control request into `dst`.
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+        self.hipc.write_to(dst)?;
+
+        let body_len = self.encoded_len();
+        let data_words = self.hipc.data_words_size();
+        if body_len > data_words {
+            return Err(hipc::BuildError::TooLarge {
+                needed: body_len,
+                limit: data_words,
+            });
+        }
+
+        let start = self.hipc.data_words_offset();
+        let region = &mut dst[start..start + body_len];
+        let pad = region.as_ptr().align_offset(16);
+        let (_padding, aligned) = region.split_at_mut(pad);
 
         let (hdr, rest) =
             InHeader::mut_from_prefix(aligned).expect("internal: encoded_len guarantees fit");
@@ -277,58 +305,114 @@ where
             token: 0,
         };
 
-        let (payload, _) = T::mut_from_prefix(rest).expect("internal: encoded_len guarantees fit");
-        Ok(payload)
+        let (payload, _) = rest.split_at_mut(self.data_len());
+        payload.copy_from_slice(self.data_bytes());
+        Ok(())
     }
 }
 
-/// [`HipcPayload`] writer for a CMIF close request.
-///
-/// Two variants:
-/// - [`CmifClosePayload::session()`] — closes the entire session. Pair with
-///   `CommandType::Close` on the [`HipcRequestBuilder`]. Encodes no payload
-///   bytes; the HIPC frame itself signals the close.
-/// - [`CmifClosePayload::domain_object`] — closes a single domain object.
-///   Pair with `CommandType::Request`; encodes a [`DomainInHeader`] with
-///   `request_type = Close`.
-pub enum CmifClosePayload {
-    /// Session close — empty data words.
-    Session,
-    /// Domain object close — writes a [`DomainInHeader`] with the target id.
-    DomainObject(ObjectId),
+/// Fluent builder for a CMIF control request.
+pub struct CmifControlRequestBuilder<'a> {
+    hipc: HipcRequestBuilder,
+    request_id: u32,
+    data: RequestData<'a>,
 }
 
-impl CmifClosePayload {
-    /// Creates a session-close payload.
-    #[inline]
-    pub const fn session() -> Self {
-        Self::Session
-    }
-
-    /// Creates a domain-object-close payload for the given object id.
-    #[inline]
-    pub const fn domain_object(object_id: ObjectId) -> Self {
-        Self::DomainObject(object_id)
-    }
-}
-
-impl HipcPayload for CmifClosePayload {
-    type Output<'a> = ();
-    type Error = Infallible;
-
-    fn encoded_len(&self) -> usize {
-        match self {
-            Self::Session => 0,
-            Self::DomainObject(_) => 16 + size_of::<DomainInHeader>(),
+impl<'a> CmifControlRequestBuilder<'a> {
+    fn data_len(&self) -> usize {
+        match self.data {
+            RequestData::Borrowed(data) => data.len(),
+            RequestData::Sized(size) => size,
         }
     }
 
-    fn encode<'a>(self, _hipc: hipc::Request<'a>, dst: &'a mut [u8]) -> Result<(), Infallible> {
+    /// Starts a new control-request builder.
+    #[inline]
+    pub fn new(request_id: u32) -> Self {
+        Self {
+            hipc: HipcRequestBuilder::new(CommandType::Control),
+            request_id,
+            data: RequestData::Borrowed(&[]),
+        }
+    }
+
+    /// Sets the request payload data.
+    #[inline]
+    pub fn data(mut self, data: &'a [u8]) -> Self {
+        self.data = RequestData::Borrowed(data);
+        self
+    }
+
+    /// Reserves a payload of `size` bytes for later population.
+    #[inline]
+    pub fn data_size(mut self, size: usize) -> Self {
+        self.data = RequestData::Sized(size);
+        self
+    }
+
+    /// Finalizes the request DTO.
+    pub fn build(self) -> CmifControlRequest<'a> {
+        let encoded_len = self.encoded_len();
+        let hipc = self.hipc.build(encoded_len);
+        CmifControlRequest {
+            hipc,
+            request_id: self.request_id,
+            data: self.data,
+        }
+    }
+
+    /// Writes the request into `dst` and returns the payload slice.
+    #[inline]
+    pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<&mut [u8], RequestLayoutError> {
+        let req = self.build();
+        let payload_len = req.data_len();
+        req.write_to(dst)?;
+        let start = req.hipc.data_words_offset() + 16;
+        Ok(&mut dst[start..start + payload_len])
+    }
+
+    fn encoded_len(&self) -> usize {
+        16 + size_of::<InHeader>() + self.data_len()
+    }
+}
+
+/// CMIF close request DTO.
+#[derive(Debug, Clone)]
+pub enum CmifCloseRequest {
+    /// Session close.
+    Session(HipcRequest),
+    /// Domain object close.
+    DomainObject {
+        hipc: HipcRequest,
+        object_id: ObjectId,
+    },
+}
+
+impl CmifCloseRequest {
+    /// Creates a session-close request.
+    pub fn session() -> Self {
+        Self::Session(HipcRequestBuilder::new(CommandType::Close).build(0))
+    }
+
+    /// Creates a domain-object close request.
+    pub fn domain_object(object_id: ObjectId) -> Self {
+        Self::DomainObject {
+            hipc: HipcRequestBuilder::new(CommandType::Request)
+                .build(size_of::<DomainInHeader>() + 16),
+            object_id,
+        }
+    }
+
+    /// Writes the close request into `dst`.
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
         match self {
-            Self::Session => Ok(()),
-            Self::DomainObject(object_id) => {
-                let pad = dst.as_ptr().align_offset(16);
-                let (_padding, aligned) = dst.split_at_mut(pad);
+            Self::Session(hipc) => hipc.write_to(dst),
+            Self::DomainObject { hipc, object_id } => {
+                hipc.write_to(dst)?;
+                let start = hipc.data_words_offset();
+                let region = &mut dst[start..start + size_of::<DomainInHeader>() + 16];
+                let pad = region.as_ptr().align_offset(16);
+                let (_padding, aligned) = region.split_at_mut(pad);
 
                 let (dom_hdr, _) = DomainInHeader::mut_from_prefix(aligned)
                     .expect("internal: encoded_len guarantees fit");
@@ -347,46 +431,53 @@ impl HipcPayload for CmifClosePayload {
 }
 
 /// Fluent builder for a full CMIF request.
-///
-/// Wraps a [`HipcRequestBuilder`] and accumulates both HIPC descriptors and
-/// CMIF in-band state, hiding the auto-buffer pairing rule (each auto-buffer
-/// reserves one send-static AND one send-buffer slot, with the unused slot
-/// zero-filled). Finalize via [`send`](Self::send).
-pub struct CmifRequestBuilder {
+pub struct CmifRequestBuilder<'a> {
     hipc: HipcRequestBuilder,
-    payload: CmifPayload,
+    request_id: u32,
+    context: u32,
+    object_id: Option<ObjectId>,
+    data: RequestData<'a>,
+    num_in_auto_buffers: u32,
+    num_out_auto_buffers: u32,
+    num_in_pointers: u32,
+    num_out_pointers: u32,
+    num_out_fixed_pointers: u32,
+    objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
+    out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
     server_pointer_size: usize,
     cur_in_ptr_id: u8,
 }
 
-impl CmifRequestBuilder {
+#[derive(Debug, Clone, Copy)]
+enum RequestData<'a> {
+    Borrowed(&'a [u8]),
+    Sized(usize),
+}
+
+impl<'a> CmifRequestBuilder<'a> {
+    fn data_len(&self) -> usize {
+        match self.data {
+            RequestData::Borrowed(data) => data.len(),
+            RequestData::Sized(size) => size,
+        }
+    }
+
     /// Starts a new builder for the given command id.
-    ///
-    /// The HIPC message type is chosen at [`send`](Self::send) time based on
-    /// whether a context token is set ([`CommandType::RequestWithContext`]
-    /// vs [`CommandType::Request`]). The destination buffer is supplied to
-    /// [`send`](Self::send).
     #[inline]
     pub fn new(request_id: u32) -> Self {
-        // Provisional message type; finalized at send() based on context.
-        let hipc = HipcRequestBuilder::new(CommandType::Request);
         Self {
-            hipc,
-            payload: CmifPayload {
-                request_id,
-                context: 0,
-                object_id: None,
-                data_size: 0,
-                num_in_auto_buffers: 0,
-                num_out_auto_buffers: 0,
-                num_in_pointers: 0,
-                num_out_pointers: 0,
-                num_out_fixed_pointers: 0,
-                objects: [0; CMIF_MAX_OBJECTS],
-                object_count: 0,
-                out_pointer_sizes: [0; HIPC_MAX_RECV_LIST],
-                out_pointer_size_count: 0,
-            },
+            hipc: HipcRequestBuilder::new(CommandType::Request),
+            request_id,
+            context: 0,
+            object_id: None,
+            data: RequestData::Borrowed(&[]),
+            num_in_auto_buffers: 0,
+            num_out_auto_buffers: 0,
+            num_in_pointers: 0,
+            num_out_pointers: 0,
+            num_out_fixed_pointers: 0,
+            objects: ArrayVec::new(),
+            out_pointer_sizes: ArrayVec::new(),
             server_pointer_size: 0,
             cur_in_ptr_id: 0,
         }
@@ -405,22 +496,28 @@ impl CmifRequestBuilder {
     /// bump the [`InHeader`] version to 1.
     #[inline]
     pub fn context(mut self, ctx: u32) -> Self {
-        self.payload.context = ctx;
+        self.context = ctx;
         self
     }
 
-    /// Sets the size of the payload data area in bytes. The caller fills it
-    /// via [`CmifRequest::data`] after [`send`](Self::send).
+    /// Sets the request payload data.
     #[inline]
-    pub fn data_size(mut self, n: usize) -> Self {
-        self.payload.data_size = n;
+    pub fn data(mut self, data: &'a [u8]) -> Self {
+        self.data = RequestData::Borrowed(data);
+        self
+    }
+
+    /// Reserves a payload of `size` bytes for the caller to fill after send.
+    #[inline]
+    pub fn data_size(mut self, size: usize) -> Self {
+        self.data = RequestData::Sized(size);
         self
     }
 
     /// Marks this request as targeting a domain object.
     #[inline]
     pub fn object_id(mut self, id: ObjectId) -> Self {
-        self.payload.object_id = Some(id);
+        self.object_id = Some(id);
         self
     }
 
@@ -500,7 +597,7 @@ impl CmifRequestBuilder {
             .hipc
             .with_send_static(StaticDescriptor::new_send(buffer, size, id));
         self.cur_in_ptr_id += 1;
-        self.payload.num_in_pointers += 1;
+        self.num_in_pointers += 1;
         self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
         self
     }
@@ -511,7 +608,7 @@ impl CmifRequestBuilder {
         self.hipc = self
             .hipc
             .with_recv_list_entry(RecvListEntry::new_recv(buffer, size));
-        self.payload.num_out_fixed_pointers += 1;
+        self.num_out_fixed_pointers += 1;
         self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
         self
     }
@@ -522,14 +619,8 @@ impl CmifRequestBuilder {
         self.hipc = self
             .hipc
             .with_recv_list_entry(RecvListEntry::new_recv(buffer, size));
-        let idx = self.payload.out_pointer_size_count as usize;
-        debug_assert!(
-            idx < HIPC_MAX_RECV_LIST,
-            "out_pointer_sizes: HIPC recv-list cap exceeded ({HIPC_MAX_RECV_LIST})",
-        );
-        self.payload.out_pointer_sizes[idx] = size as u16;
-        self.payload.out_pointer_size_count += 1;
-        self.payload.num_out_pointers += 1;
+        self.out_pointer_sizes.push(size as u16);
+        self.num_out_pointers += 1;
         self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
         self
     }
@@ -543,7 +634,7 @@ impl CmifRequestBuilder {
     #[inline]
     pub fn add_in_auto_buffer(self, buffer: *const u8, size: usize, mode: BufferMode) -> Self {
         let mut s = self;
-        s.payload.num_in_auto_buffers += 1;
+        s.num_in_auto_buffers += 1;
         if s.server_pointer_size > 0 && size <= s.server_pointer_size {
             // Inline pointer + zero-filled buffer slot.
             let id = s.cur_in_ptr_id;
@@ -574,7 +665,7 @@ impl CmifRequestBuilder {
     #[inline]
     pub fn add_out_auto_buffer(self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
         let mut s = self;
-        s.payload.num_out_auto_buffers += 1;
+        s.num_out_auto_buffers += 1;
         if s.server_pointer_size > 0 && size <= s.server_pointer_size {
             // Inline output pointer + zero-filled recv-buffer slot.
             s.hipc = s
@@ -584,13 +675,7 @@ impl CmifRequestBuilder {
                 .hipc
                 .with_recv_buffer(BufferDescriptor::new_buffer(ptr::null(), 0, mode));
             // OPT entry holds the actual size for the auto-pointer.
-            let idx = s.payload.out_pointer_size_count as usize;
-            debug_assert!(
-                idx < HIPC_MAX_RECV_LIST,
-                "out_pointer_sizes: HIPC recv-list cap exceeded ({HIPC_MAX_RECV_LIST})",
-            );
-            s.payload.out_pointer_sizes[idx] = size as u16;
-            s.payload.out_pointer_size_count += 1;
+            s.out_pointer_sizes.push(size as u16);
             s.server_pointer_size = s.server_pointer_size.saturating_sub(size);
         } else {
             // Zero-filled recv-list slot + mapped recv-buffer.
@@ -601,13 +686,7 @@ impl CmifRequestBuilder {
                 .hipc
                 .with_recv_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
             // OPT entry is zero in the mapped path.
-            let idx = s.payload.out_pointer_size_count as usize;
-            debug_assert!(
-                idx < HIPC_MAX_RECV_LIST,
-                "out_pointer_sizes: HIPC recv-list cap exceeded ({HIPC_MAX_RECV_LIST})",
-            );
-            s.payload.out_pointer_sizes[idx] = 0;
-            s.payload.out_pointer_size_count += 1;
+            s.out_pointer_sizes.push(0);
         }
         s
     }
@@ -615,13 +694,7 @@ impl CmifRequestBuilder {
     /// Adds a domain input object id.
     #[inline]
     pub fn add_object(mut self, id: ObjectId) -> Self {
-        let idx = self.payload.object_count as usize;
-        debug_assert!(
-            idx < CMIF_MAX_OBJECTS,
-            "objects: CMIF object cap exceeded ({CMIF_MAX_OBJECTS})",
-        );
-        self.payload.objects[idx] = id.to_raw();
-        self.payload.object_count += 1;
+        self.objects.push(id.to_raw());
         self
     }
 
@@ -639,48 +712,57 @@ impl CmifRequestBuilder {
         self
     }
 
-    /// Finalizes the request, writing the HIPC frame and CMIF headers into
-    /// `buf`. Returns a [`CmifRequest`] with the carved payload data area
-    /// ready to be filled.
-    pub fn send<'a, const N: usize>(
-        self,
-        buf: &'a mut [u8; N],
-    ) -> Result<CmifRequest<'a>, RequestLayoutError> {
-        let Self {
-            hipc,
-            payload,
-            server_pointer_size: _,
-            cur_in_ptr_id: _,
-        } = self;
-
-        // Each `add_out_*pointer*` / `add_out_auto_buffer` call already pushed
-        // its recv-list entry via `with_recv_list_entry`, transitioning the
-        // builder into `RecvListMode::Entries`. The wire `recv_static_mode`
-        // field is derived from the entry count automatically — no separate
-        // mode declaration needed here.
-
-        // Context tokens flip the HIPC message type to RequestWithContext;
-        // the InHeader version follows from the same flag inside CmifPayload.
-        let cmd_type = if payload.context != 0 {
+    /// Finalizes the request DTO.
+    pub fn build(self) -> CmifRequest<'a> {
+        let message_type = if self.context != 0 {
             CommandType::RequestWithContext
         } else {
             CommandType::Request
         };
-        hipc.set_message_type(cmd_type).payload(buf, payload)
+        let encoded_len = self.encoded_len();
+        let hipc = self.hipc.set_message_type(message_type).build(encoded_len);
+        CmifRequest {
+            hipc,
+            request_id: self.request_id,
+            context: self.context,
+            object_id: self.object_id,
+            data: self.data,
+            num_in_auto_buffers: self.num_in_auto_buffers,
+            num_out_auto_buffers: self.num_out_auto_buffers,
+            num_in_pointers: self.num_in_pointers,
+            num_out_pointers: self.num_out_pointers,
+            num_out_fixed_pointers: self.num_out_fixed_pointers,
+            objects: self.objects,
+            out_pointer_sizes: self.out_pointer_sizes,
+        }
     }
-}
 
-/// Finalized CMIF request, returned by [`CmifRequestBuilder::send`].
-///
-/// All HIPC descriptors and CMIF headers are already populated; the caller's
-/// remaining responsibility is to fill the [`data`](Self::data) payload area
-/// before sending the request via `SendSyncRequest`.
-#[derive(Debug)]
-pub struct CmifRequest<'a> {
-    /// Underlying HIPC frame with descriptor slots already populated.
-    pub hipc: hipc::Request<'a>,
-    /// Payload data area (size matches `CmifRequestBuilder::data_size`).
-    pub data: &'a mut [u8],
+    /// Writes the request into `dst` and returns the payload slice.
+    #[inline]
+    pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<&mut [u8], RequestLayoutError> {
+        let req = self.build();
+        let data_len = req.data_len();
+        req.write_to(dst)?;
+        let start = req.hipc.data_words_offset()
+            + 16
+            + if req.object_id.is_some() {
+                size_of::<DomainInHeader>() + req.objects.len() * size_of::<u32>()
+            } else {
+                0
+            }
+            + size_of::<InHeader>();
+        Ok(&mut dst[start..start + data_len])
+    }
+
+    fn encoded_len(&self) -> usize {
+        let mut n: usize = 16;
+        if self.object_id.is_some() {
+            n += size_of::<DomainInHeader>() + self.objects.len() * size_of::<u32>();
+        }
+        n += size_of::<InHeader>() + self.data_len();
+        n = (n + 1) & !1;
+        n + size_of::<u16>() * (self.num_out_auto_buffers + self.num_out_pointers) as usize
+    }
 }
 
 /// Parses a CMIF non-domain response message into a typed payload.

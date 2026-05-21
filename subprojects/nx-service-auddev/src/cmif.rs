@@ -2,8 +2,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    hipc::BufferMode,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{proto, types::AudioDeviceName};
 
@@ -27,11 +30,11 @@ pub fn get_audio_device_service(
             .send(&mut buf)
             .map_err(GetAudioDeviceServiceError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetAudioDeviceServiceError::SendRequest)?;
+    .map_err(GetAudioDeviceServiceError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -83,9 +86,9 @@ pub fn list_audio_device_name(
             )
             .send(&mut buf)
             .map_err(ListAudioDeviceNameError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ListAudioDeviceNameError::SendRequest)?;
+    .map_err(ListAudioDeviceNameError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -122,9 +125,9 @@ pub fn list_audio_device_name_legacy(
             )
             .send(&mut buf)
             .map_err(ListAudioDeviceNameError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ListAudioDeviceNameError::SendRequest)?;
+    .map_err(ListAudioDeviceNameError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -173,11 +176,11 @@ pub fn set_audio_device_output_volume(
             .send(&mut buf)
             .map_err(SetAudioDeviceOutputVolumeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<f32>(), volume) };
+        // SAFETY: `req` is exactly `size_of::<f32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<f32>(), volume) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
+    .map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -211,11 +214,11 @@ pub fn set_audio_device_output_volume_legacy(
             .send(&mut buf)
             .map_err(SetAudioDeviceOutputVolumeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<f32>(), volume) };
+        // SAFETY: `req` is exactly `size_of::<f32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<f32>(), volume) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
+    .map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -257,9 +260,9 @@ pub fn get_audio_device_output_volume(
             )
             .send(&mut buf)
             .map_err(GetAudioDeviceOutputVolumeError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
+    .map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -294,9 +297,9 @@ pub fn get_audio_device_output_volume_legacy(
             )
             .send(&mut buf)
             .map_err(GetAudioDeviceOutputVolumeError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
+    .map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -342,9 +345,9 @@ pub fn get_active_audio_device_name(
             )
             .send(&mut buf)
             .map_err(GetActiveAudioDeviceNameError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetActiveAudioDeviceNameError::SendRequest)?;
+    .map_err(GetActiveAudioDeviceNameError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -375,9 +378,9 @@ pub fn get_active_audio_device_name_legacy(
             )
             .send(&mut buf)
             .map_err(GetActiveAudioDeviceNameError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetActiveAudioDeviceNameError::SendRequest)?;
+    .map_err(GetActiveAudioDeviceNameError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

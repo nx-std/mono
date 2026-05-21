@@ -5,8 +5,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::{
     proto::{static_service_cmds, system_clock_cmds, timezone_service_cmds},
@@ -47,9 +49,9 @@ pub fn get_standard_steady_clock(
         cmif::CmifRequestBuilder::new(static_service_cmds::GET_STANDARD_STEADY_CLOCK)
             .send(&mut buf)
             .map_err(GetSteadyClockError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSteadyClockError::SendRequest)?;
+    .map_err(GetSteadyClockError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -77,9 +79,9 @@ pub fn get_time_zone_service(
         cmif::CmifRequestBuilder::new(static_service_cmds::GET_TIME_ZONE_SERVICE)
             .send(&mut buf)
             .map_err(GetTimeZoneServiceError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetTimeZoneServiceError::SendRequest)?;
+    .map_err(GetTimeZoneServiceError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -108,9 +110,9 @@ pub fn get_shared_memory_native_handle(
         cmif::CmifRequestBuilder::new(static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE)
             .send(&mut buf)
             .map_err(GetSharedMemoryError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSharedMemoryError::SendRequest)?;
+    .map_err(GetSharedMemoryError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -136,9 +138,9 @@ pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeErr
         cmif::CmifRequestBuilder::new(system_clock_cmds::GET_CURRENT_TIME)
             .send(&mut buf)
             .map_err(GetCurrentTimeError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetCurrentTimeError::SendRequest)?;
+    .map_err(GetCurrentTimeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -169,13 +171,12 @@ pub fn to_calendar_time_with_my_rule(
                 .send(&mut buf)
                 .map_err(ToCalendarTimeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), timestamp);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), timestamp);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(ToCalendarTimeError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(ToCalendarTimeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -207,9 +208,9 @@ fn get_clock_session(
         cmif::CmifRequestBuilder::new(command_id)
             .send(&mut buf)
             .map_err(GetSystemClockError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSystemClockError::SendRequest)?;
+    .map_err(GetSystemClockError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

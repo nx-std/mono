@@ -61,7 +61,7 @@
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/tipc.h` (fincs, SciresM)
 
-use core::{convert::Infallible, mem::size_of};
+use core::mem::size_of;
 
 use nx_svc::raw::Handle as RawHandle;
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
@@ -69,7 +69,7 @@ use zerocopy::IntoBytes;
 
 use crate::{
     cmif::RequestLayoutError,
-    hipc::{self, BufferDescriptor, BufferMode, HipcPayload, HipcRequestBuilder},
+    hipc::{self, BufferDescriptor, BufferMode, HipcRequest, HipcRequestBuilder},
 };
 
 /// TIPC command types.
@@ -99,68 +99,30 @@ impl From<CommandType> for hipc::MessageType {
     }
 }
 
-/// [`HipcPayload`] writer for a TIPC request body.
-///
-/// TIPC has no in-band header — the payload bytes sit directly at the start
-/// of the data-words region. The output is a [`TipcRequest`] bundling the
-/// HIPC frame and the carved data slice.
-#[derive(Debug, Clone, Copy)]
-pub struct TipcPayload {
-    data_size: usize,
-}
-
-impl TipcPayload {
-    /// Creates a TIPC payload writer of the given byte size.
-    #[inline]
-    pub const fn new(data_size: usize) -> Self {
-        Self { data_size }
-    }
-}
-
-impl HipcPayload for TipcPayload {
-    type Output<'a> = TipcRequest<'a>;
-    type Error = Infallible;
-
-    fn encoded_len(&self) -> usize {
-        self.data_size
-    }
-
-    fn encode<'a>(
-        self,
-        hipc: hipc::Request<'a>,
-        dst: &'a mut [u8],
-    ) -> Result<TipcRequest<'a>, Infallible> {
-        let (data, _) = dst.split_at_mut(self.data_size);
-        Ok(TipcRequest { hipc, data })
-    }
-}
-
 /// Fluent builder for a TIPC request.
 ///
 /// Wraps a [`HipcRequestBuilder`] with the message type pre-set to
 /// `CommandType::request(request_id)` (ID + 16). Exposes only the descriptor
 /// kinds TIPC supports — mapped buffers and copy handles.
-pub struct TipcRequestBuilder {
+pub struct TipcRequestBuilder<'a> {
     hipc: HipcRequestBuilder,
-    data_size: usize,
+    data: &'a [u8],
 }
 
-impl TipcRequestBuilder {
-    /// Starts a new builder for the given command ID. The destination buffer
-    /// is supplied to [`send`](Self::send).
+impl<'a> TipcRequestBuilder<'a> {
+    /// Starts a new builder for the given command ID.
     #[inline]
     pub fn new(request_id: u32) -> Self {
         Self {
             hipc: HipcRequestBuilder::new(CommandType::request(request_id)),
-            data_size: 0,
+            data: &[],
         }
     }
 
-    /// Sets the size of the payload data area in bytes. The caller fills it
-    /// via [`TipcRequest::data`] after [`send`](Self::send).
+    /// Sets the request payload data.
     #[inline]
-    pub fn data_size(mut self, n: usize) -> Self {
-        self.data_size = n;
+    pub fn data(mut self, data: &'a [u8]) -> Self {
+        self.data = data;
         self
     }
 
@@ -205,24 +167,40 @@ impl TipcRequestBuilder {
         self
     }
 
-    /// Finalizes the request, writing the HIPC frame into `buf`.
-    pub fn send<'a, const N: usize>(
-        self,
-        buf: &'a mut [u8; N],
-    ) -> Result<TipcRequest<'a>, RequestLayoutError> {
-        self.hipc.payload(buf, TipcPayload::new(self.data_size))
+    /// Finalizes the request DTO.
+    pub fn build(self) -> TipcRequest<'a> {
+        let data_len = self.data.len();
+        let hipc = self.hipc.build(data_len);
+        TipcRequest {
+            hipc,
+            data: self.data,
+        }
+    }
+}
+
+/// TIPC close request DTO.
+#[derive(Debug, Clone)]
+pub struct TipcCloseRequest {
+    hipc: HipcRequest,
+}
+
+impl TipcCloseRequest {
+    /// Creates a session-close request.
+    pub fn session() -> Self {
+        Self {
+            hipc: HipcRequestBuilder::new(CommandType::Close).build(0),
+        }
+    }
+
+    /// Writes the close request into `dst`.
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+        self.hipc.write_to(dst)
     }
 }
 
 /// Builds a TIPC close request message.
-///
-/// # Errors
-///
-/// Returns [`RequestLayoutError`] if the computed request size exceeds the
-/// IPC buffer (cannot happen for a close request in practice).
 pub fn close_request<const N: usize>(buf: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-    HipcRequestBuilder::new(CommandType::Close).payload(buf, TipcPayload::new(0))?;
-    Ok(())
+    TipcCloseRequest::session().write_to(buf)
 }
 
 /// Parses a TIPC response message.
@@ -279,16 +257,22 @@ pub enum ParseResponseError {
     TruncatedPayload,
 }
 
-/// Finalized TIPC request, returned by [`TipcRequestBuilder::send`].
-///
-/// All HIPC descriptors are populated; the caller fills [`data`](Self::data)
-/// before sending the request via `SendSyncRequest`.
-#[derive(Debug)]
+/// Finalized TIPC request.
+#[derive(Debug, Clone)]
 pub struct TipcRequest<'a> {
-    /// Underlying HIPC frame with descriptor slots already populated.
-    pub hipc: hipc::Request<'a>,
-    /// Payload data area (size matches `TipcRequestBuilder::data_size`).
-    pub data: &'a mut [u8],
+    hipc: HipcRequest,
+    data: &'a [u8],
+}
+
+impl<'a> TipcRequest<'a> {
+    /// Writes the TIPC request into `dst`.
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+        self.hipc.write_to(dst)?;
+        let start = self.hipc.data_words_offset();
+        let data = &mut dst[start..start + self.data.len()];
+        data.copy_from_slice(self.data);
+        Ok(())
+    }
 }
 
 /// Parsed TIPC response.

@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -18,13 +20,13 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
             .send(&mut buf)
             .map_err(GetLastTickError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), id);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), id);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetLastTickError::SendRequest)?;
+    .map_err(GetLastTickError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -66,13 +68,13 @@ pub fn get_readable_event(
             .send(&mut buf)
             .map_err(GetReadableEventError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<EventInput>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<EventInput>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<EventInput>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<EventInput>(), input);
         }
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetReadableEventError::SendRequest)?;
+    .map_err(GetReadableEventError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -106,13 +108,12 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
             .send(&mut buf)
             .map_err(GetWritableEventError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<EventInput>()` bytes.
+        // SAFETY: `req` is exactly `size_of::<EventInput>()` bytes.
         unsafe {
-            ptr::write_unaligned(req.data.as_mut_ptr().cast::<EventInput>(), input);
+            ptr::write_unaligned(req.as_mut_ptr().cast::<EventInput>(), input);
         }
+        ipc::send_sync_request(&mut buf, session).map_err(GetWritableEventError::SendRequest)?;
     }
-
-    ipc::send_sync_request(session).map_err(GetWritableEventError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

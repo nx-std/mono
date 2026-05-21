@@ -4,9 +4,9 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
+    ipc::{self, Handle},
     service::{BufferAttr, DispatchError, OutHandleAttr, Session},
 };
-use nx_svc::ipc::{self, Handle};
 
 use crate::{
     proto,
@@ -31,11 +31,11 @@ fn dispatch_in_u32_out_bool(
             .send(&mut buf)
             .map_err(DispatchInU32OutBoolError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), value) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), value) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchInU32OutBoolError::SendRequest)?;
+    .map_err(DispatchInU32OutBoolError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -82,11 +82,11 @@ fn dispatch_in_two_u32s_out_bool(
             .send(&mut buf)
             .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<TwoU32s>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<TwoU32s>(), input) };
+        // SAFETY: `req` is exactly `size_of::<TwoU32s>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<TwoU32s>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
+    .map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -118,9 +118,9 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
         cmif::CmifRequestBuilder::new(cmd_id)
             .send(&mut buf)
             .map_err(DispatchOutU64Error::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(DispatchOutU64Error::SendRequest)?;
+    .map_err(DispatchOutU64Error::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -213,9 +213,9 @@ pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSession
         cmif::CmifRequestBuilder::new(proto::CREATE_PORT_SESSION)
             .send(&mut buf)
             .map_err(CreatePortSessionError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(CreatePortSessionError::SendRequest)?;
+    .map_err(CreatePortSessionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

@@ -61,6 +61,16 @@ impl<T, const N: usize> Default for ArrayVec<T, N> {
     }
 }
 
+impl<T: Clone, const N: usize> Clone for ArrayVec<T, N> {
+    fn clone(&self) -> Self {
+        let mut out = Self::new();
+        for value in self.as_slice() {
+            out.push(value.clone());
+        }
+        out
+    }
+}
+
 impl<T: core::fmt::Debug, const N: usize> core::fmt::Debug for ArrayVec<T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.as_slice()).finish()

@@ -2,8 +2,10 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::cmif;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::{self, Handle as SessionHandle},
+};
 
 use crate::proto;
 
@@ -21,11 +23,11 @@ pub fn open_controller(
             .send(&mut buf)
             .map_err(OpenControllerError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u32>(), device_code) };
+        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), device_code) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(OpenControllerError::SendRequest)?;
+    .map_err(OpenControllerError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -54,11 +56,11 @@ pub fn set_rotation_speed_level(
             .send(&mut buf)
             .map_err(SetRotationSpeedLevelError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<f32>(), level) };
+        // SAFETY: `req` is exactly `size_of::<f32>()` bytes.
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<f32>(), level) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetRotationSpeedLevelError::SendRequest)?;
+    .map_err(SetRotationSpeedLevelError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -78,9 +80,9 @@ pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotati
         cmif::CmifRequestBuilder::new(proto::GET_ROTATION_SPEED_LEVEL)
             .send(&mut buf)
             .map_err(GetRotationSpeedLevelError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetRotationSpeedLevelError::SendRequest)?;
+    .map_err(GetRotationSpeedLevelError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

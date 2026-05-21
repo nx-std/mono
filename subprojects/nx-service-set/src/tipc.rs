@@ -5,8 +5,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::{cmif, hipc::BufferMode, tipc};
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{cmif, hipc::BufferMode, ipc, ipc::Handle as SessionHandle, tipc};
 
 use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, FirmwareVersion};
 
@@ -40,21 +39,19 @@ fn get_firmware_version_inner(
     // Allocate output buffer on stack.
     let mut out = FirmwareVersion::new();
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        tipc::TipcRequestBuilder::new(cmd_id)
-            .add_out_buffer(
-                (&raw mut out).cast::<u8>(),
-                size_of::<FirmwareVersion>(),
-                BufferMode::Normal,
-            )
-            .send(&mut buf)
-            .map_err(GetFirmwareVersionError::BuildRequest)?;
-    }
-
-    ipc::send_sync_request(session).map_err(GetFirmwareVersionError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = tipc::TipcRequestBuilder::new(cmd_id)
+        .add_out_buffer(
+            (&raw mut out).cast::<u8>(),
+            size_of::<FirmwareVersion>(),
+            BufferMode::Normal,
+        )
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetFirmwareVersionError::BuildRequest)?;
+    ipc::send_sync_request(&mut buf, session).map_err(GetFirmwareVersionError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.

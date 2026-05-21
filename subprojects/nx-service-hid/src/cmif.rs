@@ -6,11 +6,11 @@
 use core::{mem::size_of, ptr};
 
 use nx_service_applet::aruid::{Aruid, NO_ARUID};
-use nx_sf::cmif;
-use nx_svc::{
+use nx_sf::{
+    cmif,
     ipc::{self, Handle as SessionHandle},
-    mem::shmem::Handle as ShmemHandle,
 };
+use nx_svc::mem::shmem::Handle as ShmemHandle;
 
 use crate::proto::{applet_resource_cmds, cmds};
 
@@ -34,11 +34,11 @@ pub fn create_applet_resource(
             .send(&mut buf)
             .map_err(CreateAppletResourceError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(CreateAppletResourceError::SendRequest)?;
+    .map_err(CreateAppletResourceError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -67,9 +67,9 @@ pub fn get_shared_memory_handle(
         cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE)
             .send(&mut buf)
             .map_err(GetSharedMemoryHandleError::BuildRequest)?;
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(GetSharedMemoryHandleError::SendRequest)?;
+    .map_err(GetSharedMemoryHandleError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -122,12 +122,12 @@ pub fn activate_npad(
             .send(&mut buf)
             .map_err(ActivateNpadError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
         // `repr(C)` and `input` is a valid value on the stack.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ActivateNpadError::SendRequest)?;
+    .map_err(ActivateNpadError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -170,12 +170,12 @@ pub fn set_supported_npad_style_set(
             .send(&mut buf)
             .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
         // `repr(C)` and `input` is a valid value on the stack.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetSupportedNpadStyleSetError::SendRequest)?;
+    .map_err(SetSupportedNpadStyleSetError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -208,11 +208,11 @@ pub fn set_supported_npad_id_type(
             .send(&mut buf)
             .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(SetSupportedNpadIdTypeError::SendRequest)?;
+    .map_err(SetSupportedNpadIdTypeError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -242,11 +242,11 @@ pub fn activate_touch_screen(
             .send(&mut buf)
             .map_err(ActivateTouchScreenError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ActivateTouchScreenError::SendRequest)?;
+    .map_err(ActivateTouchScreenError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -276,11 +276,11 @@ pub fn activate_keyboard(
             .send(&mut buf)
             .map_err(ActivateKeyboardError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ActivateKeyboardError::SendRequest)?;
+    .map_err(ActivateKeyboardError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -310,11 +310,11 @@ pub fn activate_mouse(
             .send(&mut buf)
             .map_err(ActivateMouseError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), aruid) };
+        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ActivateMouseError::SendRequest)?;
+    .map_err(ActivateMouseError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
@@ -356,12 +356,12 @@ pub fn activate_gesture(
             .send(&mut buf)
             .map_err(ActivateGestureError::BuildRequest)?;
 
-        // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
+        // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
         // `repr(C)` and `input` is a valid value on the stack.
-        unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<Input>(), input) };
+        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
+        ipc::send_sync_request(&mut buf, session)
     }
-
-    ipc::send_sync_request(session).map_err(ActivateGestureError::SendRequest)?;
+    .map_err(ActivateGestureError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
