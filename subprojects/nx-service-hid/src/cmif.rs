@@ -27,11 +27,11 @@ pub fn create_applet_resource(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::INITIALIZE_APPLET_RESOURCE)
+        let req = cmif::CmifRequestBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
             .context(0x20)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(CreateAppletResourceError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
@@ -64,8 +64,8 @@ pub fn get_shared_memory_handle(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, applet_resource_cmds::GET_SHARED_MEMORY_HANDLE)
-            .send()
+        cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE)
+            .send(&mut buf)
             .map_err(GetSharedMemoryHandleError::BuildRequest)?;
     }
 
@@ -115,11 +115,11 @@ pub fn activate_npad(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_NPAD_WITH_REVISION)
+        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
             .context(0x20)
             .data_size(size_of::<Input>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(ActivateNpadError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
@@ -163,11 +163,11 @@ pub fn set_supported_npad_style_set(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::SET_SUPPORTED_NPAD_STYLE_SET)
+        let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
             .context(0x20)
             .data_size(size_of::<Input>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is
@@ -200,12 +200,12 @@ pub fn set_supported_npad_id_type(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::SET_SUPPORTED_NPAD_ID_TYPE)
+        let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
             .context(0x20)
             .data_size(size_of::<u64>())
             .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
@@ -235,11 +235,11 @@ pub fn activate_touch_screen(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_TOUCH_SCREEN)
+        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
             .context(0x20)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(ActivateTouchScreenError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
@@ -269,11 +269,11 @@ pub fn activate_keyboard(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_KEYBOARD)
+        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_KEYBOARD)
             .context(0x20)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(ActivateKeyboardError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
@@ -303,11 +303,11 @@ pub fn activate_mouse(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_MOUSE)
+        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_MOUSE)
             .context(0x20)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(ActivateMouseError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes (the ARUID).
@@ -349,11 +349,11 @@ pub fn activate_gesture(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::ACTIVATE_GESTURE)
+        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_GESTURE)
             .context(0x20)
             .data_size(size_of::<Input>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(ActivateGestureError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes; `Input` is

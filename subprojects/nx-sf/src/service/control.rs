@@ -34,10 +34,11 @@ pub fn query_pointer_buffer_size(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _: &mut () = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Control)
-            .payload(CmifControlPayload::<()>::new(
-                CTRL_QUERY_POINTER_BUFFER_SIZE,
-            ))
+        let _: &mut () = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
+            .payload(
+                &mut buf,
+                CmifControlPayload::<()>::new(CTRL_QUERY_POINTER_BUFFER_SIZE),
+            )
             .map_err(QueryPointerBufferSizeError::Layout)?;
     }
 
@@ -70,8 +71,8 @@ pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, Clo
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _: &mut () = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Control)
-            .payload(CmifControlPayload::<()>::new(CTRL_CLONE_OBJECT))
+        let _: &mut () = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
+            .payload(&mut buf, CmifControlPayload::<()>::new(CTRL_CLONE_OBJECT))
             .map_err(CloneObjectError::Layout)?;
     }
 
@@ -115,8 +116,11 @@ pub fn clone_current_object_ex(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let payload = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Control)
-            .payload(CmifControlPayload::<u32>::new(CTRL_CLONE_OBJECT_EX))
+        let payload = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
+            .payload(
+                &mut buf,
+                CmifControlPayload::<u32>::new(CTRL_CLONE_OBJECT_EX),
+            )
             .map_err(CloneObjectExError::Layout)?;
         *payload = tag;
     }
@@ -160,8 +164,11 @@ pub fn convert_current_object_to_domain(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _: &mut () = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Control)
-            .payload(CmifControlPayload::<()>::new(CTRL_CONVERT_TO_DOMAIN))
+        let _: &mut () = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
+            .payload(
+                &mut buf,
+                CmifControlPayload::<()>::new(CTRL_CONVERT_TO_DOMAIN),
+            )
             .map_err(ConvertToDomainError::Layout)?;
     }
 
@@ -197,8 +204,11 @@ pub fn copy_from_current_domain(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let payload = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Control)
-            .payload(CmifControlPayload::<u32>::new(CTRL_COPY_FROM_DOMAIN))
+        let payload = hipc::HipcRequestBuilder::new(cmif::CommandType::Control)
+            .payload(
+                &mut buf,
+                CmifControlPayload::<u32>::new(CTRL_COPY_FROM_DOMAIN),
+            )
             .map_err(CopyFromDomainError::Layout)?;
         *payload = object_id.to_raw();
     }
@@ -243,8 +253,8 @@ pub(crate) fn close_session(handle: SessionHandle) {
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _ = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Close)
-            .payload(CmifClosePayload::session());
+        let _ = hipc::HipcRequestBuilder::new(cmif::CommandType::Close)
+            .payload(&mut buf, CmifClosePayload::session());
     }
 
     let _ = ipc::send_sync_request(handle);
@@ -260,8 +270,8 @@ pub(crate) fn close_object(session: SessionHandle, object_id: ObjectId) {
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let _ = hipc::HipcRequestBuilder::new(&mut buf, cmif::CommandType::Request)
-            .payload(CmifClosePayload::domain_object(object_id));
+        let _ = hipc::HipcRequestBuilder::new(cmif::CommandType::Request)
+            .payload(&mut buf, CmifClosePayload::domain_object(object_id));
     }
 
     let _ = ipc::send_sync_request(session);

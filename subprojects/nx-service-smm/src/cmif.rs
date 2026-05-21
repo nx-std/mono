@@ -27,11 +27,11 @@ pub fn register_process(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::REGISTER_PROCESS)
+        let req = cmif::CmifRequestBuilder::new(proto::REGISTER_PROCESS)
             .data_size(size_of::<u64>())
             .add_in_buffer(acid_sac.as_ptr(), acid_sac.len(), BufferMode::Normal)
             .add_in_buffer(aci0_sac.as_ptr(), aci0_sac.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(RegisterProcessError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
@@ -71,9 +71,9 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::UNREGISTER_PROCESS)
+        let req = cmif::CmifRequestBuilder::new(proto::UNREGISTER_PROCESS)
             .data_size(size_of::<u64>())
-            .send()
+            .send(&mut buf)
             .map_err(UnregisterProcessError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.

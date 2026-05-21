@@ -40,9 +40,9 @@ pub fn create_managed_layer(
             aruid,
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::CREATE_MANAGED_LAYER)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::CREATE_MANAGED_LAYER)
             .data_size(24) // layer_flags(4) + pad(4) + display_id(8) + aruid(8)
-            .send()
+            .send(&mut buf)
             .map_err(CreateManagedLayerError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -72,9 +72,9 @@ pub fn destroy_managed_layer(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::DESTROY_MANAGED_LAYER)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
             .data_size(8) // layer_id
-            .send()
+            .send(&mut buf)
             .map_err(DestroyManagedLayerError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly 8 bytes; writing layer_id as u64 is sound.
@@ -131,9 +131,9 @@ pub fn set_display_alpha(
             display_id: display_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::SET_DISPLAY_ALPHA)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_ALPHA)
             .data_size(16) // alpha(4) + pad(4) + display_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetDisplayAlphaError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -174,9 +174,9 @@ pub fn set_display_layer_stack(
             display_id: display_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::SET_DISPLAY_LAYER_STACK)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_LAYER_STACK)
             .data_size(16) // layer_stack(4) + pad(4) + display_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetDisplayLayerStackError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -217,9 +217,9 @@ pub fn set_display_power_state(
             display_id: display_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::SET_DISPLAY_POWER_STATE)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE)
             .data_size(16) // power_state(4) + pad(4) + display_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetDisplayPowerStateError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -261,9 +261,9 @@ pub fn add_to_layer_stack(
             layer_id: layer_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::ADD_TO_LAYER_STACK)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::ADD_TO_LAYER_STACK)
             .data_size(16) // layer_stack(4) + pad(4) + layer_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(AddToLayerStackError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -289,9 +289,9 @@ pub fn set_content_visibility(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, manager_cmds::SET_CONTENT_VISIBILITY)
+        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY)
             .data_size(1) // visible
-            .send()
+            .send(&mut buf)
             .map_err(SetContentVisibilityError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly 1 byte; writing visible as u8 is sound.

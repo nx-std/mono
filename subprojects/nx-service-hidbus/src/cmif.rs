@@ -26,9 +26,9 @@ fn dispatch_in<T: Copy>(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<T>())
-            .send()
+            .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<T>()` bytes and `value`
@@ -57,9 +57,9 @@ fn dispatch_in_out<T: Copy, U: Copy>(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<T>())
-            .send()
+            .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<T>()` bytes and `value`
@@ -182,10 +182,10 @@ pub fn send_command_async(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SEND_COMMAND_ASYNC)
+        let req = cmif::CmifRequestBuilder::new(proto::SEND_COMMAND_ASYNC)
             .data_size(size_of::<BusHandle>())
             .add_in_auto_buffer(buffer.as_ptr(), buffer.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<BusHandle>()` bytes.
@@ -214,10 +214,10 @@ pub fn get_send_command_async_result(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_SEND_COMMAND_ASYNC_RESULT)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_SEND_COMMAND_ASYNC_RESULT)
             .data_size(size_of::<BusHandle>())
             .add_out_auto_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(GetSendCommandAsyncResultError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<BusHandle>()` bytes.
@@ -260,9 +260,9 @@ pub fn set_event_for_send_command_async_result(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
             .data_size(size_of::<BusHandle>())
-            .send()
+            .send(&mut buf)
             .map_err(SetEventError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<BusHandle>()` bytes.
@@ -303,8 +303,8 @@ pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetShared
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_SHARED_MEMORY_HANDLE)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_HANDLE)
+            .send(&mut buf)
             .map_err(GetSharedMemoryError::BuildRequest)?;
     }
 
@@ -353,7 +353,7 @@ pub fn enable_joy_polling_receive_mode(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
+        let req = cmif::CmifRequestBuilder::new(proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
             .data_size(size_of::<EnableJoyPollingIn>())
             .add_in_auto_buffer(
                 command_buffer.as_ptr(),
@@ -361,7 +361,7 @@ pub fn enable_joy_polling_receive_mode(
                 BufferMode::Normal,
             )
             .add_copy_handle(tmem_handle)
-            .send()
+            .send(&mut buf)
             .map_err(EnableJoyPollingError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<EnableJoyPollingIn>()` bytes.

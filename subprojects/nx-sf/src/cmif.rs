@@ -55,12 +55,14 @@
 //!
 //! # Builder model
 //!
-//! [`CmifBuilder`] is the high-level entry point for full CMIF requests. It
-//! wraps a [`hipc::HipcRequestBuilder`], absorbs both HIPC descriptor
-//! management and CMIF in-band state, and finalizes via
-//! [`send`](CmifBuilder::send). For control requests use
-//! [`CmifControlPayload`]; for close requests use [`CmifClosePayload`]. Both
-//! implement [`hipc::HipcPayload`] and can be passed directly to
+//! [`CmifRequestBuilder`] is the high-level entry point for full CMIF
+//! requests. It wraps a [`hipc::HipcRequestBuilder`], absorbs both HIPC
+//! descriptor management and CMIF in-band state, and finalizes via
+//! [`send`](CmifRequestBuilder::send), which takes the destination buffer.
+//! The builder itself holds no buffer reference, so descriptor accumulation
+//! does not lock any borrow on the destination buffer. For control requests
+//! use [`CmifControlPayload`]; for close requests use [`CmifClosePayload`].
+//! Both implement [`hipc::HipcPayload`] and can be passed directly to
 //! [`hipc::HipcRequestBuilder::payload`].
 //!
 //! # References
@@ -102,9 +104,9 @@ pub type RequestLayoutError = hipc::BuildError<Infallible>;
 /// data area (caller fills via [`CmifRequest::data`] after `send`), the
 /// optional domain objects array, and the out-pointer-size table (OPT).
 ///
-/// Most callers construct this indirectly via [`CmifBuilder`], which absorbs
-/// HIPC descriptor management. Use [`CmifPayload`] directly when driving a
-/// [`HipcRequestBuilder`] with custom descriptors.
+/// Most callers construct this indirectly via [`CmifRequestBuilder`], which
+/// absorbs HIPC descriptor management. Use [`CmifPayload`] directly when
+/// driving a [`HipcRequestBuilder`] with custom descriptors.
 #[derive(Debug, Clone, Copy)]
 pub struct CmifPayload {
     request_id: u32,
@@ -350,23 +352,24 @@ impl HipcPayload for CmifClosePayload {
 /// CMIF in-band state, hiding the auto-buffer pairing rule (each auto-buffer
 /// reserves one send-static AND one send-buffer slot, with the unused slot
 /// zero-filled). Finalize via [`send`](Self::send).
-pub struct CmifBuilder<'a, const N: usize> {
-    hipc: HipcRequestBuilder<'a, N>,
+pub struct CmifRequestBuilder {
+    hipc: HipcRequestBuilder,
     payload: CmifPayload,
     server_pointer_size: usize,
     cur_in_ptr_id: u8,
 }
 
-impl<'a, const N: usize> CmifBuilder<'a, N> {
-    /// Starts a new builder for the given command id and buffer.
+impl CmifRequestBuilder {
+    /// Starts a new builder for the given command id.
     ///
     /// The HIPC message type is chosen at [`send`](Self::send) time based on
     /// whether a context token is set ([`CommandType::RequestWithContext`]
-    /// vs [`CommandType::Request`]).
+    /// vs [`CommandType::Request`]). The destination buffer is supplied to
+    /// [`send`](Self::send).
     #[inline]
-    pub fn new(buf: &'a mut [u8; N], request_id: u32) -> Self {
+    pub fn new(request_id: u32) -> Self {
         // Provisional message type; finalized at send() based on context.
-        let hipc = HipcRequestBuilder::new(buf, CommandType::Request);
+        let hipc = HipcRequestBuilder::new(CommandType::Request);
         Self {
             hipc,
             payload: CmifPayload {
@@ -637,9 +640,12 @@ impl<'a, const N: usize> CmifBuilder<'a, N> {
     }
 
     /// Finalizes the request, writing the HIPC frame and CMIF headers into
-    /// the buffer. Returns a [`CmifRequest`] with the carved payload data
-    /// area ready to be filled.
-    pub fn send(self) -> Result<CmifRequest<'a>, RequestLayoutError> {
+    /// `buf`. Returns a [`CmifRequest`] with the carved payload data area
+    /// ready to be filled.
+    pub fn send<'a, const N: usize>(
+        self,
+        buf: &'a mut [u8; N],
+    ) -> Result<CmifRequest<'a>, RequestLayoutError> {
         let Self {
             hipc,
             payload,
@@ -660,11 +666,11 @@ impl<'a, const N: usize> CmifBuilder<'a, N> {
         } else {
             CommandType::Request
         };
-        hipc.set_message_type(cmd_type).payload(payload)
+        hipc.set_message_type(cmd_type).payload(buf, payload)
     }
 }
 
-/// Finalized CMIF request, returned by [`CmifBuilder::send`].
+/// Finalized CMIF request, returned by [`CmifRequestBuilder::send`].
 ///
 /// All HIPC descriptors and CMIF headers are already populated; the caller's
 /// remaining responsibility is to fill the [`data`](Self::data) payload area
@@ -673,7 +679,7 @@ impl<'a, const N: usize> CmifBuilder<'a, N> {
 pub struct CmifRequest<'a> {
     /// Underlying HIPC frame with descriptor slots already populated.
     pub hipc: hipc::Request<'a>,
-    /// Payload data area (size matches `CmifBuilder::data_size`).
+    /// Payload data area (size matches `CmifRequestBuilder::data_size`).
     pub data: &'a mut [u8],
 }
 

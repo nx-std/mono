@@ -21,9 +21,9 @@ fn dispatch_in<T: Copy>(session: Handle, cmd_id: u32, value: &T) -> Result<(), D
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<T>())
-            .send()
+            .send(&mut buf)
             .map_err(DispatchInError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<T>()` bytes.
@@ -60,8 +60,8 @@ fn dispatch_out<T: Copy>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutE
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, cmd_id)
-            .send()
+        cmif::CmifRequestBuilder::new(cmd_id)
+            .send(&mut buf)
             .map_err(DispatchOutError::BuildRequest)?;
     }
 
@@ -102,8 +102,8 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::RCV_OPEN_RECEIVER)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::RCV_OPEN_RECEIVER)
+            .send(&mut buf)
             .map_err(OpenReceiverError::BuildRequest)?;
     }
 
@@ -166,8 +166,8 @@ pub fn receiver_get_receive_event_handle(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::RECEIVER_GET_RECEIVE_EVENT_HANDLE)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::RECEIVER_GET_RECEIVE_EVENT_HANDLE)
+            .send(&mut buf)
             .map_err(GetReceiveEventHandleError::BuildRequest)?;
     }
 
@@ -238,9 +238,9 @@ pub fn snd_open_sender(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SND_OPEN_SENDER)
+        let req = cmif::CmifRequestBuilder::new(proto::SND_OPEN_SENDER)
             .data_size(size_of::<OpenSenderIn>())
-            .send()
+            .send(&mut buf)
             .map_err(OpenSenderError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<OpenSenderIn>()` bytes.

@@ -45,8 +45,8 @@ fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispat
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, cmd_id)
-            .send()
+        cmif::CmifRequestBuilder::new(cmd_id)
+            .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
     }
 

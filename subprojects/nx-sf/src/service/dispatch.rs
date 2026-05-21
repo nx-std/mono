@@ -289,7 +289,7 @@ impl<'a> Dispatch<'a> {
         let is_domain = self.object_id.is_some();
 
         {
-            let mut cb = cmif::CmifBuilder::new(buf, self.request_id)
+            let mut cb = cmif::CmifRequestBuilder::new(self.request_id)
                 .pointer_buffer_size(self.pointer_buffer_size as usize)
                 .context(self.context)
                 .data_size(self.in_data_size);
@@ -353,7 +353,7 @@ impl<'a> Dispatch<'a> {
                 cb = cb.add_copy_handle(self.in_handles[i]);
             }
 
-            let req = cb.send().map_err(DispatchError::Layout)?;
+            let req = cb.send(buf).map_err(DispatchError::Layout)?;
 
             if !self.in_data.is_null() && self.in_data_size > 0 {
                 // SAFETY: caller of `in_raw` guarantees `in_data` is valid for

@@ -49,11 +49,11 @@ pub fn transact_parcel(
         };
 
         // Add auto-select buffers (Normal mode)
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(12) // session_id(4) + code(4) + flags(4)
             .add_in_auto_buffer(in_data.as_ptr(), in_data.len(), BufferMode::Normal)
             .add_out_auto_buffer(out_data.as_mut_ptr(), out_data.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(TransactParcelError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -99,9 +99,9 @@ pub fn adjust_refcount(
             type_,
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, binder_cmds::ADJUST_REFCOUNT)
+        let req = cmif::CmifRequestBuilder::new(binder_cmds::ADJUST_REFCOUNT)
             .data_size(12) // session_id(4) + addval(4) + type(4)
-            .send()
+            .send(&mut buf)
             .map_err(AdjustRefcountError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -140,9 +140,9 @@ pub fn get_native_handle(
             inval,
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, binder_cmds::GET_NATIVE_HANDLE)
+        let req = cmif::CmifRequestBuilder::new(binder_cmds::GET_NATIVE_HANDLE)
             .data_size(8) // session_id(4) + inval(4)
-            .send()
+            .send(&mut buf)
             .map_err(GetNativeHandleError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.

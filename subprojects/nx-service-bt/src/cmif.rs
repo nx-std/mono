@@ -27,10 +27,10 @@ fn dispatch_in_with_pid<T>(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<T>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<T>()` bytes; `value` is
@@ -61,11 +61,11 @@ fn dispatch_in_with_pid_and_pointer<T>(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<T>())
             .send_pid()
             .add_in_pointer(buffer, buffer_size)
-            .send()
+            .send(&mut buf)
             .map_err(DispatchError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<T>()` bytes; `value` is
@@ -324,11 +324,11 @@ pub fn get_le_event_info(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_LE_EVENT_INFO)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_LE_EVENT_INFO)
             .data_size(size_of::<u64>())
             .send_pid()
             .add_out_pointer(buffer.as_mut_ptr(), buffer.len())
-            .send()
+            .send(&mut buf)
             .map_err(GetLeEventInfoError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
@@ -389,10 +389,10 @@ pub fn register_ble_event(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::REGISTER_BLE_EVENT)
+        let req = cmif::CmifRequestBuilder::new(proto::REGISTER_BLE_EVENT)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(RegisterBleEventError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.

@@ -44,10 +44,10 @@ pub fn pull_context(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::PULL_CONTEXT)
+        let req = cmif::CmifRequestBuilder::new(proto::PULL_CONTEXT)
             .data_size(size_of::<Input>())
             .add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(PullContextError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.

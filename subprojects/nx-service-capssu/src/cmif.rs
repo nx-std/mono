@@ -23,10 +23,10 @@ pub fn set_shim_library_version(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_SHIM_LIBRARY_VERSION)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_SHIM_LIBRARY_VERSION)
             .data_size(size_of::<SetShimVersionIn>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(SetShimVersionError::BuildRequest)?;
 
         let input = SetShimVersionIn {
@@ -60,11 +60,11 @@ pub fn save_screen_shot_ex0(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SAVE_SCREEN_SHOT_EX0)
+        let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX0)
             .data_size(size_of::<SaveScreenShotIn>())
             .send_pid()
             .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
-            .send()
+            .send(&mut buf)
             .map_err(SaveScreenShotEx0Error::BuildRequest)?;
 
         let input = SaveScreenShotIn {
@@ -105,7 +105,7 @@ pub fn save_screen_shot_ex1(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SAVE_SCREEN_SHOT_EX1)
+        let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX1)
             .data_size(size_of::<SaveScreenShotIn>())
             .send_pid()
             .add_in_buffer(
@@ -114,7 +114,7 @@ pub fn save_screen_shot_ex1(
                 BufferMode::Normal,
             )
             .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
-            .send()
+            .send(&mut buf)
             .map_err(SaveScreenShotEx1Error::BuildRequest)?;
 
         let input = SaveScreenShotIn {
@@ -155,7 +155,7 @@ pub fn save_screen_shot_ex2(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SAVE_SCREEN_SHOT_EX2)
+        let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
             .data_size(size_of::<SaveScreenShotIn>())
             .add_in_buffer(
                 (list as *const UserIdList).cast::<u8>(),
@@ -163,7 +163,7 @@ pub fn save_screen_shot_ex2(
                 BufferMode::Normal,
             )
             .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
-            .send()
+            .send(&mut buf)
             .map_err(SaveScreenShotEx2Error::BuildRequest)?;
 
         let input = SaveScreenShotIn {

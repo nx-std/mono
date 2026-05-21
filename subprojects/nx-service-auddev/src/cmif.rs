@@ -22,9 +22,9 @@ pub fn get_audio_device_service(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_AUDIO_DEVICE_SERVICE)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_SERVICE)
             .data_size(size_of::<u64>())
-            .send()
+            .send(&mut buf)
             .map_err(GetAudioDeviceServiceError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
@@ -75,13 +75,13 @@ pub fn list_audio_device_name(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::LIST_AUDIO_DEVICE_NAME)
+        cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME)
             .add_out_auto_buffer(
                 names.as_mut_ptr().cast::<u8>(),
                 core::mem::size_of_val(names),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(ListAudioDeviceNameError::BuildRequest)?;
     }
 
@@ -114,13 +114,13 @@ pub fn list_audio_device_name_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::LIST_AUDIO_DEVICE_NAME_OLD)
+        cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME_OLD)
             .add_out_buffer(
                 names.as_mut_ptr().cast::<u8>(),
                 core::mem::size_of_val(names),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(ListAudioDeviceNameError::BuildRequest)?;
     }
 
@@ -163,14 +163,14 @@ pub fn set_audio_device_output_volume(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME)
             .data_size(size_of::<f32>())
             .add_in_auto_buffer(
                 (device_name as *const AudioDeviceName).cast::<u8>(),
                 size_of::<AudioDeviceName>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(SetAudioDeviceOutputVolumeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
@@ -201,14 +201,14 @@ pub fn set_audio_device_output_volume_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
             .data_size(size_of::<f32>())
             .add_in_buffer(
                 (device_name as *const AudioDeviceName).cast::<u8>(),
                 size_of::<AudioDeviceName>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(SetAudioDeviceOutputVolumeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<f32>()` bytes.
@@ -249,13 +249,13 @@ pub fn get_audio_device_output_volume(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME)
+        cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME)
             .add_in_auto_buffer(
                 (device_name as *const AudioDeviceName).cast::<u8>(),
                 size_of::<AudioDeviceName>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetAudioDeviceOutputVolumeError::BuildRequest)?;
     }
 
@@ -286,13 +286,13 @@ pub fn get_audio_device_output_volume_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
+        cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
             .add_in_buffer(
                 (device_name as *const AudioDeviceName).cast::<u8>(),
                 size_of::<AudioDeviceName>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetAudioDeviceOutputVolumeError::BuildRequest)?;
     }
 
@@ -334,13 +334,13 @@ pub fn get_active_audio_device_name(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_ACTIVE_AUDIO_DEVICE_NAME)
+        cmif::CmifRequestBuilder::new(proto::GET_ACTIVE_AUDIO_DEVICE_NAME)
             .add_out_auto_buffer(
                 (device_name as *mut AudioDeviceName).cast::<u8>(),
                 size_of::<AudioDeviceName>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetActiveAudioDeviceNameError::BuildRequest)?;
     }
 
@@ -367,13 +367,13 @@ pub fn get_active_audio_device_name_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_ACTIVE_AUDIO_DEVICE_NAME_OLD)
+        cmif::CmifRequestBuilder::new(proto::GET_ACTIVE_AUDIO_DEVICE_NAME_OLD)
             .add_out_buffer(
                 (device_name as *mut AudioDeviceName).cast::<u8>(),
                 size_of::<AudioDeviceName>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetActiveAudioDeviceNameError::BuildRequest)?;
     }
 

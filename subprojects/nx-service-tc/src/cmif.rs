@@ -13,8 +13,8 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::ENABLE_FAN_CONTROL)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::ENABLE_FAN_CONTROL)
+            .send(&mut buf)
             .map_err(EnableFanControlError::BuildRequest)?;
     }
 
@@ -34,8 +34,8 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::DISABLE_FAN_CONTROL)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::DISABLE_FAN_CONTROL)
+            .send(&mut buf)
             .map_err(DisableFanControlError::BuildRequest)?;
     }
 
@@ -55,8 +55,8 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::IS_FAN_CONTROL_ENABLED)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::IS_FAN_CONTROL_ENABLED)
+            .send(&mut buf)
             .map_err(IsFanControlEnabledError::BuildRequest)?;
     }
 
@@ -82,8 +82,8 @@ pub fn get_skin_temperature_milli_c(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_SKIN_TEMPERATURE_MILLI_C)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C)
+            .send(&mut buf)
             .map_err(GetSkinTemperatureMilliCError::BuildRequest)?;
     }
 

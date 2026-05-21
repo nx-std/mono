@@ -6,14 +6,15 @@
 //!
 //! # Builder model
 //!
-//! [`HipcRequestBuilder`] owns a caller-supplied `&mut [u8; N]` buffer and
-//! accumulates HIPC-level descriptors (statics, buffers, handles, recv-list).
-//! Once protocol-specific contents are known the caller invokes
-//! [`HipcRequestBuilder::payload`] with a [`HipcPayload`] writer (CMIF, TIPC,
-//! …); `payload` computes the final layout, writes the HIPC header and all
-//! descriptor slots via zerocopy, then hands the carved data-words region to
-//! the writer to fill. The writer's [`Output`](HipcPayload::Output) is the
-//! protocol-shaped value returned to the caller.
+//! [`HipcRequestBuilder`] accumulates HIPC-level descriptors (statics, buffers,
+//! handles, recv-list) without holding any buffer reference. Once
+//! protocol-specific contents are known the caller invokes
+//! [`HipcRequestBuilder::payload`] with the destination `&mut [u8; N]` buffer
+//! and a [`HipcPayload`] writer (CMIF, TIPC, …); `payload` computes the final
+//! layout, writes the HIPC header and all descriptor slots via zerocopy, then
+//! hands the carved data-words region to the writer to fill. The writer's
+//! [`Output`](HipcPayload::Output) is the protocol-shaped value returned to the
+//! caller and is the sole borrower of the supplied buffer.
 //!
 //! Descriptor counts are bounded by the HIPC header's 4-bit fields, so the
 //! builder uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage — no heap, no
@@ -165,14 +166,15 @@ pub struct Request<'a> {
     pub move_handles: &'a mut [RawHandle],
 }
 
-/// Builds an HIPC request in a caller-owned buffer.
+/// Builds an HIPC request.
 ///
 /// Accumulates HIPC-level descriptors via fluent `with_*` methods and
-/// finalizes via [`payload`](Self::payload) once a protocol writer has been
-/// chosen. Storage is inline (`[T; HIPC_MAX_DESCRIPTORS]`); the descriptor
-/// counts are bounded by the HIPC wire format.
-pub struct HipcRequestBuilder<'a, const N: usize> {
-    buf: &'a mut [u8; N],
+/// finalizes via [`payload`](Self::payload), which writes into a
+/// caller-supplied buffer. Storage is inline (`[T; HIPC_MAX_DESCRIPTORS]`); the
+/// descriptor counts are bounded by the HIPC wire format. The builder itself
+/// holds no buffer reference, so descriptor accumulation does not lock any
+/// borrow on the destination buffer.
+pub struct HipcRequestBuilder {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
     send_buffers: ArrayVec<BufferDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -184,15 +186,15 @@ pub struct HipcRequestBuilder<'a, const N: usize> {
     send_pid: bool,
 }
 
-impl<'a, const N: usize> HipcRequestBuilder<'a, N> {
-    /// Starts a new builder for the given message type and buffer.
+impl HipcRequestBuilder {
+    /// Starts a new builder for the given message type.
     ///
     /// `message_type` accepts any value convertible into [`MessageType`] —
-    /// typically a CMIF or TIPC `CommandType`.
+    /// typically a CMIF or TIPC `CommandType`. The destination buffer is
+    /// supplied later, at [`payload`](Self::payload) time.
     #[inline]
-    pub fn new(buf: &'a mut [u8; N], message_type: impl Into<MessageType>) -> Self {
+    pub fn new(message_type: impl Into<MessageType>) -> Self {
         Self {
-            buf,
             message_type: message_type.into(),
             send_statics: Default::default(),
             send_buffers: Default::default(),
@@ -338,13 +340,14 @@ impl<'a, const N: usize> HipcRequestBuilder<'a, N> {
         self
     }
 
-    /// Finalizes the request. Computes the wire layout from the accumulated
-    /// counts plus `payload.encoded_len()`, writes the HIPC header and
-    /// descriptor slots into `buf` via zerocopy, then invokes
+    /// Finalizes the request into `buf`. Computes the wire layout from the
+    /// accumulated counts plus `payload.encoded_len()`, writes the HIPC header
+    /// and descriptor slots via zerocopy, then invokes
     /// [`payload.encode`](HipcPayload::encode) on the carved data-words
     /// region.
-    pub fn payload<P: HipcPayload>(
+    pub fn payload<'a, const N: usize, P: HipcPayload>(
         self,
+        buf: &'a mut [u8; N],
         payload: P,
     ) -> Result<P::Output<'a>, BuildError<P::Error>> {
         let needed_payload = payload.encoded_len();
@@ -371,7 +374,7 @@ impl<'a, const N: usize> HipcRequestBuilder<'a, N> {
         }
 
         let (hipc, data_bytes) = write_hipc(
-            self.buf,
+            buf,
             self.message_type,
             &layout,
             &self.recv_list_mode,

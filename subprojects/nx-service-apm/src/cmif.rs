@@ -21,8 +21,8 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, CMD_OPEN_SESSION)
-            .send()
+        cmif::CmifRequestBuilder::new(CMD_OPEN_SESSION)
+            .send(&mut buf)
             .map_err(OpenSessionError::BuildRequest)?;
     }
 
@@ -51,8 +51,8 @@ pub fn get_performance_mode(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, CMD_GET_PERFORMANCE_MODE)
-            .send()
+        cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_MODE)
+            .send(&mut buf)
             .map_err(GetPerformanceModeError::BuildRequest)?;
     }
 
@@ -97,9 +97,9 @@ pub fn set_performance_configuration(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_SET_PERFORMANCE_CONFIGURATION)
+        let req = cmif::CmifRequestBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
             .data_size(size_of::<InData>())
-            .send()
+            .send(&mut buf)
             .map_err(SetPerformanceConfigurationError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<InData>()` bytes.
@@ -129,9 +129,9 @@ pub fn get_performance_configuration(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_PERFORMANCE_CONFIGURATION)
+        let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(GetPerformanceConfigurationError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.

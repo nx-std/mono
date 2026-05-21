@@ -162,9 +162,9 @@ fn dispatch_pid_delay(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd)
+        let req = cmif::CmifRequestBuilder::new(cmd)
             .data_size(size_of::<PidDelayIn>())
-            .send()
+            .send(&mut buf)
             .map_err(SuspendResumeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<PidDelayIn>()` bytes.
@@ -186,9 +186,9 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd)
+        let req = cmif::CmifRequestBuilder::new(cmd)
             .data_size(size_of::<u64>())
-            .send()
+            .send(&mut buf)
             .map_err(GetVolumeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
@@ -227,9 +227,9 @@ fn dispatch_set_volume(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd)
+        let req = cmif::CmifRequestBuilder::new(cmd)
             .data_size(size_of::<SetVolumeIn>())
-            .send()
+            .send(&mut buf)
             .map_err(SetVolumeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<SetVolumeIn>()` bytes.

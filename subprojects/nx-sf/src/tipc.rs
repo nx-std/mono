@@ -49,10 +49,11 @@
 //!
 //! # Builder model
 //!
-//! [`TipcBuilder`] is the high-level entry point for full TIPC requests. It
-//! wraps a [`hipc::HipcRequestBuilder`] and exposes only the descriptor kinds
-//! TIPC supports (mapped buffers + copy handles). Finalize via
-//! [`send`](TipcBuilder::send). [`TipcPayload`] implements
+//! [`TipcRequestBuilder`] is the high-level entry point for full TIPC
+//! requests. It wraps a [`hipc::HipcRequestBuilder`] and exposes only the
+//! descriptor kinds TIPC supports (mapped buffers + copy handles). Finalize
+//! via [`send`](TipcRequestBuilder::send), which takes the destination
+//! buffer. The builder holds no buffer reference. [`TipcPayload`] implements
 //! [`hipc::HipcPayload`] for direct use with [`hipc::HipcRequestBuilder`].
 //!
 //! # References
@@ -139,17 +140,18 @@ impl HipcPayload for TipcPayload {
 /// Wraps a [`HipcRequestBuilder`] with the message type pre-set to
 /// `CommandType::request(request_id)` (ID + 16). Exposes only the descriptor
 /// kinds TIPC supports — mapped buffers and copy handles.
-pub struct TipcBuilder<'a, const N: usize> {
-    hipc: HipcRequestBuilder<'a, N>,
+pub struct TipcRequestBuilder {
+    hipc: HipcRequestBuilder,
     data_size: usize,
 }
 
-impl<'a, const N: usize> TipcBuilder<'a, N> {
-    /// Starts a new builder for the given command ID and buffer.
+impl TipcRequestBuilder {
+    /// Starts a new builder for the given command ID. The destination buffer
+    /// is supplied to [`send`](Self::send).
     #[inline]
-    pub fn new(buf: &'a mut [u8; N], request_id: u32) -> Self {
+    pub fn new(request_id: u32) -> Self {
         Self {
-            hipc: HipcRequestBuilder::new(buf, CommandType::request(request_id)),
+            hipc: HipcRequestBuilder::new(CommandType::request(request_id)),
             data_size: 0,
         }
     }
@@ -203,9 +205,12 @@ impl<'a, const N: usize> TipcBuilder<'a, N> {
         self
     }
 
-    /// Finalizes the request, writing the HIPC frame into the buffer.
-    pub fn send(self) -> Result<TipcRequest<'a>, RequestLayoutError> {
-        self.hipc.payload(TipcPayload::new(self.data_size))
+    /// Finalizes the request, writing the HIPC frame into `buf`.
+    pub fn send<'a, const N: usize>(
+        self,
+        buf: &'a mut [u8; N],
+    ) -> Result<TipcRequest<'a>, RequestLayoutError> {
+        self.hipc.payload(buf, TipcPayload::new(self.data_size))
     }
 }
 
@@ -216,7 +221,7 @@ impl<'a, const N: usize> TipcBuilder<'a, N> {
 /// Returns [`RequestLayoutError`] if the computed request size exceeds the
 /// IPC buffer (cannot happen for a close request in practice).
 pub fn close_request<const N: usize>(buf: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-    HipcRequestBuilder::new(buf, CommandType::Close).payload(TipcPayload::new(0))?;
+    HipcRequestBuilder::new(CommandType::Close).payload(buf, TipcPayload::new(0))?;
     Ok(())
 }
 
@@ -274,7 +279,7 @@ pub enum ParseResponseError {
     TruncatedPayload,
 }
 
-/// Finalized TIPC request, returned by [`TipcBuilder::send`].
+/// Finalized TIPC request, returned by [`TipcRequestBuilder::send`].
 ///
 /// All HIPC descriptors are populated; the caller fills [`data`](Self::data)
 /// before sending the request via `SendSyncRequest`.
@@ -282,7 +287,7 @@ pub enum ParseResponseError {
 pub struct TipcRequest<'a> {
     /// Underlying HIPC frame with descriptor slots already populated.
     pub hipc: hipc::Request<'a>,
-    /// Payload data area (size matches `TipcBuilder::data_size`).
+    /// Payload data area (size matches `TipcRequestBuilder::data_size`).
     pub data: &'a mut [u8],
 }
 

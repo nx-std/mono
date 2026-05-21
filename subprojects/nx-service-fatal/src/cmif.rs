@@ -26,10 +26,10 @@ pub fn throw_fatal_with_policy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::THROW_FATAL_WITH_POLICY)
+        let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_POLICY)
             .data_size(size_of::<ThrowFatalIn>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(ThrowFatalError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<ThrowFatalIn>()` bytes.
@@ -63,7 +63,7 @@ pub fn throw_fatal_with_context(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::THROW_FATAL_WITH_CONTEXT)
+        let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_CONTEXT)
             .data_size(size_of::<ThrowFatalIn>())
             .send_pid()
             .add_in_buffer(
@@ -71,7 +71,7 @@ pub fn throw_fatal_with_context(
                 size_of::<FatalCpuContext>(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(ThrowFatalError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<ThrowFatalIn>()` bytes.

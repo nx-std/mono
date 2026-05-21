@@ -13,9 +13,9 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_LAST_TICK)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_LAST_TICK)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(GetLastTickError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -61,9 +61,9 @@ pub fn get_readable_event(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_READABLE_EVENT)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_READABLE_EVENT)
             .data_size(size_of::<EventInput>())
-            .send()
+            .send(&mut buf)
             .map_err(GetReadableEventError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<EventInput>()` bytes.
@@ -101,9 +101,9 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_WRITABLE_EVENT)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_WRITABLE_EVENT)
             .data_size(size_of::<EventInput>())
-            .send()
+            .send(&mut buf)
             .map_err(GetWritableEventError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<EventInput>()` bytes.

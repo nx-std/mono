@@ -22,9 +22,9 @@ pub fn get_service_handle(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = tipc::TipcBuilder::new(&mut buf, proto::GET_SERVICE_HANDLE)
+        let req = tipc::TipcRequestBuilder::new(proto::GET_SERVICE_HANDLE)
             .data_size(size_of::<ServiceName>())
-            .send()
+            .send(&mut buf)
             .map_err(GetServiceError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<ServiceName>()` bytes.
@@ -88,9 +88,9 @@ pub fn register_service(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = tipc::TipcBuilder::new(&mut buf, proto::REGISTER_SERVICE)
+        let req = tipc::TipcRequestBuilder::new(proto::REGISTER_SERVICE)
             .data_size(size_of::<RegisterServiceTipcIn>())
-            .send()
+            .send(&mut buf)
             .map_err(RegisterServiceError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<RegisterServiceTipcIn>()` bytes.
@@ -141,9 +141,9 @@ pub fn unregister_service(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = tipc::TipcBuilder::new(&mut buf, proto::UNREGISTER_SERVICE)
+        let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_SERVICE)
             .data_size(size_of::<ServiceName>())
-            .send()
+            .send(&mut buf)
             .map_err(UnregisterServiceError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<ServiceName>()` bytes.
@@ -184,9 +184,9 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
         // The detach-client request carries no payload data.
-        tipc::TipcBuilder::new(&mut buf, proto::DETACH_CLIENT)
+        tipc::TipcRequestBuilder::new(proto::DETACH_CLIENT)
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(DetachClientError::BuildRequest)?;
     }
 
@@ -225,9 +225,9 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
         // The register-client request carries no payload data.
-        tipc::TipcBuilder::new(&mut buf, proto::REGISTER_CLIENT)
+        tipc::TipcRequestBuilder::new(proto::REGISTER_CLIENT)
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(RegisterClientError::BuildRequest)?;
     }
 

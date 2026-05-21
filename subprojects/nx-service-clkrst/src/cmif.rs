@@ -23,9 +23,9 @@ pub fn open_session(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_SESSION)
+        let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
             .data_size(size_of::<[u32; 2]>())
-            .send()
+            .send(&mut buf)
             .map_err(OpenSessionError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<[u32; 2]>()` bytes.
@@ -57,9 +57,9 @@ pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRat
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_CLOCK_RATE)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_CLOCK_RATE)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(SetClockRateError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -82,8 +82,8 @@ pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> 
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_CLOCK_RATE)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::GET_CLOCK_RATE)
+            .send(&mut buf)
             .map_err(GetClockRateError::BuildRequest)?;
     }
 
@@ -123,14 +123,14 @@ pub fn get_possible_clock_rates(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_POSSIBLE_CLOCK_RATES)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
             .data_size(size_of::<i32>())
             .add_out_auto_buffer(
                 rates.as_mut_ptr().cast::<u8>(),
                 size_of_val(rates),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetPossibleClockRatesError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<i32>()` bytes.

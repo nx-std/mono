@@ -37,14 +37,14 @@ pub fn capture_raw_image_with_timeout(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
+        let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
             .data_size(size_of::<CaptureRawImageIn>())
             .add_out_buffer(
                 out_image.as_mut_ptr(),
                 out_image.len(),
                 BufferMode::NonSecure,
             )
-            .send()
+            .send(&mut buf)
             .map_err(CaptureRawImageError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<CaptureRawImageIn>()` bytes.
@@ -87,9 +87,9 @@ pub fn open_raw_screen_shot_read_stream(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
+        let req = cmif::CmifRequestBuilder::new(proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
             .data_size(size_of::<LayerStackTimeoutIn>())
-            .send()
+            .send(&mut buf)
             .map_err(OpenReadStreamError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
@@ -122,8 +122,8 @@ pub fn close_raw_screen_shot_read_stream(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM)
+            .send(&mut buf)
             .map_err(CloseReadStreamError::BuildRequest)?;
     }
 
@@ -149,10 +149,10 @@ pub fn read_raw_screen_shot_read_stream(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
+        let req = cmif::CmifRequestBuilder::new(proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
             .data_size(size_of::<u64>())
             .add_out_buffer(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(ReadStreamError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
@@ -192,10 +192,10 @@ pub fn capture_jpeg_screen_shot(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::CAPTURE_JPEG_SCREEN_SHOT)
+        let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_JPEG_SCREEN_SHOT)
             .data_size(size_of::<LayerStackTimeoutIn>())
             .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
-            .send()
+            .send(&mut buf)
             .map_err(CaptureJpegError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.

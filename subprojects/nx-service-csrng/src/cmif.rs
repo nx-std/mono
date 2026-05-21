@@ -12,9 +12,9 @@ pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), Ge
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_RANDOM_BYTES)
+        cmif::CmifRequestBuilder::new(proto::GET_RANDOM_BYTES)
             .add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(GetRandomBytesError::BuildRequest)?;
     }
 

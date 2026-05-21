@@ -13,9 +13,9 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::REQUEST_LOAD)
+        let req = cmif::CmifRequestBuilder::new(proto::REQUEST_LOAD)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestLoadError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -40,9 +40,9 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_LOAD_STATE)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_LOAD_STATE)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(GetLoadStateError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -69,9 +69,9 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_SIZE)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_SIZE)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(GetSizeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -101,9 +101,9 @@ pub fn get_shared_memory_address_offset(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_SHARED_MEMORY_ADDRESS_OFFSET)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_ADDRESS_OFFSET)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(GetSharedMemoryAddressOffsetError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -132,8 +132,8 @@ pub fn get_shared_memory_native_handle(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_SHARED_MEMORY_NATIVE_HANDLE)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_NATIVE_HANDLE)
+            .send(&mut buf)
             .map_err(GetSharedMemoryNativeHandleError::BuildRequest)?;
     }
 
@@ -173,7 +173,7 @@ pub fn get_shared_font(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_SHARED_FONT)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_FONT)
             .data_size(size_of::<u64>())
             .add_out_buffer(
                 types.as_mut_ptr().cast::<u8>(),
@@ -190,7 +190,7 @@ pub fn get_shared_font(
                 core::mem::size_of_val(sizes),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetSharedFontError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.

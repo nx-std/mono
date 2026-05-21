@@ -28,9 +28,9 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError>
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, nv_cmds::OPEN)
+        cmif::CmifRequestBuilder::new(nv_cmds::OPEN)
             .add_in_buffer(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(OpenError::BuildRequest)?;
     }
 
@@ -90,14 +90,14 @@ pub fn ioctl(
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
         let req = {
             let mut builder =
-                cmif::CmifBuilder::new(&mut buf, nv_cmds::IOCTL).data_size(size_of::<Input>());
+                cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).data_size(size_of::<Input>());
             if in_size > 0 {
                 builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
             }
             if out_size > 0 {
                 builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
             }
-            builder.send().map_err(IoctlError::BuildRequest)?
+            builder.send(&mut buf).map_err(IoctlError::BuildRequest)?
         };
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -155,7 +155,7 @@ pub fn ioctl2(
         let req = {
             // Auto buffers in order: argp in (if applicable), extra in, argp out (if applicable).
             let mut builder =
-                cmif::CmifBuilder::new(&mut buf, nv_cmds::IOCTL2).data_size(size_of::<Input>());
+                cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).data_size(size_of::<Input>());
             if in_size > 0 {
                 builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
             }
@@ -163,7 +163,7 @@ pub fn ioctl2(
             if out_size > 0 {
                 builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
             }
-            builder.send().map_err(Ioctl2Error::BuildRequest)?
+            builder.send(&mut buf).map_err(Ioctl2Error::BuildRequest)?
         };
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -221,7 +221,7 @@ pub fn ioctl3(
         let req = {
             // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra out.
             let mut builder =
-                cmif::CmifBuilder::new(&mut buf, nv_cmds::IOCTL3).data_size(size_of::<Input>());
+                cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).data_size(size_of::<Input>());
             if in_size > 0 {
                 builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
             }
@@ -229,7 +229,7 @@ pub fn ioctl3(
                 builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
             }
             builder = builder.add_out_auto_buffer(extra_out, extra_out_size, BufferMode::Normal);
-            builder.send().map_err(Ioctl3Error::BuildRequest)?
+            builder.send(&mut buf).map_err(Ioctl3Error::BuildRequest)?
         };
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -262,9 +262,9 @@ pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::CLOSE)
+        let req = cmif::CmifRequestBuilder::new(nv_cmds::CLOSE)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(CloseError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -302,11 +302,11 @@ pub fn initialize(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::INITIALIZE)
+        let req = cmif::CmifRequestBuilder::new(nv_cmds::INITIALIZE)
             .data_size(size_of::<u32>())
             .add_copy_handle(process_handle.to_raw())
             .add_copy_handle(tmem_handle.to_raw())
-            .send()
+            .send(&mut buf)
             .map_err(InitializeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -347,9 +347,9 @@ pub fn query_event(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::QUERY_EVENT)
+        let req = cmif::CmifRequestBuilder::new(nv_cmds::QUERY_EVENT)
             .data_size(size_of::<Input>())
-            .send()
+            .send(&mut buf)
             .map_err(QueryEventError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -387,10 +387,10 @@ pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetCli
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, nv_cmds::SET_CLIENT_PID)
+        let req = cmif::CmifRequestBuilder::new(nv_cmds::SET_CLIENT_PID)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(SetClientPidError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.

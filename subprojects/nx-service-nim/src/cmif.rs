@@ -16,9 +16,9 @@ pub fn destroy_system_update_task(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::DESTROY_SYSTEM_UPDATE_TASK)
+        let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
             .data_size(size_of::<SystemUpdateTaskId>())
-            .send()
+            .send(&mut buf)
             .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<SystemUpdateTaskId>()` bytes.
@@ -57,9 +57,9 @@ pub fn list_system_update_task(
                 core::mem::size_of_val(out),
             )
         };
-        cmif::CmifBuilder::new(&mut buf, proto::LIST_SYSTEM_UPDATE_TASK)
+        cmif::CmifRequestBuilder::new(proto::LIST_SYSTEM_UPDATE_TASK)
             .add_out_buffer(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(ListSystemUpdateTaskError::BuildRequest)?;
     }
 

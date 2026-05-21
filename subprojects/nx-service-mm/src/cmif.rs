@@ -24,9 +24,9 @@ pub fn request_initialize(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::INITIALIZE)
+        let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
             .data_size(size_of::<[u32; 3]>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestInitializeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<[u32; 3]>()` bytes.
@@ -81,9 +81,9 @@ pub fn request_initialize_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::INITIALIZE_OLD)
+        let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE_OLD)
             .data_size(size_of::<[u32; 3]>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestInitializeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<[u32; 3]>()` bytes.
@@ -123,9 +123,9 @@ pub fn request_finalize(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::FINALIZE)
+        let req = cmif::CmifRequestBuilder::new(proto::FINALIZE)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestFinalizeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -168,9 +168,9 @@ pub fn request_finalize_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::FINALIZE_OLD)
+        let req = cmif::CmifRequestBuilder::new(proto::FINALIZE_OLD)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestFinalizeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -204,9 +204,9 @@ pub fn request_set_and_wait(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_AND_WAIT)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT)
             .data_size(size_of::<[u32; 3]>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestSetAndWaitError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<[u32; 3]>()` bytes.
@@ -254,9 +254,9 @@ pub fn request_set_and_wait_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_AND_WAIT_OLD)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT_OLD)
             .data_size(size_of::<[u32; 3]>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestSetAndWaitError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<[u32; 3]>()` bytes.
@@ -288,9 +288,9 @@ pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, Reque
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET)
+        let req = cmif::CmifRequestBuilder::new(proto::GET)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestGetError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.
@@ -338,9 +338,9 @@ pub fn request_get_legacy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::GET_OLD)
+        let req = cmif::CmifRequestBuilder::new(proto::GET_OLD)
             .data_size(size_of::<u32>())
-            .send()
+            .send(&mut buf)
             .map_err(RequestGetError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.

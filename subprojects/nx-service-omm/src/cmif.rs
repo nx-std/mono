@@ -20,8 +20,8 @@ pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationMode
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_OPERATION_MODE)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::GET_OPERATION_MODE)
+            .send(&mut buf)
             .map_err(GetOperationModeError::BuildRequest)?;
     }
 
@@ -66,9 +66,9 @@ pub fn set_operation_mode_policy(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SET_OPERATION_MODE_POLICY)
+        let req = cmif::CmifRequestBuilder::new(proto::SET_OPERATION_MODE_POLICY)
             .data_size(size_of::<u8>())
-            .send()
+            .send(&mut buf)
             .map_err(SetOperationModePolicyError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u8>()` bytes.
@@ -113,8 +113,8 @@ pub fn get_default_display_resolution(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::GET_DEFAULT_DISPLAY_RESOLUTION)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::GET_DEFAULT_DISPLAY_RESOLUTION)
+            .send(&mut buf)
             .map_err(GetDefaultDisplayResolutionError::BuildRequest)?;
     }
 

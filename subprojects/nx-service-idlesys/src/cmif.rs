@@ -12,8 +12,8 @@ pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsA
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, proto::REPORT_USER_IS_ACTIVE)
-            .send()
+        cmif::CmifRequestBuilder::new(proto::REPORT_USER_IS_ACTIVE)
+            .send(&mut buf)
             .map_err(ReportUserIsActiveError::BuildRequest)?;
     }
 

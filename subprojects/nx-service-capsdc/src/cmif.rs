@@ -23,7 +23,7 @@ pub fn decode_jpeg(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::DECODE_JPEG)
+        let req = cmif::CmifRequestBuilder::new(proto::DECODE_JPEG)
             .data_size(size_of::<DecodeJpegIn>())
             .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
             .add_out_buffer(
@@ -31,7 +31,7 @@ pub fn decode_jpeg(
                 out_image.len(),
                 BufferMode::NonSecure,
             )
-            .send()
+            .send(&mut buf)
             .map_err(DecodeJpegError::BuildRequest)?;
 
         let input = DecodeJpegIn {
@@ -67,11 +67,11 @@ pub fn shrink_jpeg(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SHRINK_JPEG)
+        let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG)
             .data_size(size_of::<DecodeJpegIn>())
             .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
             .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
-            .send()
+            .send(&mut buf)
             .map_err(ShrinkJpegError::BuildRequest)?;
 
         let input = DecodeJpegIn {
@@ -112,11 +112,11 @@ pub fn shrink_jpeg_ex(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, proto::SHRINK_JPEG_EX)
+        let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG_EX)
             .data_size(size_of::<ShrinkJpegExIn>())
             .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
             .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
-            .send()
+            .send(&mut buf)
             .map_err(ShrinkJpegExError::BuildRequest)?;
 
         let input = ShrinkJpegExIn {

@@ -36,9 +36,9 @@ pub fn get_z_order_count_min(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::GET_Z_ORDER_COUNT_MIN)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MIN)
             .data_size(8) // display_id
-            .send()
+            .send(&mut buf)
             .map_err(GetZOrderCountError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
@@ -69,9 +69,9 @@ pub fn get_z_order_count_max(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::GET_Z_ORDER_COUNT_MAX)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MAX)
             .data_size(8) // display_id
-            .send()
+            .send(&mut buf)
             .map_err(GetZOrderCountError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
@@ -111,9 +111,9 @@ pub fn get_display_logical_resolution(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
             .data_size(8) // display_id
-            .send()
+            .send(&mut buf)
             .map_err(GetDisplayLogicalResolutionError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly 8 bytes; writing display_id as u64 is sound.
@@ -176,9 +176,9 @@ pub fn set_display_magnification(
             display_id: display_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_DISPLAY_MAGNIFICATION)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::SET_DISPLAY_MAGNIFICATION)
             .data_size(24) // x(4) + y(4) + width(4) + height(4) + display_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetDisplayMagnificationError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -220,9 +220,9 @@ pub fn set_layer_position(
             layer_id: layer_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_POSITION)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_POSITION)
             .data_size(16) // x(4) + y(4) + layer_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetLayerPositionError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -264,9 +264,9 @@ pub fn set_layer_size(
             height,
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_SIZE)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_SIZE)
             .data_size(24) // layer_id(8) + width(8) + height(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetLayerSizeError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -305,9 +305,9 @@ pub fn set_layer_z(
             z,
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_Z)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_Z)
             .data_size(16) // layer_id(8) + z(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetLayerZError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -348,9 +348,9 @@ pub fn set_layer_visibility(
             layer_id: layer_id.to_raw(),
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, system_cmds::SET_LAYER_VISIBILITY)
+        let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_VISIBILITY)
             .data_size(16) // visible(1) + pad(7) + layer_id(8)
-            .send()
+            .send(&mut buf)
             .map_err(SetLayerVisibilityError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.

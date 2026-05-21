@@ -33,9 +33,9 @@ pub fn get_display_service(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(4) // inval
-            .send()
+            .send(&mut buf)
             .map_err(GetDisplayServiceError::BuildRequest)?;
 
         // Write inval
@@ -74,8 +74,8 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, root_cmds::PREPARE_FATAL)
-            .send()
+        cmif::CmifRequestBuilder::new(root_cmds::PREPARE_FATAL)
+            .send(&mut buf)
             .map_err(PrepareFatalError::BuildRequest)?;
     }
 
@@ -97,8 +97,8 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifBuilder::new(&mut buf, root_cmds::SHOW_FATAL)
-            .send()
+        cmif::CmifRequestBuilder::new(root_cmds::SHOW_FATAL)
+            .send(&mut buf)
             .map_err(ShowFatalError::BuildRequest)?;
     }
 
@@ -147,9 +147,9 @@ pub fn draw_fatal_rectangle(
             end_y,
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, root_cmds::DRAW_FATAL_RECTANGLE)
+        let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_RECTANGLE)
             .data_size(20)
-            .send()
+            .send(&mut buf)
             .map_err(DrawFatalRectangleError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.
@@ -221,14 +221,14 @@ pub fn draw_fatal_text32(
             )
         };
 
-        let req = cmif::CmifBuilder::new(&mut buf, root_cmds::DRAW_FATAL_TEXT32)
+        let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_TEXT32)
             .data_size(32) // x(4) + y(4) + scale_x(4) + scale_y(4) + font_type(4) + bg_color(4) + fg_color(4) + initial_advance(4)
             .add_in_buffer(
                 codepoints_bytes.as_ptr(),
                 codepoints_bytes.len(),
                 nx_sf::hipc::BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(DrawFatalText32Error::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<Input>()` bytes.

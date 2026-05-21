@@ -57,7 +57,7 @@ pub fn get_host_by_name(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_HOST_BY_NAME)
+        let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_NAME)
             .data_size(size_of::<GetHostByNameIn>())
             .send_pid()
             .add_in_buffer(name_ptr, name_len, BufferMode::Normal)
@@ -66,7 +66,7 @@ pub fn get_host_by_name(
                 out_buffer.len(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetHostByNameError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<GetHostByNameIn>()` bytes.
@@ -138,7 +138,7 @@ pub fn get_host_by_addr(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_HOST_BY_ADDR)
+        let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_ADDR)
             .data_size(size_of::<GetHostByAddrIn>())
             .add_in_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
             .add_out_buffer(
@@ -146,7 +146,7 @@ pub fn get_host_by_addr(
                 out_buffer.len(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetHostByAddrError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<GetHostByAddrIn>()` bytes.
@@ -279,7 +279,7 @@ pub fn get_addr_info(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_ADDR_INFO)
+        let req = cmif::CmifRequestBuilder::new(CMD_GET_ADDR_INFO)
             .data_size(size_of::<GetAddrInfoIn>())
             .send_pid()
             .add_in_buffer(node_ptr, node_len, BufferMode::Normal)
@@ -290,7 +290,7 @@ pub fn get_addr_info(
                 out_buffer.len(),
                 BufferMode::Normal,
             )
-            .send()
+            .send(&mut buf)
             .map_err(GetAddrInfoError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<GetAddrInfoIn>()` bytes.
@@ -359,13 +359,13 @@ pub fn get_name_info(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_NAME_INFO)
+        let req = cmif::CmifRequestBuilder::new(CMD_GET_NAME_INFO)
             .data_size(size_of::<GetNameInfoIn>())
             .send_pid()
             .add_in_buffer(sockaddr.as_ptr(), sockaddr.len(), BufferMode::Normal)
             .add_out_buffer(host.as_mut_ptr(), host.len(), BufferMode::Normal)
             .add_out_buffer(serv.as_mut_ptr(), serv.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(GetNameInfoError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<GetNameInfoIn>()` bytes.
@@ -413,10 +413,10 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_GET_CANCEL_HANDLE)
+        let req = cmif::CmifRequestBuilder::new(CMD_GET_CANCEL_HANDLE)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(GetCancelHandleError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u64>()` bytes.
@@ -465,10 +465,10 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, CMD_CANCEL)
+        let req = cmif::CmifRequestBuilder::new(CMD_CANCEL)
             .data_size(size_of::<CancelIn>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(CancelError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<CancelIn>()` bytes.
@@ -533,10 +533,10 @@ fn string_error_impl(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<u32>())
             .add_out_buffer(out_str.as_mut_ptr(), out_str.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(StringErrorError::BuildRequest)?;
 
         // SAFETY: `req.data` is exactly `size_of::<u32>()` bytes.

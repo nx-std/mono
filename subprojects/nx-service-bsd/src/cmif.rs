@@ -62,11 +62,11 @@ pub(crate) fn register_client(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::REGISTER_CLIENT)
+        let req = cmif::CmifRequestBuilder::new(cmds::REGISTER_CLIENT)
             .data_size(size_of::<RegisterClientIn>())
             .send_pid()
             .add_copy_handle(tmem_handle.to_raw())
-            .send()
+            .send(&mut buf)
             .map_err(RegisterClientError::BuildRequest)?;
         // SAFETY: `req.data` is exactly `size_of::<RegisterClientIn>()` bytes.
         unsafe {
@@ -98,10 +98,10 @@ pub(crate) fn start_monitoring(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::START_MONITORING)
+        let req = cmif::CmifRequestBuilder::new(cmds::START_MONITORING)
             .data_size(size_of::<u64>())
             .send_pid()
-            .send()
+            .send(&mut buf)
             .map_err(StartMonitoringError::BuildRequest)?;
         // SAFETY: req.data has 8 bytes reserved for the pid payload.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<u64>(), pid) };
@@ -200,9 +200,9 @@ pub(crate) fn socket(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::SOCKET)
+        let req = cmif::CmifRequestBuilder::new(cmds::SOCKET)
             .data_size(size_of::<SocketIn>())
-            .send()
+            .send(&mut buf)
             .map_err(SocketError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SocketIn.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SocketIn>(), payload) };
@@ -223,9 +223,9 @@ pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseEr
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::CLOSE)
+        let req = cmif::CmifRequestBuilder::new(cmds::CLOSE)
             .data_size(size_of::<i32>())
-            .send()
+            .send(&mut buf)
             .map_err(CloseError::BuildRequest)?;
         // SAFETY: req.data has 4 bytes reserved for the fd.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
@@ -299,10 +299,10 @@ fn bsd_send_recv_no_buffer_in<E>(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<i32>())
             .add_in_auto_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(mk_build)?;
         // SAFETY: req.data has 4 bytes reserved for sockfd.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
@@ -334,10 +334,10 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmd_id)
+        let req = cmif::CmifRequestBuilder::new(cmd_id)
             .data_size(size_of::<i32>())
             .add_out_auto_buffer(addr_buf.as_mut_ptr(), addr_buf.len(), BufferMode::Normal)
-            .send()
+            .send(&mut buf)
             .map_err(mk_build)?;
         // SAFETY: req.data has 4 bytes reserved for sockfd.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), sockfd.raw()) };
@@ -426,9 +426,9 @@ pub(crate) fn listen(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::LISTEN)
+        let req = cmif::CmifRequestBuilder::new(cmds::LISTEN)
             .data_size(size_of::<ListenIn>())
-            .send()
+            .send(&mut buf)
             .map_err(ListenError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for ListenIn.
         unsafe {
@@ -461,9 +461,9 @@ pub(crate) fn shutdown(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut buf, cmds::SHUTDOWN)
+        let req = cmif::CmifRequestBuilder::new(cmds::SHUTDOWN)
             .data_size(size_of::<ShutdownIn>())
-            .send()
+            .send(&mut buf)
             .map_err(ShutdownError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for ShutdownIn.
         unsafe {
@@ -501,10 +501,10 @@ pub(crate) fn recv(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::RECV)
+        let req = cmif::CmifRequestBuilder::new(cmds::RECV)
             .data_size(size_of::<SockfdFlagsIn>())
             .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(RecvError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
@@ -539,11 +539,11 @@ pub(crate) fn recv_from(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::RECV_FROM)
+        let req = cmif::CmifRequestBuilder::new(cmds::RECV_FROM)
             .data_size(size_of::<SockfdFlagsIn>())
             .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
             .add_out_auto_buffer(src_addr.as_mut_ptr(), src_addr.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(RecvFromError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
@@ -578,10 +578,10 @@ pub(crate) fn send(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SEND)
+        let req = cmif::CmifRequestBuilder::new(cmds::SEND)
             .data_size(size_of::<SockfdFlagsIn>())
             .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(SendError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
@@ -616,11 +616,11 @@ pub(crate) fn send_to(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SEND_TO)
+        let req = cmif::CmifRequestBuilder::new(cmds::SEND_TO)
             .data_size(size_of::<SockfdFlagsIn>())
             .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
             .add_in_auto_buffer(dest_addr.as_ptr(), dest_addr.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(SendToError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SockfdFlagsIn.
         unsafe {
@@ -653,10 +653,10 @@ pub(crate) fn read(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::READ)
+        let req = cmif::CmifRequestBuilder::new(cmds::READ)
             .data_size(size_of::<i32>())
             .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(ReadError::BuildRequest)?;
         // SAFETY: req.data has 4 bytes reserved for the fd.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
@@ -681,10 +681,10 @@ pub(crate) fn write(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::WRITE)
+        let req = cmif::CmifRequestBuilder::new(cmds::WRITE)
             .data_size(size_of::<i32>())
             .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(WriteError::BuildRequest)?;
         // SAFETY: req.data has 4 bytes reserved for the fd.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<i32>(), fd.raw()) };
@@ -715,10 +715,10 @@ pub(crate) fn get_sock_opt(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::GET_SOCK_OPT)
+        let req = cmif::CmifRequestBuilder::new(cmds::GET_SOCK_OPT)
             .data_size(size_of::<SockOptIn>())
             .add_out_auto_buffer(optval.as_mut_ptr(), optval.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(GetSockOptError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SockOptIn.
         unsafe {
@@ -755,10 +755,10 @@ pub(crate) fn set_sock_opt(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SET_SOCK_OPT)
+        let req = cmif::CmifRequestBuilder::new(cmds::SET_SOCK_OPT)
             .data_size(size_of::<SockOptIn>())
             .add_in_auto_buffer(optval.as_ptr(), optval.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(SetSockOptError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SockOptIn.
         unsafe {
@@ -799,9 +799,9 @@ pub(crate) fn fcntl(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::FCNTL)
+        let req = cmif::CmifRequestBuilder::new(cmds::FCNTL)
             .data_size(size_of::<FcntlIn>())
-            .send()
+            .send(&mut ipc_buf)
             .map_err(FcntlError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for FcntlIn.
         unsafe {
@@ -859,7 +859,7 @@ pub(crate) fn ioctl(
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
         let mut builder =
-            cmif::CmifBuilder::new(&mut ipc_buf, cmds::IOCTL).data_size(size_of::<IoctlIn>());
+            cmif::CmifRequestBuilder::new(cmds::IOCTL).data_size(size_of::<IoctlIn>());
         if has_in {
             builder = builder.add_in_auto_buffer(data.as_ptr(), payload_len, BufferMode::Normal);
         }
@@ -867,7 +867,9 @@ pub(crate) fn ioctl(
             builder =
                 builder.add_out_auto_buffer(data.as_mut_ptr(), payload_len, BufferMode::Normal);
         }
-        let req = builder.send().map_err(IoctlError::BuildRequest)?;
+        let req = builder
+            .send(&mut ipc_buf)
+            .map_err(IoctlError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for IoctlIn.
         unsafe {
             ptr::write_unaligned(
@@ -946,7 +948,7 @@ pub(crate) fn select(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::SELECT)
+        let req = cmif::CmifRequestBuilder::new(cmds::SELECT)
             .data_size(size_of::<SelectIn>())
             .add_in_auto_buffer(readfds.as_ptr(), readfds.len(), BufferMode::Normal)
             .add_in_auto_buffer(writefds.as_ptr(), writefds.len(), BufferMode::Normal)
@@ -954,7 +956,7 @@ pub(crate) fn select(
             .add_out_auto_buffer(readfds.as_mut_ptr(), readfds.len(), BufferMode::Normal)
             .add_out_auto_buffer(writefds.as_mut_ptr(), writefds.len(), BufferMode::Normal)
             .add_out_auto_buffer(exceptfds.as_mut_ptr(), exceptfds.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(SelectError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for SelectIn.
         unsafe { ptr::write_unaligned(req.data.as_mut_ptr().cast::<SelectIn>(), payload) };
@@ -981,11 +983,11 @@ pub(crate) fn poll(
         // SAFETY: IPC operations are serialized on this thread, so no other
         // borrow of the TLS IPC buffer is live.
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifBuilder::new(&mut ipc_buf, cmds::POLL)
+        let req = cmif::CmifRequestBuilder::new(cmds::POLL)
             .data_size(size_of::<PollIn>())
             .add_in_auto_buffer(fds.as_ptr(), fds.len(), BufferMode::Normal)
             .add_out_auto_buffer(fds.as_mut_ptr(), fds.len(), BufferMode::Normal)
-            .send()
+            .send(&mut ipc_buf)
             .map_err(PollError::BuildRequest)?;
         // SAFETY: req.data has data_size bytes reserved for PollIn.
         unsafe {
