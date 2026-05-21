@@ -261,7 +261,7 @@ impl<'a> CmifControlRequestBuilder<'a> {
     /// Finalizes the request value.
     pub fn build(self) -> CmifControlRequest<'a> {
         let encoded_len = self.encoded_len();
-        let hipc = self.hipc.build(encoded_len);
+        let hipc = self.hipc.with_data_size(encoded_len).build();
         CmifControlRequest {
             hipc,
             request_id: self.request_id,
@@ -303,14 +303,19 @@ pub enum CmifCloseRequest {
 impl CmifCloseRequest {
     /// Creates a session-close request.
     pub fn session() -> Self {
-        Self::Session(HipcRequestBuilder::new(CommandType::Close).build(0))
+        Self::Session(
+            HipcRequestBuilder::new(CommandType::Close)
+                .with_data_size(0)
+                .build(),
+        )
     }
 
     /// Creates a domain-object close request.
     pub fn domain_object(object_id: ObjectId) -> Self {
         Self::DomainObject {
             hipc: HipcRequestBuilder::new(CommandType::Request)
-                .build(size_of::<DomainInHeader>() + 16),
+                .with_data_size(size_of::<DomainInHeader>() + 16)
+                .build(),
             object_id,
         }
     }
@@ -633,7 +638,11 @@ impl<'a> CmifRequestBuilder<'a> {
             CommandType::Request
         };
         let encoded_len = self.encoded_len();
-        let hipc = self.hipc.set_message_type(message_type).build(encoded_len);
+        let hipc = self
+            .hipc
+            .set_message_type(message_type)
+            .with_data_size(encoded_len)
+            .build();
         CmifRequest {
             hipc,
             request_id: self.request_id,

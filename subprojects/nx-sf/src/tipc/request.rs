@@ -87,7 +87,7 @@ impl<'a> TipcRequestBuilder<'a> {
     /// Finalizes the request DTO.
     pub fn build(self) -> TipcRequest<'a> {
         let data_len = self.data.len();
-        let hipc = self.hipc.build(data_len);
+        let hipc = self.hipc.with_data_size(data_len).build();
         TipcRequest {
             hipc,
             data: self.data,
@@ -123,7 +123,9 @@ impl TipcCloseRequest {
     /// Creates a session-close request.
     pub fn session() -> Self {
         Self {
-            hipc: HipcRequestBuilder::new(CommandType::Close).build(0),
+            hipc: HipcRequestBuilder::new(CommandType::Close)
+                .with_data_size(0)
+                .build(),
         }
     }
 

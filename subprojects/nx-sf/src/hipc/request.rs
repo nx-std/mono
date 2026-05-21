@@ -11,7 +11,7 @@
 //! a [`HipcRequest`] DTO via [`HipcRequestBuilder::build`]. The DTO carries
 //! every input needed to serialize the request — descriptors, handles,
 //! recv-list configuration, send-PID flag, and the size of the data-words
-//! region — but **no buffer reference**.
+//! region (always word-aligned) — but **no buffer reference**.
 //!
 //! Serialization happens via [`HipcRequest::write_to`], which writes the HIPC
 //! header and all descriptor slots into a caller-supplied `&mut [u8; N]`
@@ -122,8 +122,8 @@ impl RecvListMode {
 ///
 /// Self-contained value-type description of an HIPC request: message type,
 /// every descriptor / handle that goes on the wire, recv-list configuration,
-/// `send_pid` flag, and the size of the data-words region. Holds **no**
-/// buffer reference. Constructed by [`HipcRequestBuilder::build`].
+/// `send_pid` flag, and the word-aligned size of the data-words region. Holds
+/// **no** buffer reference. Constructed by [`HipcRequestBuilder::build`].
 ///
 /// Serialize via [`write_to`](Self::write_to). The data-words region is left
 /// zero-initialized; higher-level protocols (CMIF, TIPC) fill it themselves
@@ -153,10 +153,10 @@ impl HipcRequest {
         self.layout().data_words_offset()
     }
 
-    /// Returns the data-words region size in bytes (rounded up to a 4-byte
-    /// boundary, matching the HIPC `num_data_words` wire field).
+    /// Returns the data-words region size in bytes (always word-aligned,
+    /// matching the HIPC `num_data_words` wire field).
     pub fn data_words_size(&self) -> usize {
-        self.layout().num_data_words * size_of::<u32>()
+        self.data_words_size
     }
 
     /// Writes the HIPC header and descriptor slots into `dst`.
@@ -197,7 +197,7 @@ impl HipcRequest {
             send_buffers: self.send_buffers.len(),
             recv_buffers: self.recv_buffers.len(),
             exch_buffers: self.exch_buffers.len(),
-            num_data_words: self.data_words_size.div_ceil(size_of::<u32>()),
+            num_data_words: self.data_words_size / size_of::<u32>(),
             recv_list_entries: self.recv_list_mode.wire_slot_count(),
             send_pid: self.send_pid,
             num_copy_handles: self.copy_handles.len(),
@@ -209,8 +209,8 @@ impl HipcRequest {
 /// Fluent builder for an [`HipcRequest`].
 ///
 /// Accumulates HIPC-level descriptors via `with_*` methods. Holds no buffer
-/// reference. Finalize via [`build`](Self::build), which takes the
-/// data-words region size and returns a self-contained [`HipcRequest`].
+/// reference. Finalize via [`build`](Self::build), which returns a
+/// self-contained [`HipcRequest`].
 pub struct HipcRequestBuilder {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -221,6 +221,7 @@ pub struct HipcRequestBuilder {
     move_handles: ArrayVec<RawHandle, HIPC_MAX_DESCRIPTORS>,
     recv_list_mode: RecvListMode,
     send_pid: bool,
+    data_words_size: usize,
 }
 
 impl HipcRequestBuilder {
@@ -241,6 +242,7 @@ impl HipcRequestBuilder {
             move_handles: Default::default(),
             recv_list_mode: RecvListMode::None,
             send_pid: false,
+            data_words_size: 0,
         }
     }
 
@@ -260,6 +262,16 @@ impl HipcRequestBuilder {
     #[inline]
     pub fn with_send_pid(mut self) -> Self {
         self.send_pid = true;
+        self
+    }
+
+    /// Configures the data-words region size in bytes.
+    ///
+    /// The size is rounded up to the nearest 4-byte boundary to match HIPC
+    /// word alignment requirements.
+    #[inline]
+    pub fn with_data_size(mut self, size: usize) -> Self {
+        self.data_words_size = size.next_multiple_of(size_of::<u32>());
         self
     }
 
@@ -378,9 +390,8 @@ impl HipcRequestBuilder {
         self
     }
 
-    /// Finalizes the builder into a [`HipcRequest`] DTO with the given
-    /// data-words region size.
-    pub fn build(self, data_words_size: usize) -> HipcRequest {
+    /// Finalizes the builder into a [`HipcRequest`] DTO.
+    pub fn build(self) -> HipcRequest {
         HipcRequest {
             message_type: self.message_type,
             send_statics: self.send_statics,
@@ -391,7 +402,7 @@ impl HipcRequestBuilder {
             move_handles: self.move_handles,
             recv_list_mode: self.recv_list_mode,
             send_pid: self.send_pid,
-            data_words_size,
+            data_words_size: self.data_words_size,
         }
     }
 }
