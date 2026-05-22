@@ -33,10 +33,9 @@
 //! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage — no heap, no dynamic
 //! allocation.
 
-use core::mem::size_of;
+use core::mem::{size_of, size_of_val};
 
 use nx_svc::raw::Handle as RawHandle;
-use zerocopy::FromBytes as _;
 
 use super::{
     array_vec::ArrayVec,
@@ -78,6 +77,29 @@ pub struct HipcRequest<P: HipcPayload = ()> {
 }
 
 impl<P: HipcPayload> HipcRequest<P> {
+    fn has_special_header(&self) -> bool {
+        self.send_pid || !self.copy_handles.is_empty() || !self.move_handles.is_empty()
+    }
+
+    fn total_bytes(&self, data_words_size: usize) -> usize {
+        let mut total = size_of::<Header>();
+        if self.has_special_header() {
+            total += size_of::<SpecialHeader>();
+            if self.send_pid {
+                total += size_of::<u64>();
+            }
+        }
+        total += self.copy_handles.len() * size_of::<RawHandle>();
+        total += self.move_handles.len() * size_of::<RawHandle>();
+        total += self.send_statics.len() * size_of::<StaticDescriptor>();
+        total += self.send_buffers.len() * size_of::<BufferDescriptor>();
+        total += self.recv_buffers.len() * size_of::<BufferDescriptor>();
+        total += self.exch_buffers.len() * size_of::<BufferDescriptor>();
+        total += data_words_size;
+        total += self.recv_list_mode.wire_slot_count() * size_of::<RecvListEntry>();
+        total
+    }
+
     /// Writes the HIPC envelope and the payload's data-words region into `dst`.
     ///
     /// The data-words region is sized as `payload.encoded_len()` rounded up to
@@ -85,12 +107,12 @@ impl<P: HipcPayload> HipcRequest<P> {
     /// [`HipcPayload::write_to`]. The total layout size must fit in `N`;
     /// otherwise [`WriteError`] is returned.
     pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), WriteError> {
-        let data_words_size = self
-            .payload
-            .encoded_len()
-            .next_multiple_of(size_of::<u32>());
-        let layout = self.layout(data_words_size);
-        let total_bytes = layout.total_bytes();
+        // Round the payload's byte length up to a whole number of 4-byte
+        // data words, the unit HIPC headers count in.
+        let num_data_words = self.payload.encoded_len().div_ceil(size_of::<u32>());
+        let data_words_size = num_data_words * size_of::<u32>();
+
+        let total_bytes = self.total_bytes(data_words_size);
         if total_bytes > N {
             return Err(WriteError {
                 needed: total_bytes,
@@ -98,38 +120,23 @@ impl<P: HipcPayload> HipcRequest<P> {
             });
         }
 
-        write_hipc(
-            dst,
-            self.message_type,
-            &layout,
-            &self.recv_list_mode,
-            &self.send_statics,
-            &self.send_buffers,
-            &self.recv_buffers,
-            &self.exch_buffers,
-            &self.copy_handles,
-            &self.move_handles,
-        );
+        let buf = &mut dst[..];
+        let buf = write_header(buf, self, num_data_words);
+        let buf = if self.has_special_header() {
+            write_special_header(buf, self)
+        } else {
+            buf
+        };
+        let buf = write_section(buf, &self.copy_handles[..]);
+        let buf = write_section(buf, &self.move_handles[..]);
+        let buf = write_section(buf, &self.send_statics[..]);
+        let buf = write_section(buf, &self.send_buffers[..]);
+        let buf = write_section(buf, &self.recv_buffers[..]);
+        let buf = write_section(buf, &self.exch_buffers[..]);
+        let buf = write_data_words(buf, &self.payload, data_words_size);
+        let _ = write_recv_list(buf, &self.recv_list_mode);
 
-        let start = layout.data_words_offset();
-        let region = &mut dst[start..start + data_words_size];
-        region.fill(0);
-        self.payload.write_to(region);
         Ok(())
-    }
-
-    fn layout(&self, data_words_size: usize) -> Layout {
-        Layout {
-            send_statics: self.send_statics.len(),
-            send_buffers: self.send_buffers.len(),
-            recv_buffers: self.recv_buffers.len(),
-            exch_buffers: self.exch_buffers.len(),
-            num_data_words: data_words_size / size_of::<u32>(),
-            recv_list_entries: self.recv_list_mode.wire_slot_count(),
-            send_pid: self.send_pid,
-            num_copy_handles: self.copy_handles.len(),
-            num_move_handles: self.move_handles.len(),
-        }
     }
 }
 
@@ -475,157 +482,81 @@ impl RecvListMode {
     }
 }
 
-/// Wire-level layout of a finalized HIPC request.
-struct Layout {
-    send_statics: usize,
-    send_buffers: usize,
-    recv_buffers: usize,
-    exch_buffers: usize,
+/// Writes the HIPC header into `buf` and returns the remaining tail.
+fn write_header<'a, P: HipcPayload>(
+    buf: &'a mut [u8],
+    request: &HipcRequest<P>,
     num_data_words: usize,
-    recv_list_entries: usize,
-    send_pid: bool,
-    num_copy_handles: usize,
-    num_move_handles: usize,
-}
-
-impl Layout {
-    #[inline]
-    fn has_special_header(&self) -> bool {
-        self.send_pid || self.num_copy_handles > 0 || self.num_move_handles > 0
-    }
-
-    fn total_bytes(&self) -> usize {
-        let mut total = size_of::<Header>();
-        if self.has_special_header() {
-            total += size_of::<SpecialHeader>();
-            if self.send_pid {
-                total += size_of::<u64>();
-            }
-        }
-        total += self.num_copy_handles * size_of::<RawHandle>();
-        total += self.num_move_handles * size_of::<RawHandle>();
-        total += self.send_statics * size_of::<StaticDescriptor>();
-        total += self.send_buffers * size_of::<BufferDescriptor>();
-        total += self.recv_buffers * size_of::<BufferDescriptor>();
-        total += self.exch_buffers * size_of::<BufferDescriptor>();
-        total += self.num_data_words * size_of::<u32>();
-        total += self.recv_list_entries * size_of::<RecvListEntry>();
-        total
-    }
-
-    /// Byte offset of the data-words region from the start of the request.
-    fn data_words_offset(&self) -> usize {
-        let mut off = size_of::<Header>();
-        if self.has_special_header() {
-            off += size_of::<SpecialHeader>();
-            if self.send_pid {
-                off += size_of::<u64>();
-            }
-        }
-        off += self.num_copy_handles * size_of::<RawHandle>();
-        off += self.num_move_handles * size_of::<RawHandle>();
-        off += self.send_statics * size_of::<StaticDescriptor>();
-        off += self.send_buffers * size_of::<BufferDescriptor>();
-        off += self.recv_buffers * size_of::<BufferDescriptor>();
-        off += self.exch_buffers * size_of::<BufferDescriptor>();
-        off
-    }
-}
-
-/// Writes the HIPC header, special header, and descriptor slots into `buf`.
-///
-/// The total size check has already been performed by the caller, so every
-/// `mut_from_prefix*` call is infallible. The data-words region is left
-/// zero-initialized.
-#[expect(clippy::too_many_arguments)]
-fn write_hipc<const N: usize>(
-    buf: &mut [u8; N],
-    message_type: MessageType,
-    layout: &Layout,
-    recv_list_mode: &RecvListMode,
-    src_send_statics: &[StaticDescriptor],
-    src_send_buffers: &[BufferDescriptor],
-    src_recv_buffers: &[BufferDescriptor],
-    src_exch_buffers: &[BufferDescriptor],
-    src_copy_handles: &[RawHandle],
-    src_move_handles: &[RawHandle],
-) {
-    let recv_static_mode = recv_list_mode.to_raw();
+) -> &'a mut [u8] {
     let header = Header::new()
-        .with_message_type(message_type.to_raw())
-        .with_num_send_statics(layout.send_statics as u8)
-        .with_num_send_buffers(layout.send_buffers as u8)
-        .with_num_recv_buffers(layout.recv_buffers as u8)
-        .with_num_exch_buffers(layout.exch_buffers as u8)
-        .with_num_data_words(layout.num_data_words as u16)
-        .with_recv_static_mode(recv_static_mode)
-        .with_has_special_header(layout.has_special_header());
+        .with_message_type(request.message_type.to_raw())
+        .with_num_send_statics(request.send_statics.len() as u8)
+        .with_num_send_buffers(request.send_buffers.len() as u8)
+        .with_num_recv_buffers(request.recv_buffers.len() as u8)
+        .with_num_exch_buffers(request.exch_buffers.len() as u8)
+        .with_num_data_words(num_data_words as u16)
+        .with_recv_static_mode(request.recv_list_mode.to_raw())
+        .with_has_special_header(request.has_special_header());
 
-    let (hdr, buf) =
-        Header::mut_from_prefix(&mut buf[..]).expect("internal: edge check guarantees buffer fits");
-    *hdr = header;
+    write_section(buf, &header)
+}
 
-    let buf = if layout.has_special_header() {
-        let special = SpecialHeader::new()
-            .with_send_pid(layout.send_pid)
-            .with_num_copy_handles(layout.num_copy_handles as u8)
-            .with_num_move_handles(layout.num_move_handles as u8);
+/// Writes the special header and the optional PID slot.
+///
+/// Only called when [`HipcRequest::has_special_header`] is true.
+fn write_special_header<'a, P: HipcPayload>(
+    buf: &'a mut [u8],
+    request: &HipcRequest<P>,
+) -> &'a mut [u8] {
+    let special = SpecialHeader::new()
+        .with_send_pid(request.send_pid)
+        .with_num_copy_handles(request.copy_handles.len() as u8)
+        .with_num_move_handles(request.move_handles.len() as u8);
 
-        let (sp, buf) = SpecialHeader::mut_from_prefix(buf)
-            .expect("internal: edge check guarantees buffer fits");
-        *sp = special;
+    let buf = write_section(buf, &special);
 
-        if layout.send_pid {
-            let (_, rest) = buf.split_at_mut(size_of::<u64>());
-            rest
-        } else {
-            buf
-        }
+    if request.send_pid {
+        // Reserved PID slot — the kernel fills it on transmission.
+        let (_, rest) = buf.split_at_mut(size_of::<u64>());
+        rest
     } else {
         buf
-    };
-
-    let (copy_handles, buf) =
-        <[RawHandle]>::mut_from_prefix_with_elems(buf, layout.num_copy_handles)
-            .expect("internal: edge check guarantees buffer fits");
-    copy_handles.copy_from_slice(src_copy_handles);
-
-    let (move_handles, buf) =
-        <[RawHandle]>::mut_from_prefix_with_elems(buf, layout.num_move_handles)
-            .expect("internal: edge check guarantees buffer fits");
-    move_handles.copy_from_slice(src_move_handles);
-
-    let (send_statics, buf) =
-        <[StaticDescriptor]>::mut_from_prefix_with_elems(buf, layout.send_statics)
-            .expect("internal: edge check guarantees buffer fits");
-    send_statics.copy_from_slice(src_send_statics);
-
-    let (send_buffers, buf) =
-        <[BufferDescriptor]>::mut_from_prefix_with_elems(buf, layout.send_buffers)
-            .expect("internal: edge check guarantees buffer fits");
-    send_buffers.copy_from_slice(src_send_buffers);
-
-    let (recv_buffers, buf) =
-        <[BufferDescriptor]>::mut_from_prefix_with_elems(buf, layout.recv_buffers)
-            .expect("internal: edge check guarantees buffer fits");
-    recv_buffers.copy_from_slice(src_recv_buffers);
-
-    let (exch_buffers, buf) =
-        <[BufferDescriptor]>::mut_from_prefix_with_elems(buf, layout.exch_buffers)
-            .expect("internal: edge check guarantees buffer fits");
-    exch_buffers.copy_from_slice(src_exch_buffers);
-
-    let data_bytes_len = layout.num_data_words * size_of::<u32>();
-    let (_data_bytes, buf) = buf.split_at_mut(data_bytes_len);
-
-    let (recv_list, _) =
-        <[RecvListEntry]>::mut_from_prefix_with_elems(buf, layout.recv_list_entries)
-            .expect("internal: edge check guarantees buffer fits");
-    match recv_list_mode {
-        RecvListMode::Entries(v) => recv_list.copy_from_slice(v),
-        RecvListMode::SingleBuffer => recv_list[0] = RecvListEntry::default(),
-        RecvListMode::None | RecvListMode::ToMessageBuffer => {
-            // No wire slots reserved for these modes.
-        }
     }
+}
+
+/// Zero-fills the data-words region and asks the payload to populate it.
+fn write_data_words<'a, P: HipcPayload>(
+    buf: &'a mut [u8],
+    payload: &P,
+    data_words_size: usize,
+) -> &'a mut [u8] {
+    let (buf, tail) = buf.split_at_mut(data_words_size);
+    buf.fill(0);
+    payload.write_to(buf);
+    tail
+}
+
+/// Writes the recv-list section per the configured [`RecvListMode`].
+fn write_recv_list<'a>(buf: &'a mut [u8], mode: &RecvListMode) -> &'a mut [u8] {
+    match mode {
+        RecvListMode::Entries(v) => write_section(buf, v.as_slice()),
+        RecvListMode::SingleBuffer => write_section(buf, &RecvListEntry::default()),
+        RecvListMode::None | RecvListMode::ToMessageBuffer => buf,
+    }
+}
+
+/// Writes `value`'s bytes into the prefix of `buf` and returns the tail.
+///
+/// The total-size check in [`HipcRequest::write_to`] guarantees the prefix
+/// fits, so the `write_to` call is infallible.
+#[inline]
+fn write_section<'a, T>(buf: &'a mut [u8], value: &T) -> &'a mut [u8]
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable + ?Sized,
+{
+    let (buf, tail) = buf.split_at_mut(size_of_val(value));
+    value
+        .write_to(buf)
+        .expect("internal: edge check guarantees buffer fits");
+    tail
 }
