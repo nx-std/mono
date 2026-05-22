@@ -22,7 +22,7 @@ pub type RequestLayoutError = hipc::BuildError<Infallible>;
 /// `CommandType::request(request_id)` (ID + 16). Exposes only the descriptor
 /// kinds TIPC supports — mapped buffers and copy handles.
 pub struct TipcRequestBuilder<'a> {
-    hipc: HipcRequestBuilder,
+    hipc: HipcRequestBuilder<'a>,
     data: &'a [u8],
 }
 
@@ -86,40 +86,32 @@ impl<'a> TipcRequestBuilder<'a> {
 
     /// Finalizes the request DTO.
     pub fn build(self) -> TipcRequest<'a> {
-        let data_len = self.data.len();
-        let hipc = self.hipc.with_data_size(data_len).build();
-        TipcRequest {
-            hipc,
-            data: self.data,
-        }
+        let hipc = self.hipc.with_payload(self.data).build();
+        TipcRequest { hipc }
     }
 }
 
 /// Finalized TIPC request.
 #[derive(Debug, Clone)]
 pub struct TipcRequest<'a> {
-    hipc: HipcRequest,
-    data: &'a [u8],
+    hipc: HipcRequest<'a>,
 }
 
 impl<'a> TipcRequest<'a> {
     /// Writes the TIPC request into `dst`.
     pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
         self.hipc.write_to(dst)?;
-        let start = self.hipc.data_words_offset();
-        let data = &mut dst[start..start + self.data.len()];
-        data.copy_from_slice(self.data);
         Ok(())
     }
 }
 
 /// TIPC close request DTO.
 #[derive(Debug, Clone)]
-pub struct TipcCloseRequest {
-    hipc: HipcRequest,
+pub struct TipcCloseRequest<'a> {
+    hipc: HipcRequest<'a>,
 }
 
-impl TipcCloseRequest {
+impl<'a> TipcCloseRequest<'a> {
     /// Creates a session-close request.
     pub fn session() -> Self {
         Self {
@@ -131,7 +123,8 @@ impl TipcCloseRequest {
 
     /// Writes the close request into `dst`.
     pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-        self.hipc.write_to(dst)
+        self.hipc.write_to(dst)?;
+        Ok(())
     }
 }
 

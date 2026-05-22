@@ -31,11 +31,11 @@ pub type RequestLayoutError = hipc::BuildError<Infallible>;
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct CmifRequest<'a> {
-    hipc: HipcRequest,
+    hipc: HipcRequest<'a>,
     request_id: u32,
     context: u32,
     object_id: Option<ObjectId>,
-    data: RequestData<'a>,
+    payload: &'a [u8],
     num_in_auto_buffers: u32,
     num_out_auto_buffers: u32,
     num_in_pointers: u32,
@@ -43,21 +43,12 @@ pub struct CmifRequest<'a> {
     num_out_fixed_pointers: u32,
     objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
+    reserved_data_size: usize,
 }
 
 impl<'a> CmifRequest<'a> {
     fn data_len(&self) -> usize {
-        match self.data {
-            RequestData::Borrowed(data) => data.len(),
-            RequestData::Sized(size) => size,
-        }
-    }
-
-    fn data_bytes(&self) -> &[u8] {
-        match self.data {
-            RequestData::Borrowed(data) => data,
-            RequestData::Sized(_) => &[],
-        }
+        self.payload.len().max(self.reserved_data_size)
     }
 
     fn opt_size(&self) -> usize {
@@ -88,20 +79,21 @@ impl<'a> CmifRequest<'a> {
     }
 
     /// Writes the CMIF request into `dst`.
-    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-        self.hipc.write_to(dst)?;
+    pub fn write_to<'dst, const N: usize>(
+        &self,
+        dst: &'dst mut [u8; N],
+    ) -> Result<&'dst mut [u8], RequestLayoutError> {
+        let cmif_data_region = self.hipc.write_to(dst)?;
 
         let body_len = self.encoded_len();
-        let data_words = self.hipc.data_words_size();
-        if body_len > data_words {
+        if body_len > cmif_data_region.len() {
             return Err(hipc::BuildError::TooLarge {
                 needed: body_len,
-                limit: data_words,
+                limit: cmif_data_region.len(),
             });
         }
 
-        let start = self.hipc.data_words_offset();
-        let cmif_region = &mut dst[start..start + body_len];
+        let cmif_region = &mut cmif_data_region[..body_len];
 
         let opt_len = self.opt_size();
         let split = cmif_region.len() - opt_len;
@@ -141,7 +133,9 @@ impl<'a> CmifRequest<'a> {
         };
 
         let (data, rest) = rest.split_at_mut(self.data_len());
-        data.copy_from_slice(self.data_bytes());
+        if !self.payload.is_empty() {
+            data.copy_from_slice(self.payload);
+        }
 
         if self.object_id.is_some() {
             let (objects, _) = <[u32]>::mut_from_prefix_with_elems(rest, self.objects.len())
@@ -149,7 +143,7 @@ impl<'a> CmifRequest<'a> {
             objects.copy_from_slice(self.objects.as_slice());
         }
 
-        Ok(())
+        Ok(data)
     }
 }
 
@@ -159,9 +153,9 @@ impl<'a> CmifRequest<'a> {
 /// domain conversion, cloning, and pointer-buffer-size queries.
 #[derive(Debug, Clone)]
 pub struct CmifControlRequest<'a> {
-    hipc: HipcRequest,
+    hipc: HipcRequest<'a>,
     request_id: u32,
-    data: RequestData<'a>,
+    payload: &'a [u8],
 }
 
 impl<'a> CmifControlRequest<'a> {
@@ -170,34 +164,22 @@ impl<'a> CmifControlRequest<'a> {
     }
 
     fn data_len(&self) -> usize {
-        match self.data {
-            RequestData::Borrowed(data) => data.len(),
-            RequestData::Sized(size) => size,
-        }
-    }
-
-    fn data_bytes(&self) -> &[u8] {
-        match self.data {
-            RequestData::Borrowed(data) => data,
-            RequestData::Sized(_) => &[],
-        }
+        self.payload.len()
     }
 
     /// Writes the control request into `dst`.
     pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-        self.hipc.write_to(dst)?;
+        let cmif_data_region = self.hipc.write_to(dst)?;
 
         let body_len = self.encoded_len();
-        let data_words = self.hipc.data_words_size();
-        if body_len > data_words {
+        if body_len > cmif_data_region.len() {
             return Err(hipc::BuildError::TooLarge {
                 needed: body_len,
-                limit: data_words,
+                limit: cmif_data_region.len(),
             });
         }
 
-        let start = self.hipc.data_words_offset();
-        let region = &mut dst[start..start + body_len];
+        let region = &mut cmif_data_region[..body_len];
         let pad = region.as_ptr().align_offset(16);
         let (_padding, aligned) = region.split_at_mut(pad);
 
@@ -211,7 +193,9 @@ impl<'a> CmifControlRequest<'a> {
         };
 
         let (payload, _) = rest.split_at_mut(self.data_len());
-        payload.copy_from_slice(self.data_bytes());
+        if !self.payload.is_empty() {
+            payload.copy_from_slice(self.payload);
+        }
         Ok(())
     }
 }
@@ -221,17 +205,14 @@ impl<'a> CmifControlRequest<'a> {
 /// Accumulates a control command ID and optional payload before producing a
 /// control request or writing it directly into an IPC buffer.
 pub struct CmifControlRequestBuilder<'a> {
-    hipc: HipcRequestBuilder,
+    hipc: HipcRequestBuilder<'a>,
     request_id: u32,
-    data: RequestData<'a>,
+    payload: &'a [u8],
 }
 
 impl<'a> CmifControlRequestBuilder<'a> {
     fn data_len(&self) -> usize {
-        match self.data {
-            RequestData::Borrowed(data) => data.len(),
-            RequestData::Sized(size) => size,
-        }
+        self.payload.len()
     }
 
     /// Starts a new control-request builder.
@@ -240,21 +221,14 @@ impl<'a> CmifControlRequestBuilder<'a> {
         Self {
             hipc: HipcRequestBuilder::new(CommandType::Control),
             request_id,
-            data: RequestData::Borrowed(&[]),
+            payload: &[],
         }
     }
 
     /// Sets the request payload data.
     #[inline]
     pub fn data(mut self, data: &'a [u8]) -> Self {
-        self.data = RequestData::Borrowed(data);
-        self
-    }
-
-    /// Reserves a payload of `size` bytes for later population.
-    #[inline]
-    pub fn data_size(mut self, size: usize) -> Self {
-        self.data = RequestData::Sized(size);
+        self.payload = data;
         self
     }
 
@@ -265,18 +239,14 @@ impl<'a> CmifControlRequestBuilder<'a> {
         CmifControlRequest {
             hipc,
             request_id: self.request_id,
-            data: self.data,
+            payload: self.payload,
         }
     }
 
-    /// Writes the request into `dst` and returns the payload slice.
+    /// Writes the request into `dst`.
     #[inline]
-    pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<&mut [u8], RequestLayoutError> {
-        let req = self.build();
-        let payload_len = req.data_len();
-        req.write_to(dst)?;
-        let start = req.hipc.data_words_offset() + 16;
-        Ok(&mut dst[start..start + payload_len])
+    pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+        self.build().write_to(dst)
     }
 
     fn encoded_len(&self) -> usize {
@@ -288,19 +258,19 @@ impl<'a> CmifControlRequestBuilder<'a> {
 ///
 /// Represents either a plain session close or a domain-object close message.
 #[derive(Debug, Clone)]
-pub enum CmifCloseRequest {
+pub enum CmifCloseRequest<'a> {
     /// Session close.
-    Session(HipcRequest),
+    Session(HipcRequest<'a>),
     /// Domain object close.
     DomainObject {
         /// HIPC request envelope used to carry the domain close header.
-        hipc: HipcRequest,
+        hipc: HipcRequest<'a>,
         /// Domain object to close on the shared session.
         object_id: ObjectId,
     },
 }
 
-impl CmifCloseRequest {
+impl<'a> CmifCloseRequest<'a> {
     /// Creates a session-close request.
     pub fn session() -> Self {
         Self::Session(
@@ -323,11 +293,13 @@ impl CmifCloseRequest {
     /// Writes the close request into `dst`.
     pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
         match self {
-            Self::Session(hipc) => hipc.write_to(dst),
-            Self::DomainObject { hipc, object_id } => {
+            Self::Session(hipc) => {
                 hipc.write_to(dst)?;
-                let start = hipc.data_words_offset();
-                let region = &mut dst[start..start + size_of::<DomainInHeader>() + 16];
+                Ok(())
+            }
+            Self::DomainObject { hipc, object_id } => {
+                let cmif_data_region = hipc.write_to(dst)?;
+                let region = &mut cmif_data_region[..size_of::<DomainInHeader>() + 16];
                 let pad = region.as_ptr().align_offset(16);
                 let (_padding, aligned) = region.split_at_mut(pad);
 
@@ -354,11 +326,11 @@ impl CmifCloseRequest {
 /// self-contained [`CmifRequest`] that can serialize itself into the caller's
 /// IPC buffer.
 pub struct CmifRequestBuilder<'a> {
-    hipc: HipcRequestBuilder,
+    hipc: HipcRequestBuilder<'a>,
     request_id: u32,
     context: u32,
     object_id: Option<ObjectId>,
-    data: RequestData<'a>,
+    payload: &'a [u8],
     num_in_auto_buffers: u32,
     num_out_auto_buffers: u32,
     num_in_pointers: u32,
@@ -367,15 +339,13 @@ pub struct CmifRequestBuilder<'a> {
     objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
     server_pointer_size: usize,
+    reserved_data_size: usize,
     cur_in_ptr_id: u8,
 }
 
 impl<'a> CmifRequestBuilder<'a> {
     fn data_len(&self) -> usize {
-        match self.data {
-            RequestData::Borrowed(data) => data.len(),
-            RequestData::Sized(size) => size,
-        }
+        self.payload.len().max(self.reserved_data_size)
     }
 
     /// Starts a new builder for the given command id.
@@ -386,7 +356,7 @@ impl<'a> CmifRequestBuilder<'a> {
             request_id,
             context: 0,
             object_id: None,
-            data: RequestData::Borrowed(&[]),
+            payload: &[],
             num_in_auto_buffers: 0,
             num_out_auto_buffers: 0,
             num_in_pointers: 0,
@@ -395,6 +365,7 @@ impl<'a> CmifRequestBuilder<'a> {
             objects: ArrayVec::new(),
             out_pointer_sizes: ArrayVec::new(),
             server_pointer_size: 0,
+            reserved_data_size: 0,
             cur_in_ptr_id: 0,
         }
     }
@@ -423,14 +394,14 @@ impl<'a> CmifRequestBuilder<'a> {
     /// Sets the request payload bytes to copy into the CMIF data area.
     #[inline]
     pub fn data(mut self, data: &'a [u8]) -> Self {
-        self.data = RequestData::Borrowed(data);
+        self.payload = data;
         self
     }
 
-    /// Reserves a payload area of `size` bytes for the caller to fill after send.
+    /// Sets the minimum size of the CMIF data area.
     #[inline]
     pub fn data_size(mut self, size: usize) -> Self {
-        self.data = RequestData::Sized(size);
+        self.reserved_data_size = size;
         self
     }
 
@@ -648,7 +619,7 @@ impl<'a> CmifRequestBuilder<'a> {
             request_id: self.request_id,
             context: self.context,
             object_id: self.object_id,
-            data: self.data,
+            payload: self.payload,
             num_in_auto_buffers: self.num_in_auto_buffers,
             num_out_auto_buffers: self.num_out_auto_buffers,
             num_in_pointers: self.num_in_pointers,
@@ -656,24 +627,14 @@ impl<'a> CmifRequestBuilder<'a> {
             num_out_fixed_pointers: self.num_out_fixed_pointers,
             objects: self.objects,
             out_pointer_sizes: self.out_pointer_sizes,
+            reserved_data_size: self.reserved_data_size,
         }
     }
 
-    /// Writes the request into `dst` and returns the payload slice.
+    /// Writes the request into `dst`.
     #[inline]
     pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<&mut [u8], RequestLayoutError> {
-        let req = self.build();
-        let data_len = req.data_len();
-        req.write_to(dst)?;
-        let start = req.hipc.data_words_offset()
-            + 16
-            + if req.object_id.is_some() {
-                size_of::<DomainInHeader>() + req.objects.len() * size_of::<u32>()
-            } else {
-                0
-            }
-            + size_of::<InHeader>();
-        Ok(&mut dst[start..start + data_len])
+        self.build().write_to(dst)
     }
 
     fn encoded_len(&self) -> usize {
@@ -685,10 +646,4 @@ impl<'a> CmifRequestBuilder<'a> {
         n = (n + 1) & !1;
         n + size_of::<u16>() * (self.num_out_auto_buffers + self.num_out_pointers) as usize
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum RequestData<'a> {
-    Borrowed(&'a [u8]),
-    Sized(usize),
 }

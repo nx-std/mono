@@ -10,16 +10,13 @@
 //! handles, recv-list) without holding any buffer reference and finalizes into
 //! a [`HipcRequest`] DTO via [`HipcRequestBuilder::build`]. The DTO carries
 //! every input needed to serialize the request — descriptors, handles,
-//! recv-list configuration, send-PID flag, and the size of the data-words
-//! region (always word-aligned) — but **no buffer reference**.
+//! recv-list configuration, and send-PID flag — but **no buffer reference**.
 //!
 //! Serialization happens via [`HipcRequest::write_to`], which writes the HIPC
 //! header and all descriptor slots into a caller-supplied `&mut [u8; N]`
-//! buffer and leaves the data-words region zero-initialized. Higher-level
+//! buffer and copies the payload into the data-words region. Higher-level
 //! protocols (CMIF, TIPC) wrap a [`HipcRequest`] in their own DTO and
-//! delegate to [`write_to`](HipcRequest::write_to), then fill the data-words
-//! region using [`data_words_offset`](HipcRequest::data_words_offset) to
-//! locate it.
+//! delegate to [`write_to`](HipcRequest::write_to).
 //!
 //! Descriptor counts are bounded by the HIPC header's 4-bit fields, so the
 //! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage — no heap, no dynamic
@@ -122,14 +119,15 @@ impl RecvListMode {
 ///
 /// Self-contained value-type description of an HIPC request: message type,
 /// every descriptor / handle that goes on the wire, recv-list configuration,
-/// `send_pid` flag, and the word-aligned size of the data-words region. Holds
-/// **no** buffer reference. Constructed by [`HipcRequestBuilder::build`].
+/// `send_pid` flag, and the word-aligned size of the data-words region.
+/// Constructed by [`HipcRequestBuilder::build`].
 ///
-/// Serialize via [`write_to`](Self::write_to). The data-words region is left
-/// zero-initialized; higher-level protocols (CMIF, TIPC) fill it themselves
-/// using [`data_words_offset`](Self::data_words_offset) to locate the region.
+/// Serialize via [`write_to`](Self::write_to). The data-words region is filled
+/// with the payload (if any) and then zero-padded to the requested size.
+/// [`write_to`](Self::write_to) returns the entire data-words region for
+/// further protocol-specific writes.
 #[derive(Debug, Clone)]
-pub struct HipcRequest {
+pub struct HipcRequest<'a> {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
     send_buffers: ArrayVec<BufferDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -140,15 +138,12 @@ pub struct HipcRequest {
     recv_list_mode: RecvListMode,
     send_pid: bool,
     data_words_size: usize,
+    data_words_payload: &'a [u8],
 }
 
-impl HipcRequest {
+impl<'a> HipcRequest<'a> {
     /// Returns the byte offset of the data-words region inside a serialized
     /// HIPC request.
-    ///
-    /// Higher-level protocols (CMIF, TIPC) call this after
-    /// [`write_to`](Self::write_to) to locate where they should write their
-    /// in-band payload.
     pub fn data_words_offset(&self) -> usize {
         self.layout().data_words_offset()
     }
@@ -161,12 +156,16 @@ impl HipcRequest {
 
     /// Writes the HIPC header and descriptor slots into `dst`.
     ///
-    /// Leaves the data-words region zero-initialized. The total layout size
-    /// must fit in `N`; otherwise [`BuildError::TooLarge`] is returned.
-    pub fn write_to<const N: usize>(
+    /// Copies the data-words payload into the beginning of the data-words
+    /// region (offset 0) and zero-fills the remainder. Returns a mutable
+    /// slice of the *entire* data-words region.
+    ///
+    /// The total layout size must fit in `N`; otherwise
+    /// [`BuildError::TooLarge`] is returned.
+    pub fn write_to<'dst, const N: usize>(
         &self,
-        dst: &mut [u8; N],
-    ) -> Result<(), BuildError<Infallible>> {
+        dst: &'dst mut [u8; N],
+    ) -> Result<&'dst mut [u8], BuildError<Infallible>> {
         let layout = self.layout();
         let total_bytes = layout.total_bytes();
         if total_bytes > N {
@@ -188,7 +187,15 @@ impl HipcRequest {
             &self.copy_handles,
             &self.move_handles,
         );
-        Ok(())
+
+        let start = layout.data_words_offset();
+        let len = self.data_words_size();
+        let data_region = &mut dst[start..start + len];
+        data_region.fill(0);
+        if !self.data_words_payload.is_empty() {
+            data_region[..self.data_words_payload.len()].copy_from_slice(self.data_words_payload);
+        }
+        Ok(data_region)
     }
 
     fn layout(&self) -> Layout {
@@ -208,10 +215,9 @@ impl HipcRequest {
 
 /// Fluent builder for an [`HipcRequest`].
 ///
-/// Accumulates HIPC-level descriptors via `with_*` methods. Holds no buffer
-/// reference. Finalize via [`build`](Self::build), which returns a
-/// self-contained [`HipcRequest`].
-pub struct HipcRequestBuilder {
+/// Accumulates HIPC-level descriptors via `with_*` methods. Finalize via
+/// [`build`](Self::build), which returns a self-contained [`HipcRequest`].
+pub struct HipcRequestBuilder<'a> {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
     send_buffers: ArrayVec<BufferDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -222,15 +228,14 @@ pub struct HipcRequestBuilder {
     recv_list_mode: RecvListMode,
     send_pid: bool,
     data_words_size: usize,
+    data_words_payload: &'a [u8],
 }
 
-impl HipcRequestBuilder {
+impl<'a> HipcRequestBuilder<'a> {
     /// Starts a new builder for the given message type.
     ///
     /// `message_type` accepts any value convertible into [`MessageType`] —
-    /// typically a CMIF or TIPC `CommandType`. The destination buffer is
-    /// not bound until [`HipcRequest::write_to`].
-    #[inline]
+    /// typically a CMIF or TIPC `CommandType`.
     pub fn new(message_type: impl Into<MessageType>) -> Self {
         Self {
             message_type: message_type.into(),
@@ -243,6 +248,7 @@ impl HipcRequestBuilder {
             recv_list_mode: RecvListMode::None,
             send_pid: false,
             data_words_size: 0,
+            data_words_payload: &[],
         }
     }
 
@@ -268,10 +274,25 @@ impl HipcRequestBuilder {
     /// Configures the data-words region size in bytes.
     ///
     /// The size is rounded up to the nearest 4-byte boundary to match HIPC
-    /// word alignment requirements.
+    /// word alignment requirements. If a payload is set via
+    /// [`with_payload`](Self::with_payload), this size must be at least as
+    /// large as the payload.
     #[inline]
-    pub fn with_data_size(mut self, size: usize) -> Self {
+    pub(crate) fn with_data_size(mut self, size: usize) -> Self {
         self.data_words_size = size.next_multiple_of(size_of::<u32>());
+        self
+    }
+
+    /// Sets the payload to be copied into the data-words region.
+    ///
+    /// The payload is copied to offset 0. This method automatically updates
+    /// the data-words size to fit the payload if the current size is smaller.
+    #[inline]
+    pub fn with_payload(mut self, payload: &'a [u8]) -> Self {
+        self.data_words_payload = payload;
+        if self.data_words_size < payload.len() {
+            self.data_words_size = payload.len().next_multiple_of(size_of::<u32>());
+        }
         self
     }
 
@@ -391,7 +412,7 @@ impl HipcRequestBuilder {
     }
 
     /// Finalizes the builder into a [`HipcRequest`] DTO.
-    pub fn build(self) -> HipcRequest {
+    pub fn build(self) -> HipcRequest<'a> {
         HipcRequest {
             message_type: self.message_type,
             send_statics: self.send_statics,
@@ -403,6 +424,7 @@ impl HipcRequestBuilder {
             recv_list_mode: self.recv_list_mode,
             send_pid: self.send_pid,
             data_words_size: self.data_words_size,
+            data_words_payload: self.data_words_payload,
         }
     }
 }
