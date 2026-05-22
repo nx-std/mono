@@ -26,7 +26,7 @@ pub fn get_service_handle(
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = tipc::TipcRequestBuilder::new(proto::GET_SERVICE_HANDLE)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(GetServiceError::BuildRequest)?;
@@ -90,7 +90,7 @@ pub fn register_service(
     // SAFETY: `payload` is exactly `size_of::<RegisterServiceTipcIn>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<RegisterServiceTipcIn>(), input) };
     let req = tipc::TipcRequestBuilder::new(proto::REGISTER_SERVICE)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(RegisterServiceError::BuildRequest)?;
@@ -139,7 +139,7 @@ pub fn unregister_service(
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_SERVICE)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(UnregisterServiceError::BuildRequest)?;
@@ -177,7 +177,7 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 
     // The detach-client request carries no payload data.
     tipc::TipcRequestBuilder::new(proto::DETACH_CLIENT)
-        .send_pid()
+        .with_send_pid()
         .build()
         .write_to(&mut buf)
         .map_err(DetachClientError::BuildRequest)?;
@@ -216,7 +216,7 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 
     // The register-client request carries no payload data.
     tipc::TipcRequestBuilder::new(proto::REGISTER_CLIENT)
-        .send_pid()
+        .with_send_pid()
         .build()
         .write_to(&mut buf)
         .map_err(RegisterClientError::BuildRequest)?;

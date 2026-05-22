@@ -21,7 +21,7 @@ pub type RequestLayoutError = hipc::WriteError;
 /// kinds TIPC supports — mapped buffers and copy handles.
 pub struct TipcRequestBuilder<'a> {
     hipc: HipcRequestBuilder,
-    data: &'a [u8],
+    payload: &'a [u8],
 }
 
 impl<'a> TipcRequestBuilder<'a> {
@@ -30,61 +30,66 @@ impl<'a> TipcRequestBuilder<'a> {
     pub fn new(request_id: u32) -> Self {
         Self {
             hipc: HipcRequestBuilder::new(CommandType::request(request_id)),
-            data: &[],
+            payload: &[],
         }
     }
 
-    /// Sets the request payload data.
+    /// Sets the request payload bytes to copy into the TIPC data area.
     #[inline]
-    pub fn data(mut self, data: &'a [u8]) -> Self {
-        self.data = data;
+    pub fn with_data(mut self, data: &'a [u8]) -> Self {
+        self.payload = data;
         self
     }
 
-    /// Enables sending the process ID alongside the request.
+    /// Includes the current process ID in the underlying HIPC request.
     #[inline]
-    pub fn send_pid(mut self) -> Self {
+    pub fn with_send_pid(mut self) -> Self {
         self.hipc = self.hipc.with_send_pid();
         self
     }
 
-    /// Adds a mapped input buffer (Type A / Send Buffer).
+    /// Adds a mapped input buffer using a Type-A HIPC descriptor.
     #[inline]
-    pub fn add_in_buffer(mut self, buffer: *const u8, size: usize, mode: BufferMode) -> Self {
+    pub fn add_input_buffer_raw(
+        mut self,
+        buffer: *const u8,
+        size: usize,
+        mode: BufferMode,
+    ) -> Self {
         self.hipc = self
             .hipc
             .with_send_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
         self
     }
 
-    /// Adds a mapped output buffer (Type B / Recv Buffer).
+    /// Adds a mapped output buffer using a Type-B HIPC descriptor.
     #[inline]
-    pub fn add_out_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+    pub fn add_output_buffer_raw(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
         self.hipc = self
             .hipc
             .with_recv_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
         self
     }
 
-    /// Adds an exchange (in/out) buffer (Type W).
+    /// Adds a mapped bidirectional buffer using a Type-W HIPC descriptor.
     #[inline]
-    pub fn add_inout_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+    pub fn add_inout_buffer_raw(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
         self.hipc = self
             .hipc
             .with_exch_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
         self
     }
 
-    /// Adds a copy handle to the request.
+    /// Adds a copy handle to pass with the underlying HIPC request.
     #[inline]
     pub fn add_copy_handle(mut self, handle: impl Into<RawHandle>) -> Self {
         self.hipc = self.hipc.with_copy_handle(handle.into());
         self
     }
 
-    /// Finalizes the request DTO.
+    /// Finalizes the request value.
     pub fn build(self) -> TipcRequest<'a> {
-        self.hipc.with_payload(self.data).build()
+        self.hipc.with_payload(self.payload).build()
     }
 }
 

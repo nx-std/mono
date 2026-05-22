@@ -32,9 +32,9 @@ pub fn register_process(
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = tipc::TipcRequestBuilder::new(proto::REGISTER_PROCESS)
-        .data(&payload)
-        .add_in_buffer(acid_sac.as_ptr(), acid_sac.len(), BufferMode::Normal)
-        .add_in_buffer(aci0_sac.as_ptr(), aci0_sac.len(), BufferMode::Normal)
+        .with_data(&payload)
+        .add_input_buffer_raw(acid_sac.as_ptr(), acid_sac.len(), BufferMode::Normal)
+        .add_input_buffer_raw(aci0_sac.as_ptr(), aci0_sac.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(RegisterProcessError::BuildRequest)?;
@@ -72,7 +72,7 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_PROCESS)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(UnregisterProcessError::BuildRequest)?;

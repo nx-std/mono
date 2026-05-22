@@ -44,7 +44,7 @@ fn get_firmware_version_inner(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = tipc::TipcRequestBuilder::new(cmd_id)
-        .add_out_buffer(
+        .add_output_buffer_raw(
             (&raw mut out).cast::<u8>(),
             size_of::<FirmwareVersion>(),
             BufferMode::Normal,
