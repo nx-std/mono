@@ -23,6 +23,7 @@ pub(crate) fn acquire_unique_pad_connection_event_handle(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ACQUIRE_UNIQUE_PAD_CONNECTION_EVENT_HANDLE)
         .out_handle(0, OutHandleAttr::Copy)
@@ -50,6 +51,7 @@ pub(crate) fn get_unique_pad_ids(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_UNIQUE_PAD_IDS)
         .out_buffer(buf_bytes, BufferAttr::HIPC_POINTER)
@@ -70,6 +72,7 @@ pub(crate) fn acquire_joy_detach_on_bluetooth_off_event_handle(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ACQUIRE_JOY_DETACH_ON_BLUETOOTH_OFF_EVENT_HANDLE)
         .in_raw(in_bytes)

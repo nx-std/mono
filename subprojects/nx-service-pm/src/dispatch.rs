@@ -17,6 +17,7 @@ pub(crate) fn dispatch_in<I: Copy>(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -29,6 +30,7 @@ pub(crate) fn dispatch_in<I: Copy>(
 pub(crate) fn dispatch_no_io(service: &Session, cmd_id: u32) -> Result<(), DispatchError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service.dispatch(cmd_id).send(&mut buf).map(|_| ())
 }
 
@@ -45,6 +47,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -60,6 +63,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
 pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O, DispatchError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<O>())

@@ -28,6 +28,7 @@ use crate::proto::{
 /// waits will return immediately and busy-loop.
 pub fn get_event_handle(csg: &DomainObject<'_>) -> Result<EventHandle, GetEventHandleError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = csg
         .dispatch(CMD_CSG_GET_EVENT_HANDLE)
         .out_handle(0, OutHandleAttr::Copy)
@@ -60,6 +61,7 @@ pub fn receive_message(
     csg: &DomainObject<'_>,
 ) -> Result<Option<AppletMessage>, ReceiveMessageError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = csg
         .dispatch(CMD_CSG_RECEIVE_MESSAGE)
         .out_size(size_of::<u32>())
@@ -107,6 +109,7 @@ pub fn get_operation_mode(
     csg: &DomainObject<'_>,
 ) -> Result<AppletOperationMode, GetOperationModeError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = csg
         .dispatch(CMD_CSG_GET_OPERATION_MODE)
         .out_size(size_of::<u8>())
@@ -140,6 +143,7 @@ pub fn get_performance_mode(
     csg: &DomainObject<'_>,
 ) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = csg
         .dispatch(CMD_CSG_GET_PERFORMANCE_MODE)
         .out_size(size_of::<u32>())
@@ -174,6 +178,7 @@ pub fn get_current_focus_state(
     csg: &DomainObject<'_>,
 ) -> Result<AppletFocusState, GetCurrentFocusStateError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = csg
         .dispatch(CMD_CSG_GET_CURRENT_FOCUS_STATE)
         .out_size(size_of::<u8>())

@@ -23,6 +23,7 @@ pub(crate) fn get_application_control_data(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_DATA_GET_APPLICATION_CONTROL_DATA)
         .in_raw(in_bytes)
@@ -42,6 +43,7 @@ pub(crate) fn get_application_desired_language(
         core::slice::from_raw_parts((&raw const lang_bitmask).cast::<u8>(), size_of::<u8>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_DATA_GET_APPLICATION_DESIRED_LANGUAGE)
         .in_raw(in_bytes)
@@ -61,6 +63,7 @@ pub(crate) fn get_application_control_data2(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ControlData2In>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_DATA_GET_APPLICATION_CONTROL_DATA2)
         .in_raw(in_bytes)
@@ -85,6 +88,7 @@ pub(crate) fn list_application_title2(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_DATA_LIST_APPLICATION_TITLE2)
         .in_raw(in_bytes)

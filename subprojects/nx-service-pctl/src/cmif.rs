@@ -34,6 +34,7 @@ fn create_service_at(domain: &Domain, cmd_id: u32) -> Result<u32, CreateServiceE
         core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -113,6 +114,7 @@ pub(crate) fn is_pairing_active(object: &DomainObject<'_>) -> Result<u8, Dispatc
 /// Gets an event copy handle for the given command.
 pub(crate) fn get_event(object: &DomainObject<'_>, cmd_id: u32) -> Result<u32, GetEventError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .out_handle(0, OutHandleAttr::Copy)

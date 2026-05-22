@@ -97,6 +97,7 @@ pub(crate) fn write_placeholder(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CS_WRITE_PLACEHOLDER)
         .in_raw(in_bytes)
@@ -163,6 +164,7 @@ pub(crate) fn get_path(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CS_GET_PATH)
         .in_raw(in_bytes)
@@ -189,6 +191,7 @@ pub(crate) fn get_placeholder_path(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CS_GET_PLACEHOLDER_PATH)
         .in_raw(in_bytes)
@@ -219,6 +222,7 @@ pub(crate) fn list_placeholder(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CS_LIST_PLACEHOLDER)
         .out_size(size_of::<i32>())
@@ -253,6 +257,7 @@ pub(crate) fn list_content_id(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CS_LIST_CONTENT_ID)
         .in_raw(in_bytes)
@@ -348,6 +353,7 @@ pub(crate) fn read_content_id_file(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CS_READ_CONTENT_ID_FILE)
         .in_raw(in_bytes)
@@ -430,6 +436,7 @@ pub(crate) fn write_content_for_debug(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CS_WRITE_CONTENT_FOR_DEBUG)
         .in_raw(in_bytes)
@@ -519,6 +526,7 @@ pub(crate) fn register_path(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CS_REGISTER_PATH)
         .in_raw(in_bytes)

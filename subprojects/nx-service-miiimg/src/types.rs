@@ -3,7 +3,7 @@
 use static_assertions::const_assert_eq;
 
 /// Image identifier, wrapping a UUID.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct MiiimgImageId {
     /// Raw UUID bytes.

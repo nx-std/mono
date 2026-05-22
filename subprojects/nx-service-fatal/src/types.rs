@@ -3,7 +3,7 @@
 use static_assertions::const_assert_eq;
 
 /// Policy controlling fatal error behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(u32)]
 pub enum FatalPolicy {
     ErrorReportAndErrorScreen = 0,
@@ -73,11 +73,11 @@ pub union FatalCpuContextUnion {
 const_assert_eq!(size_of::<FatalCpuContextUnion>(), 0x240);
 
 /// Wire input for fatal commands: `{ u32 result_code, u32 policy, u64 pid_placeholder }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ThrowFatalIn {
     pub result_code: u32,
-    pub policy: u32,
+    pub policy: FatalPolicy,
     pub pid_placeholder: u64,
 }
 

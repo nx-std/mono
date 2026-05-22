@@ -56,7 +56,7 @@ impl CancelHandle {
 }
 
 /// Input payload for `GetHostByNameRequest` (cmd 2).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct GetHostByNameIn {
     /// Whether to use the NSD (Network Service Discovery) backend (`u8` bool widened to `u32`).
@@ -82,7 +82,7 @@ pub struct GetHostByNameOut {
 const_assert_eq!(size_of::<GetHostByNameOut>(), 12);
 
 /// Input payload for `GetHostByAddrRequest` (cmd 3).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct GetHostByAddrIn {
     /// Length of the input address buffer.
@@ -113,7 +113,7 @@ pub struct GetHostByAddrOut {
 const_assert_eq!(size_of::<GetHostByAddrOut>(), 12);
 
 /// Input payload for `GetAddrInfoRequest` (cmd 6).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct GetAddrInfoIn {
     /// Whether to use the NSD backend (`u8` bool widened to `u32`).
@@ -139,7 +139,7 @@ pub struct GetAddrInfoOut {
 const_assert_eq!(size_of::<GetAddrInfoOut>(), 12);
 
 /// Input payload for `GetNameInfoRequest` (cmd 7).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct GetNameInfoIn {
     /// `getnameinfo` flags.
@@ -163,7 +163,7 @@ pub struct GetNameInfoOut {
 const_assert_eq!(size_of::<GetNameInfoOut>(), 8);
 
 /// Input payload for `CancelRequest` (cmd 9).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct CancelIn {
     /// Cancel-token to cancel.

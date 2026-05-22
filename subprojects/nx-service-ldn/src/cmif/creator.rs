@@ -17,6 +17,7 @@ use crate::proto::{CMD_CREATE_CLIENT_PROCESS_MONITOR, CMD_CREATE_SERVICE};
 pub(crate) fn create_service_domain(creator: &Domain) -> Result<u32, CreateServiceError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = creator
         .dispatch(CMD_CREATE_SERVICE)
         .out_objects(1)
@@ -37,6 +38,7 @@ pub(crate) fn create_service_session(
 ) -> Result<SessionHandle, CreateServiceError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = creator
         .dispatch(CMD_CREATE_SERVICE)
         .send(&mut buf)
@@ -69,6 +71,7 @@ pub(crate) fn create_client_process_monitor(
 ) -> Result<u32, CreateClientProcessMonitorError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = creator
         .dispatch(CMD_CREATE_CLIENT_PROCESS_MONITOR)
         .out_objects(1)

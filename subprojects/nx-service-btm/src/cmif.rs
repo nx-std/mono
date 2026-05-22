@@ -105,6 +105,7 @@ pub(crate) fn get_device_condition(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_DEVICE_CONDITION)
         .in_raw(in_bytes)
@@ -185,6 +186,7 @@ pub(crate) fn get_device_info(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_DEVICE_INFO)
         .in_raw(in_bytes)
@@ -285,6 +287,7 @@ pub(crate) fn hid_set_retransmission_mode(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::HID_SET_RETRANSMISSION_MODE)
         .in_raw(in_bytes)
@@ -588,6 +591,7 @@ pub(crate) fn ble_get_paired_addresses(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::BLE_GET_PAIRED_ADDRESSES)
         .in_raw(in_bytes)
@@ -990,6 +994,7 @@ fn dispatch_in_buf_ptr_fixed<T>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_buffer(
@@ -1011,6 +1016,7 @@ fn dispatch_out_buf_ptr_fixed<T>(
     let out_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .out_buffer(
@@ -1036,6 +1042,7 @@ fn get_ble_scan_results(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())
@@ -1061,6 +1068,7 @@ fn ble_get_connection_state_impl(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())
@@ -1095,6 +1103,7 @@ fn get_gatt_services_impl(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1136,6 +1145,7 @@ fn get_gatt_service_impl(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1182,6 +1192,7 @@ fn get_gatt_service_data<T>(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1224,6 +1235,7 @@ fn get_belonging_service_impl(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1242,6 +1254,7 @@ fn get_belonging_service_impl(
 /// Dispatches a command that returns a copy handle for an event.
 fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_handle(0, OutHandleAttr::Copy)
@@ -1261,6 +1274,7 @@ fn acquire_event_with_flag(
     cmd_id: u32,
 ) -> Result<u32, AcquireEventWithFlagError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())

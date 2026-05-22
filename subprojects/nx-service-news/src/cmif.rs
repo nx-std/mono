@@ -27,6 +27,7 @@ pub(crate) fn create_sub_object(
     cmd_id: u32,
 ) -> Result<u32, CreateSubObjectError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .send(&mut ipc_buf)
@@ -46,6 +47,7 @@ pub(crate) fn create_sub_object(
 /// Posts local news (HipcMapAlias input buffer).
 pub(crate) fn post_local_news(service: &Session, news: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::POST_LOCAL_NEWS)
         .in_buffer(news, BufferAttr::HIPC_MAP_ALIAS)
@@ -65,6 +67,7 @@ pub(crate) fn set_passphrase(
         core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_PASSPHRASE)
         .in_raw(in_bytes)
@@ -79,6 +82,7 @@ pub(crate) fn get_subscription_status(
     filter: &[u8],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_SUBSCRIPTION_STATUS)
         .out_size(size_of::<u32>())
@@ -100,6 +104,7 @@ pub(crate) fn get_topic_list(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const channel).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_TOPIC_LIST)
         .in_raw(in_bytes)
@@ -133,6 +138,7 @@ pub(crate) fn request_immediate_reception(
     filter: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::REQUEST_IMMEDIATE_RECEPTION)
         .in_buffer(filter, BufferAttr::HIPC_POINTER)
@@ -151,6 +157,7 @@ pub(crate) fn set_subscription_status(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const status).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_SUBSCRIPTION_STATUS)
         .in_raw(in_bytes)
@@ -175,6 +182,7 @@ pub(crate) fn get_news_database_dump(
     buffer: &mut [u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_NEWS_DATABASE_DUMP)
         .out_size(size_of::<u64>())
@@ -192,6 +200,7 @@ pub(crate) fn get_news_database_dump(
 /// Gets the event handle from an event holder sub-object (cmd 0).
 pub(crate) fn event_holder_get(service: &Session) -> Result<u32, EventHolderGetError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::EVENT_HOLDER_GET)
         .out_handle(0, OutHandleAttr::Copy)
@@ -211,6 +220,7 @@ pub(crate) fn event_holder_get(service: &Session) -> Result<u32, EventHolderGetE
 /// Opens news data by file name (HipcPointer input).
 pub(crate) fn data_open(service: &Session, file_name: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DATA_OPEN)
         .in_buffer(file_name, BufferAttr::HIPC_POINTER)
@@ -229,6 +239,7 @@ pub(crate) fn data_open_with_record_v1(
         core::slice::from_raw_parts((&raw const *record).cast::<u8>(), size_of::<NewsRecordV1>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DATA_OPEN_WITH_RECORD_V1)
         .in_raw(in_bytes)
@@ -247,6 +258,7 @@ pub(crate) fn data_read(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DATA_READ)
         .in_raw(in_bytes)
@@ -274,6 +286,7 @@ pub(crate) fn data_open_with_record(
         core::slice::from_raw_parts((&raw const *record).cast::<u8>(), size_of::<NewsRecord>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DATA_OPEN_WITH_RECORD)
         .in_raw(in_bytes)
@@ -298,6 +311,7 @@ pub(crate) fn database_get_list_v1(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DATABASE_GET_LIST_V1)
         .in_raw(in_bytes)
@@ -314,6 +328,7 @@ pub(crate) fn database_get_list_v1(
 /// Counts records matching a filter.
 pub(crate) fn database_count(service: &Session, filter: &[u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DATABASE_COUNT)
         .out_size(size_of::<u32>())
@@ -337,6 +352,7 @@ pub(crate) fn database_get_list(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DATABASE_GET_LIST)
         .in_raw(in_bytes)

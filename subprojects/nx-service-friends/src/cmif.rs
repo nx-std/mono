@@ -18,6 +18,7 @@ use crate::{
 /// object is reclaimed when the pool's domain sessions close.
 pub(crate) fn create_friend_service(domain: &Domain) -> Result<u32, CreateFriendServiceError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::CREATE_FRIEND_SERVICE)
         .out_objects(1)
@@ -53,6 +54,7 @@ pub(crate) fn get_user_setting(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::GET_USER_SETTING)
         .in_raw(in_bytes)

@@ -59,8 +59,9 @@ pub fn get_host_by_name(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_NAME)
-        .data_size(size_of::<GetHostByNameIn>())
+        .data_value(&input)
         .send_pid()
         .add_in_buffer(name_ptr, name_len, BufferMode::Normal)
         .add_out_buffer(
@@ -71,14 +72,6 @@ pub fn get_host_by_name(
         .build();
     req.write_to(&mut buf)
         .map_err(GetHostByNameError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<GetHostByNameIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<GetHostByNameIn>(),
-            input,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetHostByNameError::SendRequest)?;
 
@@ -139,8 +132,9 @@ pub fn get_host_by_addr(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_ADDR)
-        .data_size(size_of::<GetHostByAddrIn>())
+        .data_value(&input)
         .add_in_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
         .add_out_buffer(
             out_buffer.as_mut_ptr(),
@@ -150,14 +144,6 @@ pub fn get_host_by_addr(
         .build();
     req.write_to(&mut buf)
         .map_err(GetHostByAddrError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<GetHostByAddrIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<GetHostByAddrIn>(),
-            input,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetHostByAddrError::SendRequest)?;
 
@@ -279,8 +265,9 @@ pub fn get_addr_info(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_GET_ADDR_INFO)
-        .data_size(size_of::<GetAddrInfoIn>())
+        .data_value(&input)
         .send_pid()
         .add_in_buffer(node_ptr, node_len, BufferMode::Normal)
         .add_in_buffer(svc_ptr, svc_len, BufferMode::Normal)
@@ -293,14 +280,6 @@ pub fn get_addr_info(
         .build();
     req.write_to(&mut buf)
         .map_err(GetAddrInfoError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<GetAddrInfoIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<GetAddrInfoIn>(),
-            input,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetAddrInfoError::SendRequest)?;
 
@@ -358,8 +337,9 @@ pub fn get_name_info(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_GET_NAME_INFO)
-        .data_size(size_of::<GetNameInfoIn>())
+        .data_value(&input)
         .send_pid()
         .add_in_buffer(sockaddr.as_ptr(), sockaddr.len(), BufferMode::Normal)
         .add_out_buffer(host.as_mut_ptr(), host.len(), BufferMode::Normal)
@@ -367,14 +347,6 @@ pub fn get_name_info(
         .build();
     req.write_to(&mut buf)
         .map_err(GetNameInfoError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<GetNameInfoIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<GetNameInfoIn>(),
-            input,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetNameInfoError::SendRequest)?;
 
@@ -411,17 +383,14 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let pid_placeholder: u64 = 0;
     let req = cmif::CmifRequestBuilder::new(CMD_GET_CANCEL_HANDLE)
-        .data_size(size_of::<u64>())
+        .data_value(&pid_placeholder)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(GetCancelHandleError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), 0u64);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetCancelHandleError::SendRequest)?;
 
@@ -459,16 +428,12 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_CANCEL)
-        .data_size(size_of::<CancelIn>())
+        .data_value(&input)
         .send_pid()
         .build();
     req.write_to(&mut buf).map_err(CancelError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<CancelIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<CancelIn>(), input);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(CancelError::SendRequest)?;
 
@@ -522,17 +487,13 @@ fn string_error_impl(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<u32>())
+        .data_value(&err)
         .add_out_buffer(out_str.as_mut_ptr(), out_str.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(StringErrorError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), err);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(StringErrorError::SendRequest)?;
 

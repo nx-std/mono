@@ -21,14 +21,12 @@ fn dispatch_in_u32_out_bool(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<u32>())
+        .data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutBoolError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), value) };
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32OutBoolError::SendRequest)?;
 
@@ -58,6 +56,7 @@ fn dispatch_in_two_u32s_out_bool(
     val1: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
     #[repr(C)]
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     struct TwoU32s {
         val0: u32,
         val1: u32,
@@ -68,14 +67,12 @@ fn dispatch_in_two_u32s_out_bool(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<TwoU32s>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<TwoU32s>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<TwoU32s>(), input) };
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
@@ -103,6 +100,7 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.write_to(&mut buf)
         .map_err(DispatchOutU64Error::BuildRequest)?;
@@ -189,6 +187,7 @@ pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSession
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::CREATE_PORT_SESSION).build();
     req.write_to(&mut buf)
         .map_err(CreatePortSessionError::BuildRequest)?;
@@ -291,6 +290,7 @@ pub fn port_open_legacy(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_OPEN)
         .in_raw(in_bytes)
@@ -339,6 +339,7 @@ pub fn port_open_v6(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_OPEN)
         .in_raw(in_bytes)
@@ -390,6 +391,7 @@ pub fn port_open_v7(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_OPEN)
         .in_raw(in_bytes)
@@ -434,6 +436,7 @@ pub fn port_open_for_dev_legacy(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
         .in_raw(in_bytes)
@@ -482,6 +485,7 @@ pub fn port_open_for_dev_v6(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
         .in_raw(in_bytes)
@@ -533,6 +537,7 @@ pub fn port_open_for_dev_v7(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
         .in_raw(in_bytes)
@@ -554,6 +559,7 @@ pub fn port_get_writable_length(session: Handle) -> Result<u64, DispatchOutU64Er
 /// Sends data through the port (HipcAutoSelect in-buffer).
 pub fn port_send(service: &Session, data: &[u8]) -> Result<u64, PortSendError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_SEND)
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
@@ -573,6 +579,7 @@ pub fn port_get_readable_length(session: Handle) -> Result<u64, DispatchOutU64Er
 /// Receives data from the port (HipcAutoSelect out-buffer).
 pub fn port_receive(service: &Session, buf: &mut [u8]) -> Result<u64, PortReceiveError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_RECEIVE)
         .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
@@ -606,6 +613,7 @@ pub fn port_bind_port_event(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PORT_BIND_PORT_EVENT)
         .in_raw(in_bytes)

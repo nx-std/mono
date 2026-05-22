@@ -61,6 +61,7 @@ pub(crate) fn get_album_file_list_deprecated0(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST_DEPRECATED0)
         .in_raw(in_bytes)
@@ -140,6 +141,7 @@ pub(crate) fn load_album_screenshot_image(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -200,6 +202,7 @@ pub(crate) fn get_album_file_list_aae(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -246,6 +249,7 @@ pub(crate) fn get_album_file_list_aae_uid(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -281,6 +285,7 @@ pub(crate) fn open_accessor_session(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_ACCESSOR_SESSION)
         .in_raw(in_bytes)
@@ -350,6 +355,7 @@ pub(crate) fn read_movie_data(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
         .in_raw(in_bytes)

@@ -20,6 +20,7 @@ fn dispatch_pid_aruid_out_handle(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -46,6 +47,7 @@ fn dispatch_pid_aruid_no_out(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)

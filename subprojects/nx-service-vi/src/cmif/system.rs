@@ -37,19 +37,13 @@ pub fn get_z_order_count_min(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MIN)
-        .data_size(8)
+        .data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetZOrderCountError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            display_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetZOrderCountError::SendRequest)?;
 
@@ -69,19 +63,13 @@ pub fn get_z_order_count_max(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MAX)
-        .data_size(8)
+        .data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetZOrderCountError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            display_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetZOrderCountError::SendRequest)?;
 
@@ -110,19 +98,13 @@ pub fn get_display_logical_resolution(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req =
-        cmif::CmifRequestBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION).data_size(8);
-    let req = req.build();
+
+    let display_id_raw = display_id.to_raw();
+    let req = cmif::CmifRequestBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
+        .data_value(&display_id_raw)
+        .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayLogicalResolutionError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            display_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetDisplayLogicalResolutionError::SendRequest)?;
@@ -159,6 +141,7 @@ pub fn set_display_magnification(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         x: i32,
         y: i32,
@@ -176,13 +159,10 @@ pub fn set_display_magnification(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_DISPLAY_MAGNIFICATION)
-        .data_size(24)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayMagnificationError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayMagnificationError::SendRequest)?;
 
@@ -203,6 +183,7 @@ pub fn set_layer_position(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         x: f32,
         y: f32,
@@ -216,13 +197,10 @@ pub fn set_layer_position(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_POSITION)
-        .data_size(16)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerPositionError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerPositionError::SendRequest)?;
 
@@ -243,6 +221,7 @@ pub fn set_layer_size(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         layer_id: u64,
         width: i64,
@@ -256,13 +235,10 @@ pub fn set_layer_size(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_SIZE)
-        .data_size(24)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerSizeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerSizeError::SendRequest)?;
 
@@ -282,6 +258,7 @@ pub fn set_layer_z(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         layer_id: u64,
         z: i64,
@@ -293,13 +270,10 @@ pub fn set_layer_z(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_Z)
-        .data_size(16)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerZError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerZError::SendRequest)?;
 
@@ -319,6 +293,7 @@ pub fn set_layer_visibility(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         visible: u8,
         _pad: [u8; 7],
@@ -332,13 +307,10 @@ pub fn set_layer_visibility(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_VISIBILITY)
-        .data_size(16)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerVisibilityError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerVisibilityError::SendRequest)?;
 

@@ -3,7 +3,7 @@
 //! This module implements Time commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{mem::size_of, ptr};
+use core::ptr;
 
 use nx_sf::{
     cmif,
@@ -45,6 +45,7 @@ pub fn get_standard_steady_clock(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(static_service_cmds::GET_STANDARD_STEADY_CLOCK).build();
     req.write_to(&mut buf)
         .map_err(GetSteadyClockError::BuildRequest)?;
@@ -70,6 +71,7 @@ pub fn get_time_zone_service(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(static_service_cmds::GET_TIME_ZONE_SERVICE).build();
     req.write_to(&mut buf)
         .map_err(GetTimeZoneServiceError::BuildRequest)?;
@@ -96,6 +98,7 @@ pub fn get_shared_memory_native_handle(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req =
         cmif::CmifRequestBuilder::new(static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE).build();
     req.write_to(&mut buf)
@@ -120,6 +123,7 @@ pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeErr
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(system_clock_cmds::GET_CURRENT_TIME).build();
     req.write_to(&mut buf)
         .map_err(GetCurrentTimeError::BuildRequest)?;
@@ -145,16 +149,12 @@ pub fn to_calendar_time_with_my_rule(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE)
-        .data_size(size_of::<u64>())
+        .data_value(&timestamp)
         .build();
     req.write_to(&mut buf)
         .map_err(ToCalendarTimeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), timestamp);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(ToCalendarTimeError::SendRequest)?;
 
@@ -181,6 +181,7 @@ fn get_clock_session(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(command_id).build();
     req.write_to(&mut buf)
         .map_err(GetSystemClockError::BuildRequest)?;

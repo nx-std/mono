@@ -95,6 +95,7 @@ pub fn open_proxy(
 
     let mut attempts: u32 = 0;
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = loop {
         // Dispatch builders are consumed by send(); rebuild each iteration.
         let mut dispatch = domain
@@ -167,6 +168,7 @@ pub fn get_common_state_getter(
     proxy: &DomainObject<'_>,
 ) -> Result<CommonStateGetter, GetCommonStateGetterError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = proxy
         .dispatch(CMD_GET_COMMON_STATE_GETTER)
         .out_objects(1)
@@ -200,6 +202,7 @@ pub fn get_self_controller(
     proxy: &DomainObject<'_>,
 ) -> Result<SelfController, GetSelfControllerError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = proxy
         .dispatch(CMD_GET_SELF_CONTROLLER)
         .out_objects(1)
@@ -233,6 +236,7 @@ pub fn get_window_controller(
     proxy: &DomainObject<'_>,
 ) -> Result<WindowController, GetWindowControllerError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = proxy
         .dispatch(CMD_GET_WINDOW_CONTROLLER)
         .out_objects(1)
@@ -266,6 +270,7 @@ pub fn acquire_foreground_rights(
     window_controller: &DomainObject<'_>,
 ) -> Result<(), AcquireForegroundRightsError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     window_controller
         .dispatch(CMD_WC_ACQUIRE_FOREGROUND_RIGHTS)
         .send(&mut buf)
@@ -321,6 +326,7 @@ pub fn set_focus_handling_mode(
     ];
 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     self_controller
         .dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE)
         .in_raw(&input)
@@ -355,6 +361,7 @@ pub fn set_out_of_focus_suspending_enabled(
     let input: u8 = enabled as u8;
 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     self_controller
         .dispatch(CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED)
         .in_raw(core::slice::from_ref(&input))
@@ -394,6 +401,7 @@ pub fn set_operation_mode_changed_notification(
     let input: u8 = enabled as u8;
 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     self_controller
         .dispatch(CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION)
         .in_raw(core::slice::from_ref(&input))
@@ -422,6 +430,7 @@ pub fn set_performance_mode_changed_notification(
     let input: u8 = enabled as u8;
 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     self_controller
         .dispatch(CMD_SC_SET_PERFORMANCE_MODE_CHANGED_NOTIFICATION)
         .in_raw(core::slice::from_ref(&input))
@@ -449,6 +458,7 @@ pub fn get_applet_resource_user_id(
     window_controller: &DomainObject<'_>,
 ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = window_controller
         .dispatch(CMD_WC_GET_APPLET_RESOURCE_USER_ID)
         .out_size(size_of::<u64>())
@@ -481,6 +491,7 @@ pub fn get_application_functions(
     proxy: &DomainObject<'_>,
 ) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = proxy
         .dispatch(CMD_GET_APPLICATION_FUNCTIONS)
         .out_objects(1)
@@ -515,6 +526,7 @@ pub enum GetApplicationFunctionsError {
 /// and setting up focus handling mode.
 pub fn notify_running(app_funcs: &DomainObject<'_>) -> Result<bool, NotifyRunningError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = app_funcs
         .dispatch(CMD_AF_NOTIFY_RUNNING)
         .out_size(size_of::<u8>())
@@ -546,6 +558,7 @@ pub fn create_managed_display_layer(
     self_controller: &DomainObject<'_>,
 ) -> Result<u64, CreateManagedDisplayLayerError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = self_controller
         .dispatch(CMD_SC_CREATE_MANAGED_DISPLAY_LAYER)
         .out_size(size_of::<u64>())
@@ -598,6 +611,7 @@ fn get_sub_interface_object_id(
     cmd_id: u32,
 ) -> Result<u32, GetSubInterfaceError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = proxy
         .dispatch(cmd_id)
         .out_objects(1)

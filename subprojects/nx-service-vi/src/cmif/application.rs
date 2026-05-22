@@ -50,6 +50,7 @@ fn get_sub_service_no_params(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.write_to(&mut buf)
         .map_err(GetSubServiceError::BuildRequest)?;
@@ -80,21 +81,12 @@ pub fn open_display(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_DISPLAY)
-        .data_size(0x40)
+        .data(name.as_bytes())
         .build();
     req.write_to(&mut buf)
         .map_err(OpenDisplayError::BuildRequest)?;
-
-    // Write display name
-    // SAFETY: `req` is exactly 0x40 bytes, matching the DisplayName payload size.
-    unsafe {
-        ptr::copy_nonoverlapping(
-            name.as_bytes().as_ptr(),
-            buf.as_array_mut().as_mut_ptr(),
-            0x40,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenDisplayError::SendRequest)?;
 
@@ -115,19 +107,13 @@ pub fn close_display(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_DISPLAY)
-        .data_size(8)
+        .data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(CloseDisplayError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            display_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(CloseDisplayError::SendRequest)?;
 
@@ -153,19 +139,13 @@ pub fn get_display_resolution(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_RESOLUTION)
-        .data_size(8)
+        .data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayResolutionError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            display_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetDisplayResolutionError::SendRequest)?;
 
@@ -213,6 +193,7 @@ pub fn open_layer(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         display_name: [u8; 0x40],
         layer_id: u64,
@@ -227,7 +208,7 @@ pub fn open_layer(
     input.display_name.copy_from_slice(display_name.as_bytes());
 
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_LAYER)
-        .data_size(0x40 + 8 + 8) // display_name + layer_id + aruid
+        .data_value(&input)
         .send_pid()
         .add_out_buffer(
             native_window.as_mut_ptr(),
@@ -237,9 +218,6 @@ pub fn open_layer(
         .build();
     req.write_to(&mut buf)
         .map_err(OpenLayerError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenLayerError::SendRequest)?;
 
@@ -260,19 +238,13 @@ pub fn close_layer(session: SessionHandle, layer_id: LayerId) -> Result<(), Clos
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_LAYER)
-        .data_size(8)
+        .data_value(&layer_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(CloseLayerError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing layer_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            layer_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(CloseLayerError::SendRequest)?;
 
@@ -330,6 +302,7 @@ pub(crate) fn create_stray_layer_dispatch(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         layer_flags: u32,
         pad: u32,
@@ -343,7 +316,7 @@ pub(crate) fn create_stray_layer_dispatch(
     };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(16) // layer_flags(4) + pad(4) + display_id(8)
+        .data_value(&input)
         .add_out_buffer(
             native_window.as_mut_ptr(),
             NATIVE_WINDOW_SIZE,
@@ -352,9 +325,6 @@ pub(crate) fn create_stray_layer_dispatch(
         .build();
     req.write_to(&mut buf)
         .map_err(CreateStrayLayerError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(CreateStrayLayerError::SendRequest)?;
 
@@ -385,19 +355,13 @@ pub fn destroy_stray_layer(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::DESTROY_STRAY_LAYER)
-        .data_size(8)
+        .data_value(&layer_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(DestroyStrayLayerError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing layer_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            layer_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(DestroyStrayLayerError::SendRequest)?;
 
@@ -417,6 +381,7 @@ pub fn set_layer_scaling_mode(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         scaling_mode: u32,
         pad: u32,
@@ -429,13 +394,11 @@ pub fn set_layer_scaling_mode(
         layer_id: layer_id.to_raw(),
     };
 
-    let req = cmif::CmifRequestBuilder::new(application_cmds::SET_LAYER_SCALING_MODE).data_size(16);
-    req.build()
-        .write_to(&mut buf)
+    let req = cmif::CmifRequestBuilder::new(application_cmds::SET_LAYER_SCALING_MODE)
+        .data_value(&input)
+        .build();
+    req.write_to(&mut buf)
         .map_err(SetLayerScalingModeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerScalingModeError::SendRequest)?;
 
@@ -468,6 +431,7 @@ pub fn get_indirect_layer_image_map(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         width: i64,
         height: i64,
@@ -484,15 +448,12 @@ pub fn get_indirect_layer_image_map(
 
     // HipcMapTransferAllowsNonSecure maps to NonSecure buffer mode
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_INDIRECT_LAYER_IMAGE_MAP)
-        .data_size(32) // width(8) + height(8) + handle(8) + aruid(8)
+        .data_value(&input)
         .send_pid()
         .add_out_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(GetIndirectLayerImageMapError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetIndirectLayerImageMapError::SendRequest)?;
@@ -535,6 +496,7 @@ pub fn get_indirect_layer_image_required_memory_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         width: i64,
         height: i64,
@@ -545,13 +507,10 @@ pub fn get_indirect_layer_image_required_memory_info(
     let req = cmif::CmifRequestBuilder::new(
         application_cmds::GET_INDIRECT_LAYER_IMAGE_REQUIRED_MEMORY_INFO,
     )
-    .data_size(16)
+    .data_value(&input)
     .build();
     req.write_to(&mut buf)
         .map_err(GetIndirectLayerImageRequiredMemoryInfoError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetIndirectLayerImageRequiredMemoryInfoError::SendRequest)?;
@@ -582,18 +541,13 @@ pub fn get_display_vsync_event(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_VSYNC_EVENT).data_size(8);
-    req.build()
-        .write_to(&mut buf)
-        .map_err(GetDisplayVsyncEventError::BuildRequest)?;
 
-    // SAFETY: `req` is exactly 8 bytes; writing display_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            display_id.to_raw(),
-        );
-    }
+    let display_id_raw = display_id.to_raw();
+    let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_VSYNC_EVENT)
+        .data_value(&display_id_raw)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetDisplayVsyncEventError::BuildRequest)?;
 
     ipc::send_sync_request(&mut buf, session).map_err(GetDisplayVsyncEventError::SendRequest)?;
 

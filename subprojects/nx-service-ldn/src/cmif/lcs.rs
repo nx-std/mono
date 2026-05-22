@@ -85,6 +85,7 @@ pub(crate) fn initialize_legacy(object: &DomainObject<'_>) -> Result<(), Dispatc
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_INITIALIZE_LEGACY)
         .send_pid()
@@ -121,6 +122,7 @@ pub(crate) fn initialize_with_version(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd)
         .send_pid()
@@ -154,6 +156,7 @@ pub(crate) fn initialize_with_priority(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_INITIALIZE_WITH_PRIORITY)
         .send_pid()
@@ -214,6 +217,7 @@ pub(crate) fn get_network_info(
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_GET_NETWORK_INFO)
         .out_buffer(
@@ -276,6 +280,7 @@ pub(crate) fn get_state_change_event(
 ) -> Result<SessionHandle, GetStateChangeEventError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(CMD_LCS_GET_STATE_CHANGE_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -321,6 +326,7 @@ pub(crate) fn get_network_info_and_history(
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_GET_NETWORK_INFO_AND_HISTORY)
         .out_buffer(
@@ -394,6 +400,7 @@ fn scan_inner(
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd)
         .in_raw(in_bytes)
@@ -496,6 +503,7 @@ pub(crate) fn set_advertise_data(
 ) -> Result<(), DispatchError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_SET_ADVERTISE_DATA)
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
@@ -567,6 +575,7 @@ pub(crate) fn create_network(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_CREATE_NETWORK)
         .in_raw(in_bytes)
@@ -611,6 +620,7 @@ pub(crate) fn create_network_private(
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_CREATE_NETWORK_PRIVATE)
         .in_raw(in_bytes)
@@ -656,6 +666,7 @@ pub(crate) fn connect(
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_CONNECT)
         .in_raw(in_bytes)
@@ -703,6 +714,7 @@ pub(crate) fn connect_private(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_CONNECT_PRIVATE)
         .in_raw(in_bytes)
@@ -800,6 +812,7 @@ fn send_action_frame_inner(
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_LCS_SEND_ACTION_FRAME)
         .in_raw(in_bytes)
@@ -874,6 +887,7 @@ fn recv_action_frame_inner(
         unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(CMD_LCS_RECV_ACTION_FRAME)
         .in_raw(in_bytes)

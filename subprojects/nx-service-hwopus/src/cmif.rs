@@ -34,6 +34,7 @@ pub(crate) fn open_hardware_opus_decoder(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenDecoderIn>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER)
         .in_raw(in_bytes)
@@ -60,6 +61,7 @@ pub(crate) fn get_work_buffer_size(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u64>()) };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE)
         .in_raw(in_bytes)
@@ -95,6 +97,7 @@ pub(crate) fn open_hardware_opus_decoder_for_multi_stream(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER_FOR_MULTI_STREAM)
         .in_raw(in_bytes)
@@ -123,6 +126,7 @@ pub(crate) fn get_work_buffer_size_for_multi_stream(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE_FOR_MULTI_STREAM)
         .out_size(size_of::<u32>())
@@ -152,6 +156,7 @@ pub(crate) fn decode_interleaved_legacy(
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<DecodeResult>())
@@ -178,6 +183,7 @@ pub(crate) fn decode_interleaved_with_perf(
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<DecodeResultWithPerf>())
@@ -216,6 +222,7 @@ pub(crate) fn decode_interleaved_ex(
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)

@@ -22,6 +22,7 @@ pub(crate) fn initialize(service: &Session) -> Result<(), DispatchError> {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::INITIALIZE)
         .in_raw(in_bytes)
@@ -55,6 +56,7 @@ pub(crate) fn load_nro(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<LoadNroIn>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::LOAD_NRO)
         .in_raw(in_bytes)
@@ -134,6 +136,7 @@ pub(crate) fn get_process_module_info(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_PROCESS_MODULE_INFO)
         .in_raw(in_bytes)

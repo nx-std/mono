@@ -25,8 +25,14 @@ pub fn decode_jpeg(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let input = DecodeJpegIn {
+        width,
+        height,
+        opts: *opts,
+    };
     let req = cmif::CmifRequestBuilder::new(proto::DECODE_JPEG)
-        .data_size(size_of::<DecodeJpegIn>())
+        .data_value(&input)
         .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
         .add_out_buffer(
             out_image.as_mut_ptr(),
@@ -36,20 +42,6 @@ pub fn decode_jpeg(
         .build();
     req.write_to(&mut buf)
         .map_err(DecodeJpegError::BuildRequest)?;
-
-    let input = DecodeJpegIn {
-        width,
-        height,
-        opts: *opts,
-    };
-
-    // SAFETY: `req` is exactly `size_of::<DecodeJpegIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<DecodeJpegIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(DecodeJpegError::SendRequest)?;
 
@@ -70,27 +62,19 @@ pub fn shrink_jpeg(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG)
-        .data_size(size_of::<DecodeJpegIn>())
-        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
-        .build();
-    req.write_to(&mut buf)
-        .map_err(ShrinkJpegError::BuildRequest)?;
 
     let input = DecodeJpegIn {
         width,
         height,
         opts: *opts,
     };
-
-    // SAFETY: `req` is exactly `size_of::<DecodeJpegIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<DecodeJpegIn>(),
-            input,
-        )
-    };
+    let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG)
+        .data_value(&input)
+        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
+        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ShrinkJpegError::BuildRequest)?;
 
     ipc::send_sync_request(&mut buf, session).map_err(ShrinkJpegError::SendRequest)?;
 
@@ -116,13 +100,6 @@ pub fn shrink_jpeg_ex(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG_EX)
-        .data_size(size_of::<ShrinkJpegExIn>())
-        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
-        .build();
-    req.write_to(&mut buf)
-        .map_err(ShrinkJpegExError::BuildRequest)?;
 
     let input = ShrinkJpegExIn {
         scaled_width,
@@ -131,14 +108,13 @@ pub fn shrink_jpeg_ex(
         _pad: [0; 4],
         opts: *opts,
     };
-
-    // SAFETY: `req` is exactly `size_of::<ShrinkJpegExIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<ShrinkJpegExIn>(),
-            input,
-        )
-    };
+    let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG_EX)
+        .data_value(&input)
+        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
+        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ShrinkJpegExError::BuildRequest)?;
 
     ipc::send_sync_request(&mut buf, session).map_err(ShrinkJpegExError::SendRequest)?;
 

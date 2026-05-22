@@ -33,7 +33,7 @@ pub enum AlbumReportOption {
 }
 
 /// Screenshot attributes for album save operations.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct ScreenShotAttribute {
     pub unk_x0: u32,
@@ -90,7 +90,7 @@ pub struct UserIdList {
 const_assert_eq!(size_of::<UserIdList>(), 0x88);
 
 /// Wire-layout input for [`set_shim_library_version`](crate::cmif::set_shim_library_version) (cmd 32).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetShimVersionIn {
     pub version: u64,
@@ -100,7 +100,7 @@ pub(crate) struct SetShimVersionIn {
 const_assert_eq!(size_of::<SetShimVersionIn>(), 0x10);
 
 /// Wire-layout input for save screenshot commands (cmds 203, 205, 210).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SaveScreenShotIn {
     pub attr: ScreenShotAttribute,

@@ -23,6 +23,7 @@ use crate::{
 /// Gets the IBtmUserCore sub-object (cmd 0).
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_CORE)
         .send(&mut ipc_buf)
@@ -203,6 +204,7 @@ pub(crate) fn ble_get_connection_state(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::BLE_GET_CONNECTION_STATE)
         .in_raw(in_bytes)
@@ -288,6 +290,7 @@ pub(crate) fn ble_get_paired_devices(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::BLE_GET_PAIRED_DEVICES)
         .in_raw(in_bytes)
@@ -340,6 +343,7 @@ pub(crate) fn get_gatt_services(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_GATT_SERVICES)
         .in_raw(in_bytes)
@@ -383,6 +387,7 @@ pub(crate) fn get_gatt_service(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_GATT_SERVICE)
         .in_raw(in_bytes)
@@ -450,6 +455,7 @@ pub(crate) fn get_belonging_gatt_service(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_BELONGING_GATT_SERVICE)
         .in_raw(in_bytes)
@@ -549,6 +555,7 @@ pub(crate) fn get_ble_mtu(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetBleMtuIn>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_BLE_MTU)
         .in_raw(in_bytes)
@@ -619,6 +626,7 @@ fn get_ble_scan_results(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -661,6 +669,7 @@ fn get_gatt_service_data(
     // exclusively borrowed for the duration of this call.
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -680,6 +689,7 @@ fn acquire_event_with_flag(
     cmd_id: u32,
 ) -> Result<u32, AcquireEventWithFlagError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())

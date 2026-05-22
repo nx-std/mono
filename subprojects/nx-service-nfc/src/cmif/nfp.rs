@@ -19,6 +19,7 @@ use crate::{
 /// outlives this call; the service wrapper re-opens it per request.
 pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
         .out_objects(1)
@@ -61,6 +62,7 @@ pub(crate) fn initialize(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_INITIALIZE)
         .in_raw(in_bytes)
@@ -86,6 +88,7 @@ pub(crate) fn list_devices(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFP_LIST_DEVICES)
         .out_size(size_of::<i32>())
@@ -167,6 +170,7 @@ pub(crate) fn get_application_area(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFP_GET_APPLICATION_AREA)
         .in_raw(in_bytes)
@@ -197,6 +201,7 @@ pub(crate) fn set_application_area(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_SET_APPLICATION_AREA)
         .in_raw(in_bytes)
@@ -241,6 +246,7 @@ pub(crate) fn create_application_area(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_CREATE_APPLICATION_AREA)
         .in_raw(in_bytes)
@@ -269,6 +275,7 @@ pub(crate) fn recreate_application_area(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_RECREATE_APPLICATION_AREA)
         .in_raw(in_bytes)
@@ -308,6 +315,7 @@ pub(crate) fn get_tag_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_TAG_INFO)
         .in_raw(in_bytes)
@@ -342,6 +350,7 @@ pub(crate) fn get_register_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_REGISTER_INFO)
         .in_raw(in_bytes)
@@ -376,6 +385,7 @@ pub(crate) fn get_common_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_COMMON_INFO)
         .in_raw(in_bytes)
@@ -410,6 +420,7 @@ pub(crate) fn get_model_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_MODEL_INFO)
         .in_raw(in_bytes)
@@ -435,6 +446,7 @@ pub(crate) fn attach_activate_event(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFP_ATTACH_ACTIVATE_EVENT)
         .in_raw(in_bytes)
@@ -457,6 +469,7 @@ pub(crate) fn attach_deactivate_event(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFP_ATTACH_DEACTIVATE_EVENT)
         .in_raw(in_bytes)
@@ -470,6 +483,7 @@ pub(crate) fn attach_availability_change_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFP_ATTACH_AVAILABILITY_CHANGE_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -529,6 +543,7 @@ pub(crate) fn get_admin_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_ADMIN_INFO)
         .in_raw(in_bytes)
@@ -563,6 +578,7 @@ pub(crate) fn get_register_info_private(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_REGISTER_INFO_PRIVATE)
         .in_raw(in_bytes)
@@ -597,6 +613,7 @@ pub(crate) fn set_register_info_private(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_SET_REGISTER_INFO_PRIVATE)
         .in_raw(in_bytes)
@@ -653,6 +670,7 @@ pub(crate) fn get_all(
         core::slice::from_raw_parts_mut((out as *mut NfpData).cast::<u8>(), size_of::<NfpData>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_GET_ALL)
         .in_raw(in_bytes)
@@ -684,6 +702,7 @@ pub(crate) fn set_all(
         core::slice::from_raw_parts((data as *const NfpData).cast::<u8>(), size_of::<NfpData>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_SET_ALL)
         .in_raw(in_bytes)
@@ -731,6 +750,7 @@ pub(crate) fn read_backup_data(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFP_READ_BACKUP_DATA)
         .in_raw(in_bytes)
@@ -761,6 +781,7 @@ pub(crate) fn write_backup_data(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_WRITE_BACKUP_DATA)
         .in_raw(in_bytes)
@@ -786,6 +807,7 @@ pub(crate) fn write_ntf(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<WriteNtfIn>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFP_WRITE_NTF)
         .in_raw(in_bytes)

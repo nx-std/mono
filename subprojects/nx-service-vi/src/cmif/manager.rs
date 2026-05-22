@@ -27,6 +27,7 @@ pub fn create_managed_layer(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         layer_flags: u32,
         pad: u32,
@@ -42,13 +43,10 @@ pub fn create_managed_layer(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::CREATE_MANAGED_LAYER)
-        .data_size(24)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(CreateManagedLayerError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(CreateManagedLayerError::SendRequest)?;
 
@@ -69,19 +67,13 @@ pub fn destroy_managed_layer(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
-        .data_size(8)
+        .data_value(&layer_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(DestroyManagedLayerError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 8 bytes; writing layer_id as u64 is sound.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            layer_id.to_raw(),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(DestroyManagedLayerError::SendRequest)?;
 
@@ -115,6 +107,7 @@ pub fn set_display_alpha(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         alpha: f32,
         pad: u32,
@@ -128,13 +121,10 @@ pub fn set_display_alpha(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_ALPHA)
-        .data_size(16)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayAlphaError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayAlphaError::SendRequest)?;
 
@@ -154,6 +144,7 @@ pub fn set_display_layer_stack(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         layer_stack: u32,
         pad: u32,
@@ -167,13 +158,10 @@ pub fn set_display_layer_stack(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_LAYER_STACK)
-        .data_size(16)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayLayerStackError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayLayerStackError::SendRequest)?;
 
@@ -193,6 +181,7 @@ pub fn set_display_power_state(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         power_state: u32,
         pad: u32,
@@ -205,13 +194,11 @@ pub fn set_display_power_state(
         display_id: display_id.to_raw(),
     };
 
-    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE).data_size(16);
-    req.build()
-        .write_to(&mut buf)
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE)
+        .data_value(&input)
+        .build();
+    req.write_to(&mut buf)
         .map_err(SetDisplayPowerStateError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayPowerStateError::SendRequest)?;
 
@@ -232,6 +219,7 @@ pub fn add_to_layer_stack(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         layer_stack: u32,
         pad: u32,
@@ -245,13 +233,10 @@ pub fn add_to_layer_stack(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::ADD_TO_LAYER_STACK)
-        .data_size(16)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(AddToLayerStackError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(AddToLayerStackError::SendRequest)?;
 
@@ -268,15 +253,13 @@ pub fn set_content_visibility(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY).data_size(1);
-    req.build()
-        .write_to(&mut buf)
-        .map_err(SetContentVisibilityError::BuildRequest)?;
 
-    // SAFETY: `req` is exactly 1 byte; writing visible as u8 is sound.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr(), visible as u8);
-    }
+    let visible_u8: u8 = visible as u8;
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY)
+        .data_value(&visible_u8)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetContentVisibilityError::BuildRequest)?;
 
     ipc::send_sync_request(&mut buf, session).map_err(SetContentVisibilityError::SendRequest)?;
 

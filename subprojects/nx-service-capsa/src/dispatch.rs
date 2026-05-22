@@ -16,6 +16,7 @@ pub(crate) fn dispatch_in_no_out<T>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -35,6 +36,7 @@ pub(crate) fn dispatch_in_out<T, U: Copy>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -51,6 +53,7 @@ pub(crate) fn dispatch_in_out<T, U: Copy>(
 #[inline]
 pub(crate) fn dispatch_out<U: Copy>(service: &Session, cmd_id: u32) -> Result<U, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<U>())
@@ -74,6 +77,7 @@ pub(crate) fn dispatch_in_pid_out<T, U: Copy>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)

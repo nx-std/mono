@@ -16,6 +16,7 @@ pub(crate) fn request_link_device(
         core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ECOMMERCE_REQUEST_LINK_DEVICE)
         .in_raw(in_bytes)
@@ -29,6 +30,7 @@ pub(crate) fn request_link_device(
 /// RequestSyncRights (cmd 3).
 pub(crate) fn request_sync_rights(service: &Session) -> Result<AsyncOut, AsyncCommandError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ECOMMERCE_REQUEST_SYNC_RIGHTS)
         .out_handle(0, OutHandleAttr::Copy)
@@ -47,6 +49,7 @@ pub(crate) fn request_unlink_device(
         core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ECOMMERCE_REQUEST_UNLINK_DEVICE)
         .in_raw(in_bytes)

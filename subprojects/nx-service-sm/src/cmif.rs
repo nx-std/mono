@@ -19,6 +19,7 @@ pub fn get_service_handle(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
@@ -83,6 +84,7 @@ pub fn register_service(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut payload = [0u8; size_of::<RegisterServiceIn>()];
     // SAFETY: `payload` is exactly `size_of::<RegisterServiceIn>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<RegisterServiceIn>(), input) };
@@ -130,6 +132,7 @@ pub fn unregister_service(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
@@ -167,6 +170,7 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let payload = [0u8; size_of::<u64>()];
     let req = cmif::CmifRequestBuilder::new(proto::DETACH_CLIENT)
         .data(&payload)
@@ -203,6 +207,7 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let payload = [0u8; size_of::<u64>()];
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_CLIENT)
         .data(&payload)

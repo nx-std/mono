@@ -16,6 +16,7 @@ pub(crate) fn dispatch_in<I: Copy>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -27,5 +28,6 @@ pub(crate) fn dispatch_in<I: Copy>(
 #[inline]
 pub(crate) fn dispatch_no_io(service: &Session, cmd_id: u32) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service.dispatch(cmd_id).send(&mut ipc_buf).map(|_| ())
 }

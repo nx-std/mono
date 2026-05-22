@@ -7,6 +7,7 @@ use crate::{dispatch::as_in_bytes, proto, types::*};
 pub(crate) fn set_current_process(domain: &Domain, ctx: u32) -> Result<(), DispatchError> {
     let pid_placeholder: u64 = 0;
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_SET_CURRENT_PROCESS)
         .context(ctx)
@@ -23,6 +24,7 @@ pub(crate) fn open_file_system_legacy(
     content_path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM)
         .context(ctx)
@@ -41,6 +43,7 @@ pub(crate) fn open_data_file_system_by_current_process(
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_FILE_SYSTEM_BY_CURRENT_PROCESS)
         .context(ctx)
@@ -60,6 +63,7 @@ pub(crate) fn open_file_system_with_patch(
 ) -> Result<u32, DispatchError> {
     let input = OpenFileSystemWithPatchIn { fs_type, id };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM_WITH_PATCH)
         .context(ctx)
@@ -81,6 +85,7 @@ pub(crate) fn open_file_system_with_id(
 ) -> Result<u32, DispatchError> {
     let input = OpenFileSystemWithIdIn { fs_type, id };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM_WITH_ID)
         .context(ctx)
@@ -109,6 +114,7 @@ pub(crate) fn open_file_system_with_id_v16(
         id,
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM_WITH_ID_V16)
         .context(ctx)
@@ -128,6 +134,7 @@ pub(crate) fn open_data_file_system_by_program_id(
     program_id: u64,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_FILE_SYSTEM_BY_PROGRAM_ID)
         .context(ctx)
@@ -147,6 +154,7 @@ pub(crate) fn open_bis_file_system(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_BIS_FILE_SYSTEM)
         .context(ctx)
@@ -166,6 +174,7 @@ pub(crate) fn open_bis_storage(
     partition_id: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_BIS_STORAGE)
         .context(ctx)
@@ -180,6 +189,7 @@ pub(crate) fn open_bis_storage(
 
 pub(crate) fn open_sd_card_file_system(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SD_CARD_FILE_SYSTEM)
         .context(ctx)
@@ -197,6 +207,7 @@ pub(crate) fn open_host_file_system(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_HOST_FILE_SYSTEM)
         .context(ctx)
@@ -216,6 +227,7 @@ pub(crate) fn open_host_file_system_with_option(
     flags: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_HOST_FILE_SYSTEM_WITH_OPTION)
         .context(ctx)
@@ -235,6 +247,7 @@ pub(crate) fn delete_save_data_file_system(
     application_id: u64,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_DELETE_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
@@ -249,6 +262,7 @@ pub(crate) fn create_save_data_file_system_raw(
     input: &CreateSaveDataIn,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_CREATE_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
@@ -263,6 +277,7 @@ pub(crate) fn create_save_data_file_system_by_system_save_data_id(
     input: &CreateSaveDataBySystemIdIn,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_CREATE_SAVE_DATA_FILE_SYSTEM_BY_SYSTEM_SAVE_DATA_ID)
         .context(ctx)
@@ -277,6 +292,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_space_id(
     input: &DeleteSaveDataBySpaceIdIn,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_DELETE_SAVE_DATA_FILE_SYSTEM_BY_SAVE_DATA_SPACE_ID)
         .context(ctx)
@@ -291,6 +307,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_attribute(
     input: &DeleteSaveDataByAttributeIn,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_DELETE_SAVE_DATA_FILE_SYSTEM_BY_SAVE_DATA_ATTRIBUTE)
         .context(ctx)
@@ -301,6 +318,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_attribute(
 
 pub(crate) fn is_exfat_supported(domain: &Domain, ctx: u32) -> Result<bool, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_IS_EXFAT_SUPPORTED)
         .context(ctx)
@@ -315,6 +333,7 @@ pub(crate) fn open_game_card_file_system(
     input: &OpenGameCardFileSystemIn,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_GAME_CARD_FILE_SYSTEM)
         .context(ctx)
@@ -333,6 +352,7 @@ pub(crate) fn extend_save_data_file_system(
     input: &ExtendSaveDataIn,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_EXTEND_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
@@ -347,6 +367,7 @@ pub(crate) fn open_save_data_file_system(
     input: &OpenSaveDataIn,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
@@ -365,6 +386,7 @@ pub(crate) fn open_save_data_file_system_by_system_save_data_id(
     input: &OpenSaveDataIn,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_FILE_SYSTEM_BY_SYSTEM_SAVE_DATA_ID)
         .context(ctx)
@@ -383,6 +405,7 @@ pub(crate) fn open_read_only_save_data_file_system(
     input: &OpenSaveDataIn,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_READ_ONLY_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
@@ -402,6 +425,7 @@ pub(crate) fn read_save_data_file_system_extra_data_by_save_data_space_id(
     buf: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_READ_SAVE_DATA_FILE_SYSTEM_EXTRA_DATA_BY_SAVE_DATA_SPACE_ID)
         .context(ctx)
@@ -418,6 +442,7 @@ pub(crate) fn read_save_data_file_system_extra_data(
     buf: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_READ_SAVE_DATA_FILE_SYSTEM_EXTRA_DATA)
         .context(ctx)
@@ -434,6 +459,7 @@ pub(crate) fn write_save_data_file_system_extra_data(
     buf: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_WRITE_SAVE_DATA_FILE_SYSTEM_EXTRA_DATA)
         .context(ctx)
@@ -445,6 +471,7 @@ pub(crate) fn write_save_data_file_system_extra_data(
 
 pub(crate) fn open_save_data_info_reader(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_INFO_READER)
         .context(ctx)
@@ -462,6 +489,7 @@ pub(crate) fn open_save_data_info_reader_by_save_data_space_id(
     space_id: u8,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_INFO_READER_BY_SAVE_DATA_SPACE_ID)
         .context(ctx)
@@ -480,6 +508,7 @@ pub(crate) fn open_save_data_info_reader_with_filter(
     input: &OpenSaveDataInfoReaderWithFilterIn,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_INFO_READER_WITH_FILTER)
         .context(ctx)
@@ -498,6 +527,7 @@ pub(crate) fn open_image_directory_file_system(
     image_directory_id: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_IMAGE_DIRECTORY_FILE_SYSTEM)
         .context(ctx)
@@ -516,6 +546,7 @@ pub(crate) fn open_content_storage_file_system(
     content_storage_id: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_CONTENT_STORAGE_FILE_SYSTEM)
         .context(ctx)
@@ -534,6 +565,7 @@ pub(crate) fn open_custom_storage_file_system(
     custom_storage_id: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_CUSTOM_STORAGE_FILE_SYSTEM)
         .context(ctx)
@@ -551,6 +583,7 @@ pub(crate) fn open_data_storage_by_current_process(
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_STORAGE_BY_CURRENT_PROCESS)
         .context(ctx)
@@ -568,6 +601,7 @@ pub(crate) fn open_data_storage_by_program_id(
     program_id: u64,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_STORAGE_BY_PROGRAM_ID)
         .context(ctx)
@@ -586,6 +620,7 @@ pub(crate) fn open_data_storage_by_data_id(
     input: &OpenDataStorageByDataIdIn,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_STORAGE_BY_DATA_ID)
         .context(ctx)
@@ -603,6 +638,7 @@ pub(crate) fn open_patch_data_storage_by_current_process(
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_PATCH_DATA_STORAGE_BY_CURRENT_PROCESS)
         .context(ctx)
@@ -616,6 +652,7 @@ pub(crate) fn open_patch_data_storage_by_current_process(
 
 pub(crate) fn open_device_operator(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DEVICE_OPERATOR)
         .context(ctx)
@@ -632,6 +669,7 @@ pub(crate) fn open_sd_card_detection_event_notifier(
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SD_CARD_DETECTION_EVENT_NOTIFIER)
         .context(ctx)
@@ -649,6 +687,7 @@ pub(crate) fn get_rights_id_by_path(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<RightsId, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_RIGHTS_ID_BY_PATH)
         .context(ctx)
@@ -667,6 +706,7 @@ pub(crate) fn get_rights_id_and_key_generation_by_path(
 ) -> Result<GetRightsIdAndKeyGenOut, DispatchError> {
     if has_attr {
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let result = domain
             .dispatch(proto::PROXY_GET_RIGHTS_ID_AND_KEY_GENERATION_BY_PATH)
             .context(ctx)
@@ -679,6 +719,7 @@ pub(crate) fn get_rights_id_and_key_generation_by_path(
         })
     } else {
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let result = domain
             .dispatch(proto::PROXY_GET_RIGHTS_ID_AND_KEY_GENERATION_BY_PATH)
             .context(ctx)
@@ -698,6 +739,7 @@ pub(crate) fn get_program_id(
     attr: u8,
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_PROGRAM_ID)
         .context(ctx)
@@ -713,6 +755,7 @@ pub(crate) fn is_signed_system_partition_on_sd_card_valid(
     ctx: u32,
 ) -> Result<bool, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_IS_SIGNED_SYSTEM_PARTITION_ON_SD_CARD_VALID)
         .context(ctx)
@@ -726,6 +769,7 @@ pub(crate) fn get_and_clear_error_info(
     ctx: u32,
 ) -> Result<FileSystemProxyErrorInfo, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_AND_CLEAR_ERROR_INFO)
         .context(ctx)
@@ -741,6 +785,7 @@ pub(crate) fn get_content_storage_info_index(
     ctx: u32,
 ) -> Result<i32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_CONTENT_STORAGE_INFO_INDEX)
         .context(ctx)
@@ -754,6 +799,7 @@ pub(crate) fn disable_auto_save_data_creation(
     ctx: u32,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_DISABLE_AUTO_SAVE_DATA_CREATION)
         .context(ctx)
@@ -767,6 +813,7 @@ pub(crate) fn set_global_access_log_mode(
     mode: u32,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_SET_GLOBAL_ACCESS_LOG_MODE)
         .context(ctx)
@@ -777,6 +824,7 @@ pub(crate) fn set_global_access_log_mode(
 
 pub(crate) fn get_global_access_log_mode(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_GLOBAL_ACCESS_LOG_MODE)
         .context(ctx)
@@ -791,6 +839,7 @@ pub(crate) fn output_access_log_to_sd_card(
     log: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::PROXY_OUTPUT_ACCESS_LOG_TO_SD_CARD)
         .context(ctx)
@@ -804,6 +853,7 @@ pub(crate) fn get_program_index_for_access_log(
     ctx: u32,
 ) -> Result<ProgramIndexForAccessLogOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_PROGRAM_INDEX_FOR_ACCESS_LOG)
         .context(ctx)
@@ -819,6 +869,7 @@ pub(crate) fn get_and_clear_memory_report_info(
     ctx: u32,
 ) -> Result<MemoryReportInfo, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::PROXY_GET_AND_CLEAR_MEMORY_REPORT_INFO)
         .context(ctx)

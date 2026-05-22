@@ -32,6 +32,7 @@ pub(crate) fn set_program_arguments(
         core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_PROGRAM_ARGUMENTS)
         .in_raw(in_bytes)
@@ -63,6 +64,7 @@ pub(crate) fn set_program_arguments_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_PROGRAM_ARGUMENTS)
         .in_raw(in_bytes)
@@ -99,6 +101,7 @@ pub(crate) fn get_process_module_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DMNT_GET_PROCESS_MODULE_INFO)
         .in_raw(in_bytes)
@@ -139,6 +142,7 @@ pub(crate) fn create_process_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PM_CREATE_PROCESS)
         .in_raw(in_bytes)
@@ -176,6 +180,7 @@ pub(crate) fn create_process(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PM_CREATE_PROCESS)
         .in_raw(in_bytes)
@@ -210,6 +215,7 @@ pub(crate) fn get_program_info_v1(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::PM_GET_PROGRAM_INFO)
         .in_raw(in_bytes)
@@ -254,6 +260,7 @@ pub(crate) fn get_program_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::PM_GET_PROGRAM_INFO)
         .in_raw(in_bytes)
@@ -278,6 +285,7 @@ pub(crate) fn pin_program(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PM_PIN_PROGRAM)
         .in_raw(in_bytes)

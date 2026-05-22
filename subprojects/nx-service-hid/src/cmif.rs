@@ -3,8 +3,6 @@
 //! This module implements HID commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{mem::size_of, ptr};
-
 use nx_service_applet::aruid::{Aruid, NO_ARUID};
 use nx_sf::{
     cmif,
@@ -26,16 +24,14 @@ pub fn create_applet_resource(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
         .context(0x20)
-        .data_size(size_of::<u64>())
+        .data_value(&aruid)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(CreateAppletResourceError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
     ipc::send_sync_request(&mut buf, session).map_err(CreateAppletResourceError::SendRequest)?;
 
@@ -59,6 +55,7 @@ pub fn get_shared_memory_handle(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE).build();
     req.write_to(&mut buf)
         .map_err(GetSharedMemoryHandleError::BuildRequest)?;
@@ -91,6 +88,7 @@ pub fn activate_npad(
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         revision: u32,
         pad: u32,
@@ -105,17 +103,14 @@ pub fn activate_npad(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
         .context(0x20)
-        .data_size(size_of::<Input>())
+        .data_value(&input)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateNpadError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
-    // `repr(C)` and `input` is a valid value on the stack.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(ActivateNpadError::SendRequest)?;
 
@@ -135,6 +130,7 @@ pub fn set_supported_npad_style_set(
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         style_set: u32,
         pad: u32,
@@ -149,17 +145,14 @@ pub fn set_supported_npad_style_set(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
         .context(0x20)
-        .data_size(size_of::<Input>())
+        .data_value(&input)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
-    // `repr(C)` and `input` is a valid value on the stack.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(SetSupportedNpadStyleSetError::SendRequest)?;
@@ -183,17 +176,15 @@ pub fn set_supported_npad_id_type(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
         .context(0x20)
-        .data_size(size_of::<u64>())
+        .data_value(&aruid)
         .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetSupportedNpadIdTypeError::SendRequest)?;
 
@@ -214,16 +205,14 @@ pub fn activate_touch_screen(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
         .context(0x20)
-        .data_size(size_of::<u64>())
+        .data_value(&aruid)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateTouchScreenError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
     ipc::send_sync_request(&mut buf, session).map_err(ActivateTouchScreenError::SendRequest)?;
 
@@ -244,16 +233,14 @@ pub fn activate_keyboard(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_KEYBOARD)
         .context(0x20)
-        .data_size(size_of::<u64>())
+        .data_value(&aruid)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateKeyboardError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
     ipc::send_sync_request(&mut buf, session).map_err(ActivateKeyboardError::SendRequest)?;
 
@@ -274,16 +261,14 @@ pub fn activate_mouse(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_MOUSE)
         .context(0x20)
-        .data_size(size_of::<u64>())
+        .data_value(&aruid)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateMouseError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
     ipc::send_sync_request(&mut buf, session).map_err(ActivateMouseError::SendRequest)?;
 
@@ -302,6 +287,7 @@ pub fn activate_gesture(
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         val: u32,
         pad: u32,
@@ -316,17 +302,14 @@ pub fn activate_gesture(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_GESTURE)
         .context(0x20)
-        .data_size(size_of::<Input>())
+        .data_value(&input)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateGestureError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
-    // `repr(C)` and `input` is a valid value on the stack.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(ActivateGestureError::SendRequest)?;
 

@@ -3,7 +3,7 @@
 //! This module implements APM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{mem::size_of, ptr};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -22,6 +22,7 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_OPEN_SESSION).build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;
@@ -47,6 +48,7 @@ pub fn get_performance_mode(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_MODE).build();
     req.write_to(&mut buf)
         .map_err(GetPerformanceModeError::BuildRequest)?;
@@ -74,28 +76,23 @@ pub fn set_performance_configuration(
     config: u32,
 ) -> Result<(), SetPerformanceConfigurationError> {
     #[repr(C)]
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     struct InData {
-        mode: u32,
+        mode: PerformanceMode,
         config: u32,
     }
 
-    let in_data = InData {
-        mode: mode as i32 as u32,
-        config,
-    };
+    let in_data = InData { mode, config };
 
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
-        .data_size(size_of::<InData>())
+        .data_value(&in_data)
         .build();
     req.write_to(&mut buf)
         .map_err(SetPerformanceConfigurationError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<InData>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<InData>(), in_data) };
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(SetPerformanceConfigurationError::SendRequest)?;
@@ -112,19 +109,15 @@ pub fn get_performance_configuration(
     session: SessionHandle,
     mode: PerformanceMode,
 ) -> Result<u32, GetPerformanceConfigurationError> {
-    let in_data: u32 = mode as i32 as u32;
-
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
-        .data_size(size_of::<u32>())
+        .data_value(&mode)
         .build();
     req.write_to(&mut buf)
         .map_err(GetPerformanceConfigurationError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), in_data) };
 
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetPerformanceConfigurationError::SendRequest)?;

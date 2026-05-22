@@ -14,16 +14,12 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::GET_LAST_TICK)
-        .data_size(size_of::<u32>())
+        .data_value(&id)
         .build();
     req.write_to(&mut buf)
         .map_err(GetLastTickError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), id);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetLastTickError::SendRequest)?;
 
@@ -38,6 +34,7 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
 
 /// Input layout for event commands: `{ u32 id, u64 unk }` with C alignment.
 #[repr(C)]
+#[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
 struct EventInput {
     id: u32,
     _pad: u32,
@@ -58,16 +55,12 @@ pub fn get_readable_event(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::GET_READABLE_EVENT)
-        .data_size(size_of::<EventInput>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(GetReadableEventError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<EventInput>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<EventInput>(), input);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetReadableEventError::SendRequest)?;
 
@@ -94,16 +87,12 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::GET_WRITABLE_EVENT)
-        .data_size(size_of::<EventInput>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(GetWritableEventError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<EventInput>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<EventInput>(), input);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetWritableEventError::SendRequest)?;
 

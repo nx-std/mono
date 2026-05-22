@@ -18,6 +18,7 @@ pub(crate) fn open_location_resolver(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_LOCATION_RESOLVER)
         .in_raw(in_bytes)
@@ -37,6 +38,7 @@ pub(crate) fn open_registered_location_resolver(
     service: &Session,
 ) -> Result<u32, OpenRegisteredLocationResolverError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_REGISTERED_LOCATION_RESOLVER)
         .send(&mut ipc_buf)

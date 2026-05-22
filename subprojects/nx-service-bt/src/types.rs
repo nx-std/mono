@@ -5,7 +5,7 @@ use static_assertions::const_assert_eq;
 /// GATT attribute UUID.
 ///
 /// Size field indicates UUID length: 0x2, 0x4, or 0x10 bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct BtdrvGattAttributeUuid {
     pub size: u32,
@@ -15,7 +15,7 @@ pub struct BtdrvGattAttributeUuid {
 const_assert_eq!(size_of::<BtdrvGattAttributeUuid>(), 0x14);
 
 /// GATT ID combining an instance ID with a UUID.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct BtdrvGattId {
     pub instance_id: u8,
@@ -48,7 +48,7 @@ pub enum BtdrvBleEventType {
 // --- Wire input structs for IPC commands ---
 
 /// Input for LeClientReadCharacteristic (cmd 0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ReadCharacteristicIn {
     pub is_primary: u8,
@@ -63,7 +63,7 @@ pub(crate) struct ReadCharacteristicIn {
 const_assert_eq!(size_of::<ReadCharacteristicIn>(), 0x40);
 
 /// Input for LeClientReadDescriptor (cmd 1).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ReadDescriptorIn {
     pub is_primary: u8,
@@ -79,7 +79,7 @@ pub(crate) struct ReadDescriptorIn {
 const_assert_eq!(size_of::<ReadDescriptorIn>(), 0x58);
 
 /// Input for LeClientWriteCharacteristic (cmd 2).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct WriteCharacteristicIn {
     pub is_primary: u8,
@@ -95,7 +95,7 @@ pub(crate) struct WriteCharacteristicIn {
 const_assert_eq!(size_of::<WriteCharacteristicIn>(), 0x40);
 
 /// Input for LeClientWriteDescriptor (cmd 3).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct WriteDescriptorIn {
     pub is_primary: u8,
@@ -111,7 +111,7 @@ pub(crate) struct WriteDescriptorIn {
 const_assert_eq!(size_of::<WriteDescriptorIn>(), 0x58);
 
 /// Input for LeClientRegisterNotification / DeregisterNotification (cmds 4, 5).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct NotificationIn {
     pub is_primary: u8,
@@ -125,7 +125,7 @@ pub(crate) struct NotificationIn {
 const_assert_eq!(size_of::<NotificationIn>(), 0x40);
 
 /// Input for SetLeResponse (cmd 6).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetLeResponseIn {
     pub server_if: u8,
@@ -139,7 +139,7 @@ pub(crate) struct SetLeResponseIn {
 const_assert_eq!(size_of::<SetLeResponseIn>(), 0x38);
 
 /// Input for LeSendIndication (cmd 7).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SendIndicationIn {
     pub server_if: u8,

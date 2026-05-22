@@ -39,8 +39,17 @@ pub fn capture_raw_image_with_timeout(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
+    // completes; viewing its bytes as a slice is sound.
+    let data = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<CaptureRawImageIn>(),
+        )
+    };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
-        .data_size(size_of::<CaptureRawImageIn>())
+        .data(data)
         .add_out_buffer(
             out_image.as_mut_ptr(),
             out_image.len(),
@@ -49,14 +58,6 @@ pub fn capture_raw_image_with_timeout(
         .build();
     req.write_to(&mut buf)
         .map_err(CaptureRawImageError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<CaptureRawImageIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<CaptureRawImageIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(CaptureRawImageError::SendRequest)?;
 
@@ -90,21 +91,20 @@ pub fn open_raw_screen_shot_read_stream(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
+    // completes; viewing its bytes as a slice is sound.
+    let data = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<LayerStackTimeoutIn>(),
+        )
+    };
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
-        .data_size(size_of::<LayerStackTimeoutIn>())
+        .data(data)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenReadStreamError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut()
-                .as_mut_ptr()
-                .cast::<LayerStackTimeoutIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenReadStreamError::SendRequest)?;
 
@@ -128,6 +128,7 @@ pub fn close_raw_screen_shot_read_stream(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM).build();
     req.write_to(&mut buf)
         .map_err(CloseReadStreamError::BuildRequest)?;
@@ -150,15 +151,13 @@ pub fn read_raw_screen_shot_read_stream(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
-        .data_size(size_of::<u64>())
+        .data_value(&offset)
         .add_out_buffer(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(ReadStreamError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), offset) };
 
     ipc::send_sync_request(&mut buf, session).map_err(ReadStreamError::SendRequest)?;
 
@@ -189,22 +188,21 @@ pub fn capture_jpeg_screen_shot(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
+    // completes; viewing its bytes as a slice is sound.
+    let data = unsafe {
+        core::slice::from_raw_parts(
+            (&raw const input).cast::<u8>(),
+            size_of::<LayerStackTimeoutIn>(),
+        )
+    };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_JPEG_SCREEN_SHOT)
-        .data_size(size_of::<LayerStackTimeoutIn>())
+        .data(data)
         .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(CaptureJpegError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<LayerStackTimeoutIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut()
-                .as_mut_ptr()
-                .cast::<LayerStackTimeoutIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(CaptureJpegError::SendRequest)?;
 

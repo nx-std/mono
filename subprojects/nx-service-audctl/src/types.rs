@@ -101,7 +101,7 @@ impl AudioHeadphoneOutputLevelMode {
 }
 
 /// Wire-layout input for [`SetDefaultTarget`](crate::AudctlService::set_default_target).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetDefaultTargetIn {
     pub target: u32,
@@ -113,7 +113,7 @@ pub(crate) struct SetDefaultTargetIn {
 const_assert_eq!(size_of::<SetDefaultTargetIn>(), 0x18);
 
 /// Wire-layout input for [`SetTargetVolume`](crate::AudctlService::set_target_volume).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetTargetVolumeIn {
     pub target: u32,
@@ -123,7 +123,7 @@ pub(crate) struct SetTargetVolumeIn {
 const_assert_eq!(size_of::<SetTargetVolumeIn>(), 0x8);
 
 /// Wire-layout input for [`SetTargetMute`](crate::AudctlService::set_target_mute).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetTargetMuteIn {
     pub mute: u32,
@@ -134,7 +134,7 @@ const_assert_eq!(size_of::<SetTargetMuteIn>(), 0x8);
 
 /// Wire-layout input for paired u32 commands (set audio output mode, set
 /// output mode setting).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct TargetModeIn {
     pub target: u32,

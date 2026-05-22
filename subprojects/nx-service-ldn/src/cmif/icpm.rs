@@ -23,6 +23,7 @@ pub(crate) fn register_client(object: &DomainObject<'_>) -> Result<(), DispatchE
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(CMD_ICPM_REGISTER_CLIENT)
         .send_pid()

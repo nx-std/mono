@@ -8,6 +8,7 @@ use nx_sf::service::{DispatchError, DomainObject};
 #[inline]
 pub(crate) fn dispatch_no_io(object: &DomainObject<'_>, cmd_id: u32) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object.dispatch(cmd_id).send(&mut buf).map(|_| ())
 }
 
@@ -18,6 +19,7 @@ pub(crate) fn dispatch_out<O: Copy>(
     cmd_id: u32,
 ) -> Result<O, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .out_size(size_of::<O>())

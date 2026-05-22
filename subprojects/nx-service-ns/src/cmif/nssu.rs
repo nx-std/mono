@@ -26,6 +26,7 @@ pub(crate) fn open_system_update_control(
     service: &Session,
 ) -> Result<u32, OpenSystemUpdateControlError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_OPEN_SYSTEM_UPDATE_CONTROL)
         .send(&mut ipc_buf)
@@ -81,6 +82,7 @@ pub(crate) fn get_system_update_notification_event(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_GET_SYSTEM_UPDATE_NOTIFICATION_EVENT_FOR_CONTENT_DELIVERY)
         .out_handle(0, OutHandleAttr::Copy)
@@ -130,6 +132,7 @@ pub(crate) fn request_send_system_update(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_REQUEST_SEND_SYSTEM_UPDATE)
         .in_raw(in_bytes)
@@ -222,6 +225,7 @@ pub(crate) fn ctrl_get_downloaded_eula_data_size(
     path: &[u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_DOWNLOADED_EULA_DATA_SIZE)
         .out_size(size_of::<u64>())
@@ -238,6 +242,7 @@ pub(crate) fn ctrl_get_downloaded_eula_data(
     out: &mut [u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_DOWNLOADED_EULA_DATA)
         .out_size(size_of::<u64>())
@@ -258,6 +263,7 @@ pub(crate) fn ctrl_setup_card_update(
         core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::NSSU_CTRL_SETUP_CARD_UPDATE)
         .in_raw(in_bytes)
@@ -272,6 +278,7 @@ pub(crate) fn ctrl_get_prepared_card_update_eula_data_size(
     path: &[u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_PREPARED_CARD_UPDATE_EULA_DATA_SIZE)
         .out_size(size_of::<u64>())
@@ -288,6 +295,7 @@ pub(crate) fn ctrl_get_prepared_card_update_eula_data(
     out: &mut [u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_PREPARED_CARD_UPDATE_EULA_DATA)
         .out_size(size_of::<u64>())
@@ -308,6 +316,7 @@ pub(crate) fn ctrl_setup_card_update_via_system_updater(
         core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::NSSU_CTRL_SETUP_CARD_UPDATE_VIA_SYSTEM_UPDATER)
         .in_raw(in_bytes)
@@ -335,6 +344,7 @@ pub(crate) fn ctrl_request_receive_system_update(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_REQUEST_RECEIVE_SYSTEM_UPDATE)
         .in_raw(in_bytes)
@@ -365,6 +375,7 @@ pub(crate) fn ctrl_get_received_eula_data_size(
     path: &[u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_RECEIVED_EULA_DATA_SIZE)
         .out_size(size_of::<u64>())
@@ -381,6 +392,7 @@ pub(crate) fn ctrl_get_received_eula_data(
     out: &mut [u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::NSSU_CTRL_GET_RECEIVED_EULA_DATA)
         .out_size(size_of::<u64>())
@@ -417,6 +429,7 @@ fn dispatch_ctrl_async_no_in(
     cmd_id: u32,
 ) -> Result<AsyncOut, AsyncCommandError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_handle(0, OutHandleAttr::Copy)

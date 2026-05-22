@@ -49,6 +49,7 @@ pub fn register_program(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::REGISTER_PROGRAM)
         .in_raw(in_bytes)
@@ -65,6 +66,7 @@ pub fn unregister_program(domain: &Domain, pid: u64) -> Result<(), DispatchError
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const pid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::UNREGISTER_PROGRAM)
         .in_raw(in_bytes)
@@ -82,6 +84,7 @@ pub fn set_current_process(domain: &Domain) -> Result<(), DispatchError> {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::SET_CURRENT_PROCESS)
         .send_pid()
@@ -101,6 +104,7 @@ pub fn set_enabled_program_verification(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u8>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::SET_ENABLED_PROGRAM_VERIFICATION)
         .in_raw(in_bytes)

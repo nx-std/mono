@@ -17,6 +17,7 @@ use crate::{
 /// Gets the IBtmSystemCore sub-object (cmd 0).
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_CORE)
         .send(&mut ipc_buf)
@@ -240,6 +241,7 @@ fn dispatch_aruid(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -261,6 +263,7 @@ fn get_audio_device_list(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<i32>())
@@ -274,6 +277,7 @@ fn get_audio_device_list(
 /// Dispatches a command that returns a copy handle for an event.
 fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_handle(0, OutHandleAttr::Copy)
@@ -294,6 +298,7 @@ fn acquire_event_with_flag(
     cmd_id: u32,
 ) -> Result<u32, AcquireEventWithFlagError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u8>())

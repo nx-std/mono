@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the spsm service.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -16,16 +14,12 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN)
-        .data_size(1)
+        .data_value(&in_data)
         .build();
     req.write_to(&mut buf)
         .map_err(ShutdownError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly 1 byte.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), in_data);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(ShutdownError::SendRequest)?;
 
@@ -39,6 +33,7 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::PUT_ERROR_STATE).build();
     req.write_to(&mut buf)
         .map_err(PutErrorStateError::BuildRequest)?;

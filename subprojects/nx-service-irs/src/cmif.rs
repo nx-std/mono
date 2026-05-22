@@ -58,6 +58,7 @@ pub(crate) fn get_irsensor_shared_memory_handle(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_IRSENSOR_SHARED_MEMORY_HANDLE)
         .in_raw(in_bytes)
@@ -158,6 +159,7 @@ pub(crate) fn run_image_transfer_processor(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::RUN_IMAGE_TRANSFER_PROCESSOR)
         .in_raw(in_bytes)
@@ -190,6 +192,7 @@ pub(crate) fn get_image_transfer_processor_state(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_IMAGE_TRANSFER_PROCESSOR_STATE)
         .in_raw(in_bytes)
@@ -301,6 +304,7 @@ pub(crate) fn run_image_transfer_ex_processor(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::RUN_IMAGE_TRANSFER_EX_PROCESSOR)
         .in_raw(in_bytes)

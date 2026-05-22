@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the fatal service.
 
-use core::{mem::size_of, ptr};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -21,27 +21,20 @@ pub fn throw_fatal_with_policy(
 ) -> Result<(), ThrowFatalError> {
     let input = ThrowFatalIn {
         result_code,
-        policy: policy as u32,
+        policy,
         pid_placeholder: 0,
     };
 
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_POLICY)
-        .data_size(size_of::<ThrowFatalIn>())
+        .data_value(&input)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ThrowFatalError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<ThrowFatalIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<ThrowFatalIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(ThrowFatalError::SendRequest)?;
 
@@ -59,15 +52,16 @@ pub fn throw_fatal_with_context(
 ) -> Result<(), ThrowFatalError> {
     let input = ThrowFatalIn {
         result_code,
-        policy: policy as u32,
+        policy,
         pid_placeholder: 0,
     };
 
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_CONTEXT)
-        .data_size(size_of::<ThrowFatalIn>())
+        .data_value(&input)
         .send_pid()
         .add_in_buffer(
             (ctx as *const FatalCpuContext).cast::<u8>(),
@@ -77,14 +71,6 @@ pub fn throw_fatal_with_context(
         .build();
     req.write_to(&mut buf)
         .map_err(ThrowFatalError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<ThrowFatalIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<ThrowFatalIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(ThrowFatalError::SendRequest)?;
 

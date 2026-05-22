@@ -21,6 +21,7 @@ pub(crate) fn open_database(service: &Session, key_code: u32) -> Result<u32, Ope
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_DATABASE)
         .in_raw(in_bytes)
@@ -75,6 +76,7 @@ pub(crate) fn db_get1(
     };
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_GET1)
         .in_raw(in_bytes)

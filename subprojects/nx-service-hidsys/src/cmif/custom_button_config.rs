@@ -594,6 +594,7 @@ fn dispatch_in_buf_out_bool<T>(
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
@@ -626,6 +627,7 @@ fn dispatch_in_u64_in_buf_fixed<T>(
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -650,6 +652,7 @@ fn dispatch_in_u64_out_buf_fixed<T>(
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -674,6 +677,7 @@ fn dispatch_in_u32_in_buf_fixed<T>(
     let buf_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -698,6 +702,7 @@ fn dispatch_in_u32_out_buf_fixed<T>(
     let buf_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -725,6 +730,7 @@ fn dispatch_in_u32_out_buf_fixed_out_ptr_fixed<T, U>(
     let buf1_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf1 as *mut U).cast::<u8>(), size_of::<U>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -756,6 +762,7 @@ fn dispatch_in_u32_in_buf_fixed_in_ptr_fixed<T, U>(
     let buf1_bytes =
         unsafe { core::slice::from_raw_parts((buf1 as *const U).cast::<u8>(), size_of::<U>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)

@@ -186,6 +186,7 @@ pub(crate) fn save_album_screenshot_file(
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE)
         .in_raw(in_bytes)
@@ -223,6 +224,7 @@ pub(crate) fn save_album_screenshot_file_ex(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE_EX)
         .in_raw(in_bytes)
@@ -248,6 +250,7 @@ pub(crate) fn set_overlay_thumbnail_data(
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -278,6 +281,7 @@ pub(crate) fn open_control_session(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::OPEN_CONTROL_SESSION)
         .in_raw(in_bytes)
@@ -346,6 +350,7 @@ pub(crate) fn ctrl_read_movie_data(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_READ_MOVIE_DATA_FROM_READ_STREAM)
         .in_raw(in_bytes)
@@ -402,6 +407,7 @@ pub(crate) fn ctrl_read_image_data(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_READ_IMAGE_DATA_FROM_READ_STREAM)
         .in_raw(in_bytes)
@@ -530,6 +536,7 @@ pub(crate) fn ctrl_read_data_from_write_stream(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::CTRL_READ_DATA_FROM_WRITE_STREAM)
         .in_raw(in_bytes)
@@ -562,6 +569,7 @@ pub(crate) fn ctrl_write_data_to_write_stream(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CTRL_WRITE_DATA_TO_WRITE_STREAM)
         .in_raw(in_bytes)
@@ -589,6 +597,7 @@ pub(crate) fn ctrl_write_meta_to_write_stream(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CTRL_WRITE_META_TO_WRITE_STREAM)
         .in_raw(in_bytes)

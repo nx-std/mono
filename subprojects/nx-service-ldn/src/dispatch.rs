@@ -32,6 +32,7 @@ impl DispatchTarget for Session {
     fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         self.dispatch(cmd_id).send(&mut buf).map(|_| ())
     }
 
@@ -43,6 +44,7 @@ impl DispatchTarget for Session {
             unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         self.dispatch(cmd_id)
             .in_raw(in_bytes)
             .send(&mut buf)
@@ -53,6 +55,7 @@ impl DispatchTarget for Session {
     fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError> {
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let result = self
             .dispatch(cmd_id)
             .out_size(size_of::<O>())
@@ -67,6 +70,7 @@ impl DispatchTarget for DomainObject<'_> {
     fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         self.dispatch(cmd_id).send(&mut buf).map(|_| ())
     }
 
@@ -78,6 +82,7 @@ impl DispatchTarget for DomainObject<'_> {
             unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         self.dispatch(cmd_id)
             .in_raw(in_bytes)
             .send(&mut buf)
@@ -88,6 +93,7 @@ impl DispatchTarget for DomainObject<'_> {
     fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError> {
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let result = self
             .dispatch(cmd_id)
             .out_size(size_of::<O>())

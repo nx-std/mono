@@ -21,6 +21,7 @@ pub fn get_service_handle(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
@@ -84,6 +85,7 @@ pub fn register_service(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut payload = [0u8; size_of::<RegisterServiceTipcIn>()];
     // SAFETY: `payload` is exactly `size_of::<RegisterServiceTipcIn>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<RegisterServiceTipcIn>(), input) };
@@ -132,6 +134,7 @@ pub fn unregister_service(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
@@ -171,6 +174,7 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     // The detach-client request carries no payload data.
     tipc::TipcRequestBuilder::new(proto::DETACH_CLIENT)
         .send_pid()
@@ -209,6 +213,7 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     // The register-client request carries no payload data.
     tipc::TipcRequestBuilder::new(proto::REGISTER_CLIENT)
         .send_pid()

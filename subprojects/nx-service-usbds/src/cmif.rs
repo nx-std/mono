@@ -28,6 +28,7 @@ pub(crate) fn set_process_handle_legacy(
     proc_handle: u32,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_PROCESS_HANDLE_LEGACY)
         .in_handle(proc_handle)
@@ -47,6 +48,7 @@ pub(crate) fn bind_device(
         core::slice::from_raw_parts((&raw const complex_id).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::BIND_DEVICE)
         .in_raw(in_bytes)
@@ -58,6 +60,7 @@ pub(crate) fn bind_device(
 /// GetStateChangeEvent. Returns the copy-handle for the event.
 pub(crate) fn get_state_change_event(service: &Session, cmd_id: u32) -> Result<u32, GetEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .send(&mut ipc_buf)
@@ -82,6 +85,7 @@ pub(crate) fn get_ds_interface_legacy(
     interface_name: &[u8],
 ) -> Result<(u32, u8), GetInterfaceError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_DS_INTERFACE_LEGACY)
         .in_buffer(descriptor, BufferAttr::HIPC_MAP_ALIAS)
@@ -109,6 +113,7 @@ pub(crate) fn register_interface(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const intf_num).cast::<u8>(), size_of::<u8>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -125,6 +130,7 @@ pub(crate) fn register_interface(
 /// SetVidPidBcd (pre-5.0.0, cmd 5). Input buffer.
 pub(crate) fn set_vid_pid_bcd(service: &Session, deviceinfo: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_VID_PID_BCD)
         .in_buffer(deviceinfo, BufferAttr::HIPC_MAP_ALIAS)
@@ -153,6 +159,7 @@ pub(crate) fn add_usb_string_descriptor(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_buffer(desc_bytes, BufferAttr::HIPC_MAP_ALIAS)
@@ -183,6 +190,7 @@ pub(crate) fn set_usb_device_descriptor(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const speed).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -198,6 +206,7 @@ pub(crate) fn set_binary_object_store(
     bos: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_buffer(bos, BufferAttr::HIPC_MAP_ALIAS)
@@ -235,6 +244,7 @@ pub(crate) fn intf_get_setup_packet(
     buffer: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::INTF_GET_SETUP_PACKET)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
@@ -286,6 +296,7 @@ pub(crate) fn intf_get_ds_endpoint(
     descriptor: &[u8],
 ) -> Result<u32, RegisterEndpointError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::INTF_REGISTER_ENDPOINT)
         .in_buffer(descriptor, BufferAttr::HIPC_MAP_ALIAS)
@@ -311,6 +322,7 @@ pub(crate) fn intf_register_endpoint(
         core::slice::from_raw_parts((&raw const endpoint_address).cast::<u8>(), size_of::<u8>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::INTF_REGISTER_ENDPOINT)
         .in_raw(in_bytes)
@@ -346,6 +358,7 @@ pub(crate) fn intf_append_configuration_data_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA_LEGACY)
         .in_raw(in_bytes)
@@ -365,6 +378,7 @@ pub(crate) fn intf_append_configuration_data(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const speed).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA)
         .in_raw(in_bytes)

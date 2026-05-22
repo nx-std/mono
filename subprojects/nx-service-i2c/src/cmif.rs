@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the I2C service.
 
-use core::{mem::size_of, ptr};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -17,16 +17,12 @@ pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSession
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-        .data_size(size_of::<u32>())
+        .data_value(&device)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), device);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
 
@@ -59,6 +55,7 @@ pub fn send_auto(
         core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SEND_AUTO)
         .in_raw(in_bytes)
@@ -82,6 +79,7 @@ pub fn receive_auto(
         core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::RECEIVE_AUTO)
         .in_raw(in_bytes)
@@ -98,6 +96,7 @@ pub fn execute_command_list(
     cmd_list: &[u8],
 ) -> Result<(), ExecuteCommandListError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::EXECUTE_COMMAND_LIST)
         .out_buffer(dst, BufferAttr::HIPC_AUTO_SELECT)

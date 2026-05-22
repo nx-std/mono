@@ -44,6 +44,7 @@ fn get_firmware_version_inner(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .add_out_fixed_pointer((&raw mut out).cast::<u8>(), size_of::<FirmwareVersion>())
         .build();

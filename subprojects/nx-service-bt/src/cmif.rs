@@ -20,25 +20,20 @@ fn dispatch_in_with_pid<T>(
     session: SessionHandle,
     cmd_id: u32,
     value: &T,
-) -> Result<(), DispatchError> {
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<T>())
+        .data_value(value)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<T>()` bytes; `value` is
-    // valid for read for the same size.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<T>(),
-            ptr::read(value),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
@@ -53,26 +48,21 @@ fn dispatch_in_with_pid_and_pointer<T>(
     value: &T,
     buffer: *const u8,
     buffer_size: usize,
-) -> Result<(), DispatchError> {
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<T>())
+        .data_value(value)
         .send_pid()
         .add_in_pointer(buffer, buffer_size)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<T>()` bytes; `value` is
-    // valid for read for the same size.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<T>(),
-            ptr::read(value),
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
@@ -315,21 +305,14 @@ pub fn get_le_event_info(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::GET_LE_EVENT_INFO)
-        .data_size(size_of::<u64>())
+        .data_value(&applet_resource_user_id)
         .send_pid()
         .add_out_pointer(buffer.as_mut_ptr(), buffer.len())
         .build();
     req.write_to(&mut buf)
         .map_err(GetLeEventInfoError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            applet_resource_user_id,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetLeEventInfoError::SendRequest)?;
 
@@ -379,20 +362,13 @@ pub fn register_ble_event(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_BLE_EVENT)
-        .data_size(size_of::<u64>())
+        .data_value(&applet_resource_user_id)
         .send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(RegisterBleEventError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
-            applet_resource_user_id,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(RegisterBleEventError::SendRequest)?;
 

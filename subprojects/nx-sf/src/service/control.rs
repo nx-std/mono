@@ -33,6 +33,7 @@ pub fn query_pointer_buffer_size(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let req = CmifControlRequestBuilder::new(CTRL_QUERY_POINTER_BUFFER_SIZE).build();
         req.write_to(&mut buf)
             .map_err(QueryPointerBufferSizeError::Layout)?;
@@ -67,6 +68,7 @@ pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, Clo
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let req = CmifControlRequestBuilder::new(CTRL_CLONE_OBJECT).build();
         req.write_to(&mut buf).map_err(CloneObjectError::Layout)?;
     }
@@ -111,6 +113,7 @@ pub fn clone_current_object_ex(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let mut payload = [0u8; size_of::<u32>()];
         // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
         unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), tag) };
@@ -159,6 +162,7 @@ pub fn convert_current_object_to_domain(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let req = CmifControlRequestBuilder::new(CTRL_CONVERT_TO_DOMAIN).build();
         req.write_to(&mut buf)
             .map_err(ConvertToDomainError::Layout)?;
@@ -196,6 +200,7 @@ pub fn copy_from_current_domain(
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let mut payload = [0u8; size_of::<u32>()];
         // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
         unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), object_id.to_raw()) };
@@ -246,6 +251,7 @@ pub(crate) fn close_session(handle: SessionHandle) {
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let _ = CmifCloseRequest::session().write_to(&mut buf);
     }
 
@@ -262,6 +268,7 @@ pub(crate) fn close_object(session: SessionHandle, object_id: ObjectId) {
     {
         // SAFETY: IPC operations are serialized on this thread.
         let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
         let _ = CmifCloseRequest::domain_object(object_id).write_to(&mut buf);
     }
 

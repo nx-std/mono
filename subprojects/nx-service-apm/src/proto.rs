@@ -18,7 +18,7 @@ pub const CMD_SET_PERFORMANCE_CONFIGURATION: u32 = 0;
 pub const CMD_GET_PERFORMANCE_CONFIGURATION: u32 = 1;
 
 /// Performance mode (Normal vs Boost).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(i32)]
 pub enum PerformanceMode {
     /// Invalid performance mode.

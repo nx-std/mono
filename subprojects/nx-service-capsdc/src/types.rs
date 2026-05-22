@@ -1,23 +1,32 @@
 //! JPEG decoder wire-layout types.
 
+use modular_bitfield::prelude::*;
 use static_assertions::const_assert_eq;
 
-bitflags::bitflags! {
-    /// Flags controlling JPEG decode behaviour.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    #[repr(transparent)]
-    pub struct ScreenShotDecoderFlag: u64 {
-        /// No special processing.
-        const NONE = 0;
-        /// See libjpeg-turbo `do_fancy_upsampling`.
-        const ENABLE_FANCY_UPSAMPLING = 1 << 0;
-        /// See libjpeg-turbo `do_block_smoothing`.
-        const ENABLE_BLOCK_SMOOTHING = 1 << 1;
-    }
+/// Flags controlling JPEG decode behaviour.
+#[bitfield]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(C)]
+pub struct ScreenShotDecoderFlag {
+    /// See libjpeg-turbo `do_fancy_upsampling`.
+    pub enable_fancy_upsampling: bool,
+    /// See libjpeg-turbo `do_block_smoothing`.
+    pub enable_block_smoothing: bool,
+    #[skip]
+    __: B62,
 }
 
 /// Decode options passed to JPEG decode/shrink commands.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct ScreenShotDecodeOption {
     /// Bitflags controlling decoder behaviour.
@@ -30,7 +39,7 @@ const_assert_eq!(size_of::<ScreenShotDecodeOption>(), 0x20);
 
 /// Wire-layout input for [`decode_jpeg`](crate::cmif::decode_jpeg) (cmd 3001)
 /// and [`shrink_jpeg`](crate::cmif::shrink_jpeg) (cmd 4001).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DecodeJpegIn {
     pub width: u32,
@@ -41,7 +50,7 @@ pub(crate) struct DecodeJpegIn {
 const_assert_eq!(size_of::<DecodeJpegIn>(), 0x28);
 
 /// Wire-layout input for [`shrink_jpeg_ex`](crate::cmif::shrink_jpeg_ex) (cmd 4002).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ShrinkJpegExIn {
     pub scaled_width: u32,

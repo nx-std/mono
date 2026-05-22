@@ -19,6 +19,7 @@ use crate::{
 /// outlives this call; the service wrapper re-opens it per request.
 pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
         .out_objects(1)
@@ -79,6 +80,7 @@ fn initialize_impl(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -91,6 +93,7 @@ fn initialize_impl(
 /// Finalize — pre-4.0.0 command ID layout.
 pub(crate) fn finalize_legacy(object: &DomainObject<'_>) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFC_FINALIZE_LEGACY)
         .send(&mut ipc_buf)
@@ -100,6 +103,7 @@ pub(crate) fn finalize_legacy(object: &DomainObject<'_>) -> Result<(), DispatchE
 /// Finalize — 4.0.0+ command ID layout.
 pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFC_FINALIZE)
         .send(&mut ipc_buf)
@@ -139,6 +143,7 @@ pub(crate) fn list_devices(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFC_LIST_DEVICES)
         .out_size(size_of::<i32>())
@@ -213,6 +218,7 @@ pub(crate) fn get_tag_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFC_GET_TAG_INFO)
         .in_raw(in_bytes)
@@ -238,6 +244,7 @@ pub(crate) fn attach_activate_event(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFC_ATTACH_ACTIVATE_EVENT)
         .in_raw(in_bytes)
@@ -260,6 +267,7 @@ pub(crate) fn attach_deactivate_event(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFC_ATTACH_DEACTIVATE_EVENT)
         .in_raw(in_bytes)
@@ -273,6 +281,7 @@ pub(crate) fn attach_availability_change_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFC_ATTACH_AVAILABILITY_CHANGE_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -312,6 +321,7 @@ pub(crate) fn read_mifare(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFC_READ_MIFARE)
         .in_raw(in_bytes)
@@ -344,6 +354,7 @@ pub(crate) fn write_mifare(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::NFC_WRITE_MIFARE)
         .in_raw(in_bytes)
@@ -373,6 +384,7 @@ pub(crate) fn send_command_by_pass_through(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::NFC_SEND_COMMAND_BY_PASS_THROUGH)
         .in_raw(in_bytes)

@@ -2,8 +2,6 @@
 //!
 //! Used for Binder transactions with IGraphicBufferProducer.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -36,6 +34,7 @@ pub fn transact_parcel(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         session_id: i32,
         code: u32,
@@ -50,15 +49,12 @@ pub fn transact_parcel(
 
     // Add auto-select buffers (Normal mode)
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(12) // session_id(4) + code(4) + flags(4)
+        .data_value(&input)
         .add_in_auto_buffer(in_data.as_ptr(), in_data.len(), BufferMode::Normal)
         .add_out_auto_buffer(out_data.as_mut_ptr(), out_data.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(TransactParcelError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(TransactParcelError::SendRequest)?;
 
@@ -83,6 +79,7 @@ pub fn adjust_refcount(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         session_id: i32,
         addval: i32,
@@ -96,13 +93,10 @@ pub fn adjust_refcount(
     };
 
     let req = cmif::CmifRequestBuilder::new(binder_cmds::ADJUST_REFCOUNT)
-        .data_size(12)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(AdjustRefcountError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(AdjustRefcountError::SendRequest)?;
 
@@ -122,6 +116,7 @@ pub fn get_native_handle(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         session_id: i32,
         inval: u32,
@@ -133,13 +128,10 @@ pub fn get_native_handle(
     };
 
     let req = cmif::CmifRequestBuilder::new(binder_cmds::GET_NATIVE_HANDLE)
-        .data_size(8)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(GetNativeHandleError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(GetNativeHandleError::SendRequest)?;
 

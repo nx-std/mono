@@ -29,6 +29,7 @@ pub(crate) fn set(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DB_SET)
         .in_raw(key_bytes)
@@ -52,6 +53,7 @@ pub(crate) fn get(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_GET)
         .in_raw(key_bytes)
@@ -113,6 +115,7 @@ pub(crate) fn list_content_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_LIST_CONTENT_INFO)
         .in_raw(in_bytes)
@@ -155,6 +158,7 @@ pub(crate) fn list(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_LIST)
         .in_raw(in_bytes)
@@ -193,6 +197,7 @@ pub(crate) fn list_application(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_LIST_APPLICATION)
         .in_raw(in_bytes)
@@ -220,6 +225,7 @@ pub(crate) fn has_all(
         core::slice::from_raw_parts(keys.as_ptr().cast::<u8>(), core::mem::size_of_val(keys))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_HAS_ALL)
         .out_size(size_of::<u8>())
@@ -271,6 +277,7 @@ pub(crate) fn lookup_orphan_content(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DB_LOOKUP_ORPHAN_CONTENT)
         .out_buffer(out_orphaned, BufferAttr::HIPC_MAP_ALIAS)
@@ -330,6 +337,7 @@ pub(crate) fn list_content_meta_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::DB_LIST_CONTENT_META_INFO)
         .in_raw(in_bytes)

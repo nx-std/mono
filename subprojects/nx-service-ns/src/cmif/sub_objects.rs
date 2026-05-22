@@ -20,6 +20,7 @@ pub(crate) fn progress_monitor_get_system_event(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PROGRESS_MONITOR_GET_SYSTEM_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -76,6 +77,7 @@ pub(crate) fn progress_async_get_progress(
     out: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::PROGRESS_ASYNC_GET_PROGRESS)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
@@ -95,6 +97,7 @@ pub(crate) fn progress_async_get_error_context(
     out: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::PROGRESS_ASYNC_GET_ERROR_CONTEXT)
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)

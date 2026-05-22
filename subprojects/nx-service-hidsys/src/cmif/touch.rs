@@ -37,6 +37,7 @@ pub(crate) fn is_firmware_update_needed_for_notification(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::IS_FIRMWARE_UPDATE_NEEDED_FOR_NOTIFICATION)
         .in_raw(in_bytes)

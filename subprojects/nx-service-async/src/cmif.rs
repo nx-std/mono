@@ -13,6 +13,7 @@ use crate::{proto, types::ErrorContext};
 /// Queries the value size (IAsyncValue cmd 0).
 pub fn async_value_get_size(service: &Session) -> Result<u64, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ASYNC_VALUE_GET_SIZE)
         .out_size(size_of::<u64>())
@@ -25,6 +26,7 @@ pub fn async_value_get_size(service: &Session) -> Result<u64, DispatchError> {
 /// Retrieves the value into a caller-supplied buffer (IAsyncValue cmd 1).
 pub fn async_value_get(service: &Session, buffer: &mut [u8]) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ASYNC_VALUE_GET)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
@@ -35,6 +37,7 @@ pub fn async_value_get(service: &Session, buffer: &mut [u8]) -> Result<(), Dispa
 /// Cancels the async operation (IAsyncValue cmd 2).
 pub fn async_value_cancel(service: &Session) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ASYNC_VALUE_CANCEL)
         .send(&mut buf)
@@ -55,6 +58,7 @@ pub fn async_value_get_error_context(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ASYNC_VALUE_GET_ERROR_CONTEXT)
         .out_buffer(bytes, BufferAttr::HIPC_MAP_ALIAS)
@@ -69,6 +73,7 @@ pub fn async_value_get_error_context(
 /// Retrieves the result code (IAsyncResult cmd 0).
 pub fn async_result_get(service: &Session) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ASYNC_RESULT_GET)
         .send(&mut buf)
@@ -78,6 +83,7 @@ pub fn async_result_get(service: &Session) -> Result<(), DispatchError> {
 /// Cancels the async operation (IAsyncResult cmd 1).
 pub fn async_result_cancel(service: &Session) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ASYNC_RESULT_CANCEL)
         .send(&mut buf)
@@ -98,6 +104,7 @@ pub fn async_result_get_error_context(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ASYNC_RESULT_GET_ERROR_CONTEXT)
         .out_buffer(bytes, BufferAttr::HIPC_MAP_ALIAS)

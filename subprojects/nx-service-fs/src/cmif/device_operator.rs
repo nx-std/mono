@@ -74,6 +74,7 @@ pub(crate) fn get_and_clear_storage_error_info(
     dst: &mut [u8],
 ) -> Result<GetAndClearStorageErrorInfoOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
@@ -181,6 +182,7 @@ pub(crate) fn get_game_card_device_certificate_legacy(
         buffer_size: size,
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
         .context(ctx)
@@ -202,6 +204,7 @@ pub(crate) fn get_game_card_device_certificate(
         buffer_size: size,
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
         .context(ctx)
@@ -262,6 +265,7 @@ pub(crate) fn challenge_card_existence(
     value: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::DEVICE_OPERATOR_CHALLENGE_CARD_EXISTENCE)
         .context(ctx)

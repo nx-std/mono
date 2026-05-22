@@ -14,6 +14,7 @@ pub fn shutdown_system(session: SessionHandle) -> Result<(), ShutdownSystemError
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN_SYSTEM).build();
     req.write_to(&mut buf)
         .map_err(ShutdownSystemError::BuildRequest)?;
@@ -30,6 +31,7 @@ pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::REBOOT_SYSTEM).build();
     req.write_to(&mut buf)
         .map_err(RebootSystemError::BuildRequest)?;
@@ -51,6 +53,7 @@ pub fn get_sleep_button_state(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::GET_SLEEP_BUTTON_STATE).build();
     req.write_to(&mut buf)
         .map_err(GetSleepButtonStateError::BuildRequest)?;
@@ -74,6 +77,7 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::GET_POWER_BUTTON).build();
     req.write_to(&mut buf)
         .map_err(GetPowerButtonError::BuildRequest)?;

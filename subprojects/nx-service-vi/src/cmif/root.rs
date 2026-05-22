@@ -35,15 +35,12 @@ pub fn get_display_service(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(cmd_id).data_size(4).build();
+
+    let req = cmif::CmifRequestBuilder::new(cmd_id)
+        .data_value(&inval)
+        .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayServiceError::BuildRequest)?;
-
-    // Write inval
-    // SAFETY: `req` is exactly 4 bytes; writing inval as u32 is sound.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), inval);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(GetDisplayServiceError::SendRequest)?;
 
@@ -70,6 +67,7 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(root_cmds::PREPARE_FATAL).build();
     req.write_to(&mut buf)
         .map_err(PrepareFatalError::BuildRequest)?;
@@ -88,6 +86,7 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(root_cmds::SHOW_FATAL).build();
     req.write_to(&mut buf)
         .map_err(ShowFatalError::BuildRequest)?;
@@ -117,8 +116,10 @@ pub fn draw_fatal_rectangle(
     // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` — naturally
     // aligned, total 20 bytes (u16 + 2 bytes padding + 4 * s32).
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         color: u16,
+        _pad: [u8; 2],
         x: i32,
         y: i32,
         end_x: i32,
@@ -127,6 +128,7 @@ pub fn draw_fatal_rectangle(
 
     let input = Input {
         color,
+        _pad: [0; 2],
         x,
         y,
         end_x,
@@ -134,13 +136,10 @@ pub fn draw_fatal_rectangle(
     };
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_RECTANGLE)
-        .data_size(20)
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DrawFatalRectangleError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(DrawFatalRectangleError::SendRequest)?;
 
@@ -170,6 +169,7 @@ pub fn draw_fatal_text32(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     #[repr(C)]
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     struct Input {
         x: i32,
         y: i32,
@@ -204,7 +204,7 @@ pub fn draw_fatal_text32(
     };
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_TEXT32)
-        .data_size(32) // x(4) + y(4) + scale_x(4) + scale_y(4) + font_type(4) + bg_color(4) + fg_color(4) + initial_advance(4)
+        .data_value(&input)
         .add_in_buffer(
             codepoints_bytes.as_ptr(),
             codepoints_bytes.len(),
@@ -213,9 +213,6 @@ pub fn draw_fatal_text32(
         .build();
     req.write_to(&mut buf)
         .map_err(DrawFatalText32Error::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(DrawFatalText32Error::SendRequest)?;
 

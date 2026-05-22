@@ -5,7 +5,7 @@ use static_assertions::const_assert_eq;
 /// Source name for overlay notifications.
 ///
 /// Official software always uses the name "overlay".
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OvlnSourceName {
     pub name: [u8; 0x10],
@@ -24,7 +24,7 @@ impl OvlnSourceName {
 }
 
 /// Raw overlay notification message.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OvlnRawMessage {
     pub tag: u32,
@@ -35,7 +35,7 @@ pub struct OvlnRawMessage {
 const_assert_eq!(size_of::<OvlnRawMessage>(), 0x80);
 
 /// Queue attribute for sender creation.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OvlnQueueAttribute {
     pub queue_length: u32,
@@ -45,7 +45,7 @@ pub struct OvlnQueueAttribute {
 const_assert_eq!(size_of::<OvlnQueueAttribute>(), 0x08);
 
 /// Send option controlling enqueue position and overflow behavior.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OvlnSendOption {
     pub enqueue_position: u8,

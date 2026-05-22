@@ -14,6 +14,7 @@ fn dispatch_no_io(session: Handle, cmd_id: u32) -> Result<(), DispatchNoIoError>
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.write_to(&mut buf)
@@ -40,14 +41,12 @@ fn dispatch_in_u32(session: Handle, cmd_id: u32, value: u32) -> Result<(), Dispa
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<u32>())
+        .data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32Error::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), value) };
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32Error::SendRequest)?;
 
@@ -72,14 +71,12 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<u8>())
+        .data_value(&raw)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInBoolError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), raw) };
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInBoolError::SendRequest)?;
 
@@ -102,6 +99,7 @@ fn dispatch_out_u32(session: Handle, cmd_id: u32) -> Result<u32, DispatchOutU32E
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.write_to(&mut buf)
@@ -132,6 +130,7 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchOutBo
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.write_to(&mut buf)
@@ -166,14 +165,12 @@ fn dispatch_in_u32_out_bool(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<u32>())
+        .data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutBoolError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), value) };
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32OutBoolError::SendRequest)?;
 
@@ -201,14 +198,12 @@ pub fn open_session(session: Handle, pad_name: u32) -> Result<Session, OpenSessi
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-        .data_size(size_of::<u32>())
+        .data_value(&pad_name)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), pad_name) };
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
 
@@ -232,6 +227,7 @@ pub fn open_session2(
     access_mode: u32,
 ) -> Result<Session, OpenSession2Error> {
     #[repr(C)]
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     struct OpenSession2In {
         device_code: u32,
         access_mode: u32,
@@ -245,19 +241,12 @@ pub fn open_session2(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION2)
-        .data_size(size_of::<OpenSession2In>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSession2Error::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<OpenSession2In>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<OpenSession2In>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSession2Error::SendRequest)?;
 
@@ -343,6 +332,7 @@ pub fn pad_get_value(session: Handle) -> Result<u32, DispatchOutU32Error> {
 /// Binds the interrupt and returns the event handle.
 pub fn pad_bind_interrupt(service: &Session) -> Result<u32, BindInterruptError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PAD_BIND_INTERRUPT)
         .out_handle(0, OutHandleAttr::Copy)

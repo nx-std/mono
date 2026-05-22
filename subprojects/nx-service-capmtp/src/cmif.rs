@@ -13,6 +13,7 @@ use crate::{
 /// Opens a session sub-object on the root domain service.
 pub(crate) fn open_session<'d>(domain: &'d Domain) -> Result<DomainObject<'d>, OpenSessionError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(proto::OPEN_SESSION)
         .out_objects(1)
@@ -55,6 +56,7 @@ pub(crate) fn session_open(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::SESSION_OPEN)
         .in_raw(in_bytes)
@@ -93,6 +95,7 @@ pub(crate) fn session_get_connection_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::SESSION_GET_CONNECTION_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -112,6 +115,7 @@ pub(crate) fn session_get_scan_error_event(
     object: &DomainObject<'_>,
 ) -> Result<u32, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::SESSION_GET_SCAN_ERROR_EVENT)
         .out_handle(0, OutHandleAttr::Copy)

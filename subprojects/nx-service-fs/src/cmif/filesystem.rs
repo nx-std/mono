@@ -25,6 +25,7 @@ pub(crate) fn create_file(
         size,
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::FS_CREATE_FILE)
         .context(ctx)
@@ -41,6 +42,7 @@ pub(crate) fn cmd_with_path(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .context(ctx)
@@ -57,6 +59,7 @@ pub(crate) fn cmd_with_two_paths(
     new_path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .context(ctx)
@@ -72,6 +75,7 @@ pub(crate) fn get_entry_type(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::FS_GET_ENTRY_TYPE)
         .context(ctx)
@@ -88,6 +92,7 @@ pub(crate) fn open_file(
     mode: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = object
         .dispatch(proto::FS_OPEN_FILE)
         .context(ctx)
@@ -106,6 +111,7 @@ pub(crate) fn open_directory(
     mode: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = object
         .dispatch(proto::FS_OPEN_DIRECTORY)
         .context(ctx)
@@ -133,6 +139,7 @@ pub(crate) fn get_space(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<i64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
@@ -148,6 +155,7 @@ pub(crate) fn get_file_time_stamp_raw(
     path: &[u8; FS_MAX_PATH],
 ) -> Result<TimeStampRaw, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::FS_GET_FILE_TIME_STAMP_RAW)
         .context(ctx)
@@ -166,6 +174,7 @@ pub(crate) fn query_entry(
     out_buf: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::FS_QUERY_ENTRY)
         .context(ctx)

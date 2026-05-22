@@ -32,6 +32,7 @@ pub(crate) fn list_all_users(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::LIST_ALL_USERS)
         .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
@@ -52,6 +53,7 @@ pub(crate) fn get_profile(service: &Session, uid: AccountUid) -> Result<u32, Get
         core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_PROFILE)
         .in_raw(in_bytes)
@@ -76,6 +78,7 @@ pub(crate) fn initialize_application_info_legacy(service: &Session) -> Result<()
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::INITIALIZE_APPLICATION_INFO_LEGACY)
         .in_raw(in_bytes)
@@ -96,6 +99,7 @@ pub(crate) fn initialize_application_info(service: &Session) -> Result<(), Dispa
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::INITIALIZE_APPLICATION_INFO)
         .in_raw(in_bytes)
@@ -144,6 +148,7 @@ pub(crate) fn profile_get(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PROFILE_GET)
         .out_size(size_of::<AccountProfileBase>())
@@ -170,6 +175,7 @@ pub(crate) fn profile_get_image_size(service: &Session) -> Result<u32, DispatchE
 /// Loads the JPEG profile icon image. Returns bytes written.
 pub(crate) fn profile_load_image(service: &Session, buf: &mut [u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::PROFILE_LOAD_IMAGE)
         .out_size(size_of::<u32>())
@@ -200,6 +206,7 @@ fn dispatch_in_out_with_pid<I: Copy, O: Copy>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)

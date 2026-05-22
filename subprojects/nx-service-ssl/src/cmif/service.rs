@@ -35,6 +35,7 @@ pub(crate) fn create_context(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let mut result = domain
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -62,6 +63,7 @@ pub enum CreateContextError {
 /// Gets the context count.
 pub(crate) fn get_context_count(domain: &Domain) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::GET_CONTEXT_COUNT)
         .out_size(size_of::<u32>())
@@ -89,6 +91,7 @@ pub(crate) fn get_certificates_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::GET_CERTIFICATES)
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
@@ -112,6 +115,7 @@ pub(crate) fn get_certificates(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::GET_CERTIFICATES)
         .out_size(size_of::<u32>())
@@ -140,6 +144,7 @@ pub(crate) fn get_certificate_buf_size(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::GET_CERTIFICATE_BUF_SIZE)
         .out_size(size_of::<u32>())
@@ -160,6 +165,7 @@ pub(crate) fn set_interface_version(domain: &Domain, version: u32) -> Result<(),
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const version).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::SET_INTERFACE_VERSION)
         .in_raw(in_bytes)
@@ -179,6 +185,7 @@ pub(crate) fn flush_session_cache(
         core::slice::from_raw_parts((&raw const option_type).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::FLUSH_SESSION_CACHE)
         .in_raw(in_bytes)
@@ -205,6 +212,7 @@ pub(crate) fn set_debug_option(
         core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::SET_DEBUG_OPTION)
         .in_raw(in_bytes)
@@ -225,6 +233,7 @@ pub(crate) fn get_debug_option(
         core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::GET_DEBUG_OPTION)
         .in_raw(in_bytes)
@@ -236,6 +245,7 @@ pub(crate) fn get_debug_option(
 /// Clears TLS 1.2 fallback flag (14.0.0+).
 pub(crate) fn clear_tls12_fallback_flag(domain: &Domain) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::CLEAR_TLS12_FALLBACK_FLAG)
         .send(&mut ipc_buf)
@@ -249,6 +259,7 @@ pub(crate) fn set_thread_core_mask(domain: &Domain, mask: u64) -> Result<(), Dis
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const mask).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     domain
         .dispatch(proto::SET_THREAD_CORE_MASK)
         .in_raw(in_bytes)
@@ -259,6 +270,7 @@ pub(crate) fn set_thread_core_mask(domain: &Domain, mask: u64) -> Result<(), Dis
 /// Gets the thread core mask (15.0.0+, system only).
 pub(crate) fn get_thread_core_mask(domain: &Domain) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = domain
         .dispatch(proto::GET_THREAD_CORE_MASK)
         .out_size(size_of::<u64>())

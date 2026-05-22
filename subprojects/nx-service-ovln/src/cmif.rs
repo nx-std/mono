@@ -15,20 +15,19 @@ use crate::{
     },
 };
 
-fn dispatch_in<T: Copy>(session: Handle, cmd_id: u32, value: &T) -> Result<(), DispatchInError> {
+fn dispatch_in<T>(session: Handle, cmd_id: u32, value: &T) -> Result<(), DispatchInError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_size(size_of::<T>())
+        .data_value(value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<T>()` bytes.
-    unsafe {
-        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<T>(), *value);
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInError::SendRequest)?;
 
@@ -54,6 +53,7 @@ fn dispatch_out<T: Copy>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutE
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.write_to(&mut buf)
         .map_err(DispatchOutError::BuildRequest)?;
@@ -87,6 +87,7 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::RCV_OPEN_RECEIVER).build();
     req.write_to(&mut buf)
         .map_err(OpenReceiverError::BuildRequest)?;
@@ -142,6 +143,7 @@ pub fn receiver_get_receive_event_handle(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::RECEIVER_GET_RECEIVE_EVENT_HANDLE).build();
     req.write_to(&mut buf)
         .map_err(GetReceiveEventHandleError::BuildRequest)?;
@@ -191,7 +193,7 @@ pub fn snd_open_sender(
     attribute: &OvlnQueueAttribute,
 ) -> Result<Session, OpenSenderError> {
     #[repr(C)]
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     struct OpenSenderIn {
         name: OvlnSourceName,
         attribute: OvlnQueueAttribute,
@@ -205,19 +207,12 @@ pub fn snd_open_sender(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::SND_OPEN_SENDER)
-        .data_size(size_of::<OpenSenderIn>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSenderError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<OpenSenderIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<OpenSenderIn>(),
-            input,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSenderError::SendRequest)?;
 
@@ -257,7 +252,7 @@ pub fn sender_send(
     message: &OvlnRawMessage,
 ) -> Result<(), DispatchInError> {
     #[repr(C)]
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     struct SendIn {
         option: OvlnSendOption,
         message: OvlnRawMessage,

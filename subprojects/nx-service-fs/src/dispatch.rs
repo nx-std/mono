@@ -13,6 +13,7 @@ pub(crate) fn dispatch_no_io(
     ctx: u32,
 ) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .context(ctx)
@@ -27,6 +28,7 @@ pub(crate) fn dispatch_in<I: Copy>(
     input: I,
 ) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .context(ctx)
@@ -41,6 +43,7 @@ pub(crate) fn dispatch_out<O: Copy>(
     ctx: u32,
 ) -> Result<O, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
@@ -56,6 +59,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
     input: I,
 ) -> Result<O, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
@@ -105,6 +109,7 @@ pub(crate) fn dispatch_in_size_out_buffer(
     dst: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .context(ctx)

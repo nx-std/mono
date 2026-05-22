@@ -18,19 +18,12 @@ pub fn destroy_system_update_task(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
-        .data_size(size_of::<SystemUpdateTaskId>())
+        .data_value(task_id)
         .build();
     req.write_to(&mut buf)
         .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<SystemUpdateTaskId>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<SystemUpdateTaskId>(),
-            *task_id,
-        );
-    }
 
     ipc::send_sync_request(&mut buf, session).map_err(DestroySystemUpdateTaskError::SendRequest)?;
 
@@ -50,6 +43,7 @@ pub fn list_system_update_task(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     // SAFETY: `out` is a valid `&mut` slice; viewing it as a byte slice
     // for the OUT buffer is sound, and the byte slice borrows `out`.
     let out_bytes = unsafe {

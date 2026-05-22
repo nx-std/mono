@@ -25,25 +25,17 @@ pub fn set_shim_library_version(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(proto::SET_SHIM_LIBRARY_VERSION)
-        .data_size(size_of::<SetShimVersionIn>())
-        .send_pid()
-        .build();
-    req.write_to(&mut buf)
-        .map_err(SetShimVersionError::BuildRequest)?;
 
     let input = SetShimVersionIn {
         version,
         applet_resource_user_id,
     };
-
-    // SAFETY: `req` is exactly `size_of::<SetShimVersionIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<SetShimVersionIn>(),
-            input,
-        )
-    };
+    let req = cmif::CmifRequestBuilder::new(proto::SET_SHIM_LIBRARY_VERSION)
+        .data_value(&input)
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetShimVersionError::BuildRequest)?;
 
     ipc::send_sync_request(&mut buf, session).map_err(SetShimVersionError::SendRequest)?;
 
@@ -63,13 +55,6 @@ pub fn save_screen_shot_ex0(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX0)
-        .data_size(size_of::<SaveScreenShotIn>())
-        .send_pid()
-        .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
-        .build();
-    req.write_to(&mut buf)
-        .map_err(SaveScreenShotEx0Error::BuildRequest)?;
 
     let input = SaveScreenShotIn {
         attr: *attr,
@@ -77,14 +62,13 @@ pub fn save_screen_shot_ex0(
         _pad: 0,
         applet_resource_user_id,
     };
-
-    // SAFETY: `req` is exactly `size_of::<SaveScreenShotIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<SaveScreenShotIn>(),
-            input,
-        )
-    };
+    let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX0)
+        .data_value(&input)
+        .send_pid()
+        .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SaveScreenShotEx0Error::BuildRequest)?;
 
     ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx0Error::SendRequest)?;
 
@@ -109,8 +93,15 @@ pub fn save_screen_shot_ex1(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let input = SaveScreenShotIn {
+        attr: *attr,
+        report_option,
+        _pad: 0,
+        applet_resource_user_id,
+    };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX1)
-        .data_size(size_of::<SaveScreenShotIn>())
+        .data_value(&input)
         .send_pid()
         .add_in_buffer(
             (appdata as *const ApplicationData).cast::<u8>(),
@@ -121,21 +112,6 @@ pub fn save_screen_shot_ex1(
         .build();
     req.write_to(&mut buf)
         .map_err(SaveScreenShotEx1Error::BuildRequest)?;
-
-    let input = SaveScreenShotIn {
-        attr: *attr,
-        report_option,
-        _pad: 0,
-        applet_resource_user_id,
-    };
-
-    // SAFETY: `req` is exactly `size_of::<SaveScreenShotIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<SaveScreenShotIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx1Error::SendRequest)?;
 
@@ -160,8 +136,15 @@ pub fn save_screen_shot_ex2(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let input = SaveScreenShotIn {
+        attr: *attr,
+        report_option,
+        _pad: 0,
+        applet_resource_user_id,
+    };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
-        .data_size(size_of::<SaveScreenShotIn>())
+        .data_value(&input)
         .add_in_buffer(
             (list as *const UserIdList).cast::<u8>(),
             size_of::<UserIdList>(),
@@ -171,21 +154,6 @@ pub fn save_screen_shot_ex2(
         .build();
     req.write_to(&mut buf)
         .map_err(SaveScreenShotEx2Error::BuildRequest)?;
-
-    let input = SaveScreenShotIn {
-        attr: *attr,
-        report_option,
-        _pad: 0,
-        applet_resource_user_id,
-    };
-
-    // SAFETY: `req` is exactly `size_of::<SaveScreenShotIn>()` bytes.
-    unsafe {
-        ptr::write_unaligned(
-            buf.as_array_mut().as_mut_ptr().cast::<SaveScreenShotIn>(),
-            input,
-        )
-    };
 
     ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx2Error::SendRequest)?;
 

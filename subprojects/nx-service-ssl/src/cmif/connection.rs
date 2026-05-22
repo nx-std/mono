@@ -25,6 +25,7 @@ pub(crate) fn set_socket_descriptor(
 /// Sets the host name for TLS verification.
 pub(crate) fn set_host_name(object: &DomainObject<'_>, name: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::CONN_SET_HOST_NAME)
         .in_buffer(name, BufferAttr::HIPC_MAP_ALIAS)
@@ -56,6 +57,7 @@ pub(crate) fn get_host_name(
     buffer: &mut [u8],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_GET_HOST_NAME)
         .out_size(size_of::<u32>())
@@ -90,6 +92,7 @@ pub(crate) fn do_handshake_get_server_cert(
     server_certbuf: &mut [u8],
 ) -> Result<HandshakeServerCertOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_DO_HANDSHAKE_GET_SERVER_CERT)
         .out_size(size_of::<HandshakeServerCertOut>())
@@ -102,6 +105,7 @@ pub(crate) fn do_handshake_get_server_cert(
 /// Reads data from the TLS connection.
 pub(crate) fn read(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_READ)
         .out_size(size_of::<u32>())
@@ -118,6 +122,7 @@ pub(crate) fn read(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, 
 /// Writes data to the TLS connection.
 pub(crate) fn write(object: &DomainObject<'_>, buffer: &[u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_WRITE)
         .out_size(size_of::<u32>())
@@ -139,6 +144,7 @@ pub(crate) fn pending(object: &DomainObject<'_>) -> Result<i32, DispatchError> {
 /// Peeks at data without consuming it.
 pub(crate) fn peek(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_PEEK)
         .out_size(size_of::<u32>())
@@ -229,6 +235,7 @@ pub(crate) fn get_option(object: &DomainObject<'_>, option: u32) -> Result<bool,
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const option).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_GET_OPTION)
         .in_raw(in_bytes)
@@ -251,6 +258,7 @@ pub(crate) fn get_verify_cert_errors(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_GET_VERIFY_CERT_ERRORS)
         .out_size(size_of::<u32>() * 2)
@@ -290,6 +298,7 @@ pub(crate) fn get_cipher_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::CONN_GET_CIPHER_INFO)
         .in_raw(in_bytes)
@@ -304,6 +313,7 @@ pub(crate) fn set_next_alpn_proto(
     proto_list: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::CONN_SET_NEXT_ALPN_PROTO)
         .in_buffer(proto_list, BufferAttr::HIPC_MAP_ALIAS)
@@ -317,6 +327,7 @@ pub(crate) fn get_next_alpn_proto(
     buffer: &mut [u8],
 ) -> Result<GetNextAlpnProtoOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_GET_NEXT_ALPN_PROTO)
         .out_size(size_of::<GetNextAlpnProtoOut>())
@@ -337,6 +348,7 @@ pub(crate) fn set_dtls_socket_descriptor(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const sockfd).cast::<u8>(), size_of::<i32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_SET_DTLS_SOCKET_DESCRIPTOR)
         .in_raw(in_bytes)
@@ -360,6 +372,7 @@ pub(crate) fn get_dtls_handshake_timeout(object: &DomainObject<'_>) -> Result<u6
     let out_bytes =
         unsafe { core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::CONN_GET_DTLS_HANDSHAKE_TIMEOUT)
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
@@ -405,6 +418,7 @@ pub(crate) fn set_srtp_ciphers(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::CONN_SET_SRTP_CIPHERS)
         .in_buffer(cipher_bytes, BufferAttr::HIPC_MAP_ALIAS)
@@ -415,6 +429,7 @@ pub(crate) fn set_srtp_ciphers(
 /// Gets the negotiated SRTP cipher (16.0.0+).
 pub(crate) fn get_srtp_cipher(object: &DomainObject<'_>) -> Result<u16, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(proto::CONN_GET_SRTP_CIPHER)
         .out_size(size_of::<u16>())
@@ -430,6 +445,7 @@ pub(crate) fn export_keying_material(
     context: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(proto::CONN_EXPORT_KEYING_MATERIAL)
         .out_buffer(outbuf, BufferAttr::HIPC_MAP_ALIAS)

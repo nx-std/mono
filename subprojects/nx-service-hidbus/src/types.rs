@@ -23,7 +23,7 @@ pub enum JoyPollingMode {
 }
 
 /// Bus handle identifying a specific hidbus device.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct BusHandle {
     pub abstracted_pad_id: u32,
@@ -222,7 +222,7 @@ const_assert_eq!(size_of::<StatusManager>(), 0x1000);
 // --- Wire input structs for IPC commands ---
 
 /// Input for GetBusHandle (cmd 1).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetBusHandleIn {
     pub npad_id: u32,
@@ -245,7 +245,7 @@ pub(crate) struct GetBusHandleOut {
 const_assert_eq!(size_of::<GetBusHandleOut>(), 0x10);
 
 /// Input for Initialize/Finalize (cmds 3, 4).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct BusHandleResIdIn {
     pub handle: BusHandle,
@@ -255,7 +255,7 @@ pub(crate) struct BusHandleResIdIn {
 const_assert_eq!(size_of::<BusHandleResIdIn>(), 0x10);
 
 /// Input for EnableExternalDevice (cmd 5).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EnableExternalDeviceIn {
     pub flag: u8,
@@ -268,7 +268,7 @@ pub(crate) struct EnableExternalDeviceIn {
 const_assert_eq!(size_of::<EnableExternalDeviceIn>(), 0x20);
 
 /// Input for EnableJoyPollingReceiveMode (cmd 11).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EnableJoyPollingIn {
     pub tmem_size: u32,

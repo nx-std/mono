@@ -34,6 +34,7 @@ pub(crate) fn user_exp_mod(
     dst: &mut [u8; RSA_BUFFER_SIZE],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::USER_EXP_MOD)
         .out_buffer(dst, BufferAttr::HIPC_POINTER)
@@ -61,6 +62,7 @@ pub(crate) fn set_config(
 /// GetRandomBytes (cmd 7).
 pub(crate) fn get_random_bytes(service: &Session, out: &mut [u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::GET_RANDOM_BYTES)
         .out_buffer(out, BufferAttr::HIPC_POINTER)
@@ -162,6 +164,7 @@ pub(crate) fn crypt_aes_ctr(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<CryptAesCtrIn>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CRYPT_AES_CTR)
         .in_raw(in_bytes)
@@ -188,6 +191,7 @@ pub(crate) fn compute_cmac(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const keyslot).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::COMPUTE_CMAC)
         .in_raw(in_bytes)
@@ -214,6 +218,7 @@ pub(crate) fn get_security_engine_event(
     service: &Session,
 ) -> Result<u32, GetSecurityEngineEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_SECURITY_ENGINE_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -255,6 +260,7 @@ pub(crate) fn decrypt_rsa_private_key_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
         .in_raw(in_bytes)
@@ -283,6 +289,7 @@ pub(crate) fn decrypt_rsa_private_key(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
         .in_raw(in_bytes)
@@ -530,6 +537,7 @@ pub(crate) fn fs_get_package2_hash(
     out_hash: &mut [u8; SHA256_HASH_SIZE],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::FS_GET_PACKAGE2_HASH)
         .out_buffer(out_hash, BufferAttr::HIPC_POINTER)
@@ -570,6 +578,7 @@ pub(crate) fn manu_encrypt_rsa_key_for_import(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::MANU_ENCRYPT_RSA_KEY_FOR_IMPORT)
         .in_raw(in_bytes)
@@ -592,6 +601,7 @@ fn secure_exp_mod(
     dst: &mut [u8; RSA_BUFFER_SIZE],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .out_buffer(dst, BufferAttr::HIPC_POINTER)
@@ -620,6 +630,7 @@ fn import_secure_exp_mod_key(
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -652,6 +663,7 @@ fn import_secure_exp_mod_key_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -675,6 +687,7 @@ fn unwrap_rsa_oaep_wrapped_key(
         core::slice::from_raw_parts((&raw const key_generation).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)

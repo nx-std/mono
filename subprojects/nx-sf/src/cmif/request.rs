@@ -43,12 +43,11 @@ pub struct CmifRequest<'a> {
     num_out_fixed_pointers: u32,
     objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
-    reserved_data_size: usize,
 }
 
 impl<'a> CmifRequest<'a> {
     fn data_len(&self) -> usize {
-        self.payload.len().max(self.reserved_data_size)
+        self.payload.len()
     }
 
     fn opt_size(&self) -> usize {
@@ -326,13 +325,12 @@ pub struct CmifRequestBuilder<'a> {
     objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
     server_pointer_size: usize,
-    reserved_data_size: usize,
     cur_in_ptr_id: u8,
 }
 
 impl<'a> CmifRequestBuilder<'a> {
     fn data_len(&self) -> usize {
-        self.payload.len().max(self.reserved_data_size)
+        self.payload.len()
     }
 
     /// Starts a new builder for the given command id.
@@ -352,7 +350,6 @@ impl<'a> CmifRequestBuilder<'a> {
             objects: ArrayVec::new(),
             out_pointer_sizes: ArrayVec::new(),
             server_pointer_size: 0,
-            reserved_data_size: 0,
             cur_in_ptr_id: 0,
         }
     }
@@ -385,11 +382,13 @@ impl<'a> CmifRequestBuilder<'a> {
         self
     }
 
-    /// Sets the minimum size of the CMIF data area.
+    /// Sets the request payload from a typed value via its zero-copy byte view.
     #[inline]
-    pub fn data_size(mut self, size: usize) -> Self {
-        self.reserved_data_size = size;
-        self
+    pub fn data_value<T>(self, value: &'a T) -> Self
+    where
+        T: zerocopy::IntoBytes + zerocopy::Immutable,
+    {
+        self.data(value.as_bytes())
     }
 
     /// Marks the request as targeting an object inside a CMIF domain.
@@ -614,7 +613,6 @@ impl<'a> CmifRequestBuilder<'a> {
             num_out_fixed_pointers: self.num_out_fixed_pointers,
             objects: self.objects,
             out_pointer_sizes: self.out_pointer_sizes,
-            reserved_data_size: self.reserved_data_size,
         }
     }
 

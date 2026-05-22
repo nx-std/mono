@@ -183,6 +183,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -220,6 +221,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -233,6 +235,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -337,6 +340,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -350,6 +354,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -457,7 +462,7 @@ dependencies = [
 name = "nx-service-capsdc"
 version = "0.1.0"
 dependencies = [
- "bitflags",
+ "modular-bitfield",
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
@@ -465,6 +470,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -492,6 +498,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -519,6 +526,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -543,6 +551,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -568,6 +577,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -630,6 +640,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -658,6 +669,7 @@ dependencies = [
  "nx-sys-mem",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -671,6 +683,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -761,6 +774,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -866,6 +880,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -879,6 +894,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -945,6 +961,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -984,6 +1001,7 @@ dependencies = [
  "nx-sys-mem",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1009,6 +1027,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1149,6 +1168,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1261,6 +1281,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1301,6 +1322,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]

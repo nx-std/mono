@@ -44,6 +44,7 @@ pub(crate) fn set_touch_screen_auto_pilot_state(
         core::slice::from_raw_parts(states.as_ptr().cast::<u8>(), core::mem::size_of_val(states))
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_TOUCH_SCREEN_AUTO_PILOT_STATE)
         .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
@@ -155,6 +156,7 @@ pub(crate) fn acquire_operation_event_handle(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ACQUIRE_OPERATION_EVENT_HANDLE)
         .in_raw(in_bytes)
@@ -194,6 +196,7 @@ pub(crate) fn read_serial_flash(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::READ_SERIAL_FLASH)
         .in_raw(in_bytes)
@@ -229,6 +232,7 @@ pub(crate) fn write_serial_flash(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::WRITE_SERIAL_FLASH)
         .in_raw(in_bytes)
@@ -276,6 +280,7 @@ pub(crate) fn get_abstracted_pad_handles(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_ABSTRACTED_PAD_HANDLES)
         .out_buffer(buf_bytes, BufferAttr::HIPC_POINTER)
@@ -317,6 +322,7 @@ pub(crate) fn get_abstracted_pads_state(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::GET_ABSTRACTED_PADS_STATE)
         .out_buffer(handles_bytes, BufferAttr::HIPC_POINTER)
@@ -377,6 +383,7 @@ pub(crate) fn attach_hdls_work_buffer_legacy(
         core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::ATTACH_HDLS_WORK_BUFFER)
         .in_raw(in_bytes)
@@ -397,6 +404,7 @@ pub(crate) fn attach_hdls_work_buffer(
         core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::ATTACH_HDLS_WORK_BUFFER)
         .in_raw(in_bytes)

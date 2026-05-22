@@ -8,6 +8,7 @@ use nx_sf::service::{DispatchError, DomainObject};
 #[inline]
 pub(crate) fn dispatch_no_io(object: &DomainObject<'_>, cmd_id: u32) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object.dispatch(cmd_id).send(&mut buf).map(|_| ())
 }
 
@@ -23,6 +24,7 @@ pub(crate) fn dispatch_in<I: Copy>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     object
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -42,6 +44,7 @@ pub(crate) fn dispatch_in_out_u32<I: Copy>(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -62,6 +65,7 @@ pub(crate) fn dispatch_out_u32(
     cmd_id: u32,
 ) -> Result<u32, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = object
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())

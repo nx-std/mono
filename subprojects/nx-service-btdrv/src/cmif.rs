@@ -81,6 +81,7 @@ pub(crate) fn get_adapter_property_legacy(
         core::slice::from_raw_parts((&raw const property_type).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::GET_ADAPTER_PROPERTY)
         .in_raw(in_bytes)
@@ -109,6 +110,7 @@ pub(crate) fn get_adapter_property(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::GET_ADAPTER_PROPERTY)
         .in_raw(in_bytes)
@@ -129,6 +131,7 @@ pub(crate) fn set_adapter_property_legacy(
         core::slice::from_raw_parts((&raw const property_type).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_ADAPTER_PROPERTY)
         .in_raw(in_bytes)
@@ -157,6 +160,7 @@ pub(crate) fn set_adapter_property(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_ADAPTER_PROPERTY)
         .in_raw(in_bytes)
@@ -197,6 +201,7 @@ pub(crate) fn create_bond_legacy(
         core::slice::from_raw_parts((&raw const bond_type).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::CREATE_BOND)
         .in_raw(in_bytes)
@@ -303,6 +308,7 @@ pub(crate) fn write_hid_data_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::WRITE_HID_DATA)
         .in_raw(in_bytes)
@@ -331,6 +337,7 @@ pub(crate) fn write_hid_data(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::WRITE_HID_DATA)
         .in_raw(in_bytes)
@@ -351,6 +358,7 @@ pub(crate) fn write_hid_data2(
         core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::WRITE_HID_DATA2)
         .in_raw(in_bytes)
@@ -379,6 +387,7 @@ pub(crate) fn set_hid_report_legacy(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_HID_REPORT)
         .in_raw(in_bytes)
@@ -407,6 +416,7 @@ pub(crate) fn set_hid_report(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_HID_REPORT)
         .in_raw(in_bytes)
@@ -467,6 +477,7 @@ pub(crate) fn get_paired_device_info(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::GET_PAIRED_DEVICE_INFO)
         .in_raw(in_bytes)
@@ -509,6 +520,7 @@ pub(crate) fn set_zero_retransmission(
         core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(proto::SET_ZERO_RETRANSMISSION)
         .in_raw(in_bytes)
@@ -1057,6 +1069,7 @@ pub(crate) fn write_gatt_characteristic(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1081,6 +1094,7 @@ pub(crate) fn write_gatt_descriptor(
         )
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1264,6 +1278,7 @@ pub(crate) fn send_audio_data(
         core::slice::from_raw_parts((&raw const audio_handle).cast::<u8>(), size_of::<u32>())
     };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::SEND_AUDIO_DATA)
         .in_raw(in_bytes)
@@ -1381,6 +1396,7 @@ pub(crate) fn dispatch_in_buf_ptr_fixed<T>(
     let buf =
         unsafe { core::slice::from_raw_parts((input as *const T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
@@ -1399,6 +1415,7 @@ fn dispatch_out_buf_ptr_fixed<T>(
     let buf =
         unsafe { core::slice::from_raw_parts_mut((out as *mut T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .out_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
@@ -1417,6 +1434,7 @@ fn dispatch_out_buf_alias_fixed<T>(
     let buf =
         unsafe { core::slice::from_raw_parts_mut((out as *mut T).cast::<u8>(), size_of::<T>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE))
@@ -1427,6 +1445,7 @@ fn dispatch_out_buf_alias_fixed<T>(
 /// Dispatches a command that returns a copy handle for an event.
 pub(crate) fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_handle(0, OutHandleAttr::Copy)
@@ -1451,6 +1470,7 @@ fn acquire_event_with_u32_in(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1476,6 +1496,7 @@ fn dispatch_in_u16_get_handle(
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u16>()) };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -1497,6 +1518,7 @@ fn dispatch_out_u32_out_buf(
     cmd_id: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())

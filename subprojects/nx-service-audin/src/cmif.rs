@@ -51,6 +51,7 @@ fn list_audio_ins_impl(
     buffer_attr: BufferAttr,
 ) -> Result<u32, ListAudioInsError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())
@@ -118,6 +119,7 @@ fn open_audio_in_impl(
         core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<OpenAudioInIn>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -146,6 +148,7 @@ fn open_audio_in_impl(
 /// Gets the current audio input state.
 pub(crate) fn audio_in_get_state(service: &Session) -> Result<u32, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::AUDIO_IN_GET_STATE)
         .out_size(size_of::<u32>())
@@ -170,6 +173,7 @@ pub(crate) fn audio_in_stop(service: &Session) -> Result<(), DispatchError> {
 /// Registers the buffer event (returns copy handle).
 pub(crate) fn audio_in_register_buffer_event(service: &Session) -> Result<u32, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::AUDIO_IN_REGISTER_BUFFER_EVENT)
         .out_handle(0, OutHandleAttr::Copy)
@@ -232,6 +236,7 @@ fn append_buffer_impl(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
@@ -285,6 +290,7 @@ fn get_released_buffer_impl(
         core::slice::from_raw_parts_mut((out_buffer_ptr as *mut u64).cast::<u8>(), size_of::<u64>())
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())
@@ -312,6 +318,7 @@ pub(crate) fn audio_in_contains_buffer(
         )
     };
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let result = service
         .dispatch(proto::AUDIO_IN_CONTAINS_BUFFER)
         .in_raw(in_bytes)

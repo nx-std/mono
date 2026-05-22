@@ -20,3 +20,4 @@ nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", features = ["ffi"] }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
+zerocopy = { workspace = true }

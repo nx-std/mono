@@ -11,7 +11,7 @@ use static_assertions::const_assert_eq;
 use crate::proto;
 
 /// Wire input for suspend/resume commands: `{ u64 pid, u64 delay }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 struct PidDelayIn {
     pid: u64,
@@ -21,7 +21,7 @@ struct PidDelayIn {
 const_assert_eq!(size_of::<PidDelayIn>(), 0x10);
 
 /// Wire input for set-volume commands: `{ f32 volume, pad, u64 pid, u64 delay }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 struct SetVolumeIn {
     volume: f32,
@@ -151,14 +151,12 @@ fn dispatch_pid_delay(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd)
-        .data_size(size_of::<PidDelayIn>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SuspendResumeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<PidDelayIn>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<PidDelayIn>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SuspendResumeError::SendRequest)?;
 
@@ -171,14 +169,10 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let req = cmif::CmifRequestBuilder::new(cmd)
-        .data_size(size_of::<u64>())
-        .build();
+
+    let req = cmif::CmifRequestBuilder::new(cmd).data_value(&pid).build();
     req.write_to(&mut buf)
         .map_err(GetVolumeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), pid) };
 
     ipc::send_sync_request(&mut buf, session).map_err(GetVolumeError::SendRequest)?;
 
@@ -208,14 +202,12 @@ fn dispatch_set_volume(
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
     let req = cmif::CmifRequestBuilder::new(cmd)
-        .data_size(size_of::<SetVolumeIn>())
+        .data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetVolumeError::BuildRequest)?;
-
-    // SAFETY: `req` is exactly `size_of::<SetVolumeIn>()` bytes.
-    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<SetVolumeIn>(), input) };
 
     ipc::send_sync_request(&mut buf, session).map_err(SetVolumeError::SendRequest)?;
 
