@@ -388,12 +388,16 @@ impl<P: HipcPayload> HipcRequestBuilder<P> {
 /// # Contract
 ///
 /// [`HipcRequest::write_to`] computes the data-words region as
-/// `encoded_len().next_multiple_of(4)`, zero-fills it, and then calls
-/// [`write_to`](Self::write_to). Implementations only need to write the
-/// bytes they know about; any trailing word-padding stays zero. Encoding
-/// is infallible — the destination slice is guaranteed large enough by
-/// construction, and CMIF/TIPC wire-format bodies have no other failure
-/// modes.
+/// `encoded_len().next_multiple_of(4)` and hands the impl a `dst` slice of
+/// exactly that length. The region is **not** pre-zeroed — IPC is on the
+/// hot path, and the previous global fill duplicated writes the impl
+/// already performs for its sections. Bytes in `dst` that the impl does
+/// not overwrite (alignment slack, trailing word padding) are transmitted
+/// as-is from the caller's TLS buffer; well-behaved servers parse by
+/// structure layout and ignore them. Impls that need deterministic wire
+/// bytes must zero those regions themselves. Encoding is infallible — the
+/// destination slice is guaranteed large enough by construction, and
+/// CMIF/TIPC wire-format bodies have no other failure modes.
 pub trait HipcPayload {
     /// Byte length of the encoded payload, **unrounded**.
     ///
@@ -403,9 +407,9 @@ pub trait HipcPayload {
 
     /// Writes the payload into the data-words region starting at `dst[0]`.
     ///
-    /// `dst.len()` is guaranteed to be at least
-    /// [`encoded_len`](Self::encoded_len) rounded up to a 4-byte multiple,
-    /// and the region is pre-zeroed by HIPC.
+    /// `dst.len()` equals [`encoded_len`](Self::encoded_len) rounded up to a
+    /// 4-byte multiple. The region is **not** pre-zeroed; see the trait-level
+    /// [`Contract`](Self#contract) for the rules governing untouched bytes.
     fn write_to(&self, dst: &mut [u8]);
 }
 
@@ -524,14 +528,18 @@ fn write_special_header<'a, P: HipcPayload>(
     }
 }
 
-/// Zero-fills the data-words region and asks the payload to populate it.
+/// Hands the data-words region to the payload for serialization.
+///
+/// The region is **not** pre-zeroed: IPC sits on the hot path and the global
+/// fill duplicates writes already performed by the payload's section emits.
+/// Per the [`HipcPayload`] contract, any padding bytes the impl leaves
+/// untouched are transmitted as-is from the caller's TLS buffer.
 fn write_data_words<'a, P: HipcPayload>(
     buf: &'a mut [u8],
     payload: &P,
     data_words_size: usize,
 ) -> &'a mut [u8] {
     let (buf, tail) = buf.split_at_mut(data_words_size);
-    buf.fill(0);
     payload.write_to(buf);
     tail
 }
