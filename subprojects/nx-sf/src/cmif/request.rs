@@ -25,26 +25,18 @@ use nx_svc::raw::Handle as RawHandle;
 
 use super::{
     object_id::ObjectId,
-    wire::{CMIF_MAX_OBJECTS, CommandType, DomainInHeader, DomainRequestType, InHeader},
+    wire::{
+        CMIF_HEADER_ALIGN, CMIF_MAX_OBJECTS, CommandType, DomainInHeader, DomainRequestType,
+        InHeader,
+    },
 };
-use crate::hipc::{
-    self, ArrayVec, BufferDescriptor, BufferMode, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest,
-    HipcRequestBuilder, RecvListEntry, StaticDescriptor,
+use crate::{
+    array_vec::ArrayVec,
+    hipc::{
+        self, BufferDescriptor, BufferMode, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest,
+        HipcRequestBuilder, RecvListEntry, StaticDescriptor,
+    },
 };
-
-/// Total CMIF pad budget within the raw-data section, in bytes.
-///
-/// The first CMIF header (`DomainInHeader` if present, otherwise `InHeader`)
-/// must land on a 16-byte boundary measured from the TLS message-buffer base.
-/// HIPC's data-words region is only u32-aligned, so the body skips
-/// `region_ptr.align_offset(0x10)` bytes — in `{0, 4, 8, 12}` — as the
-/// leading pad. The remaining `0x10 - leading_pad` bytes appear after the
-/// CMIF content (before the out-pointer-size table) as trailing pad.
-///
-/// `encoded_len` reserves the full `0x10` budget so the leading-plus-trailing
-/// split is always satisfiable; the bytes not consumed by the leading pad
-/// stay zero thanks to HIPC pre-zeroing the data-words region.
-const CMIF_HEADER_ALIGN: usize = 0x10;
 
 /// Layout error for CMIF request serialization.
 ///

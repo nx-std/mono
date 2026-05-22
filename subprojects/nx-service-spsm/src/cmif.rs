@@ -23,7 +23,7 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
 
     ipc::send_sync_request(&mut buf, session).map_err(ShutdownError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ShutdownError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ShutdownError::ParseResponse)?;
 
     Ok(())
 }
@@ -40,7 +40,7 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
 
     ipc::send_sync_request(&mut buf, session).map_err(PutErrorStateError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(PutErrorStateError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(PutErrorStateError::ParseResponse)?;
 
     Ok(())
 }
@@ -56,7 +56,7 @@ pub enum ShutdownError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`put_error_state`].
@@ -70,5 +70,5 @@ pub enum PutErrorStateError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

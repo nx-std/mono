@@ -3,8 +3,6 @@
 //! This module implements NV commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{mem::size_of, ptr};
-
 use nx_service_applet::aruid::Aruid;
 use nx_sf::{
     cmif,
@@ -37,17 +35,15 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError>
     ipc::send_sync_request(&mut buf, session).map_err(OpenError::SendRequest)?;
 
     // Response contains: fd (u32), error (u32).
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
     struct Output {
         fd: u32,
         error: u32,
     }
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<Output>()).map_err(OpenError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is exactly `size_of::<Output>()` bytes.
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp = cmif::parse_response::<&Output>(&buf).map_err(OpenError::ParseResponse)?;
+    let output = resp.payload;
 
     if output.error != 0 {
         return Err(OpenError::NvError(OpenNvError::from_raw(output.error)));
@@ -101,11 +97,8 @@ pub fn ioctl(
 
     ipc::send_sync_request(&mut buf, session).map_err(IoctlError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(IoctlError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
-    let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(IoctlError::ParseResponse)?;
+    let error = *resp.payload;
 
     if error != 0 {
         return Err(IoctlError::NvError(IoctlNvError::from_raw(error)));
@@ -163,11 +156,8 @@ pub fn ioctl2(
 
     ipc::send_sync_request(&mut buf, session).map_err(Ioctl2Error::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(Ioctl2Error::ParseResponse)?;
-
-    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
-    let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(Ioctl2Error::ParseResponse)?;
+    let error = *resp.payload;
 
     if error != 0 {
         return Err(Ioctl2Error::NvError(IoctlNvError::from_raw(error)));
@@ -225,11 +215,8 @@ pub fn ioctl3(
 
     ipc::send_sync_request(&mut buf, session).map_err(Ioctl3Error::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(Ioctl3Error::ParseResponse)?;
-
-    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
-    let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(Ioctl3Error::ParseResponse)?;
+    let error = *resp.payload;
 
     if error != 0 {
         return Err(Ioctl3Error::NvError(IoctlNvError::from_raw(error)));
@@ -254,11 +241,8 @@ pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(CloseError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(CloseError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
-    let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(CloseError::ParseResponse)?;
+    let error = *resp.payload;
 
     if error != 0 {
         return Err(CloseError::NvError(CloseNvError::from_raw(error)));
@@ -290,7 +274,7 @@ pub fn initialize(
 
     ipc::send_sync_request(&mut buf, session).map_err(InitializeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(InitializeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(InitializeError::ParseResponse)?;
 
     Ok(())
 }
@@ -329,11 +313,8 @@ pub fn query_event(
     ipc::send_sync_request(&mut buf, session).map_err(QueryEventError::SendRequest)?;
 
     // Response contains error code (u32) and a copy handle for the event.
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(QueryEventError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is exactly `size_of::<u32>()` bytes.
-    let error = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(QueryEventError::ParseResponse)?;
+    let error = *resp.payload;
 
     if error != 0 {
         return Err(QueryEventError::NvError(QueryEventNvError::from_raw(error)));
@@ -364,7 +345,7 @@ pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetCli
 
     ipc::send_sync_request(&mut buf, session).map_err(SetClientPidError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetClientPidError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetClientPidError::ParseResponse)?;
 
     Ok(())
 }
@@ -380,7 +361,7 @@ pub enum OpenError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] OpenNvError),
@@ -397,7 +378,7 @@ pub enum IoctlError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
@@ -414,7 +395,7 @@ pub enum Ioctl2Error {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
@@ -431,7 +412,7 @@ pub enum Ioctl3Error {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
@@ -448,7 +429,7 @@ pub enum CloseError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] CloseNvError),
@@ -465,7 +446,7 @@ pub enum InitializeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by query_event operation.
@@ -479,7 +460,7 @@ pub enum QueryEventError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] QueryEventNvError),
@@ -499,5 +480,5 @@ pub enum SetClientPidError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

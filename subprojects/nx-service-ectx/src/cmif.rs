@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the error context service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -36,6 +34,7 @@ pub fn pull_context(
     }
 
     #[repr(C)]
+    #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     struct Output {
         field0: i32,
         total_size: u32,
@@ -57,11 +56,9 @@ pub fn pull_context(
 
     ipc::send_sync_request(&mut buf, session).map_err(PullContextError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<Output>())
-        .map_err(PullContextError::ParseResponse)?;
+    let resp = cmif::parse_response::<&Output>(&buf).map_err(PullContextError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<Output>()` bytes.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let out = *resp.payload;
 
     Ok(PullContextOutput {
         field0: out.field0,
@@ -81,5 +78,5 @@ pub enum PullContextError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

@@ -24,7 +24,15 @@ impl OvlnSourceName {
 }
 
 /// Raw overlay notification message.
-#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::IntoBytes,
+    zerocopy::FromBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct OvlnRawMessage {
     pub tag: u32,
@@ -74,7 +82,7 @@ pub enum OvlnOverflowOption {
 }
 
 /// Result of [`OvlnReceiver::receive_with_tick`](crate::OvlnReceiver::receive_with_tick).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ReceiveWithTickOut {
     pub message: OvlnRawMessage,

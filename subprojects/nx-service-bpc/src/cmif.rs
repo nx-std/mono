@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the BPC service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -21,7 +19,7 @@ pub fn shutdown_system(session: SessionHandle) -> Result<(), ShutdownSystemError
 
     ipc::send_sync_request(&mut buf, session).map_err(ShutdownSystemError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ShutdownSystemError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ShutdownSystemError::ParseResponse)?;
 
     Ok(())
 }
@@ -38,7 +36,7 @@ pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(RebootSystemError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RebootSystemError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RebootSystemError::ParseResponse)?;
 
     Ok(())
 }
@@ -60,11 +58,10 @@ pub fn get_sleep_button_state(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSleepButtonStateError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(GetSleepButtonStateError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&u8>(&buf).map_err(GetSleepButtonStateError::ParseResponse)?;
 
-    // SAFETY: parse_response_bytes guarantees at least size_of::<u8>() bytes in resp.data.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
+    let raw = *resp.payload;
 
     SleepButtonState::from_raw(raw).ok_or(GetSleepButtonStateError::UnknownState(raw))
 }
@@ -84,11 +81,9 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
 
     ipc::send_sync_request(&mut buf, session).map_err(GetPowerButtonError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(GetPowerButtonError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u8>(&buf).map_err(GetPowerButtonError::ParseResponse)?;
 
-    // SAFETY: parse_response_bytes guarantees at least size_of::<u8>() bytes in resp.data.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
+    let raw = *resp.payload;
 
     Ok(raw != 0)
 }
@@ -101,7 +96,7 @@ pub enum ShutdownSystemError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`reboot_system`].
@@ -112,7 +107,7 @@ pub enum RebootSystemError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_sleep_button_state`].
@@ -123,7 +118,7 @@ pub enum GetSleepButtonStateError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("unknown sleep button state: {0}")]
     UnknownState(u8),
 }
@@ -136,5 +131,5 @@ pub enum GetPowerButtonError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

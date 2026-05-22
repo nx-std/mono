@@ -42,16 +42,16 @@ impl<T> SyncUnsafeCell<T> {
     }
 }
 
-/// Converts a CMIF [`cmif::ParseRespError`] to a raw result code.
-pub fn parse_resp_error_to_rc(err: cmif::ParseRespError) -> u32 {
+/// Converts a CMIF [`cmif::ParseError`] to a raw result code.
+pub fn parse_resp_error_to_rc(err: cmif::ParseError) -> u32 {
     match err {
-        cmif::ParseRespError::ServiceError(code) => code,
-        cmif::ParseRespError::InvalidMagic
-        | cmif::ParseRespError::Hipc(_)
-        | cmif::ParseRespError::TruncatedOutHeader
-        | cmif::ParseRespError::TruncatedDomainHeader
-        | cmif::ParseRespError::TruncatedPayload
-        | cmif::ParseRespError::TruncatedDomainObjects => GENERIC_ERROR,
+        cmif::ParseError::ServiceError(code) => code,
+        cmif::ParseError::InvalidMagic
+        | cmif::ParseError::Hipc(_)
+        | cmif::ParseError::TruncatedOutHeader
+        | cmif::ParseError::TruncatedDomainHeader
+        | cmif::ParseError::TruncatedPayload
+        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
     }
 }
 
@@ -59,23 +59,22 @@ pub fn parse_resp_error_to_rc(err: cmif::ParseRespError) -> u32 {
 pub fn parse_tipc_resp_error_to_rc(err: tipc::ParseResponseError) -> u32 {
     match err {
         tipc::ParseResponseError::ServiceError(code) => code,
-        tipc::ParseResponseError::EmptyResponse
-        | tipc::ParseResponseError::Hipc(_)
+        tipc::ParseResponseError::Hipc(_)
         | tipc::ParseResponseError::TruncatedResult
         | tipc::ParseResponseError::TruncatedPayload => GENERIC_ERROR,
     }
 }
 
-/// Converts a CMIF [`cmif::ParseRespBytesError`] to a raw result code.
-pub fn parse_resp_bytes_error_to_rc(err: cmif::ParseRespBytesError) -> u32 {
+/// Converts a CMIF [`cmif::ParseError`] to a raw result code.
+pub fn parse_resp_bytes_error_to_rc(err: cmif::ParseError) -> u32 {
     match err {
-        cmif::ParseRespBytesError::ServiceError(code) => code,
-        cmif::ParseRespBytesError::InvalidMagic
-        | cmif::ParseRespBytesError::Hipc(_)
-        | cmif::ParseRespBytesError::TruncatedOutHeader
-        | cmif::ParseRespBytesError::TruncatedDomainHeader
-        | cmif::ParseRespBytesError::TruncatedPayload
-        | cmif::ParseRespBytesError::TruncatedDomainObjects => GENERIC_ERROR,
+        cmif::ParseError::ServiceError(code) => code,
+        cmif::ParseError::InvalidMagic
+        | cmif::ParseError::Hipc(_)
+        | cmif::ParseError::TruncatedOutHeader
+        | cmif::ParseError::TruncatedDomainHeader
+        | cmif::ParseError::TruncatedPayload
+        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
     }
 }
 

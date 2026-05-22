@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the mii image service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -26,12 +24,8 @@ pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeErro
 
     ipc::send_sync_request(&mut buf, session).map_err(InitializeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(InitializeError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u8>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
+    let resp = cmif::parse_response::<&u8>(&buf).map_err(InitializeError::ParseResponse)?;
+    let out = *resp.payload;
 
     Ok(out)
 }
@@ -47,7 +41,7 @@ pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(ReloadError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ReloadError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ReloadError::ParseResponse)?;
 
     Ok(())
 }
@@ -64,12 +58,8 @@ pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(GetCountError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<i32>()).map_err(GetCountError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<i32>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let count = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
+    let resp = cmif::parse_response::<&i32>(&buf).map_err(GetCountError::ParseResponse)?;
+    let count = *resp.payload;
 
     Ok(count)
 }
@@ -85,12 +75,8 @@ pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(IsEmptyError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u8>()).map_err(IsEmptyError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u8>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let val = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
+    let resp = cmif::parse_response::<&u8>(&buf).map_err(IsEmptyError::ParseResponse)?;
+    let val = *resp.payload;
 
     Ok(val & 1 != 0)
 }
@@ -106,12 +92,8 @@ pub fn is_full(session: SessionHandle) -> Result<bool, IsFullError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(IsFullError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u8>()).map_err(IsFullError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u8>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let val = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
+    let resp = cmif::parse_response::<&u8>(&buf).map_err(IsFullError::ParseResponse)?;
+    let val = *resp.payload;
 
     Ok(val & 1 != 0)
 }
@@ -133,12 +115,9 @@ pub fn get_attribute(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetAttributeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<MiiimgImageAttribute>())
+    let resp = cmif::parse_response::<&MiiimgImageAttribute>(&buf)
         .map_err(GetAttributeError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<MiiimgImageAttribute>()` bytes
-    // per the size argument passed to `parse_response_bytes`.
-    let attr = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<MiiimgImageAttribute>()) };
+    let attr = *resp.payload;
 
     Ok(attr)
 }
@@ -162,7 +141,7 @@ pub fn load_image(
 
     ipc::send_sync_request(&mut buf, session).map_err(LoadImageError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(LoadImageError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(LoadImageError::ParseResponse)?;
 
     Ok(())
 }
@@ -178,7 +157,7 @@ pub enum InitializeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`reload`].
@@ -192,7 +171,7 @@ pub enum ReloadError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_count`].
@@ -206,7 +185,7 @@ pub enum GetCountError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`is_empty`].
@@ -220,7 +199,7 @@ pub enum IsEmptyError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`is_full`].
@@ -234,7 +213,7 @@ pub enum IsFullError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_attribute`].
@@ -248,7 +227,7 @@ pub enum GetAttributeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`load_image`].
@@ -262,5 +241,5 @@ pub enum LoadImageError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

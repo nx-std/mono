@@ -2,8 +2,6 @@
 //!
 //! This is the main display service interface available to all apps.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -57,7 +55,7 @@ fn get_sub_service_no_params(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSubServiceError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSubServiceError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetSubServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetSubServiceError::MissingHandle);
@@ -90,11 +88,10 @@ pub fn open_display(
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenDisplayError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 8).map_err(OpenDisplayError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(OpenDisplayError::ParseResponse)?;
 
     // Output: display_id (u64)
-    // SAFETY: `resp.data` is exactly 8 bytes; reading it as u64 is sound.
-    let display_id = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let display_id = *resp.payload;
 
     Ok(DisplayId::new(display_id))
 }
@@ -117,7 +114,7 @@ pub fn close_display(
 
     ipc::send_sync_request(&mut buf, session).map_err(CloseDisplayError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(CloseDisplayError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(CloseDisplayError::ParseResponse)?;
 
     Ok(())
 }
@@ -149,21 +146,19 @@ pub fn get_display_resolution(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetDisplayResolutionError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, 16).map_err(GetDisplayResolutionError::ParseResponse)?;
-
     #[repr(C)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     struct Output {
         width: i64,
         height: i64,
     }
 
-    // SAFETY: `resp.data` is exactly 16 bytes; reading it as Output (two i64) is sound.
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp =
+        cmif::parse_response::<&Output>(&buf).map_err(GetDisplayResolutionError::ParseResponse)?;
 
     Ok(DisplayResolution {
-        width: output.width,
-        height: output.height,
+        width: resp.payload.width,
+        height: resp.payload.height,
     })
 }
 
@@ -221,11 +216,10 @@ pub fn open_layer(
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenLayerError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 8).map_err(OpenLayerError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(OpenLayerError::ParseResponse)?;
 
     // Output: native_window_size (u64)
-    // SAFETY: `resp.data` is exactly 8 bytes; reading it as u64 is sound.
-    let native_window_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let native_window_size = *resp.payload;
 
     Ok(OpenLayerOutput {
         native_window_size,
@@ -248,7 +242,7 @@ pub fn close_layer(session: SessionHandle, layer_id: LayerId) -> Result<(), Clos
 
     ipc::send_sync_request(&mut buf, session).map_err(CloseLayerError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(CloseLayerError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(CloseLayerError::ParseResponse)?;
 
     Ok(())
 }
@@ -328,21 +322,19 @@ pub(crate) fn create_stray_layer_dispatch(
 
     ipc::send_sync_request(&mut buf, session).map_err(CreateStrayLayerError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, 16).map_err(CreateStrayLayerError::ParseResponse)?;
-
     #[repr(C)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     struct Output {
         layer_id: u64,
         native_window_size: u64,
     }
 
-    // SAFETY: `resp.data` is exactly 16 bytes; reading it as Output (two u64) is sound.
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp =
+        cmif::parse_response::<&Output>(&buf).map_err(CreateStrayLayerError::ParseResponse)?;
 
     Ok(CreateStrayLayerOutput {
-        layer_id: LayerId::new(output.layer_id),
-        native_window_size: output.native_window_size,
+        layer_id: LayerId::new(resp.payload.layer_id),
+        native_window_size: resp.payload.native_window_size,
         native_window,
     })
 }
@@ -365,7 +357,7 @@ pub fn destroy_stray_layer(
 
     ipc::send_sync_request(&mut buf, session).map_err(DestroyStrayLayerError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DestroyStrayLayerError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DestroyStrayLayerError::ParseResponse)?;
 
     Ok(())
 }
@@ -402,7 +394,7 @@ pub fn set_layer_scaling_mode(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerScalingModeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerScalingModeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetLayerScalingModeError::ParseResponse)?;
 
     Ok(())
 }
@@ -458,21 +450,19 @@ pub fn get_indirect_layer_image_map(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetIndirectLayerImageMapError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 16)
-        .map_err(GetIndirectLayerImageMapError::ParseResponse)?;
-
     #[repr(C)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     struct Output {
         size: i64,
         stride: i64,
     }
 
-    // SAFETY: `resp.data` is exactly 16 bytes; reading it as Output (two i64) is sound.
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp = cmif::parse_response::<&Output>(&buf)
+        .map_err(GetIndirectLayerImageMapError::ParseResponse)?;
 
     Ok(IndirectLayerImageInfo {
-        size: output.size,
-        stride: output.stride,
+        size: resp.payload.size,
+        stride: resp.payload.stride,
     })
 }
 
@@ -515,21 +505,19 @@ pub fn get_indirect_layer_image_required_memory_info(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetIndirectLayerImageRequiredMemoryInfoError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 16)
-        .map_err(GetIndirectLayerImageRequiredMemoryInfoError::ParseResponse)?;
-
     #[repr(C)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     struct Output {
         size: i64,
         alignment: i64,
     }
 
-    // SAFETY: `resp.data` is exactly 16 bytes; reading it as Output (two i64) is sound.
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp = cmif::parse_response::<&Output>(&buf)
+        .map_err(GetIndirectLayerImageRequiredMemoryInfoError::ParseResponse)?;
 
     Ok(IndirectLayerMemoryInfo {
-        size: output.size,
-        alignment: output.alignment,
+        size: resp.payload.size,
+        alignment: resp.payload.alignment,
     })
 }
 
@@ -552,7 +540,7 @@ pub fn get_display_vsync_event(
     ipc::send_sync_request(&mut buf, session).map_err(GetDisplayVsyncEventError::SendRequest)?;
 
     let resp =
-        cmif::parse_response_bytes(&buf, 0).map_err(GetDisplayVsyncEventError::ParseResponse)?;
+        cmif::parse_response::<()>(&buf).map_err(GetDisplayVsyncEventError::ParseResponse)?;
 
     let Some(&event_handle) = resp.copy_handles.first() else {
         return Err(GetDisplayVsyncEventError::MissingHandle);
@@ -574,7 +562,7 @@ pub enum GetSubServiceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing handle in response.
     #[error("missing handle in response")]
     MissingHandle,
@@ -591,7 +579,7 @@ pub enum OpenDisplayError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`close_display`].
@@ -605,7 +593,7 @@ pub enum CloseDisplayError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`get_display_resolution`].
@@ -619,7 +607,7 @@ pub enum GetDisplayResolutionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`open_layer`].
@@ -633,7 +621,7 @@ pub enum OpenLayerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`close_layer`].
@@ -647,7 +635,7 @@ pub enum CloseLayerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`create_stray_layer`].
@@ -661,7 +649,7 @@ pub enum CreateStrayLayerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`destroy_stray_layer`].
@@ -675,7 +663,7 @@ pub enum DestroyStrayLayerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_layer_scaling_mode`].
@@ -689,7 +677,7 @@ pub enum SetLayerScalingModeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`get_indirect_layer_image_map`].
@@ -703,7 +691,7 @@ pub enum GetIndirectLayerImageMapError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`get_indirect_layer_image_required_memory_info`].
@@ -717,7 +705,7 @@ pub enum GetIndirectLayerImageRequiredMemoryInfoError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`get_display_vsync_event`].
@@ -731,7 +719,7 @@ pub enum GetDisplayVsyncEventError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing event handle in response.
     #[error("missing event handle in response")]
     MissingHandle,

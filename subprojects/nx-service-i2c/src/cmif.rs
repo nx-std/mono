@@ -26,7 +26,7 @@ pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSession
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
     let raw_handle = resp
         .move_handles
@@ -117,7 +117,7 @@ pub enum OpenSessionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected move handle.
     #[error("missing session handle in response")]
     MissingHandle,

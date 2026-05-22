@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the wlan:inf service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -53,11 +51,9 @@ fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispat
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(DispatchError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    // SAFETY: resp.data is at least size_of::<u32>() bytes as requested above.
-    Ok(unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) })
+    Ok(*resp.payload)
 }
 
 /// Low-level error returned by [`dispatch_no_in_u32`].
@@ -71,5 +67,5 @@ pub enum DispatchError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

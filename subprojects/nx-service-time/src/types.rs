@@ -30,7 +30,16 @@ pub enum TimeType {
 }
 
 /// Calendar time representation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct TimeCalendarTime {
     /// Year
@@ -50,7 +59,7 @@ pub struct TimeCalendarTime {
 }
 
 /// Additional calendar information.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct TimeCalendarAdditionalInfo {
     /// 0-based day-of-week (0 = Sunday).

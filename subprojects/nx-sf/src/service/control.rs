@@ -44,7 +44,7 @@ pub fn query_pointer_buffer_size(
     // SAFETY: IPC operations are serialized on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let resp =
-        cmif::parse_response::<u16>(&buf).map_err(QueryPointerBufferSizeError::ParseResponse)?;
+        cmif::parse_response::<&u16>(&buf).map_err(QueryPointerBufferSizeError::ParseResponse)?;
 
     Ok(*resp.payload)
 }
@@ -60,7 +60,7 @@ pub enum QueryPointerBufferSizeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Clones the current session via control request 2.
@@ -99,7 +99,7 @@ pub enum CloneObjectError {
     SendRequest(#[source] ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// The server returned success but no move handle.
     #[error("missing move handle in response")]
     MissingHandle,
@@ -149,7 +149,7 @@ pub enum CloneObjectExError {
     SendRequest(#[source] ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// The server returned success but no move handle.
     #[error("missing move handle in response")]
     MissingHandle,
@@ -172,7 +172,7 @@ pub fn convert_current_object_to_domain(
 
     // SAFETY: IPC operations are serialized on this thread.
     let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-    let resp = cmif::parse_response::<u32>(&buf).map_err(ConvertToDomainError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(ConvertToDomainError::ParseResponse)?;
 
     // SAFETY: The kernel always returns a non-zero object id on success here.
     Ok(unsafe { ObjectId::new_unchecked(*resp.payload) })
@@ -189,7 +189,7 @@ pub enum ConvertToDomainError {
     SendRequest(#[source] ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Copies a domain object to a new standalone session via control request 1.
@@ -237,7 +237,7 @@ pub enum CopyFromDomainError {
     SendRequest(#[source] ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// The server returned success but no move handle.
     #[error("missing move handle in response")]
     MissingHandle,

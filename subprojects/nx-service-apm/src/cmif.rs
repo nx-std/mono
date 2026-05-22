@@ -3,8 +3,6 @@
 //! This module implements APM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::mem::size_of;
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -29,7 +27,7 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenSessionError::MissingHandle);
@@ -55,14 +53,9 @@ pub fn get_performance_mode(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetPerformanceModeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(GetPerformanceModeError::ParseResponse)?;
-
-    if resp.data.len() < 4 {
-        return Err(GetPerformanceModeError::InvalidResponse);
-    }
-
-    let raw_mode = i32::from_le_bytes([resp.data[0], resp.data[1], resp.data[2], resp.data[3]]);
+    let resp =
+        cmif::parse_response::<&i32>(&buf).map_err(GetPerformanceModeError::ParseResponse)?;
+    let raw_mode = *resp.payload;
 
     PerformanceMode::from_raw(raw_mode).ok_or(GetPerformanceModeError::InvalidMode(raw_mode))
 }
@@ -97,7 +90,7 @@ pub fn set_performance_configuration(
     ipc::send_sync_request(&mut buf, session)
         .map_err(SetPerformanceConfigurationError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetPerformanceConfigurationError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetPerformanceConfigurationError::ParseResponse)?;
 
     Ok(())
 }
@@ -122,16 +115,10 @@ pub fn get_performance_configuration(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetPerformanceConfigurationError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
+    let resp = cmif::parse_response::<&u32>(&buf)
         .map_err(GetPerformanceConfigurationError::ParseResponse)?;
 
-    if resp.data.len() < 4 {
-        return Err(GetPerformanceConfigurationError::InvalidResponse);
-    }
-
-    let config = u32::from_le_bytes([resp.data[0], resp.data[1], resp.data[2], resp.data[3]]);
-
-    Ok(config)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`open_session`].
@@ -145,7 +132,7 @@ pub enum OpenSessionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -162,10 +149,7 @@ pub enum GetPerformanceModeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
-    /// Response data was too short.
-    #[error("invalid response data")]
-    InvalidResponse,
+    ParseResponse(#[source] cmif::ParseError),
     /// Invalid performance mode value.
     #[error("invalid performance mode: {0}")]
     InvalidMode(i32),
@@ -182,7 +166,7 @@ pub enum SetPerformanceConfigurationError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_performance_configuration`].
@@ -196,8 +180,5 @@ pub enum GetPerformanceConfigurationError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
-    /// Response data was too short.
-    #[error("invalid response data")]
-    InvalidResponse,
+    ParseResponse(#[source] cmif::ParseError),
 }

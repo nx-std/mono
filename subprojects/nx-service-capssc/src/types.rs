@@ -34,7 +34,7 @@ pub(crate) struct LayerStackTimeoutIn {
 const_assert_eq!(size_of::<LayerStackTimeoutIn>(), 0x10);
 
 /// Wire-layout output for [`open_raw_screen_shot_read_stream`](crate::cmif::open_raw_screen_shot_read_stream) (cmd 1201).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct OpenReadStreamOut {
     pub size: u64,

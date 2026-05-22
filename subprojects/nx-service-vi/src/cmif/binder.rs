@@ -58,7 +58,7 @@ pub fn transact_parcel(
 
     ipc::send_sync_request(&mut buf, session).map_err(TransactParcelError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(TransactParcelError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(TransactParcelError::ParseResponse)?;
 
     Ok(())
 }
@@ -100,7 +100,7 @@ pub fn adjust_refcount(
 
     ipc::send_sync_request(&mut buf, session).map_err(AdjustRefcountError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(AdjustRefcountError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(AdjustRefcountError::ParseResponse)?;
 
     Ok(())
 }
@@ -135,7 +135,7 @@ pub fn get_native_handle(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetNativeHandleError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetNativeHandleError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetNativeHandleError::ParseResponse)?;
 
     let Some(&handle) = resp.copy_handles.first() else {
         return Err(GetNativeHandleError::MissingHandle);
@@ -155,7 +155,7 @@ pub enum TransactParcelError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`adjust_refcount`].
@@ -169,7 +169,7 @@ pub enum AdjustRefcountError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`get_native_handle`].
@@ -183,7 +183,7 @@ pub enum GetNativeHandleError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing handle in response.
     #[error("missing handle in response")]
     MissingHandle,

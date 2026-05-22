@@ -69,7 +69,9 @@ pub struct GetHostByNameIn {
 const_assert_eq!(size_of::<GetHostByNameIn>(), 16);
 
 /// Output payload for `GetHostByNameRequest` (cmd 2).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct GetHostByNameOut {
     /// `h_errno` value from the resolver.
@@ -100,7 +102,9 @@ pub struct GetHostByAddrIn {
 const_assert_eq!(size_of::<GetHostByAddrIn>(), 24);
 
 /// Output payload for `GetHostByAddrRequest` (cmd 3).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct GetHostByAddrOut {
     /// `h_errno` value from the resolver.
@@ -126,7 +130,9 @@ pub struct GetAddrInfoIn {
 const_assert_eq!(size_of::<GetAddrInfoIn>(), 16);
 
 /// Output payload for `GetAddrInfoRequest` (cmd 6).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct GetAddrInfoOut {
     /// `errno` value from the resolver.
@@ -152,7 +158,9 @@ pub struct GetNameInfoIn {
 const_assert_eq!(size_of::<GetNameInfoIn>(), 16);
 
 /// Output payload for `GetNameInfoRequest` (cmd 7).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct GetNameInfoOut {
     /// `errno` value from the resolver.

@@ -57,7 +57,7 @@ fn get_firmware_version_inner(
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
     // Size is 0 because response data comes via buffer, not inline.
-    tipc::parse_response(&buf, 0).map_err(GetFirmwareVersionError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(GetFirmwareVersionError::ParseResponse)?;
 
     Ok(out)
 }

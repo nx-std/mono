@@ -40,7 +40,7 @@ pub fn register_process(
         .map_err(RegisterProcessError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(RegisterProcessError::SendRequest)?;
 
-    tipc::parse_response(&buf, 0).map_err(RegisterProcessError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(RegisterProcessError::ParseResponse)?;
 
     Ok(())
 }
@@ -78,7 +78,7 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
         .map_err(UnregisterProcessError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(UnregisterProcessError::SendRequest)?;
 
-    tipc::parse_response(&buf, 0).map_err(UnregisterProcessError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(UnregisterProcessError::ParseResponse)?;
 
     Ok(())
 }

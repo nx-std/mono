@@ -38,7 +38,7 @@ pub fn throw_fatal_with_policy(
 
     ipc::send_sync_request(&mut buf, session).map_err(ThrowFatalError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ThrowFatalError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ThrowFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -74,7 +74,7 @@ pub fn throw_fatal_with_context(
 
     ipc::send_sync_request(&mut buf, session).map_err(ThrowFatalError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ThrowFatalError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ThrowFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -90,5 +90,5 @@ pub enum ThrowFatalError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

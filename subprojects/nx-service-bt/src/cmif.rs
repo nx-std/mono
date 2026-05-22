@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the Bluetooth user service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -37,7 +35,7 @@ where
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -66,7 +64,7 @@ where
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -79,7 +77,7 @@ pub enum DispatchError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// LeClientReadCharacteristic (cmd 0).
@@ -316,11 +314,9 @@ pub fn get_le_event_info(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetLeEventInfoError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(GetLeEventInfoError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(GetLeEventInfoError::ParseResponse)?;
 
-    // SAFETY: parse_response_bytes guarantees at least size_of::<u32>() bytes in resp.data.
-    let raw_type = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let raw_type = *resp.payload;
 
     Ok(match raw_type {
         0 => BtdrvBleEventType::ClientRegistration,
@@ -349,7 +345,7 @@ pub enum GetLeEventInfoError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("invalid BLE event type: {0}")]
     InvalidEventType(u32),
 }
@@ -372,7 +368,7 @@ pub fn register_ble_event(
 
     ipc::send_sync_request(&mut buf, session).map_err(RegisterBleEventError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(RegisterBleEventError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(RegisterBleEventError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.copy_handles.first() else {
         return Err(RegisterBleEventError::MissingHandle);
@@ -389,7 +385,7 @@ pub enum RegisterBleEventError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("missing event handle in response")]
     MissingHandle,
 }

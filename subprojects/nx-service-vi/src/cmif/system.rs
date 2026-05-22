@@ -2,8 +2,6 @@
 //!
 //! Available to System and Manager service types.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -47,10 +45,9 @@ pub fn get_z_order_count_min(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetZOrderCountError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 8).map_err(GetZOrderCountError::ParseResponse)?;
+    let resp = cmif::parse_response::<&i64>(&buf).map_err(GetZOrderCountError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly 8 bytes; reading it as i64 is sound.
-    let z = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i64>()) };
+    let z = *resp.payload;
 
     Ok(z)
 }
@@ -73,10 +70,9 @@ pub fn get_z_order_count_max(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetZOrderCountError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 8).map_err(GetZOrderCountError::ParseResponse)?;
+    let resp = cmif::parse_response::<&i64>(&buf).map_err(GetZOrderCountError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly 8 bytes; reading it as i64 is sound.
-    let z = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i64>()) };
+    let z = *resp.payload;
 
     Ok(z)
 }
@@ -109,21 +105,19 @@ pub fn get_display_logical_resolution(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetDisplayLogicalResolutionError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 8)
-        .map_err(GetDisplayLogicalResolutionError::ParseResponse)?;
-
     #[repr(C)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     struct Output {
         width: i32,
         height: i32,
     }
 
-    // SAFETY: `resp.data` is exactly 8 bytes; reading it as Output (two i32) is sound.
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp = cmif::parse_response::<&Output>(&buf)
+        .map_err(GetDisplayLogicalResolutionError::ParseResponse)?;
 
     Ok(LogicalResolution {
-        width: output.width,
-        height: output.height,
+        width: resp.payload.width,
+        height: resp.payload.height,
     })
 }
 
@@ -166,7 +160,7 @@ pub fn set_display_magnification(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayMagnificationError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayMagnificationError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetDisplayMagnificationError::ParseResponse)?;
 
     Ok(())
 }
@@ -204,7 +198,7 @@ pub fn set_layer_position(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerPositionError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerPositionError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetLayerPositionError::ParseResponse)?;
 
     Ok(())
 }
@@ -242,7 +236,7 @@ pub fn set_layer_size(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerSizeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerSizeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetLayerSizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -277,7 +271,7 @@ pub fn set_layer_z(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerZError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerZError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetLayerZError::ParseResponse)?;
 
     Ok(())
 }
@@ -314,7 +308,7 @@ pub fn set_layer_visibility(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetLayerVisibilityError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetLayerVisibilityError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetLayerVisibilityError::ParseResponse)?;
 
     Ok(())
 }
@@ -332,7 +326,7 @@ pub enum GetZOrderCountError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`get_display_logical_resolution`].
@@ -346,7 +340,7 @@ pub enum GetDisplayLogicalResolutionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_display_magnification`].
@@ -360,7 +354,7 @@ pub enum SetDisplayMagnificationError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_layer_position`].
@@ -374,7 +368,7 @@ pub enum SetLayerPositionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_layer_size`].
@@ -388,7 +382,7 @@ pub enum SetLayerSizeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_layer_z`].
@@ -402,7 +396,7 @@ pub enum SetLayerZError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_layer_visibility`].
@@ -416,5 +410,5 @@ pub enum SetLayerVisibilityError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

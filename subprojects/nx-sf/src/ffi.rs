@@ -345,15 +345,15 @@ fn clone_error_to_rc(err: CloneObjectError) -> u32 {
 }
 
 /// Converts a parse response error to a raw result code.
-fn parse_response_error_to_rc(err: cmif::ParseRespError) -> u32 {
+fn parse_response_error_to_rc(err: cmif::ParseError) -> u32 {
     match err {
-        cmif::ParseRespError::InvalidMagic => GENERIC_ERROR,
-        cmif::ParseRespError::ServiceError(code) => code,
-        cmif::ParseRespError::Hipc(_)
-        | cmif::ParseRespError::TruncatedOutHeader
-        | cmif::ParseRespError::TruncatedDomainHeader
-        | cmif::ParseRespError::TruncatedPayload
-        | cmif::ParseRespError::TruncatedDomainObjects => GENERIC_ERROR,
+        cmif::ParseError::InvalidMagic => GENERIC_ERROR,
+        cmif::ParseError::ServiceError(code) => code,
+        cmif::ParseError::Hipc(_)
+        | cmif::ParseError::TruncatedOutHeader
+        | cmif::ParseError::TruncatedDomainHeader
+        | cmif::ParseError::TruncatedPayload
+        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
     }
 }
 

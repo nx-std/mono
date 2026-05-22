@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the fan service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -26,7 +24,7 @@ pub fn open_controller(
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenControllerError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenControllerError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenControllerError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenControllerError::MissingHandle);
@@ -53,7 +51,7 @@ pub fn set_rotation_speed_level(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetRotationSpeedLevelError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetRotationSpeedLevelError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetRotationSpeedLevelError::ParseResponse)?;
 
     Ok(())
 }
@@ -71,13 +69,10 @@ pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotati
 
     ipc::send_sync_request(&mut buf, session).map_err(GetRotationSpeedLevelError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
-        .map_err(GetRotationSpeedLevelError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&f32>(&buf).map_err(GetRotationSpeedLevelError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<f32>()` bytes.
-    let level = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
-
-    Ok(level)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`open_controller`].
@@ -91,7 +86,7 @@ pub enum OpenControllerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected move handle.
     #[error("missing controller handle in response")]
     MissingHandle,
@@ -108,7 +103,7 @@ pub enum SetRotationSpeedLevelError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_rotation_speed_level`].
@@ -122,5 +117,5 @@ pub enum GetRotationSpeedLevelError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

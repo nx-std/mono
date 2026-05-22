@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the audio services.
 
-use core::{mem::size_of, ptr};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -160,7 +160,7 @@ fn dispatch_pid_delay(
 
     ipc::send_sync_request(&mut buf, session).map_err(SuspendResumeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SuspendResumeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SuspendResumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -178,13 +178,9 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
 
     ipc::send_sync_request(&mut buf, session).map_err(GetVolumeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
-        .map_err(GetVolumeError::ParseResponse)?;
+    let resp = cmif::parse_response::<&f32>(&buf).map_err(GetVolumeError::ParseResponse)?;
 
-    // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
-    let volume = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
-
-    Ok(volume)
+    Ok(*resp.payload)
 }
 
 fn dispatch_set_volume(
@@ -213,7 +209,7 @@ fn dispatch_set_volume(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetVolumeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetVolumeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetVolumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -229,7 +225,7 @@ pub enum SuspendResumeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by get-volume operations.
@@ -243,7 +239,7 @@ pub enum GetVolumeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by set-volume operations.
@@ -257,5 +253,5 @@ pub enum SetVolumeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

@@ -23,7 +23,17 @@ pub enum JoyPollingMode {
 }
 
 /// Bus handle identifying a specific hidbus device.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::IntoBytes,
+    zerocopy::FromBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BusHandle {
     pub abstracted_pad_id: u32,
@@ -234,7 +244,7 @@ pub(crate) struct GetBusHandleIn {
 const_assert_eq!(size_of::<GetBusHandleIn>(), 0x18);
 
 /// Output for GetBusHandle (cmd 1).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetBusHandleOut {
     pub flag: u8,

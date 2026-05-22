@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the INS services.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -23,11 +21,9 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
 
     ipc::send_sync_request(&mut buf, session).map_err(GetLastTickError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(GetLastTickError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(GetLastTickError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.
-    let tick = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let tick = *resp.payload;
 
     Ok(tick)
 }
@@ -64,7 +60,7 @@ pub fn get_readable_event(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetReadableEventError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetReadableEventError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetReadableEventError::ParseResponse)?;
 
     let handle = resp
         .copy_handles
@@ -96,7 +92,7 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
 
     ipc::send_sync_request(&mut buf, session).map_err(GetWritableEventError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetWritableEventError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetWritableEventError::ParseResponse)?;
 
     let handle = resp
         .copy_handles
@@ -118,7 +114,7 @@ pub enum GetLastTickError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_readable_event`].
@@ -132,7 +128,7 @@ pub enum GetReadableEventError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected copy handle.
     #[error("missing event handle in response")]
     MissingHandle,
@@ -149,7 +145,7 @@ pub enum GetWritableEventError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected copy handle.
     #[error("missing event handle in response")]
     MissingHandle,

@@ -1,72 +1,71 @@
 //! TIPC response parsing.
 
-use core::mem::size_of;
-
 use nx_svc::raw::Handle as RawHandle;
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
-use zerocopy::IntoBytes;
+use zerocopy::little_endian::U32;
 
-use crate::hipc;
+use crate::{
+    cursor::{Cursor, ResponsePayload},
+    hipc,
+};
 
-/// Parses a TIPC response message.
-pub fn parse_response<'a>(
+/// Parses a TIPC response.
+///
+/// Generic over `P: ResponsePayload`: pick the payload shape via
+/// turbofish — `&T` for a zerocopy struct or `()` for responses that
+/// carry no payload.
+///
+/// The first data word of a TIPC response is the result code; non-zero
+/// codes surface as [`ParseResponseError::ServiceError`] before the
+/// payload is parsed.
+pub fn parse_response<'a, P>(
     buf: &'a [u8; IPC_BUFFER_SIZE],
-    size: usize,
-) -> Result<Response<'a>, ParseResponseError> {
-    let hipc_resp = hipc::parse_response(buf)?;
+) -> Result<Response<'a, P>, ParseResponseError>
+where
+    P: ResponsePayload<'a>,
+{
+    let envelope = hipc::parse_response_envelope(buf)?;
+    let cursor = Cursor::new(envelope.data_words);
 
-    // Result code is the first word of data.
-    if hipc_resp.data_words.is_empty() {
-        return Err(ParseResponseError::EmptyResponse);
-    }
-
-    let result = hipc_resp.data_words[0];
+    let (result_word, cursor) = cursor
+        .read::<U32>()
+        .ok_or(ParseResponseError::TruncatedResult)?;
+    let result = result_word.get();
     if result != 0 {
         return Err(ParseResponseError::ServiceError(result));
     }
 
-    // Skip the 4-byte result code prefix.
-    let (_result_word, payload) = hipc_resp
-        .data_words
-        .as_bytes()
-        .split_at_checked(size_of::<u32>())
-        .ok_or(ParseResponseError::TruncatedResult)?;
-    let (data, _) = payload
-        .split_at_checked(size)
-        .ok_or(ParseResponseError::TruncatedPayload)?;
+    let (payload, _) = P::read(cursor).ok_or(ParseResponseError::TruncatedPayload)?;
 
     Ok(Response {
-        data,
-        copy_handles: hipc_resp.copy_handles,
-        move_handles: hipc_resp.move_handles,
+        payload,
+        copy_handles: envelope.copy_handles,
+        move_handles: envelope.move_handles,
     })
 }
 
 /// Error returned by [`parse_response`].
 #[derive(Debug, thiserror::Error)]
 pub enum ParseResponseError {
-    /// Response data words are empty.
-    #[error("empty response data")]
-    EmptyResponse,
     /// Service returned a non-zero result code.
     #[error("service error: {0:#x}")]
     ServiceError(u32),
     /// Underlying HIPC layer rejected the response.
     #[error("HIPC parse: {0}")]
     Hipc(#[from] hipc::ResponseParseError),
-    /// Response data words too small to contain the result code word.
+    /// Response data words too small to contain the result-code word.
     #[error("TIPC response too small for result code")]
     TruncatedResult,
-    /// Response too small to contain the caller-requested payload size.
+    /// Response too small to contain the caller-requested payload.
     #[error("TIPC response too small for payload")]
     TruncatedPayload,
 }
 
-/// Parsed TIPC response.
+/// Parsed TIPC response with a typed payload.
 #[derive(Debug)]
-pub struct Response<'a> {
-    /// Response payload data (excludes the result code word).
-    pub data: &'a [u8],
+pub struct Response<'a, P> {
+    /// In-band response payload, in whatever shape the caller selected.
+    pub payload: P,
     /// Returned copy handles.
     pub copy_handles: &'a [RawHandle],
     /// Returned move handles (used for receiving service objects).

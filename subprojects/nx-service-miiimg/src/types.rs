@@ -3,7 +3,17 @@
 use static_assertions::const_assert_eq;
 
 /// Image identifier, wrapping a UUID.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiimgImageId {
     /// Raw UUID bytes.
@@ -13,7 +23,16 @@ pub struct MiiimgImageId {
 const_assert_eq!(size_of::<MiiimgImageId>(), 0x10);
 
 /// Mii create identifier, wrapping a UUID.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiCreateId {
     /// Raw UUID bytes.
@@ -23,7 +42,7 @@ pub struct MiiCreateId {
 const_assert_eq!(size_of::<MiiCreateId>(), 0x10);
 
 /// Image attribute returned by [`MiiimgService::get_attribute`](crate::MiiimgService::get_attribute).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C, packed)]
 pub struct MiiimgImageAttribute {
     /// Image ID.

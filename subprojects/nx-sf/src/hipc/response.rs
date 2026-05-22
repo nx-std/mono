@@ -3,59 +3,48 @@
 use core::mem::size_of;
 
 use nx_svc::raw::Handle as RawHandle;
-use zerocopy::FromBytes;
 
 use super::wire::{
     Header, MIN_PREFIX_BUF_SIZE, RECV_LIST_WIRE_NONE, SpecialHeader, StaticDescriptor,
 };
+use crate::cursor::{Cursor, ResponsePayload};
 
-/// Parsed HIPC response from the server.
+/// Parses a full HIPC response into the envelope plus a typed payload.
 ///
-/// Constructed exclusively by [`parse_response`]; its existence is proof that
-/// the wire bytes formed a well-formed response (all declared bytes fit, no
-/// client→server descriptors, no receive list).
-#[derive(Debug)]
-pub struct Response<'a> {
-    /// Data words (raw response data).
-    pub data_words: &'a [u32],
-    /// Copy handles received.
-    pub copy_handles: &'a [RawHandle],
-    /// Move handles received.
-    pub move_handles: &'a [RawHandle],
-}
-
-/// Error returned by [`parse_response`].
-#[derive(Debug, thiserror::Error)]
-pub enum ResponseParseError {
-    /// The header's declared descriptor counts imply a message longer than
-    /// [`IPC_BUFFER_SIZE`], so the response cannot be decoded without reading
-    /// past the end of the TLR buffer.
-    #[error("HIPC response declares {declared} bytes but only {capacity} remain in buffer")]
-    DeclaredSizeExceedsBuffer {
-        /// Total descriptor-region bytes implied by the header's counts.
-        declared: usize,
-        /// Bytes available after the decoded prefix.
-        capacity: usize,
-    },
-    /// Response carries A/B/W buffer descriptors. These are client→server only;
-    /// a server reply must not carry them.
-    #[error("HIPC response carries client→server buffer descriptors")]
-    UnexpectedBufferDescriptor,
-    /// Response declares a Type-C receive list. The receive list is a
-    /// request-side construct used by clients to pre-allocate buffers for
-    /// server pointer descriptors; it has no meaning in a reply.
-    #[error("HIPC response declares a receive-list mode")]
-    UnexpectedRecvList,
-}
-
-/// Parses an HIPC response from the thread's IPC buffer.
+/// Generic over `P: ResponsePayload`: callers pick the payload shape via
+/// turbofish — `&T` for a zerocopy struct or `()` for no in-band
+/// payload.
 ///
 /// Returns a typed error for any malformed wire shape — never panics on
 /// untrusted input. See [`ResponseParseError`] for the failure cases.
 ///
 /// Generic over the buffer size `N`; [`parse_prefix`] enforces at
 /// monomorphization that `N >= MIN_PREFIX_BUF_SIZE`.
-pub fn parse_response<const N: usize>(buf: &[u8; N]) -> Result<Response<'_>, ResponseParseError> {
+pub fn parse_response<'a, const N: usize, P>(
+    buf: &'a [u8; N],
+) -> Result<Response<'a, P>, ResponseParseError>
+where
+    P: ResponsePayload<'a>,
+{
+    let envelope = parse_response_envelope(buf)?;
+    let cursor = Cursor::new(envelope.data_words);
+    let (payload, _) = P::read(cursor).ok_or(ResponseParseError::TruncatedPayload)?;
+
+    Ok(Response {
+        payload,
+        copy_handles: envelope.copy_handles,
+        move_handles: envelope.move_handles,
+    })
+}
+
+/// Parses the HIPC envelope and exposes the raw data-words region.
+///
+/// Used by CMIF and TIPC, which build their own cursor over
+/// `data_words` to walk their protocol-specific headers before
+/// delegating to a [`ResponsePayload`] for the user payload.
+pub fn parse_response_envelope<const N: usize>(
+    buf: &[u8; N],
+) -> Result<Envelope<'_>, ResponseParseError> {
     let (prefix, buf) = parse_prefix(buf);
     let header = &prefix.header;
 
@@ -80,7 +69,7 @@ pub fn parse_response<const N: usize>(buf: &[u8; N]) -> Result<Response<'_>, Res
     let num_data_words = header.num_data_words() as usize;
 
     // Bound-check the declared payload against the buffer once so the
-    // subsequent slicing steps can rely on the fit without re-validating.
+    // subsequent cursor reads can rely on the fit without re-validating.
     let declared = num_copy_handles * size_of::<RawHandle>()
         + num_move_handles * size_of::<RawHandle>()
         + num_statics * size_of::<StaticDescriptor>()
@@ -92,21 +81,83 @@ pub fn parse_response<const N: usize>(buf: &[u8; N]) -> Result<Response<'_>, Res
         });
     }
 
-    // Size check above proves every slicing below fits.
-    let (copy_handles, rest) = <[RawHandle]>::ref_from_prefix_with_elems(buf, num_copy_handles)
+    // Size check above proves every cursor read below fits.
+    let cursor = Cursor::new(buf);
+    let (copy_handles, cursor) = cursor
+        .read_slice::<RawHandle>(num_copy_handles)
         .expect("internal: size check guarantees fit");
-    let (move_handles, rest) = <[RawHandle]>::ref_from_prefix_with_elems(rest, num_move_handles)
+    let (move_handles, cursor) = cursor
+        .read_slice::<RawHandle>(num_move_handles)
         .expect("internal: size check guarantees fit");
-    let (_statics, rest) = <[StaticDescriptor]>::ref_from_prefix_with_elems(rest, num_statics)
+    let (_statics, cursor) = cursor
+        .read_slice::<StaticDescriptor>(num_statics)
         .expect("internal: size check guarantees fit");
-    let (data_words, _) = <[u32]>::ref_from_prefix_with_elems(rest, num_data_words)
+    let (data_words, _) = cursor
+        .read_bytes(num_data_words * size_of::<u32>())
         .expect("internal: size check guarantees fit");
 
-    Ok(Response {
+    Ok(Envelope {
         data_words,
         copy_handles,
         move_handles,
     })
+}
+
+/// Error returned by [`parse_response`] and [`parse_response_envelope`].
+#[derive(Debug, thiserror::Error)]
+pub enum ResponseParseError {
+    /// The header's declared descriptor counts imply a message longer than
+    /// [`IPC_BUFFER_SIZE`], so the response cannot be decoded without reading
+    /// past the end of the TLR buffer.
+    #[error("HIPC response declares {declared} bytes but only {capacity} remain in buffer")]
+    DeclaredSizeExceedsBuffer {
+        /// Total descriptor-region bytes implied by the header's counts.
+        declared: usize,
+        /// Bytes available after the decoded prefix.
+        capacity: usize,
+    },
+    /// Response carries A/B/W buffer descriptors. These are client→server only;
+    /// a server reply must not carry them.
+    #[error("HIPC response carries client→server buffer descriptors")]
+    UnexpectedBufferDescriptor,
+    /// Response declares a Type-C receive list. The receive list is a
+    /// request-side construct used by clients to pre-allocate buffers for
+    /// server pointer descriptors; it has no meaning in a reply.
+    #[error("HIPC response declares a receive-list mode")]
+    UnexpectedRecvList,
+    /// Data-words region too small to hold the caller-requested payload.
+    #[error("HIPC response too small for payload")]
+    TruncatedPayload,
+}
+
+/// Parsed HIPC response with a typed payload.
+///
+/// Returned by [`parse_response`]. The payload type is whatever the
+/// caller selected via the `P` type parameter.
+#[derive(Debug)]
+pub struct Response<'a, P> {
+    /// In-band payload, parsed from the data-words region.
+    pub payload: P,
+    /// Copy handles received.
+    pub copy_handles: &'a [RawHandle],
+    /// Move handles received.
+    pub move_handles: &'a [RawHandle],
+}
+
+/// Parsed HIPC envelope with the raw data-words region exposed.
+///
+/// Returned by [`parse_response_envelope`]. CMIF and TIPC consume this
+/// shape to walk their own protocol headers before exposing the user
+/// payload.
+#[derive(Debug)]
+pub struct Envelope<'a> {
+    /// Raw data-words region, as bytes. The kernel reserves
+    /// `num_data_words * 4` bytes here for the protocol payload.
+    pub data_words: &'a [u8],
+    /// Copy handles received.
+    pub copy_handles: &'a [RawHandle],
+    /// Move handles received.
+    pub move_handles: &'a [RawHandle],
 }
 
 /// Decodes the wire-level prefix (header + optional special header + optional PID)
@@ -150,33 +201,33 @@ fn parse_prefix<const N: usize>(buf: &[u8; N]) -> (Prefix, &[u8]) {
         );
     }
 
-    // SAFETY: the const assertion above ensures `N >= MIN_PREFIX_BUF_SIZE`,
-    // which is large enough to hold the header, so `ref_from_prefix` cannot fail.
-    let (header, rest) =
-        Header::ref_from_prefix(buf).expect("internal: TLR buffer fits HIPC header");
+    // The const assertion above ensures `N >= MIN_PREFIX_BUF_SIZE`, so the
+    // cursor reads below cannot fail.
+    let cursor = Cursor::new(buf);
+    let (header, cursor) = cursor
+        .read::<Header>()
+        .expect("internal: TLR buffer fits HIPC header");
     if !header.has_special_header() {
         return (
             Prefix {
                 header: *header,
                 extras: None,
             },
-            rest,
+            cursor.remaining(),
         );
     }
 
-    // SAFETY: `rest` has at least IPC_BUFFER_SIZE - HEADER_SIZE (8) = 248 bytes remaining and
-    // SpecialHeader is 4 bytes, so `ref_from_prefix` cannot fail.
-    let (special_hdr, rest) =
-        SpecialHeader::ref_from_prefix(rest).expect("internal: TLR buffer fits special header");
+    let (special_hdr, cursor) = cursor
+        .read::<SpecialHeader>()
+        .expect("internal: TLR buffer fits special header");
 
-    let (pid, rest) = if special_hdr.send_pid() {
-        // SAFETY: `rest` has at least 244 bytes remaining and ProcessId is 8 bytes,
-        // so `ref_from_prefix` cannot fail.
-        let (pid_ref, rest) =
-            ProcessId::ref_from_prefix(rest).expect("internal: TLR buffer fits PID");
-        (Some(*pid_ref), rest)
+    let (pid, cursor) = if special_hdr.send_pid() {
+        let (pid_ref, cursor) = cursor
+            .read::<ProcessId>()
+            .expect("internal: TLR buffer fits PID");
+        (Some(*pid_ref), cursor)
     } else {
-        (None, rest)
+        (None, cursor)
     };
 
     let prefix = Prefix {
@@ -188,7 +239,7 @@ fn parse_prefix<const N: usize>(buf: &[u8; N]) -> (Prefix, &[u8]) {
         }),
     };
 
-    (prefix, rest)
+    (prefix, cursor.remaining())
 }
 
 /// Parsed wire-level prefix shared by requests and responses.
@@ -234,7 +285,7 @@ struct Extras {
     /// Number of move handles (≤ 15, bound by the `B4` bitfield width).
     num_move_handles: u8,
     /// Sender's process ID, if the `send_pid` bit was set on the wire.
-    /// Decoded for completeness; `parse_response` currently discards it.
+    /// Decoded for completeness; the parser currently discards it.
     #[allow(dead_code)]
     pid: Option<ProcessId>,
 }

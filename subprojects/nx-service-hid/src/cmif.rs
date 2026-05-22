@@ -329,7 +329,7 @@ pub enum CreateAppletResourceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -346,7 +346,7 @@ pub enum GetSharedMemoryHandleError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing shared memory handle in response.
     #[error("missing shared memory handle in response")]
     MissingHandle,
@@ -363,7 +363,7 @@ pub enum ActivateNpadError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`set_supported_npad_style_set`].
@@ -377,7 +377,7 @@ pub enum SetSupportedNpadStyleSetError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`set_supported_npad_id_type`].
@@ -391,7 +391,7 @@ pub enum SetSupportedNpadIdTypeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`activate_touch_screen`].
@@ -405,7 +405,7 @@ pub enum ActivateTouchScreenError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`activate_keyboard`].
@@ -419,7 +419,7 @@ pub enum ActivateKeyboardError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`activate_mouse`].
@@ -433,7 +433,7 @@ pub enum ActivateMouseError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`activate_gesture`].
@@ -447,5 +447,5 @@ pub enum ActivateGestureError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }

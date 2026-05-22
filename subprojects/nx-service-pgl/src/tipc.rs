@@ -28,7 +28,7 @@ fn dispatch_in_u64(session: Handle, cmd_id: u32, value: u64) -> Result<(), Dispa
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    tipc::parse_response(&buf, 0).map_err(DispatchError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -48,7 +48,7 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    tipc::parse_response(&buf, 0).map_err(DispatchError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -64,10 +64,9 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchError> 
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp =
-        tipc::parse_response(&buf, size_of::<u64>()).map_err(DispatchError::ParseResponse)?;
+    let resp = tipc::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let value = *resp.payload;
 
     Ok(value)
 }
@@ -83,11 +82,9 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchError
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp = tipc::parse_response(&buf, size_of::<u8>()).map_err(DispatchError::ParseResponse)?;
+    let resp = tipc::parse_response::<&u8>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(value & 1 != 0)
+    Ok(*resp.payload & 1 != 0)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -128,10 +125,9 @@ pub fn launch_program(
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp =
-        tipc::parse_response(&buf, size_of::<u64>()).map_err(DispatchError::ParseResponse)?;
+    let resp = tipc::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let pid = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let pid = *resp.payload;
 
     Ok(pid)
 }
@@ -166,10 +162,9 @@ pub fn launch_program_from_host(
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp =
-        tipc::parse_response(&buf, size_of::<u64>()).map_err(DispatchError::ParseResponse)?;
+    let resp = tipc::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let pid = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let pid = *resp.payload;
 
     Ok(pid)
 }
@@ -194,10 +189,10 @@ pub fn get_host_content_meta_info(
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp = tipc::parse_response(&buf, size_of::<ContentMetaInfo>())
-        .map_err(DispatchError::ParseResponse)?;
+    let resp =
+        tipc::parse_response::<&ContentMetaInfo>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let info = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ContentMetaInfo>()) };
+    let info = *resp.payload;
 
     Ok(info)
 }
@@ -228,11 +223,9 @@ pub fn is_process_tracked(session: Handle, pid: u64) -> Result<bool, DispatchErr
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp = tipc::parse_response(&buf, size_of::<u8>()).map_err(DispatchError::ParseResponse)?;
+    let resp = tipc::parse_response::<&u8>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(value & 1 != 0)
+    Ok(*resp.payload & 1 != 0)
 }
 
 /// Enables/disables application crash reports (cmd 8).
@@ -269,7 +262,7 @@ pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverEr
         .map_err(GetEventObserverError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(GetEventObserverError::SendRequest)?;
 
-    let resp = tipc::parse_response(&buf, 0).map_err(GetEventObserverError::ParseResponse)?;
+    let resp = tipc::parse_response::<()>(&buf).map_err(GetEventObserverError::ParseResponse)?;
 
     let raw_handle = resp
         .move_handles
@@ -308,7 +301,7 @@ pub fn observer_get_process_event(session: Handle) -> Result<u32, GetProcessEven
         .map_err(GetProcessEventError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(GetProcessEventError::SendRequest)?;
 
-    let resp = tipc::parse_response(&buf, 0).map_err(GetProcessEventError::ParseResponse)?;
+    let resp = tipc::parse_response::<()>(&buf).map_err(GetProcessEventError::ParseResponse)?;
 
     let raw_handle = resp
         .copy_handles
@@ -343,10 +336,8 @@ pub fn observer_get_process_event_info(session: Handle) -> Result<ProcessEventIn
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp = tipc::parse_response(&buf, size_of::<ProcessEventInfo>())
-        .map_err(DispatchError::ParseResponse)?;
+    let resp =
+        tipc::parse_response::<&ProcessEventInfo>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    let info = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ProcessEventInfo>()) };
-
-    Ok(info)
+    Ok(*resp.payload)
 }

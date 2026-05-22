@@ -271,7 +271,7 @@ impl<'a> Dispatch<'a> {
     pub fn send<'b>(self, buf: &'b mut IpcBuffer) -> Result<DispatchResult<'b>, DispatchError> {
         let resp = self.send_response(buf)?;
         Ok(DispatchResult {
-            data: resp.data,
+            data: resp.payload,
             copy_handles: resp.copy_handles,
             move_handles: resp.move_handles,
         })
@@ -285,7 +285,7 @@ impl<'a> Dispatch<'a> {
     pub(crate) fn send_response<'b>(
         self,
         buf: &'b mut IpcBuffer,
-    ) -> Result<cmif::ResponseBytes<'b>, DispatchError> {
+    ) -> Result<cmif::Response<'b, &'b [u8]>, DispatchError> {
         let is_domain = self.object_id.is_some();
 
         {
@@ -375,7 +375,7 @@ impl<'a> Dispatch<'a> {
         // caller, who must consume the response before the next IPC
         // operation reuses the token.
         let resp = if is_domain {
-            cmif::parse_response_bytes_domain(buf.as_array(), self.out_data_size)
+            cmif::parse_response_domain_bytes(buf.as_array(), self.out_data_size)
         } else {
             cmif::parse_response_bytes(buf.as_array(), self.out_data_size)
         }
@@ -396,7 +396,7 @@ pub enum DispatchError {
     SendRequest(#[source] nx_svc::ipc::SendSyncError),
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Result of a successful non-domain dispatch operation.
@@ -412,6 +412,24 @@ pub struct DispatchResult<'a> {
     pub copy_handles: &'a [u32],
     /// Returned move handles.
     pub move_handles: &'a [u32],
+}
+
+impl<'a> DispatchResult<'a> {
+    /// Borrows the response payload as a typed reference.
+    ///
+    /// Infallible by construction: the caller of [`Dispatch::out_size`]
+    /// declares `size_of::<T>()`, and the underlying CMIF parser yields a
+    /// 16-byte-aligned `data` slice — sufficient for any `T` whose
+    /// `align_of` is ≤ 16. Panics only if those invariants do not hold.
+    #[inline]
+    pub fn value<T>(&self) -> &'a T
+    where
+        T: zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+    {
+        let (val, _) = T::ref_from_prefix(self.data)
+            .expect("dispatch response data does not satisfy T's layout");
+        val
+    }
 }
 
 /// Builder for dispatching a single CMIF request in domain mode.
@@ -567,7 +585,7 @@ impl<'d> DomainDispatch<'d> {
         }
 
         Ok(DomainDispatchResult {
-            data: resp.data,
+            data: resp.payload,
             copy_handles: resp.copy_handles,
             move_handles: resp.move_handles,
             objects,
@@ -596,6 +614,23 @@ pub struct DomainDispatchResult<'d, 'b> {
 }
 
 impl<'d, 'b> DomainDispatchResult<'d, 'b> {
+    /// Borrows the response payload as a typed reference.
+    ///
+    /// Infallible by construction: the caller of
+    /// [`DomainDispatch::out_size`] declares `size_of::<T>()`, and the
+    /// underlying CMIF parser yields a 16-byte-aligned `data` slice —
+    /// sufficient for any `T` whose `align_of` is ≤ 16. Panics only if
+    /// those invariants do not hold.
+    #[inline]
+    pub fn value<T>(&self) -> &'b T
+    where
+        T: zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+    {
+        let (val, _) = T::ref_from_prefix(self.data)
+            .expect("dispatch response data does not satisfy T's layout");
+        val
+    }
+
     /// Number of [`DomainObject`]s the server emitted in this response.
     #[inline]
     pub fn object_count(&self) -> usize {

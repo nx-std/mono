@@ -136,18 +136,16 @@
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/hipc.h` (fincs, SciresM)
 
-mod array_vec;
 mod request;
 mod response;
 mod wire;
 
-pub(crate) use self::array_vec::ArrayVec;
 pub use self::{
     request::{
         HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest, HipcRequestBuilder,
         WriteError,
     },
-    response::{Response, ResponseParseError, parse_response},
+    response::{Envelope, Response, ResponseParseError, parse_response, parse_response_envelope},
     wire::{
         BufferDescriptor, BufferMode, Header, MessageType, RecvListEntry, SpecialHeader,
         StaticDescriptor,

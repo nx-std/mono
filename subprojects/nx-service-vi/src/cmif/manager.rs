@@ -2,8 +2,6 @@
 //!
 //! Available only to Manager service type.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -51,10 +49,9 @@ pub fn create_managed_layer(
     ipc::send_sync_request(&mut buf, session).map_err(CreateManagedLayerError::SendRequest)?;
 
     let resp =
-        cmif::parse_response_bytes(&buf, 8).map_err(CreateManagedLayerError::ParseResponse)?;
+        cmif::parse_response::<&u64>(&buf).map_err(CreateManagedLayerError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly 8 bytes; reading it as u64 is sound.
-    let layer_id = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let layer_id = *resp.payload;
 
     Ok(LayerId::new(layer_id))
 }
@@ -77,7 +74,7 @@ pub fn destroy_managed_layer(
 
     ipc::send_sync_request(&mut buf, session).map_err(DestroyManagedLayerError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DestroyManagedLayerError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DestroyManagedLayerError::ParseResponse)?;
 
     Ok(())
 }
@@ -128,7 +125,7 @@ pub fn set_display_alpha(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayAlphaError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayAlphaError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetDisplayAlphaError::ParseResponse)?;
 
     Ok(())
 }
@@ -165,7 +162,7 @@ pub fn set_display_layer_stack(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayLayerStackError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayLayerStackError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetDisplayLayerStackError::ParseResponse)?;
 
     Ok(())
 }
@@ -202,7 +199,7 @@ pub fn set_display_power_state(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetDisplayPowerStateError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayPowerStateError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetDisplayPowerStateError::ParseResponse)?;
 
     Ok(())
 }
@@ -240,7 +237,7 @@ pub fn add_to_layer_stack(
 
     ipc::send_sync_request(&mut buf, session).map_err(AddToLayerStackError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(AddToLayerStackError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(AddToLayerStackError::ParseResponse)?;
 
     Ok(())
 }
@@ -263,7 +260,7 @@ pub fn set_content_visibility(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetContentVisibilityError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetContentVisibilityError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetContentVisibilityError::ParseResponse)?;
 
     Ok(())
 }
@@ -281,7 +278,7 @@ pub enum CreateManagedLayerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`destroy_managed_layer`].
@@ -295,7 +292,7 @@ pub enum DestroyManagedLayerError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_display_alpha`].
@@ -309,7 +306,7 @@ pub enum SetDisplayAlphaError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_display_layer_stack`].
@@ -323,7 +320,7 @@ pub enum SetDisplayLayerStackError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_display_power_state`].
@@ -337,7 +334,7 @@ pub enum SetDisplayPowerStateError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`add_to_layer_stack`].
@@ -351,7 +348,7 @@ pub enum AddToLayerStackError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`set_content_visibility`].
@@ -365,5 +362,5 @@ pub enum SetContentVisibilityError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

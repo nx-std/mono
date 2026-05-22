@@ -52,7 +52,7 @@ fn get_firmware_version_inner(
         .map_err(GetFirmwareVersionError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(GetFirmwareVersionError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(GetFirmwareVersionError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(GetFirmwareVersionError::ParseResponse)?;
 
     Ok(out)
 }
@@ -68,5 +68,5 @@ pub enum GetFirmwareVersionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

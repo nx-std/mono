@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the PL (shared font) service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -24,7 +22,7 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestLoadError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RequestLoadError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RequestLoadError::ParseResponse)?;
 
     Ok(())
 }
@@ -45,11 +43,9 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
 
     ipc::send_sync_request(&mut buf, session).map_err(GetLoadStateError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(GetLoadStateError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(GetLoadStateError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u32.
-    let state = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let state = *resp.payload;
 
     Ok(state)
 }
@@ -67,11 +63,9 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSizeError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(GetSizeError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(GetSizeError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u32.
-    let size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let size = *resp.payload;
 
     Ok(size)
 }
@@ -94,11 +88,10 @@ pub fn get_shared_memory_address_offset(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetSharedMemoryAddressOffsetError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
+    let resp = cmif::parse_response::<&u32>(&buf)
         .map_err(GetSharedMemoryAddressOffsetError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u32.
-    let offset = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let offset = *resp.payload;
 
     Ok(offset)
 }
@@ -118,7 +111,7 @@ pub fn get_shared_memory_native_handle(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetSharedMemoryNativeHandleError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0)
+    let resp = cmif::parse_response::<()>(&buf)
         .map_err(GetSharedMemoryNativeHandleError::ParseResponse)?;
 
     let handle = resp
@@ -172,11 +165,10 @@ pub fn get_shared_font(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSharedFontError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<GetSharedFontOut>())
+    let resp = cmif::parse_response::<&GetSharedFontOut>(&buf)
         .map_err(GetSharedFontError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for GetSharedFontOut.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<GetSharedFontOut>()) };
+    let out = *resp.payload;
 
     Ok(out)
 }
@@ -192,7 +184,7 @@ pub enum RequestLoadError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_load_state`].
@@ -206,7 +198,7 @@ pub enum GetLoadStateError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_size`].
@@ -220,7 +212,7 @@ pub enum GetSizeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_shared_memory_address_offset`].
@@ -234,7 +226,7 @@ pub enum GetSharedMemoryAddressOffsetError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_shared_memory_native_handle`].
@@ -248,7 +240,7 @@ pub enum GetSharedMemoryNativeHandleError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected copy handle.
     #[error("missing shared memory handle in response")]
     MissingHandle,
@@ -265,5 +257,5 @@ pub enum GetSharedFontError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

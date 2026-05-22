@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the HID Bus service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -32,18 +30,15 @@ where
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
 
-fn dispatch_in_out<T, U: Copy>(
-    session: SessionHandle,
-    cmd_id: u32,
-    value: &T,
-) -> Result<U, DispatchError>
+fn dispatch_in_out<T, U>(session: SessionHandle, cmd_id: u32, value: &T) -> Result<U, DispatchError>
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
+    U: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -57,13 +52,9 @@ where
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, size_of::<U>()).map_err(DispatchError::ParseResponse)?;
+    let resp = cmif::parse_response::<&U>(&buf).map_err(DispatchError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<U>()` bytes.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<U>()) };
-
-    Ok(out)
+    Ok(*resp.payload)
 }
 
 /// Error returned by hidbus dispatch operations.
@@ -74,7 +65,7 @@ pub enum DispatchError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// GetBusHandle (cmd 1).
@@ -170,7 +161,7 @@ pub fn send_command_async(
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
     Ok(())
 }
@@ -195,13 +186,10 @@ pub fn get_send_command_async_result(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetSendCommandAsyncResultError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
+    let resp = cmif::parse_response::<&u32>(&buf)
         .map_err(GetSendCommandAsyncResultError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes.
-    let out_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-
-    Ok(out_size)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`get_send_command_async_result`].
@@ -212,7 +200,7 @@ pub enum GetSendCommandAsyncResultError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// SetEventForSendCommandAsyncResult (cmd 9).
@@ -232,7 +220,7 @@ pub fn set_event_for_send_command_async_result(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetEventError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(SetEventError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(SetEventError::ParseResponse)?;
 
     resp.copy_handles
         .first()
@@ -248,7 +236,7 @@ pub enum SetEventError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("missing event handle in response")]
     MissingHandle,
 }
@@ -265,7 +253,7 @@ pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetShared
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSharedMemoryError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSharedMemoryError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryError::ParseResponse)?;
 
     resp.copy_handles
         .first()
@@ -281,7 +269,7 @@ pub enum GetSharedMemoryError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("missing shared memory handle in response")]
     MissingHandle,
 }
@@ -319,7 +307,7 @@ pub fn enable_joy_polling_receive_mode(
 
     ipc::send_sync_request(&mut buf, session).map_err(EnableJoyPollingError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(EnableJoyPollingError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(EnableJoyPollingError::ParseResponse)?;
 
     Ok(())
 }
@@ -332,7 +320,7 @@ pub enum EnableJoyPollingError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// DisableJoyPollingReceiveMode (cmd 12).

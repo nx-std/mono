@@ -76,12 +76,23 @@ const_assert_eq!(size_of::<RegisterClientIn>(), 48);
 /// Common response prefix returned by every BSD service command. The service
 /// reports POSIX-style outcomes via `ret`; `errno` is meaningful when `ret < 0`.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 pub(crate) struct CallResponse {
     pub ret: i32,
     pub errno: i32,
 }
 const_assert_eq!(size_of::<CallResponse>(), 8);
+
+/// `CallResponse` followed by a trailing `u32` (e.g. `socklen_t` for
+/// `accept`/`getsockname`, `optlen` for `getsockopt`). Wire layout is exactly
+/// the standard prefix immediately followed by one `u32`.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
+pub(crate) struct CallResponseExtraU32 {
+    pub prefix: CallResponse,
+    pub extra: u32,
+}
+const_assert_eq!(size_of::<CallResponseExtraU32>(), 12);
 
 /// Input payload for [`cmds::SOCKET`] / `SocketExempt`.
 #[repr(C)]

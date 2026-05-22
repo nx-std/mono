@@ -9,10 +9,8 @@
 //! caller is informed via the corresponding `Service { ret, errno }` variant in
 //! the per-command error enum — no thread-local `errno` is maintained.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
-    cmif::{self, ParseRespBytesError},
+    cmif::{self, ParseError},
     hipc::BufferMode,
 };
 use nx_svc::{
@@ -24,8 +22,9 @@ use nx_sys_thread_tls::IpcBuffer;
 use crate::{
     fd::BsdSockFd,
     proto::{
-        BsdServiceConfigWire, CallResponse, FcntlIn, IoctlIn, ListenIn, PollIn, RegisterClientIn,
-        SelectIn, SelectTimeval, ShutdownIn, SockOptIn, SocketIn, SockfdFlagsIn, Timeval, cmds,
+        BsdServiceConfigWire, CallResponse, CallResponseExtraU32, FcntlIn, IoctlIn, ListenIn,
+        PollIn, RegisterClientIn, SelectIn, SelectTimeval, ShutdownIn, SockOptIn, SocketIn,
+        SockfdFlagsIn, Timeval, cmds,
     },
     types::BsdConfig,
 };
@@ -71,11 +70,9 @@ pub(crate) fn register_client(
 
     // The reply is a CMIF `u64 pid` payload — no extra `{ ret; errno; }` prefix here
     // because cmd 0 / cmd 1 don't use the dispatch path that adds it.
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(RegisterClientError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(RegisterClientError::ParseResponse)?;
 
-    // SAFETY: resp.data points to at least size_of::<u64>() bytes.
-    let pid = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let pid = *resp.payload;
     Ok(pid)
 }
 
@@ -97,7 +94,7 @@ pub(crate) fn start_monitoring(
 
     ipc::send_sync_request(monitor_session).map_err(StartMonitoringError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(StartMonitoringError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(StartMonitoringError::ParseResponse)?;
     Ok(())
 }
 
@@ -125,37 +122,43 @@ unsafe fn read_service_response(
     buf: &IpcBuffer,
     has_extra_u32: bool,
 ) -> Result<ServiceOutcome, ServiceResponseFailure> {
-    let extra_size = if has_extra_u32 { size_of::<u32>() } else { 0 };
-    let resp = cmif::parse_response_bytes(buf, size_of::<CallResponse>() + extra_size)
-        .map_err(ServiceResponseFailure::Parse)?;
+    if has_extra_u32 {
+        let resp = cmif::parse_response::<&CallResponseExtraU32>(buf)
+            .map_err(ServiceResponseFailure::Parse)?;
+        let payload = resp.payload;
 
-    // SAFETY: parse_response_bytes guaranteed at least size_of::<CallResponse>()
-    // bytes are valid in resp.data.
-    let prefix = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<CallResponse>()) };
+        if payload.prefix.ret < 0 {
+            return Err(ServiceResponseFailure::Service {
+                ret: payload.prefix.ret,
+                errno: payload.prefix.errno,
+            });
+        }
 
-    if prefix.ret < 0 {
-        return Err(ServiceResponseFailure::Service {
-            ret: prefix.ret,
-            errno: prefix.errno,
-        });
-    }
-
-    let extra_u32 = if has_extra_u32 {
-        let extra_bytes = &resp.data[size_of::<CallResponse>()..];
-        // SAFETY: parse_response_bytes guarantees `extra_size` bytes are valid.
-        Some(unsafe { ptr::read_unaligned(extra_bytes.as_ptr().cast::<u32>()) })
+        Ok(ServiceOutcome {
+            ret: payload.prefix.ret,
+            extra_u32: Some(payload.extra),
+        })
     } else {
-        None
-    };
+        let resp =
+            cmif::parse_response::<&CallResponse>(buf).map_err(ServiceResponseFailure::Parse)?;
+        let prefix = resp.payload;
 
-    Ok(ServiceOutcome {
-        ret: prefix.ret,
-        extra_u32,
-    })
+        if prefix.ret < 0 {
+            return Err(ServiceResponseFailure::Service {
+                ret: prefix.ret,
+                errno: prefix.errno,
+            });
+        }
+
+        Ok(ServiceOutcome {
+            ret: prefix.ret,
+            extra_u32: None,
+        })
+    }
 }
 
 enum ServiceResponseFailure {
-    Parse(ParseRespBytesError),
+    Parse(ParseError),
     Service { ret: i32, errno: i32 },
 }
 
@@ -260,7 +263,7 @@ fn bsd_send_recv_no_buffer_in<E>(
     addr: &[u8],
     mk_build: fn(cmif::RequestLayoutError) -> E,
     mk_send: fn(SendSyncError) -> E,
-    mk_parse: fn(ParseRespBytesError) -> E,
+    mk_parse: fn(ParseError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<i32, E> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -294,7 +297,7 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
     addr_buf: &mut [u8],
     mk_build: fn(cmif::RequestLayoutError) -> E,
     mk_send: fn(SendSyncError) -> E,
-    mk_parse: fn(ParseRespBytesError) -> E,
+    mk_parse: fn(ParseError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<(i32, u32), E> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -910,7 +913,7 @@ pub enum RegisterClientError {
     SendRequest(#[source] SendSyncError),
     /// The CMIF response could not be parsed.
     #[error("failed to parse register_client response")]
-    ParseResponse(#[source] ParseRespBytesError),
+    ParseResponse(#[source] ParseError),
 }
 
 /// Error returned by [`start_monitoring`].
@@ -924,7 +927,7 @@ pub enum StartMonitoringError {
     SendRequest(#[source] SendSyncError),
     /// The CMIF response could not be parsed.
     #[error("failed to parse start_monitoring response")]
-    ParseResponse(#[source] ParseRespBytesError),
+    ParseResponse(#[source] ParseError),
 }
 
 macro_rules! define_per_command_error {
@@ -940,7 +943,7 @@ macro_rules! define_per_command_error {
             SendRequest(#[source] SendSyncError),
             /// Failed to parse the CMIF response.
             #[error($parse_msg)]
-            ParseResponse(#[source] ParseRespBytesError),
+            ParseResponse(#[source] ParseError),
             /// The service returned a POSIX-domain failure. `errno` is the libc
             /// errno; `ret` is the raw value returned (typically `-1`).
             #[error($svc_msg)]

@@ -39,7 +39,9 @@ extern crate alloc;
 extern crate nx_panic_handler;
 // Provides #[panic_handler]
 
+mod array_vec;
 pub mod cmif;
+mod cursor;
 pub mod hipc;
 pub mod ipc;
 pub mod service;
@@ -47,6 +49,7 @@ mod service_name;
 pub mod tipc;
 
 pub use self::{
+    cursor::{Cursor, ResponsePayload},
     service::{Domain, DomainObject, OverrideService, Session},
     service_name::ServiceName,
 };

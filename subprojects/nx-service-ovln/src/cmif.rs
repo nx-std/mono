@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the overlay notification service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle},
@@ -31,7 +29,7 @@ where
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchInError::ParseResponse)?;
 
     Ok(())
 }
@@ -46,10 +44,13 @@ pub enum DispatchInError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out<T: Copy>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutError> {
+fn dispatch_out<T>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutError>
+where
+    T: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -60,13 +61,9 @@ fn dispatch_out<T: Copy>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutE
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchOutError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<T>())
-        .map_err(DispatchOutError::ParseResponse)?;
+    let resp = cmif::parse_response::<&T>(&buf).map_err(DispatchOutError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<T>()` bytes.
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<T>()) };
-
-    Ok(value)
+    Ok(*resp.payload)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -79,7 +76,7 @@ pub enum DispatchOutError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Opens a receiver sub-object.
@@ -94,7 +91,7 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenReceiverError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenReceiverError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenReceiverError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.move_handles.first() else {
         return Err(OpenReceiverError::MissingHandle);
@@ -117,7 +114,7 @@ pub enum OpenReceiverError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected handle.
     #[error("missing receiver handle in response")]
     MissingHandle,
@@ -151,7 +148,7 @@ pub fn receiver_get_receive_event_handle(
     ipc::send_sync_request(&mut buf, session).map_err(GetReceiveEventHandleError::SendRequest)?;
 
     let resp =
-        cmif::parse_response_bytes(&buf, 0).map_err(GetReceiveEventHandleError::ParseResponse)?;
+        cmif::parse_response::<()>(&buf).map_err(GetReceiveEventHandleError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.copy_handles.first() else {
         return Err(GetReceiveEventHandleError::MissingHandle);
@@ -170,7 +167,7 @@ pub enum GetReceiveEventHandleError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected handle.
     #[error("missing event handle in response")]
     MissingHandle,
@@ -216,7 +213,7 @@ pub fn snd_open_sender(
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSenderError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSenderError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenSenderError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.move_handles.first() else {
         return Err(OpenSenderError::MissingHandle);
@@ -239,7 +236,7 @@ pub enum OpenSenderError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected handle.
     #[error("missing sender handle in response")]
     MissingHandle,

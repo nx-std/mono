@@ -5,7 +5,7 @@
 //! addrinfo wire format) are returned as a serialized byte count; decoding
 //! the wire format is the caller's responsibility.
 
-use core::{mem::size_of, ptr};
+use core::ptr;
 
 use nx_sf::{
     cmif,
@@ -75,11 +75,10 @@ pub fn get_host_by_name(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetHostByNameError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<GetHostByNameOut>())
+    let resp = cmif::parse_response::<&GetHostByNameOut>(&buf)
         .map_err(GetHostByNameError::ParseResponse)?;
 
-    // SAFETY: resp.data points to a GetHostByNameOut-sized payload.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<GetHostByNameOut>()) };
+    let out = *resp.payload;
 
     Ok(GetHostByNameResult {
         h_errno: out.h_errno,
@@ -99,7 +98,7 @@ pub enum GetHostByNameError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Result of `GetHostByAddrRequest` (cmd 3).
@@ -147,11 +146,10 @@ pub fn get_host_by_addr(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetHostByAddrError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<GetHostByAddrOut>())
+    let resp = cmif::parse_response::<&GetHostByAddrOut>(&buf)
         .map_err(GetHostByAddrError::ParseResponse)?;
 
-    // SAFETY: resp.data points to a GetHostByAddrOut-sized payload.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<GetHostByAddrOut>()) };
+    let out = *resp.payload;
 
     Ok(GetHostByAddrResult {
         h_errno: out.h_errno,
@@ -171,7 +169,7 @@ pub enum GetHostByAddrError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Writes the textual description of an `h_errno` value into `out_str`.
@@ -198,7 +196,7 @@ pub enum GetHostStringErrorError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Writes the textual description of a `getaddrinfo` error code into `out_str`.
@@ -225,7 +223,7 @@ pub enum GetGaiStringErrorError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Result of `GetAddrInfoRequest` (cmd 6).
@@ -283,11 +281,10 @@ pub fn get_addr_info(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetAddrInfoError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<GetAddrInfoOut>())
-        .map_err(GetAddrInfoError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&GetAddrInfoOut>(&buf).map_err(GetAddrInfoError::ParseResponse)?;
 
-    // SAFETY: resp.data points to a GetAddrInfoOut-sized payload.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<GetAddrInfoOut>()) };
+    let out = *resp.payload;
 
     Ok(GetAddrInfoResult {
         errno: out.errno,
@@ -307,7 +304,7 @@ pub enum GetAddrInfoError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Result of `GetNameInfoRequest` (cmd 7).
@@ -350,11 +347,10 @@ pub fn get_name_info(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetNameInfoError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<GetNameInfoOut>())
-        .map_err(GetNameInfoError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&GetNameInfoOut>(&buf).map_err(GetNameInfoError::ParseResponse)?;
 
-    // SAFETY: resp.data points to a GetNameInfoOut-sized payload.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<GetNameInfoOut>()) };
+    let out = *resp.payload;
 
     Ok(GetNameInfoResult {
         errno: out.errno,
@@ -373,7 +369,7 @@ pub enum GetNameInfoError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Allocates a fresh cancel-token from the service.
@@ -394,11 +390,9 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
 
     ipc::send_sync_request(&mut buf, session).map_err(GetCancelHandleError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(GetCancelHandleError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(GetCancelHandleError::ParseResponse)?;
 
-    // SAFETY: resp.data points to a u32 payload.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let raw = *resp.payload;
 
     Ok(CancelHandle::from_raw(raw))
 }
@@ -414,7 +408,7 @@ pub enum GetCancelHandleError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Cancels any pending resolver call tagged with `handle`.
@@ -437,7 +431,7 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
 
     ipc::send_sync_request(&mut buf, session).map_err(CancelError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(CancelError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(CancelError::ParseResponse)?;
 
     Ok(())
 }
@@ -453,7 +447,7 @@ pub enum CancelError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 #[inline]
@@ -475,7 +469,7 @@ fn ptr_or_null<T>(slice: Option<&[T]>) -> (*const u8, usize) {
 enum StringErrorError {
     BuildRequest(cmif::RequestLayoutError),
     SendRequest(ipc::SendSyncError),
-    ParseResponse(cmif::ParseRespBytesError),
+    ParseResponse(cmif::ParseError),
 }
 
 fn string_error_impl(
@@ -497,7 +491,7 @@ fn string_error_impl(
 
     ipc::send_sync_request(&mut buf, session).map_err(StringErrorError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(StringErrorError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(StringErrorError::ParseResponse)?;
 
     Ok(())
 }

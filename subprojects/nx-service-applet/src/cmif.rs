@@ -5,7 +5,7 @@
 use core::mem::size_of;
 
 use nx_sf::{
-    cmif::ParseRespBytesError,
+    cmif::ParseError,
     service::{BufferAttr, ConvertToDomainError, DispatchError, Domain, DomainObject},
 };
 use nx_svc::{process::Handle as ProcessHandle, thread};
@@ -120,7 +120,7 @@ pub fn open_proxy(
 
         match dispatch.send(&mut buf) {
             Ok(r) => break r,
-            Err(DispatchError::ParseResponse(ParseRespBytesError::ServiceError(AM_BUSY_ERROR))) => {
+            Err(DispatchError::ParseResponse(ParseError::ServiceError(AM_BUSY_ERROR))) => {
                 attempts += 1;
                 if attempts >= AM_BUSY_DEFAULT_MAX_RETRIES {
                     return Err(OpenProxyError::Timeout);

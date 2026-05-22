@@ -78,7 +78,7 @@ impl BatteryVoltageState {
 }
 
 /// Battery charge info fields (pre-17.0.0 wire layout).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct BatteryChargeInfoFieldsLegacy {
     pub input_current_limit: u32,
@@ -107,7 +107,7 @@ pub struct BatteryChargeInfoFieldsLegacy {
 const_assert_eq!(size_of::<BatteryChargeInfoFieldsLegacy>(), 0x40);
 
 /// Battery charge info fields (17.0.0+ wire layout).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct BatteryChargeInfoFields {
     pub input_current_limit: u32,

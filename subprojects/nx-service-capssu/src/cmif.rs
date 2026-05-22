@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the screenshot upload service.
 
-use core::{mem::size_of, ptr};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -39,7 +39,7 @@ pub fn set_shim_library_version(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetShimVersionError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetShimVersionError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetShimVersionError::ParseResponse)?;
 
     Ok(())
 }
@@ -72,13 +72,10 @@ pub fn save_screen_shot_ex0(
 
     ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx0Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<ApplicationAlbumEntry>())
+    let resp = cmif::parse_response::<&ApplicationAlbumEntry>(&buf)
         .map_err(SaveScreenShotEx0Error::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
-    let entry = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ApplicationAlbumEntry>()) };
-
-    Ok(entry)
+    Ok(*resp.payload)
 }
 
 /// Saves a screenshot with attributes and application data. [7.0.0+]
@@ -115,13 +112,10 @@ pub fn save_screen_shot_ex1(
 
     ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx1Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<ApplicationAlbumEntry>())
+    let resp = cmif::parse_response::<&ApplicationAlbumEntry>(&buf)
         .map_err(SaveScreenShotEx1Error::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
-    let entry = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ApplicationAlbumEntry>()) };
-
-    Ok(entry)
+    Ok(*resp.payload)
 }
 
 /// Saves a screenshot with attributes and user IDs. [6.0.0+]
@@ -157,13 +151,10 @@ pub fn save_screen_shot_ex2(
 
     ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx2Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<ApplicationAlbumEntry>())
+    let resp = cmif::parse_response::<&ApplicationAlbumEntry>(&buf)
         .map_err(SaveScreenShotEx2Error::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<ApplicationAlbumEntry>()` bytes.
-    let entry = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<ApplicationAlbumEntry>()) };
-
-    Ok(entry)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`set_shim_library_version`].
@@ -177,7 +168,7 @@ pub enum SetShimVersionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`save_screen_shot_ex0`].
@@ -191,7 +182,7 @@ pub enum SaveScreenShotEx0Error {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`save_screen_shot_ex1`].
@@ -205,7 +196,7 @@ pub enum SaveScreenShotEx1Error {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`save_screen_shot_ex2`].
@@ -219,5 +210,5 @@ pub enum SaveScreenShotEx2Error {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

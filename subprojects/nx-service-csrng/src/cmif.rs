@@ -23,7 +23,7 @@ pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), Ge
 
     ipc::send_sync_request(&mut buf, session).map_err(GetRandomBytesError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(GetRandomBytesError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(GetRandomBytesError::ParseResponse)?;
 
     Ok(())
 }
@@ -39,5 +39,5 @@ pub enum GetRandomBytesError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

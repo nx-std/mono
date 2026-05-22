@@ -42,7 +42,7 @@ pub fn register_process(
         .map_err(RegisterProcessError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(RegisterProcessError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RegisterProcessError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RegisterProcessError::ParseResponse)?;
 
     Ok(())
 }
@@ -58,7 +58,7 @@ pub enum RegisterProcessError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Unregisters a process from the Service Manager using CMIF protocol.
@@ -78,7 +78,7 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
         .map_err(UnregisterProcessError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(UnregisterProcessError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(UnregisterProcessError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(UnregisterProcessError::ParseResponse)?;
 
     Ok(())
 }
@@ -94,5 +94,5 @@ pub enum UnregisterProcessError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the nim service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -27,7 +25,7 @@ pub fn destroy_system_update_task(
 
     ipc::send_sync_request(&mut buf, session).map_err(DestroySystemUpdateTaskError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DestroySystemUpdateTaskError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DestroySystemUpdateTaskError::ParseResponse)?;
 
     Ok(())
 }
@@ -57,11 +55,10 @@ pub fn list_system_update_task(
 
     ipc::send_sync_request(&mut buf, session).map_err(ListSystemUpdateTaskError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(ListSystemUpdateTaskError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&i32>(&buf).map_err(ListSystemUpdateTaskError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<i32>()` bytes.
-    let count = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
+    let count = *resp.payload;
 
     Ok(count)
 }
@@ -77,7 +74,7 @@ pub enum DestroySystemUpdateTaskError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`list_system_update_task`].
@@ -91,5 +88,5 @@ pub enum ListSystemUpdateTaskError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

@@ -33,7 +33,7 @@ pub enum PlServiceType {
 }
 
 /// Output from [`get_shared_font`](crate::PlService::get_shared_font).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct GetSharedFontOut {
     /// Whether fonts have finished loading (non-zero = loaded).

@@ -34,7 +34,7 @@ pub fn get_service_handle(
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let resp = tipc::parse_response(&buf, 0).map_err(GetServiceError::ParseResponse)?;
+    let resp = tipc::parse_response::<()>(&buf).map_err(GetServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetServiceError::MissingHandle);
@@ -98,7 +98,7 @@ pub fn register_service(
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let resp = tipc::parse_response(&buf, 0).map_err(RegisterServiceError::ParseResponse)?;
+    let resp = tipc::parse_response::<()>(&buf).map_err(RegisterServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(RegisterServiceError::MissingHandle);
@@ -147,7 +147,7 @@ pub fn unregister_service(
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    tipc::parse_response(&buf, 0).map_err(UnregisterServiceError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(UnregisterServiceError::ParseResponse)?;
 
     Ok(())
 }
@@ -185,7 +185,7 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    tipc::parse_response(&buf, 0).map_err(DetachClientError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(DetachClientError::ParseResponse)?;
 
     Ok(())
 }
@@ -224,7 +224,7 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    tipc::parse_response(&buf, 0).map_err(RegisterClientError::ParseResponse)?;
+    tipc::parse_response::<()>(&buf).map_err(RegisterClientError::ParseResponse)?;
 
     Ok(())
 }

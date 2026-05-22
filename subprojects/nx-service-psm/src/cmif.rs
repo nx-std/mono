@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the power supply monitor service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -23,7 +21,7 @@ fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoI
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchNoIoError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchNoIoError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchNoIoError::ParseResponse)?;
 
     Ok(())
 }
@@ -36,7 +34,7 @@ pub enum DispatchNoIoError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchOutU32Error> {
@@ -50,13 +48,9 @@ fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispatch
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchOutU32Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(DispatchOutU32Error::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(DispatchOutU32Error::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u32.
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-
-    Ok(value)
+    Ok(*resp.payload)
 }
 
 /// Error returned by out-u32 dispatch operations.
@@ -67,7 +61,7 @@ pub enum DispatchOutU32Error {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_out_f64(session: SessionHandle, cmd_id: u32) -> Result<f64, DispatchOutF64Error> {
@@ -81,13 +75,9 @@ fn dispatch_out_f64(session: SessionHandle, cmd_id: u32) -> Result<f64, Dispatch
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchOutF64Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<f64>())
-        .map_err(DispatchOutF64Error::ParseResponse)?;
+    let resp = cmif::parse_response::<&f64>(&buf).map_err(DispatchOutF64Error::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for f64.
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f64>()) };
-
-    Ok(value)
+    Ok(*resp.payload)
 }
 
 /// Error returned by out-f64 dispatch operations.
@@ -98,7 +88,7 @@ pub enum DispatchOutF64Error {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, DispatchOutBoolError> {
@@ -112,13 +102,9 @@ fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, Dispat
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchOutBoolError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(DispatchOutBoolError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u8>(&buf).map_err(DispatchOutBoolError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u8.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(raw & 1 != 0)
+    Ok(*resp.payload & 1 != 0)
 }
 
 /// Error returned by out-bool dispatch operations.
@@ -129,7 +115,7 @@ pub enum DispatchOutBoolError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_in_bool(
@@ -150,7 +136,7 @@ fn dispatch_in_bool(
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInBoolError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DispatchInBoolError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DispatchInBoolError::ParseResponse)?;
 
     Ok(())
 }
@@ -163,7 +149,7 @@ pub enum DispatchInBoolError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_event(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchEventError> {
@@ -177,7 +163,7 @@ fn dispatch_event(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchEv
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchEventError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(DispatchEventError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(DispatchEventError::ParseResponse)?;
 
     if resp.copy_handles.is_empty() {
         return Err(DispatchEventError::MissingHandle);
@@ -194,15 +180,15 @@ pub enum DispatchEventError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("response did not contain expected copy handle")]
     MissingHandle,
 }
 
-fn dispatch_out_struct<T: Copy>(
-    session: SessionHandle,
-    cmd_id: u32,
-) -> Result<T, DispatchOutStructError> {
+fn dispatch_out_struct<T>(session: SessionHandle, cmd_id: u32) -> Result<T, DispatchOutStructError>
+where
+    T: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -213,13 +199,9 @@ fn dispatch_out_struct<T: Copy>(
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchOutStructError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<T>())
-        .map_err(DispatchOutStructError::ParseResponse)?;
+    let resp = cmif::parse_response::<&T>(&buf).map_err(DispatchOutStructError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for T.
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<T>()) };
-
-    Ok(value)
+    Ok(*resp.payload)
 }
 
 /// Error returned by out-struct dispatch operations.
@@ -230,7 +212,7 @@ pub enum DispatchOutStructError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_open_session(session: SessionHandle) -> Result<SessionHandle, OpenSessionError> {
@@ -244,7 +226,7 @@ fn dispatch_open_session(session: SessionHandle) -> Result<SessionHandle, OpenSe
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
     let raw_handle = resp
         .move_handles
@@ -264,7 +246,7 @@ pub enum OpenSessionError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("response did not contain expected move handle")]
     MissingHandle,
 }

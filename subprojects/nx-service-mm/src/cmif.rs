@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the multimedia service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -51,12 +49,8 @@ pub fn request_initialize(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestInitializeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(RequestInitializeError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let id = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestInitializeError::ParseResponse)?;
+    let id = *resp.payload;
 
     Ok(id)
 }
@@ -69,7 +63,7 @@ pub enum RequestInitializeError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Initialises a multimedia request (legacy, pre-2.0.0).
@@ -98,12 +92,8 @@ pub fn request_initialize_legacy(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestInitializeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(RequestInitializeError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let id = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestInitializeError::ParseResponse)?;
+    let id = *resp.payload;
 
     Ok(id)
 }
@@ -125,7 +115,7 @@ pub fn request_finalize(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestFinalizeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RequestFinalizeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RequestFinalizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -138,7 +128,7 @@ pub enum RequestFinalizeError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Finalises a multimedia request (legacy, pre-2.0.0). Keyed by module ID.
@@ -159,7 +149,7 @@ pub fn request_finalize_legacy(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestFinalizeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RequestFinalizeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RequestFinalizeError::ParseResponse)?;
 
     Ok(())
 }
@@ -188,7 +178,7 @@ pub fn request_set_and_wait(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestSetAndWaitError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RequestSetAndWaitError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RequestSetAndWaitError::ParseResponse)?;
 
     Ok(())
 }
@@ -201,7 +191,7 @@ pub enum RequestSetAndWaitError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Sets the frequency and waits (legacy, pre-2.0.0). Keyed by module ID.
@@ -228,7 +218,7 @@ pub fn request_set_and_wait_legacy(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestSetAndWaitError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(RequestSetAndWaitError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(RequestSetAndWaitError::ParseResponse)?;
 
     Ok(())
 }
@@ -247,12 +237,8 @@ pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, Reque
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(RequestGetError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let freq_hz = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestGetError::ParseResponse)?;
+    let freq_hz = *resp.payload;
 
     Ok(freq_hz)
 }
@@ -265,7 +251,7 @@ pub enum RequestGetError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Gets the current frequency in Hz (legacy, pre-2.0.0). Keyed by module ID.
@@ -286,12 +272,8 @@ pub fn request_get_legacy(
 
     ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(RequestGetError::ParseResponse)?;
-
-    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes per the size
-    // argument passed to `parse_response_bytes`.
-    let freq_hz = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestGetError::ParseResponse)?;
+    let freq_hz = *resp.payload;
 
     Ok(freq_hz)
 }

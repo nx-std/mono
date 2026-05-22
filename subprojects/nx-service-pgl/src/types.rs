@@ -27,7 +27,7 @@ pub enum SnapShotDumpType {
 
 /// Content meta information returned by `get_host_content_meta_info`.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 pub struct ContentMetaInfo {
     pub id: u64,
     pub version: u32,
@@ -50,20 +50,36 @@ pub struct NcmProgramLocation {
 const_assert_eq!(size_of::<NcmProgramLocation>(), 0x10);
 
 /// Process event type returned by `get_process_event_info`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum ProcessEvent {
-    None = 0,
-    Exit = 1,
-    Start = 2,
-    Crash = 3,
-    DebugStart = 4,
-    DebugBreak = 5,
+///
+/// Modeled as a newtype around `u32` rather than a `#[repr(u32)]` enum so
+/// the wire bytes can be zero-copy-parsed without UB risk on an unknown
+/// discriminant: any `u32` is a valid bit-pattern; callers compare against
+/// the associated constants below to discriminate.
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+pub struct ProcessEvent(pub u32);
+
+impl ProcessEvent {
+    pub const NONE: Self = Self(0);
+    pub const EXIT: Self = Self(1);
+    pub const START: Self = Self(2);
+    pub const CRASH: Self = Self(3);
+    pub const DEBUG_START: Self = Self(4);
+    pub const DEBUG_BREAK: Self = Self(5);
 }
 
 /// Process event info returned by the event observer.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 pub struct ProcessEventInfo {
     pub event: ProcessEvent,
     pub process_id: u64,

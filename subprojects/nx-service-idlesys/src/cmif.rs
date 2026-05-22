@@ -20,7 +20,7 @@ pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsA
 
     ipc::send_sync_request(&mut buf, session).map_err(ReportUserIsActiveError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ReportUserIsActiveError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ReportUserIsActiveError::ParseResponse)?;
 
     Ok(())
 }
@@ -36,5 +36,5 @@ pub enum ReportUserIsActiveError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

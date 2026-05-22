@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the operation mode manager service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -24,13 +22,9 @@ pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationMode
 
     ipc::send_sync_request(&mut buf, session).map_err(GetOperationModeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(GetOperationModeError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u8>(&buf).map_err(GetOperationModeError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<u8>()` bytes.
-    let mode = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(mode)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`get_operation_mode`].
@@ -44,7 +38,7 @@ pub enum GetOperationModeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Sets the operation mode policy (3.0.0+).
@@ -64,7 +58,7 @@ pub fn set_operation_mode_policy(
 
     ipc::send_sync_request(&mut buf, session).map_err(SetOperationModePolicyError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetOperationModePolicyError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetOperationModePolicyError::ParseResponse)?;
 
     Ok(())
 }
@@ -80,7 +74,7 @@ pub enum SetOperationModePolicyError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Gets the default display resolution (3.0.0+).
@@ -100,17 +94,10 @@ pub fn get_default_display_resolution(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetDefaultDisplayResolutionError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
+    let resp = cmif::parse_response::<&[i32; 2]>(&buf)
         .map_err(GetDefaultDisplayResolutionError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<[i32; 2]>()` bytes.
-    let (width, height) = unsafe {
-        let data_ptr = resp.data.as_ptr().cast::<i32>();
-        (
-            ptr::read_unaligned(data_ptr),
-            ptr::read_unaligned(data_ptr.add(1)),
-        )
-    };
+    let [width, height] = *resp.payload;
 
     Ok((width, height))
 }
@@ -126,5 +113,5 @@ pub enum GetDefaultDisplayResolutionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

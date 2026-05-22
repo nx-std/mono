@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the temperature measurement service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -28,11 +26,10 @@ pub fn get_temperature_range(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureRangeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
-        .map_err(GetTemperatureRangeError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&[i32; 2]>(&buf).map_err(GetTemperatureRangeError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for two i32.
-    let data = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<[i32; 2]>()) };
+    let data = *resp.payload;
 
     Ok((data[0], data[1]))
 }
@@ -51,13 +48,9 @@ pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetT
 
     ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(GetTemperatureError::ParseResponse)?;
+    let resp = cmif::parse_response::<&i32>(&buf).map_err(GetTemperatureError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for i32.
-    let temp = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
-
-    Ok(temp)
+    Ok(*resp.payload)
 }
 
 /// Gets the temperature for a location, in millicelsius.
@@ -77,13 +70,10 @@ pub fn get_temperature_milli_c(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureMilliCError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(GetTemperatureMilliCError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&i32>(&buf).map_err(GetTemperatureMilliCError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for i32.
-    let temp = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
-
-    Ok(temp)
+    Ok(*resp.payload)
 }
 
 /// Opens a temperature session for a device code.
@@ -105,7 +95,7 @@ pub fn open_session(
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(OpenSessionError::MissingHandle);
@@ -127,13 +117,10 @@ pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGet
 
     ipc::send_sync_request(&mut buf, session).map_err(SessionGetTemperatureError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
-        .map_err(SessionGetTemperatureError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&f32>(&buf).map_err(SessionGetTemperatureError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for f32.
-    let temp = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
-
-    Ok(temp)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`get_temperature_range`].
@@ -147,7 +134,7 @@ pub enum GetTemperatureRangeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_temperature`].
@@ -161,7 +148,7 @@ pub enum GetTemperatureError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_temperature_milli_c`].
@@ -175,7 +162,7 @@ pub enum GetTemperatureMilliCError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`open_session`].
@@ -189,7 +176,7 @@ pub enum OpenSessionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected move handle.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -206,5 +193,5 @@ pub enum SessionGetTemperatureError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

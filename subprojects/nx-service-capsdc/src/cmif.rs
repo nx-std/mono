@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the JPEG decoder service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     hipc::BufferMode,
@@ -45,7 +43,7 @@ pub fn decode_jpeg(
 
     ipc::send_sync_request(&mut buf, session).map_err(DecodeJpegError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DecodeJpegError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DecodeJpegError::ParseResponse)?;
 
     Ok(())
 }
@@ -78,11 +76,9 @@ pub fn shrink_jpeg(
 
     ipc::send_sync_request(&mut buf, session).map_err(ShrinkJpegError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(ShrinkJpegError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(ShrinkJpegError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.
-    let result_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let result_size = *resp.payload;
 
     Ok(result_size)
 }
@@ -118,11 +114,9 @@ pub fn shrink_jpeg_ex(
 
     ipc::send_sync_request(&mut buf, session).map_err(ShrinkJpegExError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(ShrinkJpegExError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(ShrinkJpegExError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<u64>()` bytes.
-    let result_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let result_size = *resp.payload;
 
     Ok(result_size)
 }
@@ -138,7 +132,7 @@ pub enum DecodeJpegError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`shrink_jpeg`].
@@ -152,7 +146,7 @@ pub enum ShrinkJpegError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`shrink_jpeg_ex`].
@@ -166,5 +160,5 @@ pub enum ShrinkJpegExError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

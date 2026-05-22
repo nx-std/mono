@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the temperature control service.
 
-use core::{mem::size_of, ptr};
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -21,7 +19,7 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
 
     ipc::send_sync_request(&mut buf, session).map_err(EnableFanControlError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(EnableFanControlError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(EnableFanControlError::ParseResponse)?;
 
     Ok(())
 }
@@ -38,7 +36,7 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
 
     ipc::send_sync_request(&mut buf, session).map_err(DisableFanControlError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DisableFanControlError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DisableFanControlError::ParseResponse)?;
 
     Ok(())
 }
@@ -55,13 +53,10 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
 
     ipc::send_sync_request(&mut buf, session).map_err(IsFanControlEnabledError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(IsFanControlEnabledError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&u8>(&buf).map_err(IsFanControlEnabledError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u8.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(raw & 1 != 0)
+    Ok(*resp.payload & 1 != 0)
 }
 
 /// Gets the skin temperature in milli-degrees Celsius.
@@ -79,13 +74,10 @@ pub fn get_skin_temperature_milli_c(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetSkinTemperatureMilliCError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(GetSkinTemperatureMilliCError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&i32>(&buf).map_err(GetSkinTemperatureMilliCError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for i32.
-    let temp = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
-
-    Ok(temp)
+    Ok(*resp.payload)
 }
 
 /// Error returned by [`enable_fan_control`].
@@ -99,7 +91,7 @@ pub enum EnableFanControlError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`disable_fan_control`].
@@ -113,7 +105,7 @@ pub enum DisableFanControlError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`is_fan_control_enabled`].
@@ -127,7 +119,7 @@ pub enum IsFanControlEnabledError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_skin_temperature_milli_c`].
@@ -141,5 +133,5 @@ pub enum GetSkinTemperatureMilliCError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

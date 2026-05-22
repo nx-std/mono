@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the screenshot control service.
 
-use core::ptr;
-
 use nx_service_vi::ViLayerStack;
 use nx_sf::{
     cmif,
@@ -61,7 +59,7 @@ pub fn capture_raw_image_with_timeout(
 
     ipc::send_sync_request(&mut buf, session).map_err(CaptureRawImageError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(CaptureRawImageError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(CaptureRawImageError::ParseResponse)?;
 
     Ok(())
 }
@@ -108,11 +106,10 @@ pub fn open_raw_screen_shot_read_stream(
 
     ipc::send_sync_request(&mut buf, session).map_err(OpenReadStreamError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<OpenReadStreamOut>())
+    let resp = cmif::parse_response::<&OpenReadStreamOut>(&buf)
         .map_err(OpenReadStreamError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<OpenReadStreamOut>()` bytes.
-    let out = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<OpenReadStreamOut>()) };
+    let out = *resp.payload;
 
     Ok(ReadStreamInfo {
         size: out.size,
@@ -135,7 +132,7 @@ pub fn close_raw_screen_shot_read_stream(
 
     ipc::send_sync_request(&mut buf, session).map_err(CloseReadStreamError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(CloseReadStreamError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(CloseReadStreamError::ParseResponse)?;
 
     Ok(())
 }
@@ -161,11 +158,9 @@ pub fn read_raw_screen_shot_read_stream(
 
     ipc::send_sync_request(&mut buf, session).map_err(ReadStreamError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(ReadStreamError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(ReadStreamError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<u64>()` bytes.
-    let bytes_read = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let bytes_read = *resp.payload;
 
     Ok(bytes_read)
 }
@@ -206,11 +201,9 @@ pub fn capture_jpeg_screen_shot(
 
     ipc::send_sync_request(&mut buf, session).map_err(CaptureJpegError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(CaptureJpegError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(CaptureJpegError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is exactly `size_of::<u64>()` bytes.
-    let jpeg_size = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
+    let jpeg_size = *resp.payload;
 
     Ok(jpeg_size)
 }
@@ -226,7 +219,7 @@ pub enum CaptureRawImageError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`open_raw_screen_shot_read_stream`].
@@ -240,7 +233,7 @@ pub enum OpenReadStreamError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`close_raw_screen_shot_read_stream`].
@@ -254,7 +247,7 @@ pub enum CloseReadStreamError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`read_raw_screen_shot_read_stream`].
@@ -268,7 +261,7 @@ pub enum ReadStreamError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`capture_jpeg_screen_shot`].
@@ -282,5 +275,5 @@ pub enum CaptureJpegError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

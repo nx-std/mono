@@ -3,8 +3,6 @@
 //! This module implements Time commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -52,7 +50,7 @@ pub fn get_standard_steady_clock(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSteadyClockError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSteadyClockError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetSteadyClockError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetSteadyClockError::MissingHandle);
@@ -78,8 +76,7 @@ pub fn get_time_zone_service(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetTimeZoneServiceError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, 0).map_err(GetTimeZoneServiceError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetTimeZoneServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetTimeZoneServiceError::MissingHandle);
@@ -106,7 +103,7 @@ pub fn get_shared_memory_native_handle(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSharedMemoryError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSharedMemoryError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryError::ParseResponse)?;
 
     let Some(&handle) = resp.copy_handles.first() else {
         return Err(GetSharedMemoryError::MissingHandle);
@@ -130,13 +127,9 @@ pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeErr
 
     ipc::send_sync_request(&mut buf, session).map_err(GetCurrentTimeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetCurrentTimeError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(GetCurrentTimeError::ParseResponse)?;
 
-    // Read u64 timestamp from response data
-    // SAFETY: resp.data contains at least 8 bytes for u64.
-    let timestamp = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
-
-    Ok(timestamp)
+    Ok(*resp.payload)
 }
 
 /// Converts a POSIX timestamp to calendar time with the device's timezone rule.
@@ -158,19 +151,16 @@ pub fn to_calendar_time_with_my_rule(
 
     ipc::send_sync_request(&mut buf, session).map_err(ToCalendarTimeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(ToCalendarTimeError::ParseResponse)?;
-
-    // Read output structure
-    // SAFETY: resp.data contains TimeCalendarTime + TimeCalendarAdditionalInfo.
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
     struct Output {
         caltime: TimeCalendarTime,
         info: TimeCalendarAdditionalInfo,
     }
 
-    let output = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<Output>()) };
+    let resp = cmif::parse_response::<&Output>(&buf).map_err(ToCalendarTimeError::ParseResponse)?;
 
-    Ok((output.caltime, output.info))
+    Ok((resp.payload.caltime, resp.payload.info))
 }
 
 /// Helper function to get a clock session (used by user and network system clocks).
@@ -188,7 +178,7 @@ fn get_clock_session(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetSystemClockError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 0).map_err(GetSystemClockError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetSystemClockError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetSystemClockError::MissingHandle);
@@ -209,7 +199,7 @@ pub enum GetSystemClockError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -226,7 +216,7 @@ pub enum GetSteadyClockError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -243,7 +233,7 @@ pub enum GetTimeZoneServiceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -260,7 +250,7 @@ pub enum GetSharedMemoryError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing shared memory handle in response.
     #[error("missing shared memory handle in response")]
     MissingHandle,
@@ -277,7 +267,7 @@ pub enum GetCurrentTimeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Network clock is not available.
     #[error("network clock is not available")]
     NetworkClockUnavailable,
@@ -300,5 +290,5 @@ pub enum ToCalendarTimeError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

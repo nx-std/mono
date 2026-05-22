@@ -3,8 +3,6 @@
 //! The root service is used to get IApplicationDisplayService and
 //! fatal display commands (16.0.0+ Manager only).
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
     ipc::{self, Handle as SessionHandle},
@@ -44,8 +42,7 @@ pub fn get_display_service(
 
     ipc::send_sync_request(&mut buf, session).map_err(GetDisplayServiceError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, 0).map_err(GetDisplayServiceError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(GetDisplayServiceError::ParseResponse)?;
 
     // Sub-service is returned via move handle
     let Some(&handle) = resp.move_handles.first() else {
@@ -74,7 +71,7 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(PrepareFatalError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(PrepareFatalError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(PrepareFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -93,7 +90,7 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
 
     ipc::send_sync_request(&mut buf, session).map_err(ShowFatalError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(ShowFatalError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(ShowFatalError::ParseResponse)?;
 
     Ok(())
 }
@@ -143,7 +140,7 @@ pub fn draw_fatal_rectangle(
 
     ipc::send_sync_request(&mut buf, session).map_err(DrawFatalRectangleError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(DrawFatalRectangleError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(DrawFatalRectangleError::ParseResponse)?;
 
     Ok(())
 }
@@ -216,11 +213,10 @@ pub fn draw_fatal_text32(
 
     ipc::send_sync_request(&mut buf, session).map_err(DrawFatalText32Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, 4).map_err(DrawFatalText32Error::ParseResponse)?;
+    let resp = cmif::parse_response::<&i32>(&buf).map_err(DrawFatalText32Error::ParseResponse)?;
 
     // Output: advance (i32)
-    // SAFETY: `resp.data` is exactly 4 bytes; reading it as i32 is sound.
-    let advance = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
+    let advance = *resp.payload;
 
     Ok(advance)
 }
@@ -236,7 +232,7 @@ pub enum GetDisplayServiceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Missing handle in response.
     #[error("missing handle in response")]
     MissingHandle,
@@ -253,7 +249,7 @@ pub enum PrepareFatalError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`show_fatal`].
@@ -267,7 +263,7 @@ pub enum ShowFatalError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`draw_fatal_rectangle`].
@@ -281,7 +277,7 @@ pub enum DrawFatalRectangleError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error from [`draw_fatal_text32`].
@@ -295,5 +291,5 @@ pub enum DrawFatalText32Error {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

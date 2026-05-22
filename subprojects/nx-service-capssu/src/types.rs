@@ -60,7 +60,7 @@ impl ScreenShotAttribute {
 }
 
 /// Opaque application album entry returned by save operations.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ApplicationAlbumEntry {
     pub data: [u8; 0x20],

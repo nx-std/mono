@@ -52,7 +52,7 @@ pub enum GetServiceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
@@ -117,7 +117,7 @@ pub enum RegisterServiceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
@@ -159,7 +159,7 @@ pub enum UnregisterServiceError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Detaches the client from the Service Manager using CMIF protocol.
@@ -196,7 +196,7 @@ pub enum DetachClientError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Registers the client with the Service Manager using CMIF protocol.
@@ -233,5 +233,5 @@ pub enum RegisterClientError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }

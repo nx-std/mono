@@ -37,13 +37,11 @@ use core::mem::{size_of, size_of_val};
 
 use nx_svc::raw::Handle as RawHandle;
 
-use super::{
-    array_vec::ArrayVec,
-    wire::{
-        BufferDescriptor, Header, MessageType, RECV_LIST_WIRE_NONE, RECV_LIST_WIRE_SINGLE_BUFFER,
-        RECV_LIST_WIRE_TO_MESSAGE_BUFFER, RecvListEntry, SpecialHeader, StaticDescriptor,
-    },
+use super::wire::{
+    BufferDescriptor, Header, MessageType, RECV_LIST_WIRE_NONE, RECV_LIST_WIRE_SINGLE_BUFFER,
+    RECV_LIST_WIRE_TO_MESSAGE_BUFFER, RecvListEntry, SpecialHeader, StaticDescriptor,
 };
+use crate::array_vec::ArrayVec;
 
 /// Maximum descriptors of any single kind that fit in an HIPC header
 /// (each `num_*` field is 4 bits wide).

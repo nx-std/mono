@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the IAudioDevice service.
 
-use core::{mem::size_of, ptr};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -30,7 +30,7 @@ pub fn get_audio_device_service(
     ipc::send_sync_request(&mut buf, session).map_err(GetAudioDeviceServiceError::SendRequest)?;
 
     let resp =
-        cmif::parse_response_bytes(&buf, 0).map_err(GetAudioDeviceServiceError::ParseResponse)?;
+        cmif::parse_response::<()>(&buf).map_err(GetAudioDeviceServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
         return Err(GetAudioDeviceServiceError::MissingHandle);
@@ -48,7 +48,7 @@ pub enum GetAudioDeviceServiceError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("missing session handle in response")]
     MissingHandle,
 }
@@ -75,11 +75,10 @@ pub fn list_audio_device_name(
 
     ipc::send_sync_request(&mut buf, session).map_err(ListAudioDeviceNameError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(ListAudioDeviceNameError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&i32>(&buf).map_err(ListAudioDeviceNameError::ParseResponse)?;
 
-    // SAFETY: resp.data points to at least `size_of::<i32>()` bytes.
-    let total = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
+    let total = *resp.payload;
 
     Ok(total)
 }
@@ -107,11 +106,10 @@ pub fn list_audio_device_name_legacy(
 
     ipc::send_sync_request(&mut buf, session).map_err(ListAudioDeviceNameError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
-        .map_err(ListAudioDeviceNameError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&i32>(&buf).map_err(ListAudioDeviceNameError::ParseResponse)?;
 
-    // SAFETY: resp.data points to at least `size_of::<i32>()` bytes.
-    let total = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
+    let total = *resp.payload;
 
     Ok(total)
 }
@@ -124,7 +122,7 @@ pub enum ListAudioDeviceNameError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Sets the output volume for a named audio device (3.0.0+, auto-select buffers).
@@ -151,7 +149,7 @@ pub fn set_audio_device_output_volume(
     ipc::send_sync_request(&mut buf, session)
         .map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -180,7 +178,7 @@ pub fn set_audio_device_output_volume_legacy(
     ipc::send_sync_request(&mut buf, session)
         .map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
 
     Ok(())
 }
@@ -193,7 +191,7 @@ pub enum SetAudioDeviceOutputVolumeError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Gets the output volume for a named audio device (3.0.0+, auto-select buffers).
@@ -218,11 +216,10 @@ pub fn get_audio_device_output_volume(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
+    let resp = cmif::parse_response::<&f32>(&buf)
         .map_err(GetAudioDeviceOutputVolumeError::ParseResponse)?;
 
-    // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
-    let volume = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
+    let volume = *resp.payload;
 
     Ok(volume)
 }
@@ -249,11 +246,10 @@ pub fn get_audio_device_output_volume_legacy(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
+    let resp = cmif::parse_response::<&f32>(&buf)
         .map_err(GetAudioDeviceOutputVolumeError::ParseResponse)?;
 
-    // SAFETY: resp.data points to at least `size_of::<f32>()` bytes.
-    let volume = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<f32>()) };
+    let volume = *resp.payload;
 
     Ok(volume)
 }
@@ -266,7 +262,7 @@ pub enum GetAudioDeviceOutputVolumeError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Gets the active audio device name (3.0.0+, auto-select buffers).
@@ -291,7 +287,7 @@ pub fn get_active_audio_device_name(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetActiveAudioDeviceNameError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
 
     Ok(())
 }
@@ -318,7 +314,7 @@ pub fn get_active_audio_device_name_legacy(
     ipc::send_sync_request(&mut buf, session)
         .map_err(GetActiveAudioDeviceNameError::SendRequest)?;
 
-    cmif::parse_response_bytes(&buf, 0).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
+    cmif::parse_response::<()>(&buf).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
 
     Ok(())
 }
@@ -331,5 +327,5 @@ pub enum GetActiveAudioDeviceNameError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }

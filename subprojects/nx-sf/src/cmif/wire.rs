@@ -9,6 +9,16 @@ use zerocopy::{IntoBytes, KnownLayout};
 
 use crate::hipc;
 
+/// Total CMIF pad budget within the raw-data section, in bytes.
+///
+/// The first CMIF header (`DomainInHeader` if present, otherwise `InHeader`)
+/// must land on a 16-byte boundary measured from the TLS message-buffer base.
+/// HIPC's data-words region is only u32-aligned, so the body skips
+/// `region_ptr.align_offset(0x10)` bytes — in `{0, 4, 8, 12}` — as the
+/// leading pad. The remaining `0x10 - leading_pad` bytes appear after the
+/// CMIF content (before the out-pointer-size table) as trailing pad.
+pub const CMIF_HEADER_ALIGN: usize = 0x10;
+
 /// Magic number for CMIF input headers ("SFCI" - Service Framework Command Input).
 pub const IN_HEADER_MAGIC: u32 = 0x49434653;
 

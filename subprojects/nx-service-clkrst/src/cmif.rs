@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the clkrst service.
 
-use core::{
-    mem::{size_of, size_of_val},
-    ptr,
-};
+use core::mem::size_of_val;
 
 use nx_sf::{
     cmif,
@@ -21,6 +18,15 @@ use crate::{
 struct OpenSessionIn {
     module_id: u32,
     unk: u32,
+}
+
+/// Inline response payload for
+/// [`GetPossibleClockRates`](crate::proto::GET_POSSIBLE_CLOCK_RATES).
+#[repr(C)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
+struct GetPossibleClockRatesOut {
+    list_type: i32,
+    count: i32,
 }
 
 /// Opens a [`ClkrstSession`](crate::ClkrstSession) for the given module.
@@ -86,13 +92,9 @@ pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> 
 
     ipc::send_sync_request(&mut buf, session).map_err(GetClockRateError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
-        .map_err(GetClockRateError::ParseResponse)?;
+    let resp = cmif::parse_response::<&u32>(&buf).map_err(GetClockRateError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<u32>()` bytes.
-    let hz = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
-
-    Ok(hz)
+    Ok(*resp.payload)
 }
 
 /// Result of [`get_possible_clock_rates`].
@@ -131,12 +133,11 @@ pub fn get_possible_clock_rates(
     ipc::send_sync_request(&mut buf, session).map_err(GetPossibleClockRatesError::SendRequest)?;
 
     // Response inline data: { i32 type, i32 count }.
-    let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
+    let resp = cmif::parse_response::<&GetPossibleClockRatesOut>(&buf)
         .map_err(GetPossibleClockRatesError::ParseResponse)?;
 
-    // SAFETY: `resp.data` is at least `size_of::<[i32; 2]>()` bytes.
-    let raw_type = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>()) };
-    let count = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<i32>().add(1)) };
+    let raw_type = resp.payload.list_type;
+    let count = resp.payload.count;
 
     let list_type = ClockRatesListType::from_raw(raw_type)
         .ok_or(GetPossibleClockRatesError::UnknownListType(raw_type))?;
@@ -155,7 +156,7 @@ pub enum OpenSessionError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Response did not include the expected session handle.
     #[error("missing session handle in response")]
     MissingHandle,
@@ -172,7 +173,7 @@ pub enum SetClockRateError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_clock_rate`].
@@ -186,7 +187,7 @@ pub enum GetClockRateError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Error returned by [`get_possible_clock_rates`].
@@ -200,7 +201,7 @@ pub enum GetPossibleClockRatesError {
     SendRequest(#[source] ipc::SendSyncError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     /// Unknown clock rates list type.
     #[error("unknown clock rates list type: {0}")]
     UnknownListType(i32),

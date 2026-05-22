@@ -30,13 +30,10 @@ fn dispatch_in_u32_out_bool(
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32OutBoolError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(DispatchInU32OutBoolError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&u8>(&buf).map_err(DispatchInU32OutBoolError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u8.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(raw & 1 != 0)
+    Ok(*resp.payload & 1 != 0)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -46,7 +43,7 @@ pub enum DispatchInU32OutBoolError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_in_two_u32s_out_bool(
@@ -77,13 +74,10 @@ fn dispatch_in_two_u32s_out_bool(
     ipc::send_sync_request(&mut buf, session)
         .map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
-        .map_err(DispatchInTwoU32sOutBoolError::ParseResponse)?;
+    let resp =
+        cmif::parse_response::<&u8>(&buf).map_err(DispatchInTwoU32sOutBoolError::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u8.
-    let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u8>()) };
-
-    Ok(raw & 1 != 0)
+    Ok(*resp.payload & 1 != 0)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -93,7 +87,7 @@ pub enum DispatchInTwoU32sOutBoolError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64Error> {
@@ -107,13 +101,9 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
 
     ipc::send_sync_request(&mut buf, session).map_err(DispatchOutU64Error::SendRequest)?;
 
-    let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
-        .map_err(DispatchOutU64Error::ParseResponse)?;
+    let resp = cmif::parse_response::<&u64>(&buf).map_err(DispatchOutU64Error::ParseResponse)?;
 
-    // SAFETY: resp.data points to valid payload area with space for u64.
-    let value = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u64>()) };
-
-    Ok(value)
+    Ok(*resp.payload)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -123,7 +113,7 @@ pub enum DispatchOutU64Error {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
 }
 
 /// Checks if a production port exists (pre-17.0.0).
@@ -194,8 +184,7 @@ pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSession
 
     ipc::send_sync_request(&mut buf, session).map_err(CreatePortSessionError::SendRequest)?;
 
-    let resp =
-        cmif::parse_response_bytes(&buf, 0).map_err(CreatePortSessionError::ParseResponse)?;
+    let resp = cmif::parse_response::<()>(&buf).map_err(CreatePortSessionError::ParseResponse)?;
 
     let Some(&raw_handle) = resp.move_handles.first() else {
         return Err(CreatePortSessionError::MissingHandle);
@@ -648,7 +637,7 @@ pub enum CreatePortSessionError {
     #[error("failed to send request")]
     SendRequest(#[source] ipc::SendSyncError),
     #[error("failed to parse response")]
-    ParseResponse(#[source] cmif::ParseRespBytesError),
+    ParseResponse(#[source] cmif::ParseError),
     #[error("missing session handle in response")]
     MissingHandle,
 }
