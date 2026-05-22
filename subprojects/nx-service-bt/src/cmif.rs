@@ -29,8 +29,8 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(value)
-        .send_pid()
+        .with_data_value(value)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
@@ -57,8 +57,8 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(value)
-        .send_pid()
+        .with_data_value(value)
+        .with_send_pid()
         .add_in_pointer(buffer, buffer_size)
         .build();
     req.write_to(&mut buf)
@@ -307,8 +307,8 @@ pub fn get_le_event_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_LE_EVENT_INFO)
-        .data_value(&applet_resource_user_id)
-        .send_pid()
+        .with_data_value(&applet_resource_user_id)
+        .with_send_pid()
         .add_out_pointer(buffer.as_mut_ptr(), buffer.len())
         .build();
     req.write_to(&mut buf)
@@ -364,8 +364,8 @@ pub fn register_ble_event(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_BLE_EVENT)
-        .data_value(&applet_resource_user_id)
-        .send_pid()
+        .with_data_value(&applet_resource_user_id)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(RegisterBleEventError::BuildRequest)?;

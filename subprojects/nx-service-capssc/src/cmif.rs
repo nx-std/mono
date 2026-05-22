@@ -49,8 +49,8 @@ pub fn capture_raw_image_with_timeout(
         )
     };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
-        .data(data)
-        .add_out_buffer(
+        .with_data(data)
+        .add_output_buffer_raw(
             out_image.as_mut_ptr(),
             out_image.len(),
             BufferMode::NonSecure,
@@ -101,7 +101,7 @@ pub fn open_raw_screen_shot_read_stream(
         )
     };
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
-        .data(data)
+        .with_data(data)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenReadStreamError::BuildRequest)?;
@@ -153,8 +153,8 @@ pub fn read_raw_screen_shot_read_stream(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
-        .data_value(&offset)
-        .add_out_buffer(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal)
+        .with_data_value(&offset)
+        .add_output_buffer_raw(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(ReadStreamError::BuildRequest)?;
@@ -198,8 +198,8 @@ pub fn capture_jpeg_screen_shot(
         )
     };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_JPEG_SCREEN_SHOT)
-        .data(data)
-        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .with_data(data)
+        .add_output_buffer_raw(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(CaptureJpegError::BuildRequest)?;

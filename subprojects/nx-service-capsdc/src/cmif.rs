@@ -32,9 +32,9 @@ pub fn decode_jpeg(
         opts: *opts,
     };
     let req = cmif::CmifRequestBuilder::new(proto::DECODE_JPEG)
-        .data_value(&input)
-        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_out_buffer(
+        .with_data_value(&input)
+        .add_input_buffer_raw(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
+        .add_output_buffer_raw(
             out_image.as_mut_ptr(),
             out_image.len(),
             BufferMode::NonSecure,
@@ -69,9 +69,9 @@ pub fn shrink_jpeg(
         opts: *opts,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG)
-        .data_value(&input)
-        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .with_data_value(&input)
+        .add_input_buffer_raw(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
+        .add_output_buffer_raw(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(ShrinkJpegError::BuildRequest)?;
@@ -109,9 +109,9 @@ pub fn shrink_jpeg_ex(
         opts: *opts,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG_EX)
-        .data_value(&input)
-        .add_in_buffer(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_out_buffer(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .with_data_value(&input)
+        .add_input_buffer_raw(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
+        .add_output_buffer_raw(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(ShrinkJpegExError::BuildRequest)?;

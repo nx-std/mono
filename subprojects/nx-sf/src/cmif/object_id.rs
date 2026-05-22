@@ -1,7 +1,18 @@
 //! CMIF domain object identifiers.
 
 /// CMIF object identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(transparent)]
 pub struct ObjectId(u32);
 
 impl ObjectId {

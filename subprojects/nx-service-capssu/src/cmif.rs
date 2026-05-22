@@ -31,8 +31,8 @@ pub fn set_shim_library_version(
         applet_resource_user_id,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SET_SHIM_LIBRARY_VERSION)
-        .data_value(&input)
-        .send_pid()
+        .with_data_value(&input)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(SetShimVersionError::BuildRequest)?;
@@ -63,9 +63,9 @@ pub fn save_screen_shot_ex0(
         applet_resource_user_id,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX0)
-        .data_value(&input)
-        .send_pid()
-        .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_input_buffer_raw(image.as_ptr(), image.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(SaveScreenShotEx0Error::BuildRequest)?;
@@ -101,14 +101,14 @@ pub fn save_screen_shot_ex1(
         applet_resource_user_id,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX1)
-        .data_value(&input)
-        .send_pid()
-        .add_in_buffer(
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_input_buffer_raw(
             (appdata as *const ApplicationData).cast::<u8>(),
             size_of::<ApplicationData>(),
             BufferMode::Normal,
         )
-        .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+        .add_input_buffer_raw(image.as_ptr(), image.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(SaveScreenShotEx1Error::BuildRequest)?;
@@ -144,13 +144,13 @@ pub fn save_screen_shot_ex2(
         applet_resource_user_id,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
-        .data_value(&input)
-        .add_in_buffer(
+        .with_data_value(&input)
+        .add_input_buffer_raw(
             (list as *const UserIdList).cast::<u8>(),
             size_of::<UserIdList>(),
             BufferMode::Normal,
         )
-        .add_in_buffer(image.as_ptr(), image.len(), BufferMode::NonSecure)
+        .add_input_buffer_raw(image.as_ptr(), image.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(SaveScreenShotEx2Error::BuildRequest)?;

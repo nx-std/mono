@@ -46,7 +46,7 @@ fn dispatch_in_u64(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU64Error::BuildRequest)?;
@@ -79,7 +79,7 @@ fn dispatch_in_f32(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInF32Error::BuildRequest)?;

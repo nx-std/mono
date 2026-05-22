@@ -25,7 +25,7 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(value)
+        .with_data_value(value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
@@ -50,7 +50,7 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(value)
+        .with_data_value(value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
@@ -162,7 +162,7 @@ pub fn send_command_async(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SEND_COMMAND_ASYNC)
-        .data_value(&handle)
+        .with_data_value(&handle)
         .add_in_auto_buffer(buffer.as_ptr(), buffer.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
@@ -186,7 +186,7 @@ pub fn get_send_command_async_result(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SEND_COMMAND_ASYNC_RESULT)
-        .data_value(&handle)
+        .with_data_value(&handle)
         .add_out_auto_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
@@ -225,7 +225,7 @@ pub fn set_event_for_send_command_async_result(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
-        .data_value(&handle)
+        .with_data_value(&handle)
         .build();
     req.write_to(&mut buf)
         .map_err(SetEventError::BuildRequest)?;
@@ -306,7 +306,7 @@ pub fn enable_joy_polling_receive_mode(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
-        .data_value(&input)
+        .with_data_value(&input)
         .add_in_auto_buffer(
             command_buffer.as_ptr(),
             command_buffer.len(),

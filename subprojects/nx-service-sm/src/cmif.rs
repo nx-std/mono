@@ -24,7 +24,7 @@ pub fn get_service_handle(
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = cmif::CmifRequestBuilder::new(proto::GET_SERVICE_HANDLE)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(GetServiceError::BuildRequest)?;
@@ -89,7 +89,7 @@ pub fn register_service(
     // SAFETY: `payload` is exactly `size_of::<RegisterServiceIn>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<RegisterServiceIn>(), input) };
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_SERVICE)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(RegisterServiceError::BuildRequest)?;
@@ -137,7 +137,7 @@ pub fn unregister_service(
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = cmif::CmifRequestBuilder::new(proto::UNREGISTER_SERVICE)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(UnregisterServiceError::BuildRequest)?;
@@ -173,8 +173,8 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 
     let payload = [0u8; size_of::<u64>()];
     let req = cmif::CmifRequestBuilder::new(proto::DETACH_CLIENT)
-        .data(&payload)
-        .send_pid()
+        .with_data(&payload)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(DetachClientError::BuildRequest)?;
@@ -210,8 +210,8 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 
     let payload = [0u8; size_of::<u64>()];
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_CLIENT)
-        .data(&payload)
-        .send_pid()
+        .with_data(&payload)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(RegisterClientError::BuildRequest)?;

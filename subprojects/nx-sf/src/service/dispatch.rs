@@ -290,8 +290,8 @@ impl<'a> Dispatch<'a> {
 
         {
             let mut cb = cmif::CmifRequestBuilder::new(self.request_id)
-                .pointer_buffer_size(self.pointer_buffer_size as usize)
-                .context(self.context);
+                .with_pointer_buffer_size(self.pointer_buffer_size as usize)
+                .with_context(self.context);
 
             let in_slice: &[u8] = if !self.in_data.is_null() && self.in_data_size > 0 {
                 // SAFETY: caller of `in_raw` guarantees `in_data` is valid for
@@ -300,13 +300,13 @@ impl<'a> Dispatch<'a> {
             } else {
                 &[]
             };
-            cb = cb.data(in_slice);
+            cb = cb.with_data(in_slice);
 
             if let Some(object_id) = self.object_id {
-                cb = cb.object_id(object_id);
+                cb = cb.with_object_id(object_id);
             }
             if self.send_pid {
-                cb = cb.send_pid();
+                cb = cb.with_send_pid();
             }
 
             for i in 0..self.buffer_count {
@@ -332,11 +332,11 @@ impl<'a> Dispatch<'a> {
                     }
                 } else if attr.contains(BufferAttr::HIPC_MAP_ALIAS) {
                     if is_in && is_out {
-                        cb = cb.add_inout_buffer(buf_desc.ptr as *mut u8, buf_desc.size, mode);
+                        cb = cb.add_inout_buffer_raw(buf_desc.ptr as *mut u8, buf_desc.size, mode);
                     } else if is_in {
-                        cb = cb.add_in_buffer(buf_desc.ptr, buf_desc.size, mode);
+                        cb = cb.add_input_buffer_raw(buf_desc.ptr, buf_desc.size, mode);
                     } else if is_out {
-                        cb = cb.add_out_buffer(buf_desc.ptr as *mut u8, buf_desc.size, mode);
+                        cb = cb.add_output_buffer_raw(buf_desc.ptr as *mut u8, buf_desc.size, mode);
                     }
                 } else if attr.contains(BufferAttr::HIPC_POINTER) {
                     if is_in {

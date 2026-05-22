@@ -16,7 +16,7 @@ pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), Ge
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_RANDOM_BYTES)
-        .add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal)
+        .add_output_buffer_raw(out.as_mut_ptr(), out.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(GetRandomBytesError::BuildRequest)?;

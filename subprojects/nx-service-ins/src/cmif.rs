@@ -16,7 +16,7 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_LAST_TICK)
-        .data_value(&id)
+        .with_data_value(&id)
         .build();
     req.write_to(&mut buf)
         .map_err(GetLastTickError::BuildRequest)?;
@@ -57,7 +57,7 @@ pub fn get_readable_event(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_READABLE_EVENT)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(GetReadableEventError::BuildRequest)?;
@@ -89,7 +89,7 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_WRITABLE_EVENT)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(GetWritableEventError::BuildRequest)?;

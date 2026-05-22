@@ -29,7 +29,9 @@ fn dispatch_in_u64(session: Handle, cmd_id: u32, value: u64) -> Result<(), Dispa
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let payload = value.to_ne_bytes();
-    let req = cmif::CmifRequestBuilder::new(cmd_id).data(&payload).build();
+    let req = cmif::CmifRequestBuilder::new(cmd_id)
+        .with_data(&payload)
+        .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
@@ -45,7 +47,9 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let payload = (value as u8).to_ne_bytes();
-    let req = cmif::CmifRequestBuilder::new(cmd_id).data(&payload).build();
+    let req = cmif::CmifRequestBuilder::new(cmd_id)
+        .with_data(&payload)
+        .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
@@ -127,7 +131,7 @@ pub fn launch_program(
     // SAFETY: `payload` is exactly `size_of::<LaunchProgramCmifIn>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<LaunchProgramCmifIn>(), input) };
     let req = cmif::CmifRequestBuilder::new(proto::LAUNCH_PROGRAM)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
@@ -160,8 +164,8 @@ pub fn launch_program_from_host(
     // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), pm_launch_flags) };
     let req = cmif::CmifRequestBuilder::new(proto::LAUNCH_PROGRAM_FROM_HOST)
-        .data(&payload)
-        .add_in_buffer(
+        .with_data(&payload)
+        .add_input_buffer_raw(
             content_path.as_ptr(),
             content_path.len(),
             BufferMode::Normal,
@@ -189,7 +193,7 @@ pub fn get_host_content_meta_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_HOST_CONTENT_META_INFO)
-        .add_in_buffer(
+        .add_input_buffer_raw(
             content_path.as_ptr(),
             content_path.len(),
             BufferMode::Normal,
@@ -227,7 +231,7 @@ pub fn is_process_tracked(session: Handle, pid: u64) -> Result<bool, DispatchErr
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = cmif::CmifRequestBuilder::new(proto::IS_PROCESS_TRACKED)
-        .data(&payload)
+        .with_data(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;
@@ -277,8 +281,8 @@ pub fn trigger_application_snapshot_dumper(
     // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), dump_type as u32) };
     let req = cmif::CmifRequestBuilder::new(proto::TRIGGER_APPLICATION_SNAPSHOT_DUMPER)
-        .data(&payload)
-        .add_in_buffer(arg.as_ptr(), arg.len(), BufferMode::Normal)
+        .with_data(&payload)
+        .add_input_buffer_raw(arg.as_ptr(), arg.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchError::BuildRequest)?;

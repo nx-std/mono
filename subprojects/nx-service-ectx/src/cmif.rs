@@ -49,8 +49,8 @@ pub fn pull_context(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::PULL_CONTEXT)
-        .data_value(&input)
-        .add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
+        .with_data_value(&input)
+        .add_output_buffer_raw(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(PullContextError::BuildRequest)?;

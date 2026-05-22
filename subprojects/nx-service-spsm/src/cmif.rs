@@ -16,7 +16,7 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN)
-        .data_value(&in_data)
+        .with_data_value(&in_data)
         .build();
     req.write_to(&mut buf)
         .map_err(ShutdownError::BuildRequest)?;

@@ -19,7 +19,7 @@ pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeErro
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
-        .data_value(&mode)
+        .with_data_value(&mode)
         .build();
     req.write_to(&mut buf)
         .map_err(InitializeError::BuildRequest)?;
@@ -126,7 +126,7 @@ pub fn get_attribute(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_ATTRIBUTE)
-        .data_value(&index)
+        .with_data_value(&index)
         .build();
     req.write_to(&mut buf)
         .map_err(GetAttributeError::BuildRequest)?;
@@ -154,8 +154,8 @@ pub fn load_image(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::LOAD_IMAGE)
-        .data_value(&id)
-        .add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
+        .with_data_value(&id)
+        .add_output_buffer_raw(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(LoadImageError::BuildRequest)?;

@@ -83,7 +83,7 @@ pub fn open_display(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_DISPLAY)
-        .data(name.as_bytes())
+        .with_data(name.as_bytes())
         .build();
     req.write_to(&mut buf)
         .map_err(OpenDisplayError::BuildRequest)?;
@@ -110,7 +110,7 @@ pub fn close_display(
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_DISPLAY)
-        .data_value(&display_id_raw)
+        .with_data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(CloseDisplayError::BuildRequest)?;
@@ -142,7 +142,7 @@ pub fn get_display_resolution(
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_RESOLUTION)
-        .data_value(&display_id_raw)
+        .with_data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayResolutionError::BuildRequest)?;
@@ -208,9 +208,9 @@ pub fn open_layer(
     input.display_name.copy_from_slice(display_name.as_bytes());
 
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_LAYER)
-        .data_value(&input)
-        .send_pid()
-        .add_out_buffer(
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_output_buffer_raw(
             native_window.as_mut_ptr(),
             NATIVE_WINDOW_SIZE,
             BufferMode::Normal,
@@ -241,7 +241,7 @@ pub fn close_layer(session: SessionHandle, layer_id: LayerId) -> Result<(), Clos
 
     let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_LAYER)
-        .data_value(&layer_id_raw)
+        .with_data_value(&layer_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(CloseLayerError::BuildRequest)?;
@@ -316,8 +316,8 @@ pub(crate) fn create_stray_layer_dispatch(
     };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&input)
-        .add_out_buffer(
+        .with_data_value(&input)
+        .add_output_buffer_raw(
             native_window.as_mut_ptr(),
             NATIVE_WINDOW_SIZE,
             BufferMode::Normal,
@@ -358,7 +358,7 @@ pub fn destroy_stray_layer(
 
     let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::DESTROY_STRAY_LAYER)
-        .data_value(&layer_id_raw)
+        .with_data_value(&layer_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(DestroyStrayLayerError::BuildRequest)?;
@@ -395,7 +395,7 @@ pub fn set_layer_scaling_mode(
     };
 
     let req = cmif::CmifRequestBuilder::new(application_cmds::SET_LAYER_SCALING_MODE)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerScalingModeError::BuildRequest)?;
@@ -448,9 +448,9 @@ pub fn get_indirect_layer_image_map(
 
     // HipcMapTransferAllowsNonSecure maps to NonSecure buffer mode
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_INDIRECT_LAYER_IMAGE_MAP)
-        .data_value(&input)
-        .send_pid()
-        .add_out_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::NonSecure)
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_output_buffer_raw(buffer.as_mut_ptr(), buffer.len(), BufferMode::NonSecure)
         .build();
     req.write_to(&mut buf)
         .map_err(GetIndirectLayerImageMapError::BuildRequest)?;
@@ -507,7 +507,7 @@ pub fn get_indirect_layer_image_required_memory_info(
     let req = cmif::CmifRequestBuilder::new(
         application_cmds::GET_INDIRECT_LAYER_IMAGE_REQUIRED_MEMORY_INFO,
     )
-    .data_value(&input)
+    .with_data_value(&input)
     .build();
     req.write_to(&mut buf)
         .map_err(GetIndirectLayerImageRequiredMemoryInfoError::BuildRequest)?;
@@ -544,7 +544,7 @@ pub fn get_display_vsync_event(
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_VSYNC_EVENT)
-        .data_value(&display_id_raw)
+        .with_data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayVsyncEventError::BuildRequest)?;

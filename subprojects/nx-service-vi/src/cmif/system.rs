@@ -40,7 +40,7 @@ pub fn get_z_order_count_min(
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MIN)
-        .data_value(&display_id_raw)
+        .with_data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetZOrderCountError::BuildRequest)?;
@@ -66,7 +66,7 @@ pub fn get_z_order_count_max(
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MAX)
-        .data_value(&display_id_raw)
+        .with_data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetZOrderCountError::BuildRequest)?;
@@ -101,7 +101,7 @@ pub fn get_display_logical_resolution(
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
-        .data_value(&display_id_raw)
+        .with_data_value(&display_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayLogicalResolutionError::BuildRequest)?;
@@ -159,7 +159,7 @@ pub fn set_display_magnification(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_DISPLAY_MAGNIFICATION)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayMagnificationError::BuildRequest)?;
@@ -197,7 +197,7 @@ pub fn set_layer_position(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_POSITION)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerPositionError::BuildRequest)?;
@@ -235,7 +235,7 @@ pub fn set_layer_size(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_SIZE)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerSizeError::BuildRequest)?;
@@ -270,7 +270,7 @@ pub fn set_layer_z(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_Z)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerZError::BuildRequest)?;
@@ -307,7 +307,7 @@ pub fn set_layer_visibility(
     };
 
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_VISIBILITY)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetLayerVisibilityError::BuildRequest)?;

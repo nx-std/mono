@@ -37,7 +37,7 @@ pub fn get_display_service(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&inval)
+        .with_data_value(&inval)
         .build();
     req.write_to(&mut buf)
         .map_err(GetDisplayServiceError::BuildRequest)?;
@@ -136,7 +136,7 @@ pub fn draw_fatal_rectangle(
     };
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_RECTANGLE)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DrawFatalRectangleError::BuildRequest)?;
@@ -204,8 +204,8 @@ pub fn draw_fatal_text32(
     };
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_TEXT32)
-        .data_value(&input)
-        .add_in_buffer(
+        .with_data_value(&input)
+        .add_input_buffer_raw(
             codepoints_bytes.as_ptr(),
             codepoints_bytes.len(),
             nx_sf::hipc::BufferMode::Normal,

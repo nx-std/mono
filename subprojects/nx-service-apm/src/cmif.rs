@@ -89,7 +89,7 @@ pub fn set_performance_configuration(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
-        .data_value(&in_data)
+        .with_data_value(&in_data)
         .build();
     req.write_to(&mut buf)
         .map_err(SetPerformanceConfigurationError::BuildRequest)?;
@@ -114,7 +114,7 @@ pub fn get_performance_configuration(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
-        .data_value(&mode)
+        .with_data_value(&mode)
         .build();
     req.write_to(&mut buf)
         .map_err(GetPerformanceConfigurationError::BuildRequest)?;

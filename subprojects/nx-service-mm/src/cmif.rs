@@ -44,7 +44,7 @@ pub fn request_initialize(
         autoclear: autoclear as u32,
     };
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestInitializeError::BuildRequest)?;
@@ -91,7 +91,7 @@ pub fn request_initialize_legacy(
         autoclear: autoclear as u32,
     };
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE_OLD)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestInitializeError::BuildRequest)?;
@@ -118,7 +118,7 @@ pub fn request_finalize(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::FINALIZE)
-        .data_value(&request_id)
+        .with_data_value(&request_id)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestFinalizeError::BuildRequest)?;
@@ -152,7 +152,7 @@ pub fn request_finalize_legacy(
 
     let module_raw = module.as_raw();
     let req = cmif::CmifRequestBuilder::new(proto::FINALIZE_OLD)
-        .data_value(&module_raw)
+        .with_data_value(&module_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestFinalizeError::BuildRequest)?;
@@ -181,7 +181,7 @@ pub fn request_set_and_wait(
         timeout: timeout as u32,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestSetAndWaitError::BuildRequest)?;
@@ -221,7 +221,7 @@ pub fn request_set_and_wait_legacy(
         timeout: timeout as u32,
     };
     let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT_OLD)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestSetAndWaitError::BuildRequest)?;
@@ -240,7 +240,7 @@ pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, Reque
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET)
-        .data_value(&request_id)
+        .with_data_value(&request_id)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestGetError::BuildRequest)?;
@@ -279,7 +279,7 @@ pub fn request_get_legacy(
 
     let module_raw = module.as_raw();
     let req = cmif::CmifRequestBuilder::new(proto::GET_OLD)
-        .data_value(&module_raw)
+        .with_data_value(&module_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestGetError::BuildRequest)?;

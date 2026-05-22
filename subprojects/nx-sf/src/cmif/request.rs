@@ -16,10 +16,12 @@
 //! control requests, and [`CmifCloseBody`] for domain-object close.
 //! Session-close has no in-band data and reuses the default `()` payload.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::{size_of, size_of_val},
+    ptr,
+};
 
 use nx_svc::raw::Handle as RawHandle;
-use zerocopy::FromBytes;
 
 use super::{
     object_id::ObjectId,
@@ -29,6 +31,20 @@ use crate::hipc::{
     self, ArrayVec, BufferDescriptor, BufferMode, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest,
     HipcRequestBuilder, RecvListEntry, StaticDescriptor,
 };
+
+/// Total CMIF pad budget within the raw-data section, in bytes.
+///
+/// The first CMIF header (`DomainInHeader` if present, otherwise `InHeader`)
+/// must land on a 16-byte boundary measured from the TLS message-buffer base.
+/// HIPC's data-words region is only u32-aligned, so the body skips
+/// `region_ptr.align_offset(0x10)` bytes — in `{0, 4, 8, 12}` — as the
+/// leading pad. The remaining `0x10 - leading_pad` bytes appear after the
+/// CMIF content (before the out-pointer-size table) as trailing pad.
+///
+/// `encoded_len` reserves the full `0x10` budget so the leading-plus-trailing
+/// split is always satisfiable; the bytes not consumed by the leading pad
+/// stay zero thanks to HIPC pre-zeroing the data-words region.
+const CMIF_HEADER_ALIGN: usize = 0x10;
 
 /// Layout error for CMIF request serialization.
 ///
@@ -59,7 +75,7 @@ pub struct CmifRequestBuilder<'a> {
     payload: &'a [u8],
     num_out_auto_buffers: u32,
     num_out_pointers: u32,
-    objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
+    objects: ArrayVec<ObjectId, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
     server_pointer_size: usize,
     cur_in_ptr_id: u8,
@@ -89,7 +105,7 @@ impl<'a> CmifRequestBuilder<'a> {
     /// Auto-buffers use inline pointer descriptors while enough pointer-buffer
     /// capacity remains, then fall back to mapped buffer descriptors.
     #[inline]
-    pub fn pointer_buffer_size(mut self, size: usize) -> Self {
+    pub fn with_pointer_buffer_size(mut self, size: usize) -> Self {
         self.server_pointer_size = size;
         self
     }
@@ -100,44 +116,49 @@ impl<'a> CmifRequestBuilder<'a> {
     /// [`CommandType::RequestWithContext`] and set the CMIF header version to
     /// 1.
     #[inline]
-    pub fn context(mut self, ctx: u32) -> Self {
+    pub fn with_context(mut self, ctx: u32) -> Self {
         self.context = ctx;
         self
     }
 
     /// Sets the request payload bytes to copy into the CMIF data area.
     #[inline]
-    pub fn data(mut self, data: &'a [u8]) -> Self {
+    pub fn with_data(mut self, data: &'a [u8]) -> Self {
         self.payload = data;
         self
     }
 
     /// Sets the request payload from a typed value via its zero-copy byte view.
     #[inline]
-    pub fn data_value<T>(self, value: &'a T) -> Self
+    pub fn with_data_value<T>(self, value: &'a T) -> Self
     where
         T: zerocopy::IntoBytes + zerocopy::Immutable,
     {
-        self.data(value.as_bytes())
+        self.with_data(value.as_bytes())
     }
 
     /// Marks the request as targeting an object inside a CMIF domain.
     #[inline]
-    pub fn object_id(mut self, id: ObjectId) -> Self {
+    pub fn with_object_id(mut self, id: ObjectId) -> Self {
         self.object_id = Some(id);
         self
     }
 
     /// Includes the current process ID in the underlying HIPC request.
     #[inline]
-    pub fn send_pid(mut self) -> Self {
+    pub fn with_send_pid(mut self) -> Self {
         self.hipc = self.hipc.with_send_pid();
         self
     }
 
     /// Adds a mapped input buffer using a Type-A HIPC descriptor.
     #[inline]
-    pub fn add_in_buffer(mut self, buffer: *const u8, size: usize, mode: BufferMode) -> Self {
+    pub fn add_input_buffer_raw(
+        mut self,
+        buffer: *const u8,
+        size: usize,
+        mode: BufferMode,
+    ) -> Self {
         self.hipc = self
             .hipc
             .with_send_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
@@ -146,10 +167,19 @@ impl<'a> CmifRequestBuilder<'a> {
 
     /// Adds a mapped output buffer using a Type-B HIPC descriptor.
     #[inline]
-    pub fn add_out_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+    pub fn add_output_buffer_raw(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
         self.hipc = self
             .hipc
             .with_recv_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
+        self
+    }
+
+    /// Adds a mapped bidirectional buffer using a Type-W HIPC descriptor.
+    #[inline]
+    pub fn add_inout_buffer_raw(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+        self.hipc = self
+            .hipc
+            .with_exch_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
         self
     }
 
@@ -158,13 +188,13 @@ impl<'a> CmifRequestBuilder<'a> {
     /// Empty slices encode a null descriptor instead of taking a dangling
     /// pointer from the slice.
     #[inline]
-    pub fn add_in_slice(self, buffer: &[u8], mode: BufferMode) -> Self {
+    pub fn add_input_buffer(self, buffer: &[u8], mode: BufferMode) -> Self {
         let ptr = if buffer.is_empty() {
             ptr::null()
         } else {
             buffer.as_ptr()
         };
-        self.add_in_buffer(ptr, buffer.len(), mode)
+        self.add_input_buffer_raw(ptr, buffer.len(), mode)
     }
 
     /// Adds a mapped output buffer from a mutable byte slice.
@@ -172,22 +202,13 @@ impl<'a> CmifRequestBuilder<'a> {
     /// Empty slices encode a null descriptor instead of taking a dangling
     /// pointer from the slice.
     #[inline]
-    pub fn add_out_slice(self, buffer: &mut [u8], mode: BufferMode) -> Self {
+    pub fn add_output_buffer(self, buffer: &mut [u8], mode: BufferMode) -> Self {
         let ptr = if buffer.is_empty() {
             ptr::null_mut()
         } else {
             buffer.as_mut_ptr()
         };
-        self.add_out_buffer(ptr, buffer.len(), mode)
-    }
-
-    /// Adds a mapped bidirectional buffer using a Type-W HIPC descriptor.
-    #[inline]
-    pub fn add_inout_buffer(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
-        self.hipc = self
-            .hipc
-            .with_exch_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
-        self
+        self.add_output_buffer_raw(ptr, buffer.len(), mode)
     }
 
     /// Adds an input pointer using a Type-X send-static descriptor.
@@ -296,7 +317,7 @@ impl<'a> CmifRequestBuilder<'a> {
     /// Adds a domain input object ID to pass with the request.
     #[inline]
     pub fn add_object(mut self, id: ObjectId) -> Self {
-        self.objects.push(id.to_raw());
+        self.objects.push(id);
         self
     }
 
@@ -432,7 +453,7 @@ pub struct CmifBody<'a> {
     context: u32,
     object_id: Option<ObjectId>,
     payload: &'a [u8],
-    objects: ArrayVec<u32, CMIF_MAX_OBJECTS>,
+    objects: ArrayVec<ObjectId, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
     num_out_auto_buffers: u32,
     num_out_pointers: u32,
@@ -457,8 +478,13 @@ impl CmifBody<'_> {
 }
 
 impl HipcPayload for CmifBody<'_> {
+    /// Sums the in-band sections this body emits: alignment slack for the
+    /// leading pad ([`CMIF_HEADER_ALIGN`]), the optional `DomainInHeader`
+    /// plus its trailing input-object id table (domain requests only), the
+    /// always-present `InHeader`, the raw rpc payload, a half-word align-up
+    /// before the trailing tables, and the out-pointer-size table.
     fn encoded_len(&self) -> usize {
-        let mut n: usize = 16;
+        let mut n: usize = CMIF_HEADER_ALIGN;
         if self.object_id.is_some() {
             n += size_of::<DomainInHeader>() + self.objects.len() * size_of::<u32>();
         }
@@ -468,56 +494,56 @@ impl HipcPayload for CmifBody<'_> {
         n
     }
 
+    /// Writes the CMIF in-band body for a plain or domain request.
+    ///
+    /// Splits the out-pointer-size table off the region tail, skips the
+    /// [`CMIF_HEADER_ALIGN`] alignment pad at the head, then writes — in
+    /// order — the optional `DomainInHeader`, the `InHeader`, the raw rpc
+    /// payload, and the trailing input-object id table for domain requests.
     fn write_to(&self, dst: &mut [u8]) {
         let body_len = self.encoded_len();
         let cmif_region = &mut dst[..body_len];
 
+        // The out-pointer-size table lives at the region tail; split it off
+        // first so the head can be written sequentially.
         let opt_len = self.opt_size();
         let split = cmif_region.len() - opt_len;
         let (cmif_region, opt_bytes) = cmif_region.split_at_mut(split);
-        let (out_pointer_sizes, _) =
-            <[u16]>::mut_from_prefix_with_elems(opt_bytes, opt_len / size_of::<u16>())
-                .expect("internal: encoded_len guarantees fit");
-        out_pointer_sizes.copy_from_slice(self.out_pointer_sizes.as_slice());
+        write_section(opt_bytes, self.out_pointer_sizes.as_slice());
 
-        let pad = cmif_region.as_ptr().align_offset(16);
-        let (_padding, aligned) = cmif_region.split_at_mut(pad);
+        // Skip alignment padding before the CMIF in-band headers.
+        let pad = cmif_region.as_ptr().align_offset(CMIF_HEADER_ALIGN);
+        let (_padding, buf) = cmif_region.split_at_mut(pad);
 
-        let aligned = if let Some(object_id) = self.object_id {
+        // Optional DomainInHeader for domain requests.
+        let buf = if let Some(object_id) = self.object_id {
             let payload_size = size_of::<InHeader>() as u16 + self.payload.len() as u16;
-            let (dom_hdr, rest) = DomainInHeader::mut_from_prefix(aligned)
-                .expect("internal: encoded_len guarantees fit");
-            *dom_hdr = DomainInHeader {
-                request_type: DomainRequestType::SendMessage as u8,
-                num_in_objects: self.objects.len() as u8,
-                data_size: payload_size,
-                object_id: object_id.to_raw(),
-                _padding: 0,
-                token: self.context,
-            };
-            rest
+            write_cmif_domain_in_header(
+                buf,
+                DomainRequestType::SendMessage,
+                self.objects.len(),
+                payload_size,
+                object_id,
+                self.context,
+            )
         } else {
-            aligned
+            buf
         };
 
-        let (in_hdr, rest) =
-            InHeader::mut_from_prefix(aligned).expect("internal: encoded_len guarantees fit");
-        *in_hdr = InHeader {
-            magic: super::wire::IN_HEADER_MAGIC,
-            version: self.cmif_version(),
-            command_id: self.request_id,
-            token: self.in_header_token(),
-        };
+        // InHeader (always present).
+        let buf = write_cmif_in_header(
+            buf,
+            self.request_id,
+            self.cmif_version(),
+            self.in_header_token(),
+        );
 
-        let (data, rest) = rest.split_at_mut(self.payload.len());
-        if !self.payload.is_empty() {
-            data.copy_from_slice(self.payload);
-        }
+        // Raw rpc payload.
+        let buf = write_section(buf, self.payload);
 
+        // Input-object IDs (domain requests only).
         if self.object_id.is_some() {
-            let (objects, _) = <[u32]>::mut_from_prefix_with_elems(rest, self.objects.len())
-                .expect("internal: encoded_len guarantees fit");
-            objects.copy_from_slice(self.objects.as_slice());
+            write_section(buf, self.objects.as_slice());
         }
     }
 }
@@ -533,29 +559,29 @@ pub struct CmifControlBody<'a> {
 }
 
 impl HipcPayload for CmifControlBody<'_> {
+    /// Alignment slack for the leading pad ([`CMIF_HEADER_ALIGN`]), plus the
+    /// `InHeader` and the control-command payload. No domain framing and no
+    /// out-pointer table.
     fn encoded_len(&self) -> usize {
-        16 + size_of::<InHeader>() + self.payload.len()
+        CMIF_HEADER_ALIGN + size_of::<InHeader>() + self.payload.len()
     }
 
+    /// Writes a CMIF control body: skip the [`CMIF_HEADER_ALIGN`] alignment
+    /// pad, then the `InHeader` (with `version = 0`, `token = 0`) followed by
+    /// the raw control-command payload.
     fn write_to(&self, dst: &mut [u8]) {
         let body_len = self.encoded_len();
         let region = &mut dst[..body_len];
-        let pad = region.as_ptr().align_offset(16);
-        let (_padding, aligned) = region.split_at_mut(pad);
 
-        let (hdr, rest) =
-            InHeader::mut_from_prefix(aligned).expect("internal: encoded_len guarantees fit");
-        *hdr = InHeader {
-            magic: super::wire::IN_HEADER_MAGIC,
-            version: 0,
-            command_id: self.request_id,
-            token: 0,
-        };
+        // Skip alignment padding before the CMIF in-band headers.
+        let pad = region.as_ptr().align_offset(CMIF_HEADER_ALIGN);
+        let (_padding, buf) = region.split_at_mut(pad);
 
-        let (payload, _) = rest.split_at_mut(self.payload.len());
-        if !self.payload.is_empty() {
-            payload.copy_from_slice(self.payload);
-        }
+        // InHeader (always present).
+        let buf = write_cmif_in_header(buf, self.request_id, 0, 0);
+
+        // Raw rpc payload.
+        write_section(buf, self.payload);
     }
 }
 
@@ -570,24 +596,84 @@ pub struct CmifCloseBody {
 }
 
 impl HipcPayload for CmifCloseBody {
+    /// A `DomainInHeader` plus alignment slack for the leading pad
+    /// ([`CMIF_HEADER_ALIGN`]). No `InHeader`, no payload, and no
+    /// input-object id tail.
     fn encoded_len(&self) -> usize {
-        size_of::<DomainInHeader>() + 16
+        size_of::<DomainInHeader>() + CMIF_HEADER_ALIGN
     }
 
+    /// Writes a CMIF domain-object close body: skip the [`CMIF_HEADER_ALIGN`]
+    /// alignment pad, then a single `DomainInHeader` with `request_type =
+    /// Close` targeting the held object ID.
     fn write_to(&self, dst: &mut [u8]) {
         let region = &mut dst[..self.encoded_len()];
-        let pad = region.as_ptr().align_offset(16);
-        let (_padding, aligned) = region.split_at_mut(pad);
 
-        let (dom_hdr, _) =
-            DomainInHeader::mut_from_prefix(aligned).expect("internal: encoded_len guarantees fit");
-        *dom_hdr = DomainInHeader {
-            request_type: DomainRequestType::Close as u8,
-            num_in_objects: 0,
-            data_size: 0,
-            object_id: self.object_id.to_raw(),
-            _padding: 0,
-            token: 0,
-        };
+        // Skip alignment padding before the CMIF in-band headers.
+        let pad = region.as_ptr().align_offset(CMIF_HEADER_ALIGN);
+        let (_padding, buf) = region.split_at_mut(pad);
+
+        // DomainInHeader carrying the `Close` request type; no InHeader,
+        // no payload, no input-object id tail.
+        write_cmif_domain_in_header(buf, DomainRequestType::Close, 0, 0, self.object_id, 0);
     }
+}
+
+/// Writes a CMIF [`InHeader`] into `buf` and returns the remaining tail.
+///
+/// Centralizes the magic constant so each body only supplies the fields it
+/// chooses (`version`, `token`). Mirrors the `write_header` helper in
+/// [`hipc::request`].
+#[inline]
+fn write_cmif_in_header(buf: &mut [u8], command_id: u32, version: u32, token: u32) -> &mut [u8] {
+    let header = InHeader {
+        magic: super::wire::IN_HEADER_MAGIC,
+        version,
+        command_id,
+        token,
+    };
+    write_section(buf, &header)
+}
+
+/// Writes a CMIF [`DomainInHeader`] into `buf` and returns the remaining tail.
+///
+/// Centralizes the field layout so each caller only supplies the fields it
+/// chooses (`request_type`, `num_in_objects`, `data_size`, `object_id`,
+/// `token`). Mirrors [`write_cmif_in_header`] for the domain framing header.
+#[inline]
+fn write_cmif_domain_in_header(
+    buf: &mut [u8],
+    request_type: DomainRequestType,
+    num_in_objects: usize,
+    data_size: u16,
+    object_id: ObjectId,
+    token: u32,
+) -> &mut [u8] {
+    let header = DomainInHeader {
+        request_type: request_type as u8,
+        num_in_objects: num_in_objects as u8,
+        data_size,
+        object_id: object_id.to_raw(),
+        _padding: 0,
+        token,
+    };
+    write_section(buf, &header)
+}
+
+/// Writes `value`'s bytes into the prefix of `buf` and returns the tail.
+///
+/// Mirrors the helper used by [`hipc::request`] so CMIF bodies thread the
+/// destination buffer through a chain of typed sections instead of repeated
+/// `mut_from_prefix` / `copy_from_slice` calls. [`CmifBody::encoded_len`]
+/// guarantees the prefix fits, so the inner `write_to` call is infallible.
+#[inline]
+fn write_section<'a, T>(buf: &'a mut [u8], value: &T) -> &'a mut [u8]
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable + ?Sized,
+{
+    let (buf, tail) = buf.split_at_mut(size_of_val(value));
+    value
+        .write_to(buf)
+        .expect("internal: encoded_len guarantees fit");
+    tail
 }

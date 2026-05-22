@@ -49,7 +49,7 @@ fn dispatch_in_u32(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32Error::BuildRequest)?;
@@ -83,7 +83,7 @@ fn dispatch_in_bool(
 
     let value_u8 = value as u8;
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value_u8)
+        .with_data_value(&value_u8)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInBoolError::BuildRequest)?;
@@ -116,7 +116,7 @@ fn dispatch_in_f32(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInF32Error::BuildRequest)?;
@@ -152,7 +152,7 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(value)
+        .with_data_value(value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInStructError::BuildRequest)?;
@@ -278,7 +278,7 @@ fn dispatch_in_u32_out_i32(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutI32Error::BuildRequest)?;
@@ -315,7 +315,7 @@ fn dispatch_in_u32_out_u32(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutU32Error::BuildRequest)?;
@@ -352,7 +352,7 @@ fn dispatch_in_u32_out_bool(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutBoolError::BuildRequest)?;

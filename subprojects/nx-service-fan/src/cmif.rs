@@ -19,7 +19,7 @@ pub fn open_controller(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_CONTROLLER)
-        .data_value(&device_code)
+        .with_data_value(&device_code)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenControllerError::BuildRequest)?;
@@ -46,7 +46,7 @@ pub fn set_rotation_speed_level(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_ROTATION_SPEED_LEVEL)
-        .data_value(&level)
+        .with_data_value(&level)
         .build();
     req.write_to(&mut buf)
         .map_err(SetRotationSpeedLevelError::BuildRequest)?;

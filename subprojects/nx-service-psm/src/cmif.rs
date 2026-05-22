@@ -143,7 +143,7 @@ fn dispatch_in_bool(
 
     let byte = value as u8;
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&byte)
+        .with_data_value(&byte)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInBoolError::BuildRequest)?;

@@ -60,8 +60,8 @@ pub(crate) fn register_client(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::REGISTER_CLIENT)
-        .data_value(&payload)
-        .send_pid()
+        .with_data_value(&payload)
+        .with_send_pid()
         .add_copy_handle(tmem_handle.to_raw())
         .build();
     req.write_to(&mut buf)
@@ -89,8 +89,8 @@ pub(crate) fn start_monitoring(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::START_MONITORING)
-        .data_value(&pid)
-        .send_pid()
+        .with_data_value(&pid)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(StartMonitoringError::BuildRequest)?;
@@ -176,7 +176,7 @@ pub(crate) fn socket(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::SOCKET)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .build();
     req.write_to(&mut buf).map_err(SocketError::BuildRequest)?;
 
@@ -198,7 +198,7 @@ pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseEr
 
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::CLOSE)
-        .data_value(&fd_raw)
+        .with_data_value(&fd_raw)
         .build();
     req.write_to(&mut buf).map_err(CloseError::BuildRequest)?;
 
@@ -269,7 +269,7 @@ fn bsd_send_recv_no_buffer_in<E>(
 
     let sockfd_raw = sockfd.raw();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&sockfd_raw)
+        .with_data_value(&sockfd_raw)
         .add_in_auto_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf).map_err(mk_build)?;
@@ -303,7 +303,7 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
 
     let sockfd_raw = sockfd.raw();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&sockfd_raw)
+        .with_data_value(&sockfd_raw)
         .add_out_auto_buffer(addr_buf.as_mut_ptr(), addr_buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf).map_err(mk_build)?;
@@ -393,7 +393,7 @@ pub(crate) fn listen(
         backlog,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::LISTEN)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .build();
     req.write_to(&mut buf).map_err(ListenError::BuildRequest)?;
 
@@ -422,7 +422,7 @@ pub(crate) fn shutdown(
         how,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SHUTDOWN)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .build();
     req.write_to(&mut buf)
         .map_err(ShutdownError::BuildRequest)?;
@@ -453,7 +453,7 @@ pub(crate) fn recv(
         flags,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::RECV)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut ipc_buf)
@@ -486,7 +486,7 @@ pub(crate) fn recv_from(
         flags,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::RECV_FROM)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
         .add_out_auto_buffer(src_addr.as_mut_ptr(), src_addr.len(), BufferMode::Normal)
         .build();
@@ -520,7 +520,7 @@ pub(crate) fn send(
         flags,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SEND)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut ipc_buf)
@@ -553,7 +553,7 @@ pub(crate) fn send_to(
         flags,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SEND_TO)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
         .add_in_auto_buffer(dest_addr.as_ptr(), dest_addr.len(), BufferMode::Normal)
         .build();
@@ -582,7 +582,7 @@ pub(crate) fn read(
 
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::READ)
-        .data_value(&fd_raw)
+        .with_data_value(&fd_raw)
         .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut ipc_buf)
@@ -610,7 +610,7 @@ pub(crate) fn write(
 
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::WRITE)
-        .data_value(&fd_raw)
+        .with_data_value(&fd_raw)
         .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut ipc_buf)
@@ -644,7 +644,7 @@ pub(crate) fn get_sock_opt(
         optname,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::GET_SOCK_OPT)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_out_auto_buffer(optval.as_mut_ptr(), optval.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut ipc_buf)
@@ -679,7 +679,7 @@ pub(crate) fn set_sock_opt(
         optname,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SOCK_OPT)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_in_auto_buffer(optval.as_ptr(), optval.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut ipc_buf)
@@ -714,7 +714,7 @@ pub(crate) fn fcntl(
         flags,
     };
     let req = cmif::CmifRequestBuilder::new(cmds::FCNTL)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .build();
     req.write_to(&mut ipc_buf)
         .map_err(FcntlError::BuildRequest)?;
@@ -767,7 +767,7 @@ pub(crate) fn ioctl(
         request,
         bufcount: if has_inout { 1 } else { 0 },
     };
-    let mut builder = cmif::CmifRequestBuilder::new(cmds::IOCTL).data_value(&payload);
+    let mut builder = cmif::CmifRequestBuilder::new(cmds::IOCTL).with_data_value(&payload);
     if has_in {
         builder = builder.add_in_auto_buffer(data.as_ptr(), payload_len, BufferMode::Normal);
     }
@@ -841,7 +841,7 @@ pub(crate) fn select(
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::SELECT)
-        .data_value(&payload)
+        .with_data_value(&payload)
         .add_in_auto_buffer(readfds.as_ptr(), readfds.len(), BufferMode::Normal)
         .add_in_auto_buffer(writefds.as_ptr(), writefds.len(), BufferMode::Normal)
         .add_in_auto_buffer(exceptfds.as_ptr(), exceptfds.len(), BufferMode::Normal)
@@ -881,7 +881,7 @@ pub(crate) fn poll(
             _pad: 0,
         };
         let req = cmif::CmifRequestBuilder::new(cmds::POLL)
-            .data_value(&payload)
+            .with_data_value(&payload)
             .add_in_auto_buffer(fds.as_ptr(), fds.len(), BufferMode::Normal)
             .add_out_auto_buffer(fds.as_mut_ptr(), fds.len(), BufferMode::Normal)
             .build();

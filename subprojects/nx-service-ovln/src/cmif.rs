@@ -24,7 +24,7 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(value)
+        .with_data_value(value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInError::BuildRequest)?;
@@ -209,7 +209,7 @@ pub fn snd_open_sender(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SND_OPEN_SENDER)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSenderError::BuildRequest)?;

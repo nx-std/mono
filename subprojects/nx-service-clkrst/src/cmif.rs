@@ -38,7 +38,7 @@ pub fn open_session(
         unk,
     };
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;
@@ -62,7 +62,7 @@ pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRat
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_CLOCK_RATE)
-        .data_value(&hz)
+        .with_data_value(&hz)
         .build();
     req.write_to(&mut buf)
         .map_err(SetClockRateError::BuildRequest)?;
@@ -118,7 +118,7 @@ pub fn get_possible_clock_rates(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
-        .data_value(&max_count)
+        .with_data_value(&max_count)
         .add_out_auto_buffer(
             rates.as_mut_ptr().cast::<u8>(),
             size_of_val(rates),

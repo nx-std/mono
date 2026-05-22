@@ -57,7 +57,7 @@ pub fn set_operation_mode_policy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_OPERATION_MODE_POLICY)
-        .data_value(&policy)
+        .with_data_value(&policy)
         .build();
     req.write_to(&mut buf)
         .map_err(SetOperationModePolicyError::BuildRequest)?;

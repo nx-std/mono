@@ -151,7 +151,7 @@ pub fn to_calendar_time_with_my_rule(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE)
-        .data_value(&timestamp)
+        .with_data_value(&timestamp)
         .build();
     req.write_to(&mut buf)
         .map_err(ToCalendarTimeError::BuildRequest)?;

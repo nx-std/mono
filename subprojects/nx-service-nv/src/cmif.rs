@@ -30,7 +30,7 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError>
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::OPEN)
-        .add_in_buffer(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
+        .add_input_buffer_raw(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf).map_err(OpenError::BuildRequest)?;
 
@@ -86,7 +86,7 @@ pub fn ioctl(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     {
-        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).data_value(&input);
+        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).with_data_value(&input);
         if in_size > 0 {
             builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
         }
@@ -147,7 +147,7 @@ pub fn ioctl2(
 
     {
         // Auto buffers in order: argp in (if applicable), extra in, argp out (if applicable).
-        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).data_value(&input);
+        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).with_data_value(&input);
         if in_size > 0 {
             builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
         }
@@ -209,7 +209,7 @@ pub fn ioctl3(
 
     {
         // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra out.
-        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).data_value(&input);
+        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).with_data_value(&input);
         if in_size > 0 {
             builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
         }
@@ -248,7 +248,7 @@ pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
 
     let fd_raw = fd.to_raw();
     let req = cmif::CmifRequestBuilder::new(nv_cmds::CLOSE)
-        .data_value(&fd_raw)
+        .with_data_value(&fd_raw)
         .build();
     req.write_to(&mut buf).map_err(CloseError::BuildRequest)?;
 
@@ -281,7 +281,7 @@ pub fn initialize(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::INITIALIZE)
-        .data_value(&tmem_size)
+        .with_data_value(&tmem_size)
         .add_copy_handle(process_handle.to_raw())
         .add_copy_handle(tmem_handle.to_raw())
         .build();
@@ -321,7 +321,7 @@ pub fn query_event(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::QUERY_EVENT)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(QueryEventError::BuildRequest)?;
@@ -356,8 +356,8 @@ pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetCli
 
     let aruid_raw = aruid.to_raw();
     let req = cmif::CmifRequestBuilder::new(nv_cmds::SET_CLIENT_PID)
-        .data_value(&aruid_raw)
-        .send_pid()
+        .with_data_value(&aruid_raw)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(SetClientPidError::BuildRequest)?;

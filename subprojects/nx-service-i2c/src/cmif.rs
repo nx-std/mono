@@ -19,7 +19,7 @@ pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSession
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-        .data_value(&device)
+        .with_data_value(&device)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;

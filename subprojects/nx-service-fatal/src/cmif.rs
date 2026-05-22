@@ -30,8 +30,8 @@ pub fn throw_fatal_with_policy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_POLICY)
-        .data_value(&input)
-        .send_pid()
+        .with_data_value(&input)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ThrowFatalError::BuildRequest)?;
@@ -61,9 +61,9 @@ pub fn throw_fatal_with_context(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_CONTEXT)
-        .data_value(&input)
-        .send_pid()
-        .add_in_buffer(
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_input_buffer_raw(
             (ctx as *const FatalCpuContext).cast::<u8>(),
             size_of::<FatalCpuContext>(),
             BufferMode::Normal,

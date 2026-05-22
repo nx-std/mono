@@ -61,10 +61,10 @@ pub fn get_host_by_name(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_NAME)
-        .data_value(&input)
-        .send_pid()
-        .add_in_buffer(name_ptr, name_len, BufferMode::Normal)
-        .add_out_buffer(
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_input_buffer_raw(name_ptr, name_len, BufferMode::Normal)
+        .add_output_buffer_raw(
             out_buffer.as_mut_ptr(),
             out_buffer.len(),
             BufferMode::Normal,
@@ -134,9 +134,9 @@ pub fn get_host_by_addr(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_ADDR)
-        .data_value(&input)
-        .add_in_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
-        .add_out_buffer(
+        .with_data_value(&input)
+        .add_input_buffer_raw(addr.as_ptr(), addr.len(), BufferMode::Normal)
+        .add_output_buffer_raw(
             out_buffer.as_mut_ptr(),
             out_buffer.len(),
             BufferMode::Normal,
@@ -267,12 +267,12 @@ pub fn get_addr_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_ADDR_INFO)
-        .data_value(&input)
-        .send_pid()
-        .add_in_buffer(node_ptr, node_len, BufferMode::Normal)
-        .add_in_buffer(svc_ptr, svc_len, BufferMode::Normal)
-        .add_in_buffer(hints_ptr, hints_len, BufferMode::Normal)
-        .add_out_buffer(
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_input_buffer_raw(node_ptr, node_len, BufferMode::Normal)
+        .add_input_buffer_raw(svc_ptr, svc_len, BufferMode::Normal)
+        .add_input_buffer_raw(hints_ptr, hints_len, BufferMode::Normal)
+        .add_output_buffer_raw(
             out_buffer.as_mut_ptr(),
             out_buffer.len(),
             BufferMode::Normal,
@@ -339,11 +339,11 @@ pub fn get_name_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_NAME_INFO)
-        .data_value(&input)
-        .send_pid()
-        .add_in_buffer(sockaddr.as_ptr(), sockaddr.len(), BufferMode::Normal)
-        .add_out_buffer(host.as_mut_ptr(), host.len(), BufferMode::Normal)
-        .add_out_buffer(serv.as_mut_ptr(), serv.len(), BufferMode::Normal)
+        .with_data_value(&input)
+        .with_send_pid()
+        .add_input_buffer_raw(sockaddr.as_ptr(), sockaddr.len(), BufferMode::Normal)
+        .add_output_buffer_raw(host.as_mut_ptr(), host.len(), BufferMode::Normal)
+        .add_output_buffer_raw(serv.as_mut_ptr(), serv.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(GetNameInfoError::BuildRequest)?;
@@ -386,8 +386,8 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
 
     let pid_placeholder: u64 = 0;
     let req = cmif::CmifRequestBuilder::new(CMD_GET_CANCEL_HANDLE)
-        .data_value(&pid_placeholder)
-        .send_pid()
+        .with_data_value(&pid_placeholder)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(GetCancelHandleError::BuildRequest)?;
@@ -430,8 +430,8 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_CANCEL)
-        .data_value(&input)
-        .send_pid()
+        .with_data_value(&input)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf).map_err(CancelError::BuildRequest)?;
 
@@ -489,8 +489,8 @@ fn string_error_impl(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&err)
-        .add_out_buffer(out_str.as_mut_ptr(), out_str.len(), BufferMode::Normal)
+        .with_data_value(&err)
+        .add_output_buffer_raw(out_str.as_mut_ptr(), out_str.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(StringErrorError::BuildRequest)?;

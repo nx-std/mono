@@ -153,7 +153,7 @@ fn dispatch_pid_delay(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SuspendResumeError::BuildRequest)?;
@@ -170,7 +170,9 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let req = cmif::CmifRequestBuilder::new(cmd).data_value(&pid).build();
+    let req = cmif::CmifRequestBuilder::new(cmd)
+        .with_data_value(&pid)
+        .build();
     req.write_to(&mut buf)
         .map_err(GetVolumeError::BuildRequest)?;
 
@@ -204,7 +206,7 @@ fn dispatch_set_volume(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetVolumeError::BuildRequest)?;

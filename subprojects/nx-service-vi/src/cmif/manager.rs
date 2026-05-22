@@ -43,7 +43,7 @@ pub fn create_managed_layer(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::CREATE_MANAGED_LAYER)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(CreateManagedLayerError::BuildRequest)?;
@@ -70,7 +70,7 @@ pub fn destroy_managed_layer(
 
     let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
-        .data_value(&layer_id_raw)
+        .with_data_value(&layer_id_raw)
         .build();
     req.write_to(&mut buf)
         .map_err(DestroyManagedLayerError::BuildRequest)?;
@@ -121,7 +121,7 @@ pub fn set_display_alpha(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_ALPHA)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayAlphaError::BuildRequest)?;
@@ -158,7 +158,7 @@ pub fn set_display_layer_stack(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_LAYER_STACK)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayLayerStackError::BuildRequest)?;
@@ -195,7 +195,7 @@ pub fn set_display_power_state(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(SetDisplayPowerStateError::BuildRequest)?;
@@ -233,7 +233,7 @@ pub fn add_to_layer_stack(
     };
 
     let req = cmif::CmifRequestBuilder::new(manager_cmds::ADD_TO_LAYER_STACK)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(AddToLayerStackError::BuildRequest)?;
@@ -256,7 +256,7 @@ pub fn set_content_visibility(
 
     let visible_u8: u8 = visible as u8;
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY)
-        .data_value(&visible_u8)
+        .with_data_value(&visible_u8)
         .build();
     req.write_to(&mut buf)
         .map_err(SetContentVisibilityError::BuildRequest)?;

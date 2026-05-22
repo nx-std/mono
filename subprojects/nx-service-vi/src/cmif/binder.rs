@@ -49,7 +49,7 @@ pub fn transact_parcel(
 
     // Add auto-select buffers (Normal mode)
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&input)
+        .with_data_value(&input)
         .add_in_auto_buffer(in_data.as_ptr(), in_data.len(), BufferMode::Normal)
         .add_out_auto_buffer(out_data.as_mut_ptr(), out_data.len(), BufferMode::Normal)
         .build();
@@ -93,7 +93,7 @@ pub fn adjust_refcount(
     };
 
     let req = cmif::CmifRequestBuilder::new(binder_cmds::ADJUST_REFCOUNT)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(AdjustRefcountError::BuildRequest)?;
@@ -128,7 +128,7 @@ pub fn get_native_handle(
     };
 
     let req = cmif::CmifRequestBuilder::new(binder_cmds::GET_NATIVE_HANDLE)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(GetNativeHandleError::BuildRequest)?;

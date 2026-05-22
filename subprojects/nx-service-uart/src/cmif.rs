@@ -23,7 +23,7 @@ fn dispatch_in_u32_out_bool(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutBoolError::BuildRequest)?;
@@ -69,7 +69,7 @@ fn dispatch_in_two_u32s_out_bool(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;

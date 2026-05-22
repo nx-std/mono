@@ -22,7 +22,7 @@ pub fn get_audio_device_service(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_SERVICE)
-        .data_value(&aruid)
+        .with_data_value(&aruid)
         .build();
     req.write_to(&mut buf)
         .map_err(GetAudioDeviceServiceError::BuildRequest)?;
@@ -96,7 +96,7 @@ pub fn list_audio_device_name_legacy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME_OLD)
-        .add_out_buffer(
+        .add_output_buffer_raw(
             names.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(names),
             BufferMode::Normal,
@@ -138,7 +138,7 @@ pub fn set_audio_device_output_volume(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME)
-        .data_value(&volume)
+        .with_data_value(&volume)
         .add_in_auto_buffer(
             (device_name as *const AudioDeviceName).cast::<u8>(),
             size_of::<AudioDeviceName>(),
@@ -167,8 +167,8 @@ pub fn set_audio_device_output_volume_legacy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
-        .data_value(&volume)
-        .add_in_buffer(
+        .with_data_value(&volume)
+        .add_input_buffer_raw(
             (device_name as *const AudioDeviceName).cast::<u8>(),
             size_of::<AudioDeviceName>(),
             BufferMode::Normal,
@@ -237,7 +237,7 @@ pub fn get_audio_device_output_volume_legacy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
-        .add_in_buffer(
+        .add_input_buffer_raw(
             (device_name as *const AudioDeviceName).cast::<u8>(),
             size_of::<AudioDeviceName>(),
             BufferMode::Normal,
@@ -306,7 +306,7 @@ pub fn get_active_audio_device_name_legacy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_ACTIVE_AUDIO_DEVICE_NAME_OLD)
-        .add_out_buffer(
+        .add_output_buffer_raw(
             (device_name as *mut AudioDeviceName).cast::<u8>(),
             size_of::<AudioDeviceName>(),
             BufferMode::Normal,

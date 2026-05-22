@@ -26,9 +26,9 @@ pub fn create_applet_resource(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
-        .context(0x20)
-        .data_value(&aruid)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&aruid)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(CreateAppletResourceError::BuildRequest)?;
@@ -105,9 +105,9 @@ pub fn activate_npad(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
-        .context(0x20)
-        .data_value(&input)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&input)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateNpadError::BuildRequest)?;
@@ -147,9 +147,9 @@ pub fn set_supported_npad_style_set(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
-        .context(0x20)
-        .data_value(&input)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&input)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
@@ -178,10 +178,10 @@ pub fn set_supported_npad_id_type(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
-        .context(0x20)
-        .data_value(&aruid)
+        .with_context(0x20)
+        .with_data_value(&aruid)
         .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
-        .send_pid()
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
@@ -207,9 +207,9 @@ pub fn activate_touch_screen(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
-        .context(0x20)
-        .data_value(&aruid)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&aruid)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateTouchScreenError::BuildRequest)?;
@@ -235,9 +235,9 @@ pub fn activate_keyboard(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_KEYBOARD)
-        .context(0x20)
-        .data_value(&aruid)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&aruid)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateKeyboardError::BuildRequest)?;
@@ -263,9 +263,9 @@ pub fn activate_mouse(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_MOUSE)
-        .context(0x20)
-        .data_value(&aruid)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&aruid)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateMouseError::BuildRequest)?;
@@ -304,9 +304,9 @@ pub fn activate_gesture(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_GESTURE)
-        .context(0x20)
-        .data_value(&input)
-        .send_pid()
+        .with_context(0x20)
+        .with_data_value(&input)
+        .with_send_pid()
         .build();
     req.write_to(&mut buf)
         .map_err(ActivateGestureError::BuildRequest)?;

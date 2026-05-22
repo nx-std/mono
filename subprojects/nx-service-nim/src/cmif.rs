@@ -20,7 +20,7 @@ pub fn destroy_system_update_task(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
-        .data_value(task_id)
+        .with_data_value(task_id)
         .build();
     req.write_to(&mut buf)
         .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
@@ -50,7 +50,7 @@ pub fn list_system_update_task(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let req = cmif::CmifRequestBuilder::new(proto::LIST_SYSTEM_UPDATE_TASK)
-        .add_out_buffer(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
+        .add_output_buffer_raw(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
         .build();
     req.write_to(&mut buf)
         .map_err(ListSystemUpdateTaskError::BuildRequest)?;

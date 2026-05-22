@@ -17,7 +17,7 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::REQUEST_LOAD)
-        .data_value(&font_type)
+        .with_data_value(&font_type)
         .build();
     req.write_to(&mut buf)
         .map_err(RequestLoadError::BuildRequest)?;
@@ -38,7 +38,7 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_LOAD_STATE)
-        .data_value(&font_type)
+        .with_data_value(&font_type)
         .build();
     req.write_to(&mut buf)
         .map_err(GetLoadStateError::BuildRequest)?;
@@ -61,7 +61,7 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SIZE)
-        .data_value(&font_type)
+        .with_data_value(&font_type)
         .build();
     req.write_to(&mut buf).map_err(GetSizeError::BuildRequest)?;
 
@@ -86,7 +86,7 @@ pub fn get_shared_memory_address_offset(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_ADDRESS_OFFSET)
-        .data_value(&font_type)
+        .with_data_value(&font_type)
         .build();
     req.write_to(&mut buf)
         .map_err(GetSharedMemoryAddressOffsetError::BuildRequest)?;
@@ -150,18 +150,18 @@ pub fn get_shared_font(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_FONT)
-        .data_value(&language_code)
-        .add_out_buffer(
+        .with_data_value(&language_code)
+        .add_output_buffer_raw(
             types.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(types),
             BufferMode::Normal,
         )
-        .add_out_buffer(
+        .add_output_buffer_raw(
             offsets.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(offsets),
             BufferMode::Normal,
         )
-        .add_out_buffer(
+        .add_output_buffer_raw(
             sizes.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(sizes),
             BufferMode::Normal,

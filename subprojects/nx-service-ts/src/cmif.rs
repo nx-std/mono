@@ -21,7 +21,7 @@ pub fn get_temperature_range(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_RANGE)
-        .data_value(&location)
+        .with_data_value(&location)
         .build();
     req.write_to(&mut buf)
         .map_err(GetTemperatureRangeError::BuildRequest)?;
@@ -44,7 +44,7 @@ pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetT
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE)
-        .data_value(&location)
+        .with_data_value(&location)
         .build();
     req.write_to(&mut buf)
         .map_err(GetTemperatureError::BuildRequest)?;
@@ -70,7 +70,7 @@ pub fn get_temperature_milli_c(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_MILLI_C)
-        .data_value(&location)
+        .with_data_value(&location)
         .build();
     req.write_to(&mut buf)
         .map_err(GetTemperatureMilliCError::BuildRequest)?;
@@ -98,7 +98,7 @@ pub fn open_session(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-        .data_value(&device_code)
+        .with_data_value(&device_code)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;

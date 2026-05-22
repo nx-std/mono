@@ -43,7 +43,7 @@ fn dispatch_in_u32(session: Handle, cmd_id: u32, value: u32) -> Result<(), Dispa
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32Error::BuildRequest)?;
@@ -73,7 +73,7 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&raw)
+        .with_data_value(&raw)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInBoolError::BuildRequest)?;
@@ -167,7 +167,7 @@ fn dispatch_in_u32_out_bool(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .data_value(&value)
+        .with_data_value(&value)
         .build();
     req.write_to(&mut buf)
         .map_err(DispatchInU32OutBoolError::BuildRequest)?;
@@ -200,7 +200,7 @@ pub fn open_session(session: Handle, pad_name: u32) -> Result<Session, OpenSessi
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-        .data_value(&pad_name)
+        .with_data_value(&pad_name)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSessionError::BuildRequest)?;
@@ -243,7 +243,7 @@ pub fn open_session2(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION2)
-        .data_value(&input)
+        .with_data_value(&input)
         .build();
     req.write_to(&mut buf)
         .map_err(OpenSession2Error::BuildRequest)?;
