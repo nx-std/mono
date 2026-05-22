@@ -3,8 +3,6 @@
 //! This module contains request values and fluent builders for TIPC requests.
 //! Response parsing lives in the sibling `response` module.
 
-use core::convert::Infallible;
-
 use nx_svc::raw::Handle as RawHandle;
 
 use super::wire::CommandType;
@@ -14,7 +12,7 @@ use crate::hipc::{self, BufferDescriptor, BufferMode, HipcRequest, HipcRequestBu
 ///
 /// TIPC request writers cannot fail while encoding their own headers; layout
 /// failures come from the underlying HIPC request size check.
-pub type RequestLayoutError = hipc::BuildError<Infallible>;
+pub type RequestLayoutError = hipc::WriteError;
 
 /// Fluent builder for a TIPC request.
 ///
@@ -22,7 +20,7 @@ pub type RequestLayoutError = hipc::BuildError<Infallible>;
 /// `CommandType::request(request_id)` (ID + 16). Exposes only the descriptor
 /// kinds TIPC supports — mapped buffers and copy handles.
 pub struct TipcRequestBuilder<'a> {
-    hipc: HipcRequestBuilder<'a>,
+    hipc: HipcRequestBuilder,
     data: &'a [u8],
 }
 
@@ -86,32 +84,22 @@ impl<'a> TipcRequestBuilder<'a> {
 
     /// Finalizes the request DTO.
     pub fn build(self) -> TipcRequest<'a> {
-        let hipc = self.hipc.with_payload(self.data).build();
-        TipcRequest { hipc }
+        self.hipc.with_payload(self.data).build()
     }
 }
 
 /// Finalized TIPC request.
-#[derive(Debug, Clone)]
-pub struct TipcRequest<'a> {
-    hipc: HipcRequest<'a>,
-}
-
-impl<'a> TipcRequest<'a> {
-    /// Writes the TIPC request into `dst`.
-    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-        self.hipc.write_to(dst)?;
-        Ok(())
-    }
-}
+///
+/// Alias for a [`HipcRequest`] carrying a raw byte-slice payload.
+pub type TipcRequest<'a> = HipcRequest<&'a [u8]>;
 
 /// TIPC close request DTO.
 #[derive(Debug, Clone)]
-pub struct TipcCloseRequest<'a> {
-    hipc: HipcRequest<'a>,
+pub struct TipcCloseRequest {
+    hipc: HipcRequest,
 }
 
-impl<'a> TipcCloseRequest<'a> {
+impl TipcCloseRequest {
     /// Creates a session-close request.
     pub fn session() -> Self {
         Self {
@@ -121,7 +109,6 @@ impl<'a> TipcCloseRequest<'a> {
 
     /// Writes the close request into `dst`.
     pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-        self.hipc.write_to(dst)?;
-        Ok(())
+        self.hipc.write_to(dst)
     }
 }

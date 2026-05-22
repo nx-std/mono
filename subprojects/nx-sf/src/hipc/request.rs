@@ -7,25 +7,36 @@
 //! # DTO model
 //!
 //! [`HipcRequestBuilder`] accumulates HIPC-level descriptors (statics, buffers,
-//! handles, recv-list) without holding any buffer reference and finalizes into
-//! a [`HipcRequest`] DTO via [`HipcRequestBuilder::build`]. The DTO carries
-//! every input needed to serialize the request — descriptors, handles,
-//! recv-list configuration, and send-PID flag — but **no buffer reference**.
+//! handles, recv-list) and finalizes into a [`HipcRequest`] DTO via
+//! [`HipcRequestBuilder::build`]. The DTO carries every input needed to
+//! serialize the request — descriptors, handles, recv-list configuration,
+//! send-PID flag, and the in-band payload `P`.
 //!
-//! Serialization happens via [`HipcRequest::write_to`], which writes the HIPC
-//! header and all descriptor slots into a caller-supplied `&mut [u8; N]`
-//! buffer and copies the payload into the data-words region. Higher-level
-//! protocols (CMIF, TIPC) wrap a [`HipcRequest`] in their own DTO and
-//! delegate to [`write_to`](HipcRequest::write_to).
+//! # In-band payloads
+//!
+//! [`HipcRequest`] is parametric over an in-band payload type `P: HipcPayload`.
+//! The payload owns the bytes that go into the data-words region. HIPC asks
+//! the payload for its [`encoded_len`](HipcPayload::encoded_len), pads up to
+//! the 4-byte word boundary, writes the envelope, zero-fills the region, and
+//! finally delegates to [`HipcPayload::write_to`].
+//!
+//! Built-in payloads cover the common cases:
+//!
+//! - `()` — no in-band data; the data-words region is empty.
+//! - `&[u8]` — raw byte slice copied verbatim.
+//!
+//! Higher-level protocols (CMIF, TIPC) define their own payload types and
+//! implement [`HipcPayload`] for them, so HIPC drives the whole write without
+//! reaching back into the data region after the fact.
 //!
 //! Descriptor counts are bounded by the HIPC header's 4-bit fields, so the
 //! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage — no heap, no dynamic
 //! allocation.
 
-use core::{convert::Infallible, mem::size_of};
+use core::mem::size_of;
 
 use nx_svc::raw::Handle as RawHandle;
-use zerocopy::FromBytes;
+use zerocopy::FromBytes as _;
 
 use super::{
     array_vec::ArrayVec,
@@ -43,91 +54,17 @@ pub const HIPC_MAX_DESCRIPTORS: usize = 15;
 /// 4-bit `recv_static_mode` field, capping `n` at 13.
 pub const HIPC_MAX_RECV_LIST: usize = 13;
 
-/// Error returned by [`HipcRequest::write_to`].
-#[derive(Debug, thiserror::Error)]
-pub enum BuildError<E> {
-    /// The accumulated descriptors plus encoded payload exceed the request
-    /// buffer size.
-    #[error("request layout requires {needed} bytes, IPC buffer holds {limit}")]
-    TooLarge {
-        /// Total bytes implied by descriptors + payload.
-        needed: usize,
-        /// Capacity of the request buffer.
-        limit: usize,
-    },
-    /// A higher-level protocol writer reported an error.
-    ///
-    /// Reserved for protocol wrappers (CMIF / TIPC) that compose
-    /// [`HipcRequest::write_to`] with their own data-words encoder; for the
-    /// bare HIPC write the error parameter is [`Infallible`].
-    #[error("payload encode failed")]
-    Payload(#[source] E),
-}
-
-/// Receive-list (Type C) configuration for the HIPC header.
-///
-/// Lowered to the 4-bit `recv_static_mode` field on the build path. Variants
-/// mirror the four kernel-defined cases — see [`RECV_LIST_WIRE_NONE`] in the
-/// wire module for the authoritative wire-encoding table.
-///
-/// The default is [`RecvListMode::None`].
-#[derive(Debug, Default, Clone)]
-pub(crate) enum RecvListMode {
-    /// No recv-list; the server may not return Type-X pointer data (wire mode
-    /// `0`).
-    #[default]
-    None,
-    /// Server places returned pointer data inside the client's TLS message
-    /// buffer, after the data words (wire mode `1`). No wire slot is reserved.
-    ToMessageBuffer,
-    /// One wire slot the server may subdivide for all returned pointer data
-    /// (wire mode `2`). libnx fills the slot on receipt with the session's
-    /// pointer buffer.
-    SingleBuffer,
-    /// Per-pointer recv-list: entry `i` is the destination of the `i`-th
-    /// out-pointer descriptor (wire mode `2 + n`, `n = entries.len()`).
-    ///
-    /// Constructed exclusively via [`HipcRequestBuilder::with_recv_list_entry`]
-    /// so the variant is never observably empty.
-    Entries(ArrayVec<RecvListEntry, HIPC_MAX_RECV_LIST>),
-}
-
-impl RecvListMode {
-    /// Number of recv-list slots this mode reserves on the wire.
-    #[inline]
-    pub fn wire_slot_count(&self) -> usize {
-        match self {
-            RecvListMode::None | RecvListMode::ToMessageBuffer => 0,
-            RecvListMode::SingleBuffer => 1,
-            RecvListMode::Entries(v) => v.len(),
-        }
-    }
-
-    /// Encodes the 4-bit `recv_static_mode` wire field.
-    #[inline]
-    pub fn to_raw(&self) -> u8 {
-        match self {
-            RecvListMode::None => RECV_LIST_WIRE_NONE,
-            RecvListMode::ToMessageBuffer => RECV_LIST_WIRE_TO_MESSAGE_BUFFER,
-            RecvListMode::SingleBuffer => RECV_LIST_WIRE_SINGLE_BUFFER,
-            RecvListMode::Entries(v) => RECV_LIST_WIRE_SINGLE_BUFFER + v.len() as u8,
-        }
-    }
-}
-
 /// HIPC request DTO.
 ///
 /// Self-contained value-type description of an HIPC request: message type,
 /// every descriptor / handle that goes on the wire, recv-list configuration,
-/// `send_pid` flag, and the word-aligned size of the data-words region.
-/// Constructed by [`HipcRequestBuilder::build`].
+/// `send_pid` flag, and an in-band payload `P`. Constructed by
+/// [`HipcRequestBuilder::build`].
 ///
-/// Serialize via [`write_to`](Self::write_to). The data-words region is filled
-/// with the payload (if any) and then zero-padded to the requested size.
-/// [`write_to`](Self::write_to) returns the entire data-words region for
-/// further protocol-specific writes.
+/// Serialize via [`write_to`](Self::write_to), which writes the HIPC envelope
+/// and then delegates the data-words region to the payload encoder.
 #[derive(Debug, Clone)]
-pub struct HipcRequest<'a> {
+pub struct HipcRequest<P: HipcPayload = ()> {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
     send_buffers: ArrayVec<BufferDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -137,39 +74,25 @@ pub struct HipcRequest<'a> {
     move_handles: ArrayVec<RawHandle, HIPC_MAX_DESCRIPTORS>,
     recv_list_mode: RecvListMode,
     send_pid: bool,
-    data_words_size: usize,
-    data_words_payload: &'a [u8],
+    payload: P,
 }
 
-impl<'a> HipcRequest<'a> {
-    /// Returns the byte offset of the data-words region inside a serialized
-    /// HIPC request.
-    pub fn data_words_offset(&self) -> usize {
-        self.layout().data_words_offset()
-    }
-
-    /// Returns the data-words region size in bytes (always word-aligned,
-    /// matching the HIPC `num_data_words` wire field).
-    pub fn data_words_size(&self) -> usize {
-        self.data_words_size
-    }
-
-    /// Writes the HIPC header and descriptor slots into `dst`.
+impl<P: HipcPayload> HipcRequest<P> {
+    /// Writes the HIPC envelope and the payload's data-words region into `dst`.
     ///
-    /// Copies the data-words payload into the beginning of the data-words
-    /// region (offset 0) and zero-fills the remainder. Returns a mutable
-    /// slice of the *entire* data-words region.
-    ///
-    /// The total layout size must fit in `N`; otherwise
-    /// [`BuildError::TooLarge`] is returned.
-    pub fn write_to<'dst, const N: usize>(
-        &self,
-        dst: &'dst mut [u8; N],
-    ) -> Result<&'dst mut [u8], BuildError<Infallible>> {
-        let layout = self.layout();
+    /// The data-words region is sized as `payload.encoded_len()` rounded up to
+    /// the next 4-byte boundary, zero-filled, then handed to
+    /// [`HipcPayload::write_to`]. The total layout size must fit in `N`;
+    /// otherwise [`WriteError`] is returned.
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), WriteError> {
+        let data_words_size = self
+            .payload
+            .encoded_len()
+            .next_multiple_of(size_of::<u32>());
+        let layout = self.layout(data_words_size);
         let total_bytes = layout.total_bytes();
         if total_bytes > N {
-            return Err(BuildError::TooLarge {
+            return Err(WriteError {
                 needed: total_bytes,
                 limit: N,
             });
@@ -189,22 +112,19 @@ impl<'a> HipcRequest<'a> {
         );
 
         let start = layout.data_words_offset();
-        let len = self.data_words_size();
-        let data_region = &mut dst[start..start + len];
-        data_region.fill(0);
-        if !self.data_words_payload.is_empty() {
-            data_region[..self.data_words_payload.len()].copy_from_slice(self.data_words_payload);
-        }
-        Ok(data_region)
+        let region = &mut dst[start..start + data_words_size];
+        region.fill(0);
+        self.payload.write_to(region);
+        Ok(())
     }
 
-    fn layout(&self) -> Layout {
+    fn layout(&self, data_words_size: usize) -> Layout {
         Layout {
             send_statics: self.send_statics.len(),
             send_buffers: self.send_buffers.len(),
             recv_buffers: self.recv_buffers.len(),
             exch_buffers: self.exch_buffers.len(),
-            num_data_words: self.data_words_size / size_of::<u32>(),
+            num_data_words: data_words_size / size_of::<u32>(),
             recv_list_entries: self.recv_list_mode.wire_slot_count(),
             send_pid: self.send_pid,
             num_copy_handles: self.copy_handles.len(),
@@ -213,11 +133,37 @@ impl<'a> HipcRequest<'a> {
     }
 }
 
+/// Error returned by [`HipcRequest::write_to`] when the destination buffer
+/// is too small to hold the encoded request.
+///
+/// HIPC request layout is computed from the accumulated envelope
+/// (descriptors, handles, recv-list, optional special header) plus the
+/// payload's data-words region (sized as
+/// `payload.encoded_len().next_multiple_of(4)`). If that total exceeds the
+/// caller-supplied destination buffer's `N` bytes,
+/// [`write_to`](HipcRequest::write_to) returns this error instead of
+/// writing a partial request. The fields report the layout requirement
+/// and the buffer capacity so callers can either size their IPC buffer
+/// to fit or drop descriptors/payload to fit the available space.
+///
+/// Building a [`HipcRequest`] is infallible — this error only surfaces at
+/// serialization time, when the destination buffer is known.
+#[derive(Debug, thiserror::Error)]
+#[error("request layout requires {needed} bytes, IPC buffer holds {limit}")]
+pub struct WriteError {
+    /// Total bytes the encoded request layout requires.
+    pub needed: usize,
+    /// Capacity of the destination buffer.
+    pub limit: usize,
+}
+
 /// Fluent builder for an [`HipcRequest`].
 ///
-/// Accumulates HIPC-level descriptors via `with_*` methods. Finalize via
-/// [`build`](Self::build), which returns a self-contained [`HipcRequest`].
-pub struct HipcRequestBuilder<'a> {
+/// Accumulates HIPC-level descriptors via `with_*` methods. The in-band
+/// payload is attached via [`with_payload`](Self::with_payload), which
+/// type-changes the builder from `HipcRequestBuilder<P>` to
+/// `HipcRequestBuilder<Q>`. Finalize via [`build`](Self::build).
+pub struct HipcRequestBuilder<P: HipcPayload = ()> {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
     send_buffers: ArrayVec<BufferDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -227,15 +173,15 @@ pub struct HipcRequestBuilder<'a> {
     move_handles: ArrayVec<RawHandle, HIPC_MAX_DESCRIPTORS>,
     recv_list_mode: RecvListMode,
     send_pid: bool,
-    data_words_size: usize,
-    data_words_payload: &'a [u8],
+    payload: P,
 }
 
-impl<'a> HipcRequestBuilder<'a> {
-    /// Starts a new builder for the given message type.
+impl HipcRequestBuilder {
+    /// Starts a new builder for the given message type with no in-band payload.
     ///
     /// `message_type` accepts any value convertible into [`MessageType`] —
-    /// typically a CMIF or TIPC `CommandType`.
+    /// typically a CMIF or TIPC `CommandType`. Attach a payload via
+    /// [`with_payload`](Self::with_payload).
     pub fn new(message_type: impl Into<MessageType>) -> Self {
         Self {
             message_type: message_type.into(),
@@ -247,11 +193,12 @@ impl<'a> HipcRequestBuilder<'a> {
             move_handles: Default::default(),
             recv_list_mode: RecvListMode::None,
             send_pid: false,
-            data_words_size: 0,
-            data_words_payload: &[],
+            payload: (),
         }
     }
+}
 
+impl<P: HipcPayload> HipcRequestBuilder<P> {
     /// Replaces the message type chosen at construction.
     ///
     /// CMIF callers use this to switch between
@@ -271,29 +218,25 @@ impl<'a> HipcRequestBuilder<'a> {
         self
     }
 
-    /// Configures the data-words region size in bytes.
+    /// Attaches an in-band payload, type-changing the builder to carry `Q`.
     ///
-    /// The size is rounded up to the nearest 4-byte boundary to match HIPC
-    /// word alignment requirements. If a payload is set via
-    /// [`with_payload`](Self::with_payload), this size must be at least as
-    /// large as the payload.
+    /// All previously-accumulated envelope state (descriptors, handles,
+    /// recv-list, `send_pid`) is preserved. Subsequent `with_*` calls operate
+    /// on the new builder.
     #[inline]
-    pub(crate) fn with_data_size(mut self, size: usize) -> Self {
-        self.data_words_size = size.next_multiple_of(size_of::<u32>());
-        self
-    }
-
-    /// Sets the payload to be copied into the data-words region.
-    ///
-    /// The payload is copied to offset 0. This method automatically updates
-    /// the data-words size to fit the payload if the current size is smaller.
-    #[inline]
-    pub fn with_payload(mut self, payload: &'a [u8]) -> Self {
-        self.data_words_payload = payload;
-        if self.data_words_size < payload.len() {
-            self.data_words_size = payload.len().next_multiple_of(size_of::<u32>());
+    pub fn with_payload<Q: HipcPayload>(self, payload: Q) -> HipcRequestBuilder<Q> {
+        HipcRequestBuilder {
+            message_type: self.message_type,
+            send_statics: self.send_statics,
+            send_buffers: self.send_buffers,
+            recv_buffers: self.recv_buffers,
+            exch_buffers: self.exch_buffers,
+            copy_handles: self.copy_handles,
+            move_handles: self.move_handles,
+            recv_list_mode: self.recv_list_mode,
+            send_pid: self.send_pid,
+            payload,
         }
-        self
     }
 
     /// Appends a send-static (Type X) descriptor.
@@ -412,7 +355,7 @@ impl<'a> HipcRequestBuilder<'a> {
     }
 
     /// Finalizes the builder into a [`HipcRequest`] DTO.
-    pub fn build(self) -> HipcRequest<'a> {
+    pub fn build(self) -> HipcRequest<P> {
         HipcRequest {
             message_type: self.message_type,
             send_statics: self.send_statics,
@@ -423,8 +366,111 @@ impl<'a> HipcRequestBuilder<'a> {
             move_handles: self.move_handles,
             recv_list_mode: self.recv_list_mode,
             send_pid: self.send_pid,
-            data_words_size: self.data_words_size,
-            data_words_payload: self.data_words_payload,
+            payload: self.payload,
+        }
+    }
+}
+
+/// Encoder for the in-band data-words region of an HIPC request.
+///
+/// HIPC owns the envelope (header, descriptors, handles); the payload owns
+/// everything that goes into the data-words region. Higher-level protocols
+/// (CMIF, TIPC) implement this trait for their wire-format bodies and attach
+/// them to a [`HipcRequest`] via [`HipcRequestBuilder::with_payload`].
+///
+/// # Contract
+///
+/// [`HipcRequest::write_to`] computes the data-words region as
+/// `encoded_len().next_multiple_of(4)`, zero-fills it, and then calls
+/// [`write_to`](Self::write_to). Implementations only need to write the
+/// bytes they know about; any trailing word-padding stays zero. Encoding
+/// is infallible — the destination slice is guaranteed large enough by
+/// construction, and CMIF/TIPC wire-format bodies have no other failure
+/// modes.
+pub trait HipcPayload {
+    /// Byte length of the encoded payload, **unrounded**.
+    ///
+    /// HIPC rounds this up to the next 4-byte word boundary when sizing the
+    /// data-words region.
+    fn encoded_len(&self) -> usize;
+
+    /// Writes the payload into the data-words region starting at `dst[0]`.
+    ///
+    /// `dst.len()` is guaranteed to be at least
+    /// [`encoded_len`](Self::encoded_len) rounded up to a 4-byte multiple,
+    /// and the region is pre-zeroed by HIPC.
+    fn write_to(&self, dst: &mut [u8]);
+}
+
+impl HipcPayload for () {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn write_to(&self, _: &mut [u8]) {}
+}
+
+impl HipcPayload for &[u8] {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn write_to(&self, dst: &mut [u8]) {
+        dst[..self.len()].copy_from_slice(self);
+    }
+}
+
+/// Receive-list (Type C) configuration for the HIPC header.
+///
+/// Lowered to the 4-bit `recv_static_mode` field on the build path. Variants
+/// mirror the four kernel-defined cases — see [`RECV_LIST_WIRE_NONE`] in the
+/// wire module for the authoritative wire-encoding table.
+///
+/// The default is [`RecvListMode::None`].
+#[derive(Debug, Default, Clone)]
+pub(crate) enum RecvListMode {
+    /// No recv-list; the server may not return Type-X pointer data (wire mode
+    /// `0`).
+    #[default]
+    None,
+    /// Server places returned pointer data inside the client's TLS message
+    /// buffer, after the data words (wire mode `1`). No wire slot is reserved.
+    ToMessageBuffer,
+    /// One wire slot the server may subdivide for all returned pointer data
+    /// (wire mode `2`). libnx fills the slot on receipt with the session's
+    /// pointer buffer.
+    SingleBuffer,
+    /// Per-pointer recv-list: entry `i` is the destination of the `i`-th
+    /// out-pointer descriptor (wire mode `2 + n`, `n = entries.len()`).
+    ///
+    /// Constructed exclusively via [`HipcRequestBuilder::with_recv_list_entry`]
+    /// so the variant is never observably empty.
+    Entries(ArrayVec<RecvListEntry, HIPC_MAX_RECV_LIST>),
+}
+
+impl RecvListMode {
+    /// Number of recv-list slots this mode reserves on the wire.
+    #[inline]
+    pub fn wire_slot_count(&self) -> usize {
+        match self {
+            RecvListMode::None | RecvListMode::ToMessageBuffer => 0,
+            RecvListMode::SingleBuffer => 1,
+            RecvListMode::Entries(v) => v.len(),
+        }
+    }
+
+    /// Encodes the 4-bit `recv_static_mode` wire field.
+    #[inline]
+    pub fn to_raw(&self) -> u8 {
+        match self {
+            RecvListMode::None => RECV_LIST_WIRE_NONE,
+            RecvListMode::ToMessageBuffer => RECV_LIST_WIRE_TO_MESSAGE_BUFFER,
+            RecvListMode::SingleBuffer => RECV_LIST_WIRE_SINGLE_BUFFER,
+            RecvListMode::Entries(v) => RECV_LIST_WIRE_SINGLE_BUFFER + v.len() as u8,
         }
     }
 }
