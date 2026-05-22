@@ -25,21 +25,15 @@ use crate::{
 ///
 /// This is INvDrvServices command 0.
 pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(nv_cmds::OPEN)
-            .add_in_buffer(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
-            .send(&mut buf)
-            .map_err(OpenError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(OpenError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(nv_cmds::OPEN)
+        .add_in_buffer(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
+        .build();
+    req.write_to(&mut buf).map_err(OpenError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(OpenError::SendRequest)?;
 
     // Response contains: fd (u32), error (u32).
     #[repr(C)]
@@ -85,31 +79,29 @@ pub fn ioctl(
         request,
     };
 
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = {
-            let mut builder =
-                cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).data_size(size_of::<Input>());
-            if in_size > 0 {
-                builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
-            }
-            if out_size > 0 {
-                builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
-            }
-            builder.send(&mut buf).map_err(IoctlError::BuildRequest)?
-        };
+        let mut builder =
+            cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).data_size(size_of::<Input>());
+        if in_size > 0 {
+            builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+        }
+        if out_size > 0 {
+            builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+        }
+        builder
+            .build()
+            .write_to(&mut buf)
+            .map_err(IoctlError::BuildRequest)?
+    };
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(IoctlError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(IoctlError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(IoctlError::ParseResponse)?;
 
@@ -149,33 +141,31 @@ pub fn ioctl2(
         request,
     };
 
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = {
-            // Auto buffers in order: argp in (if applicable), extra in, argp out (if applicable).
-            let mut builder =
-                cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).data_size(size_of::<Input>());
-            if in_size > 0 {
-                builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
-            }
-            builder = builder.add_in_auto_buffer(extra_in, extra_in_size, BufferMode::Normal);
-            if out_size > 0 {
-                builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
-            }
-            builder.send(&mut buf).map_err(Ioctl2Error::BuildRequest)?
-        };
+        // Auto buffers in order: argp in (if applicable), extra in, argp out (if applicable).
+        let mut builder =
+            cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).data_size(size_of::<Input>());
+        if in_size > 0 {
+            builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+        }
+        builder = builder.add_in_auto_buffer(extra_in, extra_in_size, BufferMode::Normal);
+        if out_size > 0 {
+            builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+        }
+        builder
+            .build()
+            .write_to(&mut buf)
+            .map_err(Ioctl2Error::BuildRequest)?
+    };
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(Ioctl2Error::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(Ioctl2Error::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(Ioctl2Error::ParseResponse)?;
 
@@ -215,33 +205,31 @@ pub fn ioctl3(
         request,
     };
 
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = {
-            // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra out.
-            let mut builder =
-                cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).data_size(size_of::<Input>());
-            if in_size > 0 {
-                builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
-            }
-            if out_size > 0 {
-                builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
-            }
-            builder = builder.add_out_auto_buffer(extra_out, extra_out_size, BufferMode::Normal);
-            builder.send(&mut buf).map_err(Ioctl3Error::BuildRequest)?
-        };
+        // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra out.
+        let mut builder =
+            cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).data_size(size_of::<Input>());
+        if in_size > 0 {
+            builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+        }
+        if out_size > 0 {
+            builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+        }
+        builder = builder.add_out_auto_buffer(extra_out, extra_out_size, BufferMode::Normal);
+        builder
+            .build()
+            .write_to(&mut buf)
+            .map_err(Ioctl3Error::BuildRequest)?
+    };
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(Ioctl3Error::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(Ioctl3Error::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(Ioctl3Error::ParseResponse)?;
 
@@ -259,24 +247,19 @@ pub fn ioctl3(
 ///
 /// This is INvDrvServices command 2.
 pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(nv_cmds::CLOSE)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(CloseError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(nv_cmds::CLOSE)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf).map_err(CloseError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), fd.to_raw()) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(CloseError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), fd.to_raw()) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(CloseError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(CloseError::ParseResponse)?;
 
@@ -299,26 +282,22 @@ pub fn initialize(
     tmem_handle: TmemHandle,
     tmem_size: u32,
 ) -> Result<(), InitializeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(nv_cmds::INITIALIZE)
-            .data_size(size_of::<u32>())
-            .add_copy_handle(process_handle.to_raw())
-            .add_copy_handle(tmem_handle.to_raw())
-            .send(&mut buf)
-            .map_err(InitializeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(nv_cmds::INITIALIZE)
+        .data_size(size_of::<u32>())
+        .add_copy_handle(process_handle.to_raw())
+        .add_copy_handle(tmem_handle.to_raw())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(InitializeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), tmem_size) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(InitializeError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), tmem_size) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(InitializeError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(InitializeError::ParseResponse)?;
 
     Ok(())
@@ -344,24 +323,20 @@ pub fn query_event(
         event_id,
     };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(nv_cmds::QUERY_EVENT)
-            .data_size(size_of::<Input>())
-            .send(&mut buf)
-            .map_err(QueryEventError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(nv_cmds::QUERY_EVENT)
+        .data_size(size_of::<Input>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(QueryEventError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(QueryEventError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(QueryEventError::SendRequest)?;
+
     // Response contains error code (u32) and a copy handle for the event.
     let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(QueryEventError::ParseResponse)?;
@@ -384,25 +359,26 @@ pub fn query_event(
 ///
 /// This is INvDrvServices command 8.
 pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetClientPidError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(nv_cmds::SET_CLIENT_PID)
-            .data_size(size_of::<u64>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(SetClientPidError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(nv_cmds::SET_CLIENT_PID)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetClientPidError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid.to_raw()) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SetClientPidError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+    unsafe {
+        ptr::write_unaligned(
+            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
+            aruid.to_raw(),
+        )
+    };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SetClientPidError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetClientPidError::ParseResponse)?;
 
     Ok(())

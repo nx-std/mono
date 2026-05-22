@@ -7,6 +7,8 @@
 use static_assertions::const_assert_eq;
 use zerocopy::{IntoBytes, KnownLayout};
 
+use crate::hipc;
+
 /// Magic number for CMIF input headers ("SFCI" - Service Framework Command Input).
 pub const IN_HEADER_MAGIC: u32 = 0x49434653;
 
@@ -38,9 +40,9 @@ pub enum CommandType {
     ControlWithContext = 7,
 }
 
-impl From<CommandType> for crate::hipc::MessageType {
+impl From<CommandType> for hipc::MessageType {
     fn from(cmd: CommandType) -> Self {
-        crate::hipc::MessageType::from_raw(cmd as u16)
+        hipc::MessageType::from_raw(cmd as u16)
     }
 }
 
@@ -72,7 +74,7 @@ pub struct InHeader {
     pub token: u32,
 }
 
-const_assert_eq!(core::mem::size_of::<InHeader>(), 16);
+const_assert_eq!(size_of::<InHeader>(), 16);
 
 /// CMIF output header (16 bytes).
 #[derive(
@@ -90,7 +92,7 @@ pub struct OutHeader {
     pub token: u32,
 }
 
-const_assert_eq!(core::mem::size_of::<OutHeader>(), 16);
+const_assert_eq!(size_of::<OutHeader>(), 16);
 
 /// Domain input header (16 bytes).
 #[derive(
@@ -112,7 +114,7 @@ pub struct DomainInHeader {
     pub token: u32,
 }
 
-const_assert_eq!(core::mem::size_of::<DomainInHeader>(), 16);
+const_assert_eq!(size_of::<DomainInHeader>(), 16);
 
 /// Domain output header (16 bytes).
 #[derive(
@@ -134,4 +136,4 @@ pub struct DomainOutHeader {
     pub token: u32,
 }
 
-const_assert_eq!(core::mem::size_of::<DomainOutHeader>(), 16);
+const_assert_eq!(size_of::<DomainOutHeader>(), 16);

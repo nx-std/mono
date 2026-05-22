@@ -41,9 +41,6 @@ pub fn register_process(
         .map_err(RegisterProcessError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(RegisterProcessError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     cmif::parse_response_bytes(&buf, 0).map_err(RegisterProcessError::ParseResponse)?;
 
     Ok(())
@@ -79,9 +76,6 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
         .map_err(UnregisterProcessError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(UnregisterProcessError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     cmif::parse_response_bytes(&buf, 0).map_err(UnregisterProcessError::ParseResponse)?;
 
     Ok(())

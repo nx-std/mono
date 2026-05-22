@@ -13,33 +13,25 @@ use crate::{
     types::{BindPortEventIn, OpenPortLegacyIn, OpenPortV6In, OpenPortV7In},
 };
 
-// ---------------------------------------------------------------------------
-// Dispatch helpers
-// ---------------------------------------------------------------------------
-
 fn dispatch_in_u32_out_bool(
     session: Handle,
     cmd_id: u32,
     value: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmd_id)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(DispatchInU32OutBoolError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd_id)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(DispatchInU32OutBoolError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), value) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(DispatchInU32OutBoolError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), value) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32OutBoolError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(DispatchInU32OutBoolError::ParseResponse)?;
 
@@ -73,24 +65,21 @@ fn dispatch_in_two_u32s_out_bool(
 
     let input = TwoU32s { val0, val1 };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmd_id)
-            .data_size(size_of::<TwoU32s>())
-            .send(&mut buf)
-            .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd_id)
+        .data_size(size_of::<TwoU32s>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<TwoU32s>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<TwoU32s>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<TwoU32s>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<TwoU32s>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session)
+        .map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(DispatchInTwoU32sOutBoolError::ParseResponse)?;
 
@@ -111,20 +100,15 @@ pub enum DispatchInTwoU32sOutBoolError {
 }
 
 fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64Error> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(cmd_id)
-            .send(&mut buf)
-            .map_err(DispatchOutU64Error::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(DispatchOutU64Error::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd_id).build();
+    req.write_to(&mut buf)
+        .map_err(DispatchOutU64Error::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutU64Error::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u64>())
         .map_err(DispatchOutU64Error::ParseResponse)?;
 
@@ -143,10 +127,6 @@ pub enum DispatchOutU64Error {
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseRespBytesError),
 }
-
-// ---------------------------------------------------------------------------
-// Manager commands
-// ---------------------------------------------------------------------------
 
 /// Checks if a production port exists (pre-17.0.0).
 pub fn has_port(session: Handle, port: u32) -> Result<bool, DispatchInU32OutBoolError> {
@@ -206,20 +186,15 @@ pub fn is_supported_flow_control_mode_for_dev(
 
 /// Creates a new port session (returns IPortSession as a move handle).
 pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSessionError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::CREATE_PORT_SESSION)
-            .send(&mut buf)
-            .map_err(CreatePortSessionError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(CreatePortSessionError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::CREATE_PORT_SESSION).build();
+    req.write_to(&mut buf)
+        .map_err(CreatePortSessionError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(CreatePortSessionError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, 0).map_err(CreatePortSessionError::ParseResponse)?;
 
@@ -284,10 +259,6 @@ pub fn is_supported_device_variation_for_dev(
         device_variation,
     )
 }
-
-// ---------------------------------------------------------------------------
-// Port session commands
-// ---------------------------------------------------------------------------
 
 /// Opens a port using the pre-6.0.0 wire format (legacy).
 #[allow(clippy::too_many_arguments)]
@@ -660,10 +631,6 @@ pub fn port_unbind_port_event(
 ) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::PORT_UNBIND_PORT_EVENT, port_event_type)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`create_port_session`].
 #[derive(Debug, thiserror::Error)]

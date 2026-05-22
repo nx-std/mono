@@ -32,10 +32,6 @@ struct SetVolumeIn {
 
 const_assert_eq!(size_of::<SetVolumeIn>(), 0x18);
 
-// ---------------------------------------------------------------------------
-// aud:a commands
-// ---------------------------------------------------------------------------
-
 /// Suspends audio for a process.
 pub fn request_suspend_audio(
     session: SessionHandle,
@@ -126,10 +122,6 @@ pub fn set_audio_output_process_record_volume(
     )
 }
 
-// ---------------------------------------------------------------------------
-// aud:d commands
-// ---------------------------------------------------------------------------
-
 /// Suspends audio for a process (debug).
 pub fn request_suspend_audio_for_debug(
     session: SessionHandle,
@@ -148,10 +140,6 @@ pub fn request_resume_audio_for_debug(
     dispatch_pid_delay(session, proto::REQUEST_RESUME_AUDIO_FOR_DEBUG, pid, delay)
 }
 
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
-
 fn dispatch_pid_delay(
     session: SessionHandle,
     cmd: u32,
@@ -160,48 +148,40 @@ fn dispatch_pid_delay(
 ) -> Result<(), SuspendResumeError> {
     let input = PidDelayIn { pid, delay };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmd)
-            .data_size(size_of::<PidDelayIn>())
-            .send(&mut buf)
-            .map_err(SuspendResumeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd)
+        .data_size(size_of::<PidDelayIn>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SuspendResumeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<PidDelayIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<PidDelayIn>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SuspendResumeError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<PidDelayIn>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<PidDelayIn>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SuspendResumeError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SuspendResumeError::ParseResponse)?;
 
     Ok(())
 }
 
 fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32, GetVolumeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmd)
-            .data_size(size_of::<u64>())
-            .send(&mut buf)
-            .map_err(GetVolumeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd)
+        .data_size(size_of::<u64>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetVolumeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), pid) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetVolumeError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), pid) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetVolumeError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(GetVolumeError::ParseResponse)?;
 
@@ -225,32 +205,24 @@ fn dispatch_set_volume(
         delay,
     };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmd)
-            .data_size(size_of::<SetVolumeIn>())
-            .send(&mut buf)
-            .map_err(SetVolumeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd)
+        .data_size(size_of::<SetVolumeIn>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetVolumeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<SetVolumeIn>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<SetVolumeIn>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SetVolumeError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<SetVolumeIn>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<SetVolumeIn>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SetVolumeError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetVolumeError::ParseResponse)?;
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by suspend/resume operations.
 #[derive(Debug, thiserror::Error)]

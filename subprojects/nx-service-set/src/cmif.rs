@@ -51,9 +51,6 @@ fn get_firmware_version_inner(
         .map_err(GetFirmwareVersionError::BuildRequest)?;
     ipc::send_sync_request(&mut buf, session).map_err(GetFirmwareVersionError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     cmif::parse_response_bytes(&buf, 0).map_err(GetFirmwareVersionError::ParseResponse)?;
 
     Ok(out)

@@ -13,25 +13,22 @@ use crate::proto;
 pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownError> {
     let in_data: u8 = u8::from(reboot);
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN)
-            .data_size(1)
-            .send(&mut buf)
-            .map_err(ShutdownError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN)
+        .data_size(1)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ShutdownError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly 1 byte.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), in_data);
-        }
-        ipc::send_sync_request(&mut buf, session).map_err(ShutdownError::SendRequest)?;
+    // SAFETY: `req` is exactly 1 byte.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), in_data);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ShutdownError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(ShutdownError::ParseResponse)?;
 
     Ok(())
@@ -39,20 +36,15 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
 
 /// Puts the system into an error state.
 pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::PUT_ERROR_STATE)
-            .send(&mut buf)
-            .map_err(PutErrorStateError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(PutErrorStateError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::PUT_ERROR_STATE).build();
+    req.write_to(&mut buf)
+        .map_err(PutErrorStateError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(PutErrorStateError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(PutErrorStateError::ParseResponse)?;
 
     Ok(())

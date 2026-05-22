@@ -43,20 +43,15 @@ pub struct GetRssiError(#[source] pub DispatchError);
 /// Sends a CMIF request with no input payload and reads a single `u32` from
 /// the response data area.
 fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(cmd_id)
-            .send(&mut buf)
-            .map_err(DispatchError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(DispatchError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmd_id).build();
+    req.write_to(&mut buf)
+        .map_err(DispatchError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u32>()).map_err(DispatchError::ParseResponse)?;
 

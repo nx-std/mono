@@ -14,24 +14,20 @@ pub fn open_controller(
     session: SessionHandle,
     device_code: u32,
 ) -> Result<SessionHandle, OpenControllerError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::OPEN_CONTROLLER)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(OpenControllerError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::OPEN_CONTROLLER)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(OpenControllerError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), device_code) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(OpenControllerError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), device_code) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(OpenControllerError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenControllerError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
@@ -47,24 +43,20 @@ pub fn set_rotation_speed_level(
     session: SessionHandle,
     level: f32,
 ) -> Result<(), SetRotationSpeedLevelError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::SET_ROTATION_SPEED_LEVEL)
-            .data_size(size_of::<f32>())
-            .send(&mut buf)
-            .map_err(SetRotationSpeedLevelError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::SET_ROTATION_SPEED_LEVEL)
+        .data_size(size_of::<f32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetRotationSpeedLevelError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<f32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<f32>(), level) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SetRotationSpeedLevelError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<f32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<f32>(), level) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SetRotationSpeedLevelError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetRotationSpeedLevelError::ParseResponse)?;
 
     Ok(())
@@ -72,21 +64,16 @@ pub fn set_rotation_speed_level(
 
 /// Gets the current fan rotation speed level from the controller.
 pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotationSpeedLevelError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        // The get-rotation-speed-level request carries no payload data.
-        cmif::CmifRequestBuilder::new(proto::GET_ROTATION_SPEED_LEVEL)
-            .send(&mut buf)
-            .map_err(GetRotationSpeedLevelError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetRotationSpeedLevelError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // The get-rotation-speed-level request carries no payload data.
+    let req = cmif::CmifRequestBuilder::new(proto::GET_ROTATION_SPEED_LEVEL).build();
+    req.write_to(&mut buf)
+        .map_err(GetRotationSpeedLevelError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetRotationSpeedLevelError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(GetRotationSpeedLevelError::ParseResponse)?;
 

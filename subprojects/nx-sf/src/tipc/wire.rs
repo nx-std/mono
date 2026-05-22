@@ -3,6 +3,8 @@
 //! TIPC stores command IDs in the HIPC message type field. Request building and
 //! response parsing live in the sibling `request` and `response` modules.
 
+use crate::hipc;
+
 /// TIPC command types.
 ///
 /// Unlike CMIF, TIPC encodes the command ID directly in the message type field
@@ -19,13 +21,13 @@ impl CommandType {
     ///
     /// TIPC stores command ID in HIPC message type as ID + 16.
     #[inline]
-    pub const fn request(id: u32) -> crate::hipc::MessageType {
-        crate::hipc::MessageType::from_raw((id + 16) as u16)
+    pub const fn request(id: u32) -> hipc::MessageType {
+        hipc::MessageType::from_raw((id + 16) as u16)
     }
 }
 
-impl From<CommandType> for crate::hipc::MessageType {
+impl From<CommandType> for hipc::MessageType {
     fn from(cmd: CommandType) -> Self {
-        crate::hipc::MessageType::from_raw(cmd as u16)
+        hipc::MessageType::from_raw(cmd as u16)
     }
 }

@@ -22,40 +22,36 @@ pub fn create_managed_layer(
     display_id: DisplayId,
     aruid: u64,
 ) -> Result<LayerId, CreateManagedLayerError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-        #[repr(C)]
-        struct Input {
-            layer_flags: u32,
-            pad: u32,
-            display_id: u64,
-            aruid: u64,
-        }
-
-        let input = Input {
-            layer_flags,
-            pad: 0,
-            display_id: display_id.to_raw(),
-            aruid,
-        };
-
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::CREATE_MANAGED_LAYER)
-            .data_size(24) // layer_flags(4) + pad(4) + display_id(8) + aruid(8)
-            .send(&mut buf)
-            .map_err(CreateManagedLayerError::BuildRequest)?;
-
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
+    #[repr(C)]
+    struct Input {
+        layer_flags: u32,
+        pad: u32,
+        display_id: u64,
+        aruid: u64,
     }
-    .map_err(CreateManagedLayerError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let input = Input {
+        layer_flags,
+        pad: 0,
+        display_id: display_id.to_raw(),
+        aruid,
+    };
+
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::CREATE_MANAGED_LAYER)
+        .data_size(24)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(CreateManagedLayerError::BuildRequest)?;
+
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
+
+    ipc::send_sync_request(&mut buf, session).map_err(CreateManagedLayerError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, 8).map_err(CreateManagedLayerError::ParseResponse)?;
 
@@ -70,26 +66,25 @@ pub fn destroy_managed_layer(
     session: SessionHandle,
     layer_id: LayerId,
 ) -> Result<(), DestroyManagedLayerError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
-            .data_size(8) // layer_id
-            .send(&mut buf)
-            .map_err(DestroyManagedLayerError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
+        .data_size(8)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(DestroyManagedLayerError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly 8 bytes; writing layer_id as u64 is sound.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), layer_id.to_raw());
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly 8 bytes; writing layer_id as u64 is sound.
+    unsafe {
+        ptr::write_unaligned(
+            buf.as_array_mut().as_mut_ptr().cast::<u64>(),
+            layer_id.to_raw(),
+        );
     }
-    .map_err(DestroyManagedLayerError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(DestroyManagedLayerError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(DestroyManagedLayerError::ParseResponse)?;
 
     Ok(())
@@ -115,38 +110,34 @@ pub fn set_display_alpha(
     display_id: DisplayId,
     alpha: f32,
 ) -> Result<(), SetDisplayAlphaError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-        #[repr(C)]
-        struct Input {
-            alpha: f32,
-            pad: u32,
-            display_id: u64,
-        }
-
-        let input = Input {
-            alpha,
-            pad: 0,
-            display_id: display_id.to_raw(),
-        };
-
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_ALPHA)
-            .data_size(16) // alpha(4) + pad(4) + display_id(8)
-            .send(&mut buf)
-            .map_err(SetDisplayAlphaError::BuildRequest)?;
-
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
+    #[repr(C)]
+    struct Input {
+        alpha: f32,
+        pad: u32,
+        display_id: u64,
     }
-    .map_err(SetDisplayAlphaError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let input = Input {
+        alpha,
+        pad: 0,
+        display_id: display_id.to_raw(),
+    };
+
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_ALPHA)
+        .data_size(16)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetDisplayAlphaError::BuildRequest)?;
+
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
+
+    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayAlphaError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayAlphaError::ParseResponse)?;
 
     Ok(())
@@ -158,38 +149,34 @@ pub fn set_display_layer_stack(
     display_id: DisplayId,
     layer_stack: ViLayerStack,
 ) -> Result<(), SetDisplayLayerStackError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-        #[repr(C)]
-        struct Input {
-            layer_stack: u32,
-            pad: u32,
-            display_id: u64,
-        }
-
-        let input = Input {
-            layer_stack: layer_stack as u32,
-            pad: 0,
-            display_id: display_id.to_raw(),
-        };
-
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_LAYER_STACK)
-            .data_size(16) // layer_stack(4) + pad(4) + display_id(8)
-            .send(&mut buf)
-            .map_err(SetDisplayLayerStackError::BuildRequest)?;
-
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
+    #[repr(C)]
+    struct Input {
+        layer_stack: u32,
+        pad: u32,
+        display_id: u64,
     }
-    .map_err(SetDisplayLayerStackError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let input = Input {
+        layer_stack: layer_stack as u32,
+        pad: 0,
+        display_id: display_id.to_raw(),
+    };
+
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_LAYER_STACK)
+        .data_size(16)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetDisplayLayerStackError::BuildRequest)?;
+
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
+
+    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayLayerStackError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayLayerStackError::ParseResponse)?;
 
     Ok(())
@@ -201,38 +188,33 @@ pub fn set_display_power_state(
     display_id: DisplayId,
     power_state: ViPowerState,
 ) -> Result<(), SetDisplayPowerStateError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-        #[repr(C)]
-        struct Input {
-            power_state: u32,
-            pad: u32,
-            display_id: u64,
-        }
-
-        let input = Input {
-            power_state: power_state as u32,
-            pad: 0,
-            display_id: display_id.to_raw(),
-        };
-
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE)
-            .data_size(16) // power_state(4) + pad(4) + display_id(8)
-            .send(&mut buf)
-            .map_err(SetDisplayPowerStateError::BuildRequest)?;
-
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
+    #[repr(C)]
+    struct Input {
+        power_state: u32,
+        pad: u32,
+        display_id: u64,
     }
-    .map_err(SetDisplayPowerStateError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let input = Input {
+        power_state: power_state as u32,
+        pad: 0,
+        display_id: display_id.to_raw(),
+    };
+
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE).data_size(16);
+    req.build()
+        .write_to(&mut buf)
+        .map_err(SetDisplayPowerStateError::BuildRequest)?;
+
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
+
+    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayPowerStateError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetDisplayPowerStateError::ParseResponse)?;
 
     Ok(())
@@ -245,38 +227,34 @@ pub fn add_to_layer_stack(
     layer_stack: ViLayerStack,
     layer_id: LayerId,
 ) -> Result<(), AddToLayerStackError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-        #[repr(C)]
-        struct Input {
-            layer_stack: u32,
-            pad: u32,
-            layer_id: u64,
-        }
-
-        let input = Input {
-            layer_stack: layer_stack as u32,
-            pad: 0,
-            layer_id: layer_id.to_raw(),
-        };
-
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::ADD_TO_LAYER_STACK)
-            .data_size(16) // layer_stack(4) + pad(4) + layer_id(8)
-            .send(&mut buf)
-            .map_err(AddToLayerStackError::BuildRequest)?;
-
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
+    #[repr(C)]
+    struct Input {
+        layer_stack: u32,
+        pad: u32,
+        layer_id: u64,
     }
-    .map_err(AddToLayerStackError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let input = Input {
+        layer_stack: layer_stack as u32,
+        pad: 0,
+        layer_id: layer_id.to_raw(),
+    };
+
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::ADD_TO_LAYER_STACK)
+        .data_size(16)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(AddToLayerStackError::BuildRequest)?;
+
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
+
+    ipc::send_sync_request(&mut buf, session).map_err(AddToLayerStackError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(AddToLayerStackError::ParseResponse)?;
 
     Ok(())
@@ -287,26 +265,21 @@ pub fn set_content_visibility(
     session: SessionHandle,
     visible: bool,
 ) -> Result<(), SetContentVisibilityError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY)
-            .data_size(1) // visible
-            .send(&mut buf)
-            .map_err(SetContentVisibilityError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY).data_size(1);
+    req.build()
+        .write_to(&mut buf)
+        .map_err(SetContentVisibilityError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly 1 byte; writing visible as u8 is sound.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr(), visible as u8);
-        }
-        ipc::send_sync_request(&mut buf, session)
-            .map_err(SetContentVisibilityError::SendRequest)?;
+    // SAFETY: `req` is exactly 1 byte; writing visible as u8 is sound.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr(), visible as u8);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SetContentVisibilityError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(SetContentVisibilityError::ParseResponse)?;
 
     Ok(())

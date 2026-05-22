@@ -15,26 +15,25 @@ pub fn destroy_system_update_task(
     session: SessionHandle,
     task_id: &SystemUpdateTaskId,
 ) -> Result<(), DestroySystemUpdateTaskError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
-            .data_size(size_of::<SystemUpdateTaskId>())
-            .send(&mut buf)
-            .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
+        .data_size(size_of::<SystemUpdateTaskId>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<SystemUpdateTaskId>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<SystemUpdateTaskId>(), *task_id);
-        }
-        ipc::send_sync_request(&mut buf, session)
-            .map_err(DestroySystemUpdateTaskError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<SystemUpdateTaskId>()` bytes.
+    unsafe {
+        ptr::write_unaligned(
+            buf.as_array_mut().as_mut_ptr().cast::<SystemUpdateTaskId>(),
+            *task_id,
+        );
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(DestroySystemUpdateTaskError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(DestroySystemUpdateTaskError::ParseResponse)?;
 
     Ok(())
@@ -48,29 +47,22 @@ pub fn list_system_update_task(
     session: SessionHandle,
     out: &mut [SystemUpdateTaskId],
 ) -> Result<i32, ListSystemUpdateTaskError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        // SAFETY: `out` is a valid `&mut` slice; viewing it as a byte slice
-        // for the OUT buffer is sound, and the byte slice borrows `out`.
-        let out_bytes = unsafe {
-            core::slice::from_raw_parts_mut(
-                out.as_mut_ptr().cast::<u8>(),
-                core::mem::size_of_val(out),
-            )
-        };
-        cmif::CmifRequestBuilder::new(proto::LIST_SYSTEM_UPDATE_TASK)
-            .add_out_buffer(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
-            .send(&mut buf)
-            .map_err(ListSystemUpdateTaskError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ListSystemUpdateTaskError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    // SAFETY: `out` is a valid `&mut` slice; viewing it as a byte slice
+    // for the OUT buffer is sound, and the byte slice borrows `out`.
+    let out_bytes = unsafe {
+        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
+    };
+    let req = cmif::CmifRequestBuilder::new(proto::LIST_SYSTEM_UPDATE_TASK)
+        .add_out_buffer(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ListSystemUpdateTaskError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ListSystemUpdateTaskError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(ListSystemUpdateTaskError::ParseResponse)?;
 

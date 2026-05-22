@@ -9,10 +9,6 @@ use nx_sf::{
 
 use crate::{proto, types::MmuModuleId};
 
-// ---------------------------------------------------------------------------
-// request_initialize (2.0.0+)
-// ---------------------------------------------------------------------------
-
 /// Initialises a multimedia request (2.0.0+).
 ///
 /// Returns the server-assigned request ID.
@@ -22,29 +18,25 @@ pub fn request_initialize(
     unk: u32,
     autoclear: bool,
 ) -> Result<u32, RequestInitializeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
-            .data_size(size_of::<[u32; 3]>())
-            .send(&mut buf)
-            .map_err(RequestInitializeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
+        .data_size(size_of::<[u32; 3]>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestInitializeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
-        unsafe {
-            let data_ptr = req.as_mut_ptr().cast::<u32>();
-            ptr::write_unaligned(data_ptr, module.as_raw());
-            ptr::write_unaligned(data_ptr.add(1), unk);
-            ptr::write_unaligned(data_ptr.add(2), autoclear as u32);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
+    unsafe {
+        let data_ptr = buf.as_array_mut().as_mut_ptr().cast::<u32>();
+        ptr::write_unaligned(data_ptr, module.as_raw());
+        ptr::write_unaligned(data_ptr.add(1), unk);
+        ptr::write_unaligned(data_ptr.add(2), autoclear as u32);
     }
-    .map_err(RequestInitializeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestInitializeError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestInitializeError::ParseResponse)?;
 
@@ -66,10 +58,6 @@ pub enum RequestInitializeError {
     ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
-// ---------------------------------------------------------------------------
-// request_initialize_legacy (pre-2.0.0)
-// ---------------------------------------------------------------------------
-
 /// Initialises a multimedia request (legacy, pre-2.0.0).
 ///
 /// Returns the server-assigned request ID.
@@ -79,29 +67,25 @@ pub fn request_initialize_legacy(
     unk: u32,
     autoclear: bool,
 ) -> Result<u32, RequestInitializeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE_OLD)
-            .data_size(size_of::<[u32; 3]>())
-            .send(&mut buf)
-            .map_err(RequestInitializeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE_OLD)
+        .data_size(size_of::<[u32; 3]>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestInitializeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
-        unsafe {
-            let data_ptr = req.as_mut_ptr().cast::<u32>();
-            ptr::write_unaligned(data_ptr, module.as_raw());
-            ptr::write_unaligned(data_ptr.add(1), unk);
-            ptr::write_unaligned(data_ptr.add(2), autoclear as u32);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
+    unsafe {
+        let data_ptr = buf.as_array_mut().as_mut_ptr().cast::<u32>();
+        ptr::write_unaligned(data_ptr, module.as_raw());
+        ptr::write_unaligned(data_ptr.add(1), unk);
+        ptr::write_unaligned(data_ptr.add(2), autoclear as u32);
     }
-    .map_err(RequestInitializeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestInitializeError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestInitializeError::ParseResponse)?;
 
@@ -112,35 +96,27 @@ pub fn request_initialize_legacy(
     Ok(id)
 }
 
-// ---------------------------------------------------------------------------
-// request_finalize (2.0.0+)
-// ---------------------------------------------------------------------------
-
 /// Finalises a multimedia request (2.0.0+). Keyed by request ID.
 pub fn request_finalize(
     session: SessionHandle,
     request_id: u32,
 ) -> Result<(), RequestFinalizeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::FINALIZE)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(RequestFinalizeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::FINALIZE)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestFinalizeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), request_id);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), request_id);
     }
-    .map_err(RequestFinalizeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestFinalizeError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(RequestFinalizeError::ParseResponse)?;
 
     Ok(())
@@ -157,43 +133,34 @@ pub enum RequestFinalizeError {
     ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
-// ---------------------------------------------------------------------------
-// request_finalize_legacy (pre-2.0.0)
-// ---------------------------------------------------------------------------
-
 /// Finalises a multimedia request (legacy, pre-2.0.0). Keyed by module ID.
 pub fn request_finalize_legacy(
     session: SessionHandle,
     module: MmuModuleId,
 ) -> Result<(), RequestFinalizeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::FINALIZE_OLD)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(RequestFinalizeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::FINALIZE_OLD)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestFinalizeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), module.as_raw());
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe {
+        ptr::write_unaligned(
+            buf.as_array_mut().as_mut_ptr().cast::<u32>(),
+            module.as_raw(),
+        );
     }
-    .map_err(RequestFinalizeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestFinalizeError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(RequestFinalizeError::ParseResponse)?;
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// request_set_and_wait (2.0.0+)
-// ---------------------------------------------------------------------------
 
 /// Sets the frequency and waits (2.0.0+). Keyed by request ID.
 pub fn request_set_and_wait(
@@ -202,29 +169,25 @@ pub fn request_set_and_wait(
     freq_hz: u32,
     timeout: i32,
 ) -> Result<(), RequestSetAndWaitError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT)
-            .data_size(size_of::<[u32; 3]>())
-            .send(&mut buf)
-            .map_err(RequestSetAndWaitError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT)
+        .data_size(size_of::<[u32; 3]>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestSetAndWaitError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
-        unsafe {
-            let data_ptr = req.as_mut_ptr().cast::<u32>();
-            ptr::write_unaligned(data_ptr, request_id);
-            ptr::write_unaligned(data_ptr.add(1), freq_hz);
-            ptr::write_unaligned(data_ptr.add(2), timeout as u32);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
+    unsafe {
+        let data_ptr = buf.as_array_mut().as_mut_ptr().cast::<u32>();
+        ptr::write_unaligned(data_ptr, request_id);
+        ptr::write_unaligned(data_ptr.add(1), freq_hz);
+        ptr::write_unaligned(data_ptr.add(2), timeout as u32);
     }
-    .map_err(RequestSetAndWaitError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestSetAndWaitError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(RequestSetAndWaitError::ParseResponse)?;
 
     Ok(())
@@ -241,10 +204,6 @@ pub enum RequestSetAndWaitError {
     ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
-// ---------------------------------------------------------------------------
-// request_set_and_wait_legacy (pre-2.0.0)
-// ---------------------------------------------------------------------------
-
 /// Sets the frequency and waits (legacy, pre-2.0.0). Keyed by module ID.
 pub fn request_set_and_wait_legacy(
     session: SessionHandle,
@@ -252,59 +211,48 @@ pub fn request_set_and_wait_legacy(
     freq_hz: u32,
     timeout: i32,
 ) -> Result<(), RequestSetAndWaitError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT_OLD)
-            .data_size(size_of::<[u32; 3]>())
-            .send(&mut buf)
-            .map_err(RequestSetAndWaitError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT_OLD)
+        .data_size(size_of::<[u32; 3]>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestSetAndWaitError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
-        unsafe {
-            let data_ptr = req.as_mut_ptr().cast::<u32>();
-            ptr::write_unaligned(data_ptr, module.as_raw());
-            ptr::write_unaligned(data_ptr.add(1), freq_hz);
-            ptr::write_unaligned(data_ptr.add(2), timeout as u32);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<[u32; 3]>()` bytes.
+    unsafe {
+        let data_ptr = buf.as_array_mut().as_mut_ptr().cast::<u32>();
+        ptr::write_unaligned(data_ptr, module.as_raw());
+        ptr::write_unaligned(data_ptr.add(1), freq_hz);
+        ptr::write_unaligned(data_ptr.add(2), timeout as u32);
     }
-    .map_err(RequestSetAndWaitError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestSetAndWaitError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(RequestSetAndWaitError::ParseResponse)?;
 
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// request_get (2.0.0+)
-// ---------------------------------------------------------------------------
-
 /// Gets the current frequency in Hz (2.0.0+). Keyed by request ID.
 pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, RequestGetError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(RequestGetError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestGetError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), request_id);
-        }
-        ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), request_id);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestGetError::ParseResponse)?;
 
@@ -326,34 +274,30 @@ pub enum RequestGetError {
     ParseResponse(#[source] cmif::ParseRespBytesError),
 }
 
-// ---------------------------------------------------------------------------
-// request_get_legacy (pre-2.0.0)
-// ---------------------------------------------------------------------------
-
 /// Gets the current frequency in Hz (legacy, pre-2.0.0). Keyed by module ID.
 pub fn request_get_legacy(
     session: SessionHandle,
     module: MmuModuleId,
 ) -> Result<u32, RequestGetError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET_OLD)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(RequestGetError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_OLD)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(RequestGetError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), module.as_raw());
-        }
-        ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe {
+        ptr::write_unaligned(
+            buf.as_array_mut().as_mut_ptr().cast::<u32>(),
+            module.as_raw(),
+        );
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(RequestGetError::ParseResponse)?;
 

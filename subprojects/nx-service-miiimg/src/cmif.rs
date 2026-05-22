@@ -14,26 +14,22 @@ use crate::{proto, types::MiiimgImageAttribute};
 ///
 /// Sends a `u8` mode value and returns a `u8` result.
 pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
-            .data_size(size_of::<u8>())
-            .send(&mut buf)
-            .map_err(InitializeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
+        .data_size(size_of::<u8>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(InitializeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), mode);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), mode);
     }
-    .map_err(InitializeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(InitializeError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(InitializeError::ParseResponse)?;
 
@@ -46,20 +42,14 @@ pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeErro
 
 /// Reloads the image database.
 pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::RELOAD)
-            .send(&mut buf)
-            .map_err(ReloadError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ReloadError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::RELOAD).build();
+    req.write_to(&mut buf).map_err(ReloadError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ReloadError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(ReloadError::ParseResponse)?;
 
     Ok(())
@@ -67,20 +57,15 @@ pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
 
 /// Gets the number of mii images in the database.
 pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::GET_COUNT)
-            .send(&mut buf)
-            .map_err(GetCountError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetCountError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_COUNT).build();
+    req.write_to(&mut buf)
+        .map_err(GetCountError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetCountError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<i32>()).map_err(GetCountError::ParseResponse)?;
 
@@ -93,20 +78,14 @@ pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
 
 /// Gets whether the image database is empty.
 pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::IS_EMPTY)
-            .send(&mut buf)
-            .map_err(IsEmptyError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(IsEmptyError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::IS_EMPTY).build();
+    req.write_to(&mut buf).map_err(IsEmptyError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(IsEmptyError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u8>()).map_err(IsEmptyError::ParseResponse)?;
 
@@ -119,20 +98,14 @@ pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
 
 /// Gets whether the image database is full.
 pub fn is_full(session: SessionHandle) -> Result<bool, IsFullError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::IS_FULL)
-            .send(&mut buf)
-            .map_err(IsFullError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(IsFullError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::IS_FULL).build();
+    req.write_to(&mut buf).map_err(IsFullError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(IsFullError::SendRequest)?;
+
     let resp =
         cmif::parse_response_bytes(&buf, size_of::<u8>()).map_err(IsFullError::ParseResponse)?;
 
@@ -148,26 +121,22 @@ pub fn get_attribute(
     session: SessionHandle,
     index: i32,
 ) -> Result<MiiimgImageAttribute, GetAttributeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET_ATTRIBUTE)
-            .data_size(size_of::<i32>())
-            .send(&mut buf)
-            .map_err(GetAttributeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_ATTRIBUTE)
+        .data_size(size_of::<i32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetAttributeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<i32>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), index);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<i32>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<i32>(), index);
     }
-    .map_err(GetAttributeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetAttributeError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<MiiimgImageAttribute>())
         .map_err(GetAttributeError::ParseResponse)?;
 
@@ -184,27 +153,28 @@ pub fn load_image(
     id: crate::types::MiiimgImageId,
     dst: &mut [u8],
 ) -> Result<(), LoadImageError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::LOAD_IMAGE)
-            .data_size(size_of::<crate::types::MiiimgImageId>())
-            .add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
-            .send(&mut buf)
-            .map_err(LoadImageError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::LOAD_IMAGE)
+        .data_size(size_of::<crate::types::MiiimgImageId>())
+        .add_out_buffer(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(LoadImageError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<MiiimgImageId>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<crate::types::MiiimgImageId>(), id);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<MiiimgImageId>()` bytes.
+    unsafe {
+        ptr::write_unaligned(
+            buf.as_array_mut()
+                .as_mut_ptr()
+                .cast::<crate::types::MiiimgImageId>(),
+            id,
+        );
     }
-    .map_err(LoadImageError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(LoadImageError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(LoadImageError::ParseResponse)?;
 
     Ok(())

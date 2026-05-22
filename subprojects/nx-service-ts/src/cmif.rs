@@ -16,26 +16,22 @@ pub fn get_temperature_range(
     session: SessionHandle,
     location: u8,
 ) -> Result<(i32, i32), GetTemperatureRangeError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_RANGE)
-            .data_size(size_of::<u8>())
-            .send(&mut buf)
-            .map_err(GetTemperatureRangeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_RANGE)
+        .data_size(size_of::<u8>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetTemperatureRangeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), location);
-        }
-        ipc::send_sync_request(&mut buf, session)
+    // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), location);
     }
-    .map_err(GetTemperatureRangeError::SendRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureRangeError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
         .map_err(GetTemperatureRangeError::ParseResponse)?;
 
@@ -47,25 +43,22 @@ pub fn get_temperature_range(
 
 /// Gets the temperature for a location, in Celsius.
 pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetTemperatureError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE)
-            .data_size(size_of::<u8>())
-            .send(&mut buf)
-            .map_err(GetTemperatureError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE)
+        .data_size(size_of::<u8>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetTemperatureError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), location);
-        }
-        ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), location);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetTemperatureError::ParseResponse)?;
 
@@ -80,26 +73,22 @@ pub fn get_temperature_milli_c(
     session: SessionHandle,
     location: u8,
 ) -> Result<i32, GetTemperatureMilliCError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_MILLI_C)
-            .data_size(size_of::<u8>())
-            .send(&mut buf)
-            .map_err(GetTemperatureMilliCError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_MILLI_C)
+        .data_size(size_of::<u8>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetTemperatureMilliCError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u8>(), location);
-        }
-        ipc::send_sync_request(&mut buf, session)
-            .map_err(GetTemperatureMilliCError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u8>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u8>(), location);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureMilliCError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetTemperatureMilliCError::ParseResponse)?;
 
@@ -116,25 +105,22 @@ pub fn open_session(
     session: SessionHandle,
     device_code: u32,
 ) -> Result<SessionHandle, OpenSessionError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(OpenSessionError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(OpenSessionError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe {
-            ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), device_code);
-        }
-        ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe {
+        ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), device_code);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, 0).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
@@ -147,20 +133,15 @@ pub fn open_session(
 
 /// Gets the temperature from a session, as a float in Celsius.
 pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGetTemperatureError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::SESSION_GET_TEMPERATURE)
-            .send(&mut buf)
-            .map_err(SessionGetTemperatureError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SessionGetTemperatureError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::SESSION_GET_TEMPERATURE).build();
+    req.write_to(&mut buf)
+        .map_err(SessionGetTemperatureError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SessionGetTemperatureError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<f32>())
         .map_err(SessionGetTemperatureError::ParseResponse)?;
 

@@ -67,9 +67,7 @@ mod response;
 mod wire;
 
 pub use self::{
-    request::{
-        RequestLayoutError, TipcCloseRequest, TipcRequest, TipcRequestBuilder, close_request,
-    },
+    request::{RequestLayoutError, TipcCloseRequest, TipcRequest, TipcRequestBuilder},
     response::{ParseResponseError, Response, parse_response},
     wire::CommandType,
 };

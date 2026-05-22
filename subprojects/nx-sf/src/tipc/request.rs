@@ -115,9 +115,7 @@ impl<'a> TipcCloseRequest<'a> {
     /// Creates a session-close request.
     pub fn session() -> Self {
         Self {
-            hipc: HipcRequestBuilder::new(CommandType::Close)
-                .with_data_size(0)
-                .build(),
+            hipc: HipcRequestBuilder::new(CommandType::Close).build(),
         }
     }
 
@@ -126,9 +124,4 @@ impl<'a> TipcCloseRequest<'a> {
         self.hipc.write_to(dst)?;
         Ok(())
     }
-}
-
-/// Builds a TIPC close request message.
-pub fn close_request<const N: usize>(buf: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-    TipcCloseRequest::session().write_to(buf)
 }

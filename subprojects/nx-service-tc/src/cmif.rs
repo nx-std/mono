@@ -11,20 +11,15 @@ use crate::proto;
 
 /// Enables fan control.
 pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControlError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::ENABLE_FAN_CONTROL)
-            .send(&mut buf)
-            .map_err(EnableFanControlError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(EnableFanControlError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::ENABLE_FAN_CONTROL).build();
+    req.write_to(&mut buf)
+        .map_err(EnableFanControlError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(EnableFanControlError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(EnableFanControlError::ParseResponse)?;
 
     Ok(())
@@ -32,20 +27,15 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
 
 /// Disables fan control.
 pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanControlError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::DISABLE_FAN_CONTROL)
-            .send(&mut buf)
-            .map_err(DisableFanControlError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(DisableFanControlError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::DISABLE_FAN_CONTROL).build();
+    req.write_to(&mut buf)
+        .map_err(DisableFanControlError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(DisableFanControlError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(DisableFanControlError::ParseResponse)?;
 
     Ok(())
@@ -53,20 +43,15 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
 
 /// Queries whether fan control is enabled.
 pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanControlEnabledError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::IS_FAN_CONTROL_ENABLED)
-            .send(&mut buf)
-            .map_err(IsFanControlEnabledError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(IsFanControlEnabledError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::IS_FAN_CONTROL_ENABLED).build();
+    req.write_to(&mut buf)
+        .map_err(IsFanControlEnabledError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(IsFanControlEnabledError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u8>())
         .map_err(IsFanControlEnabledError::ParseResponse)?;
 
@@ -80,20 +65,16 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
 pub fn get_skin_temperature_milli_c(
     session: SessionHandle,
 ) -> Result<i32, GetSkinTemperatureMilliCError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C)
-            .send(&mut buf)
-            .map_err(GetSkinTemperatureMilliCError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetSkinTemperatureMilliCError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C).build();
+    req.write_to(&mut buf)
+        .map_err(GetSkinTemperatureMilliCError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session)
+        .map_err(GetSkinTemperatureMilliCError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<i32>())
         .map_err(GetSkinTemperatureMilliCError::ParseResponse)?;
 

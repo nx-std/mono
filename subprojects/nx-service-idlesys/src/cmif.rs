@@ -10,20 +10,15 @@ use crate::proto;
 /// Reports that the user is active, resetting the sleep counter.
 #[inline]
 pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsActiveError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::REPORT_USER_IS_ACTIVE)
-            .send(&mut buf)
-            .map_err(ReportUserIsActiveError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ReportUserIsActiveError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::REPORT_USER_IS_ACTIVE).build();
+    req.write_to(&mut buf)
+        .map_err(ReportUserIsActiveError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ReportUserIsActiveError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(ReportUserIsActiveError::ParseResponse)?;
 
     Ok(())

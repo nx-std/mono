@@ -22,27 +22,24 @@ pub fn open_session(
     module_id: PcvModuleId,
     unk: u32,
 ) -> Result<SessionHandle, OpenSessionError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
-            .data_size(size_of::<[u32; 2]>())
-            .send(&mut buf)
-            .map_err(OpenSessionError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
+        .data_size(size_of::<[u32; 2]>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(OpenSessionError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<[u32; 2]>()` bytes.
-        unsafe {
-            let data_ptr = req.as_mut_ptr().cast::<u32>();
-            ptr::write_unaligned(data_ptr, module_id.as_raw());
-            ptr::write_unaligned(data_ptr.add(1), unk);
-        }
-        ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<[u32; 2]>()` bytes.
+    unsafe {
+        let data_ptr = buf.as_array_mut().as_mut_ptr().cast::<u32>();
+        ptr::write_unaligned(data_ptr, module_id.as_raw());
+        ptr::write_unaligned(data_ptr.add(1), unk);
     }
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
@@ -55,24 +52,20 @@ pub fn open_session(
 
 /// Sets the clock rate in Hz.
 pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRateError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::SET_CLOCK_RATE)
-            .data_size(size_of::<u32>())
-            .send(&mut buf)
-            .map_err(SetClockRateError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::SET_CLOCK_RATE)
+        .data_size(size_of::<u32>())
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetClockRateError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u32>(), hz) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SetClockRateError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u32>(), hz) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SetClockRateError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(SetClockRateError::ParseResponse)?;
 
     Ok(())
@@ -80,20 +73,15 @@ pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRat
 
 /// Gets the current clock rate in Hz.
 pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::GET_CLOCK_RATE)
-            .send(&mut buf)
-            .map_err(GetClockRateError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetClockRateError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_CLOCK_RATE).build();
+    req.write_to(&mut buf)
+        .map_err(GetClockRateError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetClockRateError::SendRequest)?;
+
     let resp = cmif::parse_response_bytes(&buf, size_of::<u32>())
         .map_err(GetClockRateError::ParseResponse)?;
 
@@ -121,30 +109,26 @@ pub fn get_possible_clock_rates(
 ) -> Result<PossibleClockRates, GetPossibleClockRatesError> {
     let max_count: i32 = rates.len() as i32;
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
-            .data_size(size_of::<i32>())
-            .add_out_auto_buffer(
-                rates.as_mut_ptr().cast::<u8>(),
-                size_of_val(rates),
-                BufferMode::Normal,
-            )
-            .send(&mut buf)
-            .map_err(GetPossibleClockRatesError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
+        .data_size(size_of::<i32>())
+        .add_out_auto_buffer(
+            rates.as_mut_ptr().cast::<u8>(),
+            size_of_val(rates),
+            BufferMode::Normal,
+        )
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetPossibleClockRatesError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<i32>()` bytes.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<i32>(), max_count) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetPossibleClockRatesError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<i32>()` bytes.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<i32>(), max_count) };
+
+    ipc::send_sync_request(&mut buf, session).map_err(GetPossibleClockRatesError::SendRequest)?;
 
     // Response inline data: { i32 type, i32 count }.
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let resp = cmif::parse_response_bytes(&buf, size_of::<[i32; 2]>())
         .map_err(GetPossibleClockRatesError::ParseResponse)?;
 

@@ -23,26 +23,22 @@ pub fn create_applet_resource(
 ) -> Result<SessionHandle, CreateAppletResourceError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
-            .context(0x20)
-            .data_size(size_of::<u64>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(CreateAppletResourceError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
+        .context(0x20)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(CreateAppletResourceError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(CreateAppletResourceError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(CreateAppletResourceError::SendRequest)?;
+
     let resp =
         cmif::parse_response::<()>(&buf).map_err(CreateAppletResourceError::ParseResponse)?;
 
@@ -60,20 +56,15 @@ pub fn create_applet_resource(
 pub fn get_shared_memory_handle(
     session: SessionHandle,
 ) -> Result<ShmemHandle, GetSharedMemoryHandleError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE)
-            .send(&mut buf)
-            .map_err(GetSharedMemoryHandleError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetSharedMemoryHandleError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE).build();
+    req.write_to(&mut buf)
+        .map_err(GetSharedMemoryHandleError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetSharedMemoryHandleError::SendRequest)?;
+
     let resp =
         cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryHandleError::ParseResponse)?;
 
@@ -111,27 +102,23 @@ pub fn activate_npad(
         aruid,
     };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
-            .context(0x20)
-            .data_size(size_of::<Input>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(ActivateNpadError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
+        .context(0x20)
+        .data_size(size_of::<Input>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ActivateNpadError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
-        // `repr(C)` and `input` is a valid value on the stack.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ActivateNpadError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
+    // `repr(C)` and `input` is a valid value on the stack.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ActivateNpadError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(ActivateNpadError::ParseResponse)?;
 
     Ok(())
@@ -159,27 +146,24 @@ pub fn set_supported_npad_style_set(
         aruid,
     };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
-            .context(0x20)
-            .data_size(size_of::<Input>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
+        .context(0x20)
+        .data_size(size_of::<Input>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
-        // `repr(C)` and `input` is a valid value on the stack.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SetSupportedNpadStyleSetError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
+    // `repr(C)` and `input` is a valid value on the stack.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session)
+        .map_err(SetSupportedNpadStyleSetError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadStyleSetError::ParseResponse)?;
 
     Ok(())
@@ -196,27 +180,23 @@ pub fn set_supported_npad_id_type(
     let buffer_size = core::mem::size_of_val(ids);
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
-            .context(0x20)
-            .data_size(size_of::<u64>())
-            .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
-            .send_pid()
-            .send(&mut buf)
-            .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
+        .context(0x20)
+        .data_size(size_of::<u64>())
+        .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(SetSupportedNpadIdTypeError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(SetSupportedNpadIdTypeError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadIdTypeError::ParseResponse)?;
 
     Ok(())
@@ -231,26 +211,22 @@ pub fn activate_touch_screen(
 ) -> Result<(), ActivateTouchScreenError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
-            .context(0x20)
-            .data_size(size_of::<u64>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(ActivateTouchScreenError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
+        .context(0x20)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ActivateTouchScreenError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ActivateTouchScreenError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ActivateTouchScreenError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(ActivateTouchScreenError::ParseResponse)?;
 
     Ok(())
@@ -265,26 +241,22 @@ pub fn activate_keyboard(
 ) -> Result<(), ActivateKeyboardError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_KEYBOARD)
-            .context(0x20)
-            .data_size(size_of::<u64>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(ActivateKeyboardError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_KEYBOARD)
+        .context(0x20)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ActivateKeyboardError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ActivateKeyboardError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ActivateKeyboardError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(ActivateKeyboardError::ParseResponse)?;
 
     Ok(())
@@ -299,26 +271,22 @@ pub fn activate_mouse(
 ) -> Result<(), ActivateMouseError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_MOUSE)
-            .context(0x20)
-            .data_size(size_of::<u64>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(ActivateMouseError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_MOUSE)
+        .context(0x20)
+        .data_size(size_of::<u64>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ActivateMouseError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<u64>(), aruid) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ActivateMouseError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<u64>()` bytes (the ARUID).
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<u64>(), aruid) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ActivateMouseError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(ActivateMouseError::ParseResponse)?;
 
     Ok(())
@@ -345,27 +313,23 @@ pub fn activate_gesture(
         aruid,
     };
 
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_GESTURE)
-            .context(0x20)
-            .data_size(size_of::<Input>())
-            .send_pid()
-            .send(&mut buf)
-            .map_err(ActivateGestureError::BuildRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_GESTURE)
+        .context(0x20)
+        .data_size(size_of::<Input>())
+        .send_pid()
+        .build();
+    req.write_to(&mut buf)
+        .map_err(ActivateGestureError::BuildRequest)?;
 
-        // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
-        // `repr(C)` and `input` is a valid value on the stack.
-        unsafe { ptr::write_unaligned(req.as_mut_ptr().cast::<Input>(), input) };
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(ActivateGestureError::SendRequest)?;
+    // SAFETY: `req` is exactly `size_of::<Input>()` bytes; `Input` is
+    // `repr(C)` and `input` is a valid value on the stack.
+    unsafe { ptr::write_unaligned(buf.as_array_mut().as_mut_ptr().cast::<Input>(), input) };
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(ActivateGestureError::SendRequest)?;
+
     cmif::parse_response::<()>(&buf).map_err(ActivateGestureError::ParseResponse)?;
 
     Ok(())

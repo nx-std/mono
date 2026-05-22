@@ -33,7 +33,6 @@ pub fn get_service_handle(
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let resp = tipc::parse_response(&buf, 0).map_err(GetServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
@@ -97,7 +96,6 @@ pub fn register_service(
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     let resp = tipc::parse_response(&buf, 0).map_err(RegisterServiceError::ParseResponse)?;
 
     let Some(&handle) = resp.move_handles.first() else {
@@ -146,7 +144,6 @@ pub fn unregister_service(
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     tipc::parse_response(&buf, 0).map_err(UnregisterServiceError::ParseResponse)?;
 
     Ok(())
@@ -184,7 +181,6 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     tipc::parse_response(&buf, 0).map_err(DetachClientError::ParseResponse)?;
 
     Ok(())
@@ -223,7 +219,6 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 
     // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
     // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
     tipc::parse_response(&buf, 0).map_err(RegisterClientError::ParseResponse)?;
 
     Ok(())

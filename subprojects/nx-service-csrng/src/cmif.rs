@@ -11,21 +11,17 @@ use crate::proto;
 /// Fills `out` with cryptographically-secure random bytes.
 #[inline]
 pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), GetRandomBytesError> {
-    {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-        cmif::CmifRequestBuilder::new(proto::GET_RANDOM_BYTES)
-            .add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal)
-            .send(&mut buf)
-            .map_err(GetRandomBytesError::BuildRequest)?;
-        ipc::send_sync_request(&mut buf, session)
-    }
-    .map_err(GetRandomBytesError::SendRequest)?;
+    // SAFETY: IPC operations are serialized on this thread, so no other
+    // borrow of the TLS IPC buffer is live.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let req = cmif::CmifRequestBuilder::new(proto::GET_RANDOM_BYTES)
+        .add_out_buffer(out.as_mut_ptr(), out.len(), BufferMode::Normal)
+        .build();
+    req.write_to(&mut buf)
+        .map_err(GetRandomBytesError::BuildRequest)?;
 
-    // SAFETY: the kernel populated the TLS IPC buffer during the SVC above, and
-    // no other borrow of the buffer is live on this thread.
-    let buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    ipc::send_sync_request(&mut buf, session).map_err(GetRandomBytesError::SendRequest)?;
+
     cmif::parse_response_bytes(&buf, 0).map_err(GetRandomBytesError::ParseResponse)?;
 
     Ok(())

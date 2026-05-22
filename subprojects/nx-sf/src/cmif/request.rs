@@ -79,10 +79,7 @@ impl<'a> CmifRequest<'a> {
     }
 
     /// Writes the CMIF request into `dst`.
-    pub fn write_to<'dst, const N: usize>(
-        &self,
-        dst: &'dst mut [u8; N],
-    ) -> Result<&'dst mut [u8], RequestLayoutError> {
+    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
         let cmif_data_region = self.hipc.write_to(dst)?;
 
         let body_len = self.encoded_len();
@@ -143,7 +140,7 @@ impl<'a> CmifRequest<'a> {
             objects.copy_from_slice(self.objects.as_slice());
         }
 
-        Ok(data)
+        Ok(())
     }
 }
 
@@ -243,12 +240,6 @@ impl<'a> CmifControlRequestBuilder<'a> {
         }
     }
 
-    /// Writes the request into `dst`.
-    #[inline]
-    pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
-        self.build().write_to(dst)
-    }
-
     fn encoded_len(&self) -> usize {
         16 + size_of::<InHeader>() + self.data_len()
     }
@@ -273,11 +264,7 @@ pub enum CmifCloseRequest<'a> {
 impl<'a> CmifCloseRequest<'a> {
     /// Creates a session-close request.
     pub fn session() -> Self {
-        Self::Session(
-            HipcRequestBuilder::new(CommandType::Close)
-                .with_data_size(0)
-                .build(),
-        )
+        Self::Session(HipcRequestBuilder::new(CommandType::Close).build())
     }
 
     /// Creates a domain-object close request.
@@ -629,12 +616,6 @@ impl<'a> CmifRequestBuilder<'a> {
             out_pointer_sizes: self.out_pointer_sizes,
             reserved_data_size: self.reserved_data_size,
         }
-    }
-
-    /// Writes the request into `dst`.
-    #[inline]
-    pub fn send<const N: usize>(self, dst: &mut [u8; N]) -> Result<&mut [u8], RequestLayoutError> {
-        self.build().write_to(dst)
     }
 
     fn encoded_len(&self) -> usize {
