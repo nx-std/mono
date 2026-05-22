@@ -26,6 +26,13 @@ repos:
     types_or: [rust, cargo, cargo-lock]
     stages: [pre-push, manual]
     pass_filenames: false
+  - id: clippy
+    name: clippy
+    language: system
+    entry: just clippy
+    types_or: [rust, cargo, cargo-lock]
+    stages: [pre-push, manual]
+    pass_filenames: false
   - id: check-unused-deps
     name: check-unused-deps
     language: system
