@@ -8,8 +8,8 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::proto;
@@ -35,12 +35,11 @@ pub fn register_process(
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_PROCESS)
         .with_data(&payload)
-        .add_input_buffer_raw(acid_sac.as_ptr(), acid_sac.len(), BufferMode::Normal)
-        .add_input_buffer_raw(aci0_sac.as_ptr(), aci0_sac.len(), BufferMode::Normal)
+        .add_input_buffer(InputBuffer::new(acid_sac, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(aci0_sac, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(RegisterProcessError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(RegisterProcessError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RegisterProcessError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RegisterProcessError::ParseResponse)?;
 
@@ -50,12 +49,9 @@ pub fn register_process(
 /// Error returned by [`register_process`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterProcessError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -74,9 +70,8 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
     let req = cmif::CmifRequestBuilder::new(proto::UNREGISTER_PROCESS)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(UnregisterProcessError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(UnregisterProcessError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(UnregisterProcessError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(UnregisterProcessError::ParseResponse)?;
 
@@ -86,12 +81,9 @@ pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), Unregi
 /// Error returned by [`unregister_process`].
 #[derive(Debug, thiserror::Error)]
 pub enum UnregisterProcessError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

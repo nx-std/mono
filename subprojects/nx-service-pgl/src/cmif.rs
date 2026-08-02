@@ -6,8 +6,8 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle},
+    hipc::{BufferMode, InputBuffer},
+    ipc::Handle,
     service::Session,
 };
 
@@ -32,9 +32,8 @@ fn dispatch_in_u64(session: Handle, cmd_id: u32, value: u64) -> Result<(), Dispa
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -50,9 +49,8 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -65,9 +63,8 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchError> 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -82,9 +79,8 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchError
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -93,10 +89,8 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchError
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -129,9 +123,8 @@ pub fn launch_program(
     let req = cmif::CmifRequestBuilder::new(proto::LAUNCH_PROGRAM)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -160,15 +153,10 @@ pub fn launch_program_from_host(
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), pm_launch_flags) };
     let req = cmif::CmifRequestBuilder::new(proto::LAUNCH_PROGRAM_FROM_HOST)
         .with_data(&payload)
-        .add_input_buffer_raw(
-            content_path.as_ptr(),
-            content_path.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -187,15 +175,10 @@ pub fn get_host_content_meta_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_HOST_CONTENT_META_INFO)
-        .add_input_buffer_raw(
-            content_path.as_ptr(),
-            content_path.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&ContentMetaInfo>(&buf).map_err(DispatchError::ParseResponse)?;
@@ -227,9 +210,8 @@ pub fn is_process_tracked(session: Handle, pid: u64) -> Result<bool, DispatchErr
     let req = cmif::CmifRequestBuilder::new(proto::IS_PROCESS_TRACKED)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -273,11 +255,10 @@ pub fn trigger_application_snapshot_dumper(
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), dump_type as u32) };
     let req = cmif::CmifRequestBuilder::new(proto::TRIGGER_APPLICATION_SNAPSHOT_DUMPER)
         .with_data(&payload)
-        .add_input_buffer_raw(arg.as_ptr(), arg.len(), BufferMode::Normal)
+        .add_input_buffer(InputBuffer::new(arg, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -291,9 +272,8 @@ pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverEr
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_EVENT_OBSERVER).build();
-    req.write_to(&mut buf)
-        .map_err(GetEventObserverError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(GetEventObserverError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetEventObserverError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetEventObserverError::ParseResponse)?;
 
@@ -312,10 +292,8 @@ pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverEr
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetEventObserverError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing observer handle in response")]
@@ -333,9 +311,8 @@ pub fn observer_get_process_event(session: Handle) -> Result<u32, GetProcessEven
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OBSERVER_GET_PROCESS_EVENT).build();
-    req.write_to(&mut buf)
-        .map_err(GetProcessEventError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(GetProcessEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetProcessEventError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetProcessEventError::ParseResponse)?;
 
@@ -350,10 +327,8 @@ pub fn observer_get_process_event(session: Handle) -> Result<u32, GetProcessEven
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetProcessEventError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing event handle in response")]
@@ -367,9 +342,8 @@ pub fn observer_get_process_event_info(session: Handle) -> Result<ProcessEventIn
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::OBSERVER_GET_PROCESS_EVENT_INFO).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&ProcessEventInfo>(&buf).map_err(DispatchError::ParseResponse)?;

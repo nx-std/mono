@@ -4,7 +4,7 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif,
-    ipc::{self, Handle},
+    ipc::Handle,
     service::{BufferAttr, Session},
 };
 
@@ -21,10 +21,8 @@ pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSession
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&device)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenSessionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSessionError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
@@ -109,12 +107,9 @@ pub fn execute_command_list(
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

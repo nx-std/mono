@@ -2,8 +2,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{
@@ -25,10 +25,8 @@ where
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -47,10 +45,8 @@ where
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&U>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -60,10 +56,8 @@ where
 /// Error returned by hidbus dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -154,12 +148,10 @@ pub fn send_command_async(
 
     let req = cmif::CmifRequestBuilder::new(proto::SEND_COMMAND_ASYNC)
         .with_data_value(&handle)
-        .add_in_auto_buffer(buffer.as_ptr(), buffer.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(buffer, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -178,12 +170,9 @@ pub fn get_send_command_async_result(
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SEND_COMMAND_ASYNC_RESULT)
         .with_data_value(&handle)
-        .add_out_auto_buffer(buffer.as_mut_ptr(), buffer.len(), BufferMode::Normal)
+        .add_out_auto_buffer(OutputBuffer::new(buffer, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetSendCommandAsyncResultError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetSendCommandAsyncResultError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf)
@@ -195,10 +184,8 @@ pub fn get_send_command_async_result(
 /// Error returned by [`get_send_command_async_result`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSendCommandAsyncResultError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -215,10 +202,8 @@ pub fn set_event_for_send_command_async_result(
     let req = cmif::CmifRequestBuilder::new(proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
         .with_data_value(&handle)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetEventError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetEventError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(SetEventError::ParseResponse)?;
 
@@ -231,10 +216,8 @@ pub fn set_event_for_send_command_async_result(
 /// Error returned by [`set_event_for_send_command_async_result`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetEventError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing event handle in response")]
@@ -248,10 +231,8 @@ pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetShared
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_HANDLE).build();
-    req.write_to(&mut buf)
-        .map_err(GetSharedMemoryError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSharedMemoryError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSharedMemoryError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryError::ParseResponse)?;
 
@@ -264,10 +245,8 @@ pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetShared
 /// Error returned by [`get_shared_memory_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing shared memory handle in response")]
@@ -295,17 +274,11 @@ pub fn enable_joy_polling_receive_mode(
 
     let req = cmif::CmifRequestBuilder::new(proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
         .with_data_value(&input)
-        .add_in_auto_buffer(
-            command_buffer.as_ptr(),
-            command_buffer.len(),
-            BufferMode::Normal,
-        )
+        .add_in_auto_buffer(InputBuffer::new(command_buffer, BufferMode::Normal))
         .add_copy_handle(tmem_handle)
         .build();
-    req.write_to(&mut buf)
-        .map_err(EnableJoyPollingError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(EnableJoyPollingError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(EnableJoyPollingError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(EnableJoyPollingError::ParseResponse)?;
 
@@ -315,10 +288,8 @@ pub fn enable_joy_polling_receive_mode(
 /// Error returned by [`enable_joy_polling_receive_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum EnableJoyPollingError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }

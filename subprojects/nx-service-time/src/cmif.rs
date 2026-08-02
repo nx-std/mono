@@ -3,10 +3,7 @@
 //! This module implements Time commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::{
     proto::{static_service_cmds, system_clock_cmds, timezone_service_cmds},
@@ -45,10 +42,8 @@ pub fn get_standard_steady_clock(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(static_service_cmds::GET_STANDARD_STEADY_CLOCK).build();
-    req.write_to(&mut buf)
-        .map_err(GetSteadyClockError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSteadyClockError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSteadyClockError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetSteadyClockError::ParseResponse)?;
 
@@ -71,10 +66,8 @@ pub fn get_time_zone_service(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(static_service_cmds::GET_TIME_ZONE_SERVICE).build();
-    req.write_to(&mut buf)
-        .map_err(GetTimeZoneServiceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetTimeZoneServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetTimeZoneServiceError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetTimeZoneServiceError::ParseResponse)?;
 
@@ -98,10 +91,8 @@ pub fn get_shared_memory_native_handle(
 
     let req =
         cmif::CmifRequestBuilder::new(static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE).build();
-    req.write_to(&mut buf)
-        .map_err(GetSharedMemoryError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSharedMemoryError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSharedMemoryError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryError::ParseResponse)?;
 
@@ -122,10 +113,8 @@ pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeErr
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(system_clock_cmds::GET_CURRENT_TIME).build();
-    req.write_to(&mut buf)
-        .map_err(GetCurrentTimeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetCurrentTimeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetCurrentTimeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(GetCurrentTimeError::ParseResponse)?;
 
@@ -146,10 +135,8 @@ pub fn to_calendar_time_with_my_rule(
     let req = cmif::CmifRequestBuilder::new(timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE)
         .with_data_value(&timestamp)
         .build();
-    req.write_to(&mut buf)
-        .map_err(ToCalendarTimeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ToCalendarTimeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ToCalendarTimeError::SendRequest)?;
 
     #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
@@ -173,10 +160,8 @@ fn get_clock_session(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(command_id).build();
-    req.write_to(&mut buf)
-        .map_err(GetSystemClockError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSystemClockError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSystemClockError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetSystemClockError::ParseResponse)?;
 
@@ -191,12 +176,9 @@ fn get_clock_session(
 /// Error returned by system clock retrieval operations.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSystemClockError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -208,12 +190,9 @@ pub enum GetSystemClockError {
 /// Error returned by steady clock retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSteadyClockError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -225,12 +204,9 @@ pub enum GetSteadyClockError {
 /// Error returned by timezone service retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetTimeZoneServiceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -242,12 +218,9 @@ pub enum GetTimeZoneServiceError {
 /// Error returned by shared memory retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -259,12 +232,9 @@ pub enum GetSharedMemoryError {
 /// Error returned by get current time operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetCurrentTimeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -282,12 +252,9 @@ pub enum GetCurrentTimeError {
 /// Error returned by calendar time conversion operation.
 #[derive(Debug, thiserror::Error)]
 pub enum ToCalendarTimeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

@@ -1,10 +1,6 @@
 //! CMIF protocol operations for the overlay notification service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle},
-    service::Session,
-};
+use nx_sf::{cmif, ipc::Handle, service::Session};
 
 use crate::{
     proto,
@@ -24,10 +20,8 @@ where
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchInError::ParseResponse)?;
 
@@ -36,12 +30,9 @@ where
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -56,10 +47,8 @@ where
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutError::SendRequest)?;
 
     let resp = cmif::parse_response::<&T>(&buf).map_err(DispatchOutError::ParseResponse)?;
 
@@ -68,12 +57,9 @@ where
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -86,10 +72,8 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::RCV_OPEN_RECEIVER).build();
-    req.write_to(&mut buf)
-        .map_err(OpenReceiverError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenReceiverError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenReceiverError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenReceiverError::ParseResponse)?;
 
@@ -106,12 +90,9 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
 
 #[derive(Debug, thiserror::Error)]
 pub enum OpenReceiverError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -142,10 +123,8 @@ pub fn receiver_get_receive_event_handle(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::RECEIVER_GET_RECEIVE_EVENT_HANDLE).build();
-    req.write_to(&mut buf)
-        .map_err(GetReceiveEventHandleError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetReceiveEventHandleError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetReceiveEventHandleError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<()>(&buf).map_err(GetReceiveEventHandleError::ParseResponse)?;
@@ -159,12 +138,9 @@ pub fn receiver_get_receive_event_handle(
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetReceiveEventHandleError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -208,10 +184,8 @@ pub fn snd_open_sender(
     let req = cmif::CmifRequestBuilder::new(proto::SND_OPEN_SENDER)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenSenderError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSenderError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSenderError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSenderError::ParseResponse)?;
 
@@ -228,12 +202,9 @@ pub fn snd_open_sender(
 
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSenderError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

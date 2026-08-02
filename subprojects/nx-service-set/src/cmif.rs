@@ -3,12 +3,9 @@
 //! This module implements set:sys commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::mem::size_of;
+use core::{mem::size_of, slice};
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, hipc::OutPointer, ipc::Handle as SessionHandle};
 
 use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, FirmwareVersion};
 
@@ -45,12 +42,18 @@ fn get_firmware_version_inner(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
+    // SAFETY: `FirmwareVersion` is `#[repr(C)]` with only `u8`/byte-array fields,
+    // so it is plain-old-data and any byte pattern is a valid value. The borrow
+    // is exclusive (we hold `&mut out`) and covers the full size of the struct.
+    let out_bytes: &mut [u8] = unsafe {
+        slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<FirmwareVersion>())
+    };
+
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .add_out_fixed_pointer((&raw mut out).cast::<u8>(), size_of::<FirmwareVersion>())
+        .add_out_fixed_pointer(OutPointer::new(out_bytes))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetFirmwareVersionError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(GetFirmwareVersionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetFirmwareVersionError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(GetFirmwareVersionError::ParseResponse)?;
 
@@ -60,12 +63,9 @@ fn get_firmware_version_inner(
 /// Error returned by [`get_firmware_version`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetFirmwareVersionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

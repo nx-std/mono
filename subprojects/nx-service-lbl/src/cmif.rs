@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the backlight service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -13,10 +10,8 @@ fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoI
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchNoIoError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchNoIoError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchNoIoError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchNoIoError::ParseResponse)?;
 
@@ -26,10 +21,8 @@ fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoI
 /// Error returned by no-IO dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchNoIoError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -46,10 +39,8 @@ fn dispatch_in_u64(
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInU64Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInU64Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInU64Error::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchInU64Error::ParseResponse)?;
 
@@ -59,10 +50,8 @@ fn dispatch_in_u64(
 /// Error returned by in-u64 dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInU64Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -79,10 +68,8 @@ fn dispatch_in_f32(
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInF32Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInF32Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInF32Error::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchInF32Error::ParseResponse)?;
 
@@ -92,10 +79,8 @@ fn dispatch_in_f32(
 /// Error returned by in-f32 dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInF32Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -106,10 +91,8 @@ fn dispatch_out_f32(session: SessionHandle, cmd_id: u32) -> Result<f32, Dispatch
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutF32Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutF32Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutF32Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&f32>(&buf).map_err(DispatchOutF32Error::ParseResponse)?;
 
@@ -119,10 +102,8 @@ fn dispatch_out_f32(session: SessionHandle, cmd_id: u32) -> Result<f32, Dispatch
 /// Error returned by out-f32 dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutF32Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -133,10 +114,8 @@ fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, Dispat
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutBoolError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutBoolError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutBoolError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(DispatchOutBoolError::ParseResponse)?;
 
@@ -146,10 +125,8 @@ fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, Dispat
 /// Error returned by out-bool dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutBoolError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -160,10 +137,8 @@ fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispatch
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutU32Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutU32Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutU32Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(DispatchOutU32Error::ParseResponse)?;
 
@@ -173,10 +148,8 @@ fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispatch
 /// Error returned by out-u32 dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutU32Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -274,10 +247,7 @@ pub fn get_ambient_light_sensor_value(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_AMBIENT_LIGHT_SENSOR_VALUE).build();
-    req.write_to(&mut buf)
-        .map_err(GetAmbientLightSensorValueError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetAmbientLightSensorValueError::SendRequest)?;
 
     // Wire layout: { u32 over_limit, f32 lux } = 8 bytes.
@@ -307,10 +277,8 @@ pub struct GetAmbientLightSensorValueOut {
 /// Error returned by [`get_ambient_light_sensor_value`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetAmbientLightSensorValueError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }

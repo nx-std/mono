@@ -126,26 +126,44 @@
 //! Only the **client** side of HIPC is implemented in this crate: requests are
 //! built (see [`make_request`] / [`Request`]) and responses are parsed (see
 //! [`parse_response`] / [`Response`]). There is intentionally no
-//! `parse_request` counterpart — `nx-sf` exists to talk *to* Horizon services
+//! `parse_request` counterpart - `nx-sf` exists to talk *to* Horizon services
 //! from a homebrew client, so the inbound request path the kernel would deliver
 //! to a server is out of scope. If server hosting is added later it will land
 //! in a dedicated module rather than here.
+//!
+//! # Design boundary: synchronous IPC only
+//!
+//! Buffers attached to a request are modeled as borrows ([`InputBuffer`],
+//! [`OutputBuffer`], ...) held by the request value and released when its
+//! consuming `send` returns. That model is valid **because** the IPC here is
+//! synchronous: the kernel's access window over every descriptor target is
+//! exactly the dynamic extent of `SendSyncRequest`, which the borrow region
+//! covers. Asynchronous or user-buffer request SVCs keep using the memory
+//! after the initiating call returns - a window no borrow can express. If
+//! those are ever wrapped, they need owned-buffer designs (ownership
+//! transferred in, handed back on completion), not this module's loans.
 //!
 //! # References
 //!
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
 //! - libnx `sf/hipc.h` (fincs, SciresM)
 
+mod buffer;
 mod request;
 mod response;
 mod wire;
 
+pub(crate) use self::request::HipcRequestBuilder;
 pub use self::{
+    buffer::{InOutBuffer, InPointer, InputBuffer, OutPointer, OutputBuffer},
     request::{
-        HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest, HipcRequestBuilder,
-        WriteError,
+        HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest, SendError, WriteError,
     },
     response::{Envelope, Response, ResponseParseError, parse_response, parse_response_envelope},
+    // Wire descriptor types stay readable (their accessors document the
+    // format), but their constructors are `pub(crate)`: descriptors erase
+    // loans into raw addresses, so only the loan-collecting builders (CMIF,
+    // TIPC) may produce them.
     wire::{
         BufferDescriptor, BufferMode, Header, MessageType, RecvListEntry, SpecialHeader,
         StaticDescriptor,

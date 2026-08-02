@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the idle:sys service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -15,10 +12,8 @@ pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsA
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::REPORT_USER_IS_ACTIVE).build();
-    req.write_to(&mut buf)
-        .map_err(ReportUserIsActiveError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ReportUserIsActiveError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ReportUserIsActiveError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ReportUserIsActiveError::ParseResponse)?;
 
@@ -28,12 +23,9 @@ pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsA
 /// Error returned by [`report_user_is_active`].
 #[derive(Debug, thiserror::Error)]
 pub enum ReportUserIsActiveError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

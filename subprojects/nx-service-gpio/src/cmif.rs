@@ -2,7 +2,7 @@
 
 use nx_sf::{
     cmif,
-    ipc::{self, Handle},
+    ipc::Handle,
     service::{DispatchError, OutHandleAttr, Session},
 };
 
@@ -15,10 +15,8 @@ fn dispatch_no_io(session: Handle, cmd_id: u32) -> Result<(), DispatchNoIoError>
 
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchNoIoError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchNoIoError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchNoIoError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchNoIoError::ParseResponse)?;
 
@@ -27,10 +25,8 @@ fn dispatch_no_io(session: Handle, cmd_id: u32) -> Result<(), DispatchNoIoError>
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchNoIoError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -43,10 +39,8 @@ fn dispatch_in_u32(session: Handle, cmd_id: u32, value: u32) -> Result<(), Dispa
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInU32Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInU32Error::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchInU32Error::ParseResponse)?;
 
@@ -55,10 +49,8 @@ fn dispatch_in_u32(session: Handle, cmd_id: u32, value: u32) -> Result<(), Dispa
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInU32Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -73,10 +65,8 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInBoolError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInBoolError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInBoolError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchInBoolError::ParseResponse)?;
 
@@ -85,10 +75,8 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInBoolError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -100,10 +88,8 @@ fn dispatch_out_u32(session: Handle, cmd_id: u32) -> Result<u32, DispatchOutU32E
 
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutU32Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutU32Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutU32Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(DispatchOutU32Error::ParseResponse)?;
 
@@ -112,10 +98,8 @@ fn dispatch_out_u32(session: Handle, cmd_id: u32) -> Result<u32, DispatchOutU32E
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutU32Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -127,10 +111,8 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchOutBo
 
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutBoolError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutBoolError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutBoolError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(DispatchOutBoolError::ParseResponse)?;
 
@@ -139,10 +121,8 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchOutBo
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutBoolError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -159,10 +139,8 @@ fn dispatch_in_u32_out_bool(
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInU32OutBoolError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32OutBoolError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInU32OutBoolError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&u8>(&buf).map_err(DispatchInU32OutBoolError::ParseResponse)?;
@@ -172,10 +150,8 @@ fn dispatch_in_u32_out_bool(
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInU32OutBoolError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -189,10 +165,8 @@ pub fn open_session(session: Handle, pad_name: u32) -> Result<Session, OpenSessi
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&pad_name)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenSessionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSessionError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
@@ -232,10 +206,8 @@ pub fn open_session2(
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION2)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenSession2Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSession2Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSession2Error::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSession2Error::ParseResponse)?;
 
@@ -361,10 +333,8 @@ pub fn pad_get_debounce_time(session: Handle) -> Result<i32, DispatchOutU32Error
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing session handle in response")]
@@ -374,10 +344,8 @@ pub enum OpenSessionError {
 /// Error returned by [`open_session2`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSession2Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing session handle in response")]

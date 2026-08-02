@@ -4,10 +4,7 @@
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
 use nx_service_applet::aruid::{Aruid, NO_ARUID};
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, hipc::InPointer, ipc::Handle as SessionHandle};
 use nx_svc::mem::shmem::Handle as ShmemHandle;
 
 use crate::proto::{applet_resource_cmds, cmds};
@@ -30,10 +27,8 @@ pub fn create_applet_resource(
         .with_data_value(&aruid)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(CreateAppletResourceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CreateAppletResourceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CreateAppletResourceError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<()>(&buf).map_err(CreateAppletResourceError::ParseResponse)?;
@@ -57,10 +52,8 @@ pub fn get_shared_memory_handle(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE).build();
-    req.write_to(&mut buf)
-        .map_err(GetSharedMemoryHandleError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSharedMemoryHandleError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSharedMemoryHandleError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<()>(&buf).map_err(GetSharedMemoryHandleError::ParseResponse)?;
@@ -109,10 +102,8 @@ pub fn activate_npad(
         .with_data_value(&input)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(ActivateNpadError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ActivateNpadError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ActivateNpadError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ActivateNpadError::ParseResponse)?;
 
@@ -151,10 +142,7 @@ pub fn set_supported_npad_style_set(
         .with_data_value(&input)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetSupportedNpadStyleSetError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(SetSupportedNpadStyleSetError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadStyleSetError::ParseResponse)?;
@@ -177,16 +165,18 @@ pub fn set_supported_npad_id_type(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
+    // SAFETY: `ids` is a live `&[u32]`; reinterpreting its bytes as `&[u8]`
+    // of the matching length is sound for the lifetime of the borrow, and
+    // `u32` has no padding or invalid bit patterns when read as bytes.
+    let ids_bytes = unsafe { core::slice::from_raw_parts(ids.as_ptr().cast::<u8>(), buffer_size) };
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
         .with_context(0x20)
         .with_data_value(&aruid)
-        .add_in_pointer(ids.as_ptr().cast::<u8>(), buffer_size)
+        .add_in_pointer(InPointer::new(ids_bytes))
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetSupportedNpadIdTypeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetSupportedNpadIdTypeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetSupportedNpadIdTypeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadIdTypeError::ParseResponse)?;
 
@@ -211,10 +201,8 @@ pub fn activate_touch_screen(
         .with_data_value(&aruid)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(ActivateTouchScreenError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ActivateTouchScreenError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ActivateTouchScreenError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ActivateTouchScreenError::ParseResponse)?;
 
@@ -239,10 +227,8 @@ pub fn activate_keyboard(
         .with_data_value(&aruid)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(ActivateKeyboardError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ActivateKeyboardError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ActivateKeyboardError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ActivateKeyboardError::ParseResponse)?;
 
@@ -267,10 +253,8 @@ pub fn activate_mouse(
         .with_data_value(&aruid)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(ActivateMouseError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ActivateMouseError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ActivateMouseError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ActivateMouseError::ParseResponse)?;
 
@@ -308,10 +292,8 @@ pub fn activate_gesture(
         .with_data_value(&input)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(ActivateGestureError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ActivateGestureError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ActivateGestureError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ActivateGestureError::ParseResponse)?;
 
@@ -321,12 +303,9 @@ pub fn activate_gesture(
 /// Error returned by [`create_applet_resource`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateAppletResourceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -338,12 +317,9 @@ pub enum CreateAppletResourceError {
 /// Error returned by [`get_shared_memory_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryHandleError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -355,12 +331,9 @@ pub enum GetSharedMemoryHandleError {
 /// Error returned by [`activate_npad`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateNpadError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -369,12 +342,9 @@ pub enum ActivateNpadError {
 /// Error returned by [`set_supported_npad_style_set`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetSupportedNpadStyleSetError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -383,12 +353,9 @@ pub enum SetSupportedNpadStyleSetError {
 /// Error returned by [`set_supported_npad_id_type`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetSupportedNpadIdTypeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -397,12 +364,9 @@ pub enum SetSupportedNpadIdTypeError {
 /// Error returned by [`activate_touch_screen`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateTouchScreenError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -411,12 +375,9 @@ pub enum ActivateTouchScreenError {
 /// Error returned by [`activate_keyboard`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateKeyboardError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -425,12 +386,9 @@ pub enum ActivateKeyboardError {
 /// Error returned by [`activate_mouse`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateMouseError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -439,12 +397,9 @@ pub enum ActivateMouseError {
 /// Error returned by [`activate_gesture`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateGestureError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

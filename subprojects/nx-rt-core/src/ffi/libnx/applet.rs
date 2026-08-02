@@ -23,6 +23,7 @@ use nx_svc::raw::INVALID_HANDLE;
 use crate::{
     ffi::common::{
         GENERIC_ERROR, convert_to_domain_error_to_rc, dispatch_error_to_rc, parse_resp_error_to_rc,
+        send_error_to_rc,
     },
     services::applet,
 };
@@ -421,14 +422,12 @@ pub fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
 
 fn open_error_to_rc(err: nx_service_applet::proxy::OpenError) -> u32 {
     use nx_service_applet::proxy::OpenError;
-    use nx_svc::error::ToRawResultCode;
 
     match err {
         OpenError::Connect(e) => match e {
             nx_service_applet::ConnectError::GetService(e) => match e {
-                nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+                nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
                 nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-                nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
                 nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
             },
             nx_service_applet::ConnectError::ConvertToDomain(e) => convert_to_domain_error_to_rc(e),

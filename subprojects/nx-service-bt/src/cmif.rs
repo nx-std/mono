@@ -2,7 +2,8 @@
 
 use nx_sf::{
     cmif,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{InPointer, OutPointer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{
@@ -30,10 +31,8 @@ where
         .with_data_value(value)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -44,8 +43,7 @@ fn dispatch_in_with_pid_and_pointer<T>(
     session: SessionHandle,
     cmd_id: u32,
     value: &T,
-    buffer: *const u8,
-    buffer_size: usize,
+    buffer: &[u8],
 ) -> Result<(), DispatchError>
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
@@ -57,12 +55,10 @@ where
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
         .with_send_pid()
-        .add_in_pointer(buffer, buffer_size)
+        .add_in_pointer(InPointer::new(buffer))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -72,10 +68,8 @@ where
 /// Error returned by BT dispatch operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -157,8 +151,7 @@ pub fn le_client_write_characteristic(
         session,
         proto::LE_CLIENT_WRITE_CHARACTERISTIC,
         &input,
-        buffer.as_ptr(),
-        buffer.len(),
+        buffer,
     )
 }
 
@@ -186,13 +179,7 @@ pub fn le_client_write_descriptor(
         applet_resource_user_id,
     };
 
-    dispatch_in_with_pid_and_pointer(
-        session,
-        proto::LE_CLIENT_WRITE_DESCRIPTOR,
-        &input,
-        buffer.as_ptr(),
-        buffer.len(),
-    )
+    dispatch_in_with_pid_and_pointer(session, proto::LE_CLIENT_WRITE_DESCRIPTOR, &input, buffer)
 }
 
 /// LeClientRegisterNotification (cmd 4).
@@ -255,13 +242,7 @@ pub fn set_le_response(
         applet_resource_user_id,
     };
 
-    dispatch_in_with_pid_and_pointer(
-        session,
-        proto::SET_LE_RESPONSE,
-        &input,
-        buffer.as_ptr(),
-        buffer.len(),
-    )
+    dispatch_in_with_pid_and_pointer(session, proto::SET_LE_RESPONSE, &input, buffer)
 }
 
 /// LeSendIndication (cmd 7).
@@ -285,13 +266,7 @@ pub fn le_send_indication(
         applet_resource_user_id,
     };
 
-    dispatch_in_with_pid_and_pointer(
-        session,
-        proto::LE_SEND_INDICATION,
-        &input,
-        buffer.as_ptr(),
-        buffer.len(),
-    )
+    dispatch_in_with_pid_and_pointer(session, proto::LE_SEND_INDICATION, &input, buffer)
 }
 
 /// GetLeEventInfo (cmd 8).
@@ -307,12 +282,10 @@ pub fn get_le_event_info(
     let req = cmif::CmifRequestBuilder::new(proto::GET_LE_EVENT_INFO)
         .with_data_value(&applet_resource_user_id)
         .with_send_pid()
-        .add_out_pointer(buffer.as_mut_ptr(), buffer.len())
+        .add_out_pointer(OutPointer::new(buffer))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetLeEventInfoError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetLeEventInfoError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetLeEventInfoError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(GetLeEventInfoError::ParseResponse)?;
 
@@ -340,10 +313,8 @@ pub fn get_le_event_info(
 /// Error returned by [`get_le_event_info`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetLeEventInfoError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("invalid BLE event type: {0}")]
@@ -363,10 +334,8 @@ pub fn register_ble_event(
         .with_data_value(&applet_resource_user_id)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(RegisterBleEventError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RegisterBleEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RegisterBleEventError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(RegisterBleEventError::ParseResponse)?;
 
@@ -380,10 +349,8 @@ pub fn register_ble_event(
 /// Error returned by [`register_ble_event`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterBleEventError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing event handle in response")]

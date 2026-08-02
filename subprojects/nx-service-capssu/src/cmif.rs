@@ -4,8 +4,8 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{
@@ -34,10 +34,8 @@ pub fn set_shim_library_version(
         .with_data_value(&input)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetShimVersionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetShimVersionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetShimVersionError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetShimVersionError::ParseResponse)?;
 
@@ -65,12 +63,10 @@ pub fn save_screen_shot_ex0(
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX0)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer_raw(image.as_ptr(), image.len(), BufferMode::NonSecure)
+        .add_input_buffer(InputBuffer::new(image, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(SaveScreenShotEx0Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx0Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SaveScreenShotEx0Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&ApplicationAlbumEntry>(&buf)
         .map_err(SaveScreenShotEx0Error::ParseResponse)?;
@@ -97,20 +93,23 @@ pub fn save_screen_shot_ex1(
         _pad: 0,
         applet_resource_user_id,
     };
+    // SAFETY: `appdata` is a valid `&ApplicationData` for the duration of the
+    // builder; the resulting byte slice covers exactly its `repr(C)` layout
+    // and is not retained beyond this call.
+    let appdata_bytes = unsafe {
+        core::slice::from_raw_parts(
+            (appdata as *const ApplicationData).cast::<u8>(),
+            size_of::<ApplicationData>(),
+        )
+    };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX1)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer_raw(
-            (appdata as *const ApplicationData).cast::<u8>(),
-            size_of::<ApplicationData>(),
-            BufferMode::Normal,
-        )
-        .add_input_buffer_raw(image.as_ptr(), image.len(), BufferMode::NonSecure)
+        .add_input_buffer(InputBuffer::new(appdata_bytes, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(image, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(SaveScreenShotEx1Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx1Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SaveScreenShotEx1Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&ApplicationAlbumEntry>(&buf)
         .map_err(SaveScreenShotEx1Error::ParseResponse)?;
@@ -137,19 +136,22 @@ pub fn save_screen_shot_ex2(
         _pad: 0,
         applet_resource_user_id,
     };
-    let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
-        .with_data_value(&input)
-        .add_input_buffer_raw(
+    // SAFETY: `list` is a valid `&UserIdList` for the duration of the
+    // builder; the resulting byte slice covers exactly its `repr(C)` layout
+    // and is not retained beyond this call.
+    let list_bytes = unsafe {
+        core::slice::from_raw_parts(
             (list as *const UserIdList).cast::<u8>(),
             size_of::<UserIdList>(),
-            BufferMode::Normal,
         )
-        .add_input_buffer_raw(image.as_ptr(), image.len(), BufferMode::NonSecure)
+    };
+    let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
+        .with_data_value(&input)
+        .add_input_buffer(InputBuffer::new(list_bytes, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(image, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(SaveScreenShotEx2Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SaveScreenShotEx2Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SaveScreenShotEx2Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&ApplicationAlbumEntry>(&buf)
         .map_err(SaveScreenShotEx2Error::ParseResponse)?;
@@ -160,12 +162,9 @@ pub fn save_screen_shot_ex2(
 /// Error returned by [`set_shim_library_version`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetShimVersionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -174,12 +173,9 @@ pub enum SetShimVersionError {
 /// Error returned by [`save_screen_shot_ex0`].
 #[derive(Debug, thiserror::Error)]
 pub enum SaveScreenShotEx0Error {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -188,12 +184,9 @@ pub enum SaveScreenShotEx0Error {
 /// Error returned by [`save_screen_shot_ex1`].
 #[derive(Debug, thiserror::Error)]
 pub enum SaveScreenShotEx1Error {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -202,12 +195,9 @@ pub enum SaveScreenShotEx1Error {
 /// Error returned by [`save_screen_shot_ex2`].
 #[derive(Debug, thiserror::Error)]
 pub enum SaveScreenShotEx2Error {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

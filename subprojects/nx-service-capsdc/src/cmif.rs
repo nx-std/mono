@@ -2,8 +2,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{
@@ -31,17 +31,11 @@ pub fn decode_jpeg(
     };
     let req = cmif::CmifRequestBuilder::new(proto::DECODE_JPEG)
         .with_data_value(&input)
-        .add_input_buffer_raw(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_output_buffer_raw(
-            out_image.as_mut_ptr(),
-            out_image.len(),
-            BufferMode::NonSecure,
-        )
+        .add_input_buffer(InputBuffer::new(jpeg, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out_image, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DecodeJpegError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DecodeJpegError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DecodeJpegError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DecodeJpegError::ParseResponse)?;
 
@@ -68,13 +62,11 @@ pub fn shrink_jpeg(
     };
     let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG)
         .with_data_value(&input)
-        .add_input_buffer_raw(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_output_buffer_raw(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .add_input_buffer(InputBuffer::new(jpeg, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out_jpeg, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(ShrinkJpegError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ShrinkJpegError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ShrinkJpegError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(ShrinkJpegError::ParseResponse)?;
 
@@ -106,13 +98,11 @@ pub fn shrink_jpeg_ex(
     };
     let req = cmif::CmifRequestBuilder::new(proto::SHRINK_JPEG_EX)
         .with_data_value(&input)
-        .add_input_buffer_raw(jpeg.as_ptr(), jpeg.len(), BufferMode::Normal)
-        .add_output_buffer_raw(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .add_input_buffer(InputBuffer::new(jpeg, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out_jpeg, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(ShrinkJpegExError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ShrinkJpegExError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ShrinkJpegExError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(ShrinkJpegExError::ParseResponse)?;
 
@@ -124,12 +114,9 @@ pub fn shrink_jpeg_ex(
 /// Error returned by [`decode_jpeg`].
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeJpegError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -138,12 +125,9 @@ pub enum DecodeJpegError {
 /// Error returned by [`shrink_jpeg`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShrinkJpegError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -152,12 +136,9 @@ pub enum ShrinkJpegError {
 /// Error returned by [`shrink_jpeg_ex`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShrinkJpegExError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

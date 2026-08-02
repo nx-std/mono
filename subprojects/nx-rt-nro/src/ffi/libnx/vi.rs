@@ -7,7 +7,7 @@ use nx_sf::ffi::Service;
 use crate::{
     ffi::common::{
         GENERIC_ERROR, LibnxError, SyncUnsafeCell, libnx_error, parse_resp_bytes_error_to_rc,
-        parse_resp_error_to_rc,
+        parse_resp_error_to_rc, send_error_to_rc,
     },
     services::{applet, vi},
 };
@@ -1268,13 +1268,10 @@ fn vi_connect_error_to_rc(err: vi::ConnectError) -> u32 {
 }
 
 fn vi_service_connect_error_to_rc(err: nx_service_vi::ConnectError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::ConnectError::GetService(e) => match e {
-            nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
         nx_service_vi::ConnectError::NoServiceAvailable => GENERIC_ERROR,
@@ -1284,74 +1281,56 @@ fn vi_service_connect_error_to_rc(err: nx_service_vi::ConnectError) -> u32 {
 }
 
 fn vi_get_display_service_error_to_rc(err: nx_service_vi::GetDisplayServiceError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::GetDisplayServiceError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::GetDisplayServiceError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::GetDisplayServiceError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::GetDisplayServiceError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_vi::GetDisplayServiceError::MissingHandle => GENERIC_ERROR,
     }
 }
 
 fn vi_get_sub_service_error_to_rc(err: nx_service_vi::GetSubServiceError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::GetSubServiceError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::GetSubServiceError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::GetSubServiceError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::GetSubServiceError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_vi::GetSubServiceError::MissingHandle => GENERIC_ERROR,
     }
 }
 
 fn vi_open_display_error_to_rc(err: nx_service_vi::OpenDisplayError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::OpenDisplayError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::OpenDisplayError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::OpenDisplayError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::OpenDisplayError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_close_display_error_to_rc(err: nx_service_vi::CloseDisplayError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::CloseDisplayError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::CloseDisplayError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::CloseDisplayError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::CloseDisplayError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_get_display_resolution_error_to_rc(err: nx_service_vi::GetDisplayResolutionError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::GetDisplayResolutionError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::GetDisplayResolutionError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::GetDisplayResolutionError::ParseResponse(e) => {
             parse_resp_bytes_error_to_rc(e)
         }
-        nx_service_vi::GetDisplayResolutionError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_get_display_logical_resolution_error_to_rc(
     err: nx_service_vi::GetDisplayLogicalResolutionWrapperError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::GetDisplayLogicalResolutionWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::GetDisplayLogicalResolutionWrapperError::Cmif(e) => match e {
-            nx_service_vi::GetDisplayLogicalResolutionError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::GetDisplayLogicalResolutionError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::GetDisplayLogicalResolutionError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::GetDisplayLogicalResolutionError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
@@ -1359,31 +1338,25 @@ fn vi_get_display_logical_resolution_error_to_rc(
 fn vi_set_display_magnification_error_to_rc(
     err: nx_service_vi::SetDisplayMagnificationWrapperError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetDisplayMagnificationWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetDisplayMagnificationWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetDisplayMagnificationError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetDisplayMagnificationError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetDisplayMagnificationError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::SetDisplayMagnificationError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_get_display_vsync_event_error_to_rc(err: nx_service_vi::GetDisplayVsyncEventError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::GetDisplayVsyncEventError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::GetDisplayVsyncEventError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::GetDisplayVsyncEventError::ParseResponse(e) => {
             parse_resp_bytes_error_to_rc(e)
         }
-        nx_service_vi::GetDisplayVsyncEventError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_vi::GetDisplayVsyncEventError::MissingHandle => GENERIC_ERROR,
     }
 }
@@ -1391,92 +1364,74 @@ fn vi_get_display_vsync_event_error_to_rc(err: nx_service_vi::GetDisplayVsyncEve
 fn vi_set_display_power_state_error_to_rc(
     err: nx_service_vi::SetDisplayPowerStateWrapperError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetDisplayPowerStateWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetDisplayPowerStateWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetDisplayPowerStateError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetDisplayPowerStateError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetDisplayPowerStateError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::SetDisplayPowerStateError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_set_display_alpha_error_to_rc(err: nx_service_vi::SetDisplayAlphaWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetDisplayAlphaWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetDisplayAlphaWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetDisplayAlphaError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetDisplayAlphaError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetDisplayAlphaError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::SetDisplayAlphaError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_get_z_order_count_min_error_to_rc(err: nx_service_vi::GetZOrderCountMinError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::GetZOrderCountMinError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::GetZOrderCountMinError::Cmif(e) => match e {
-            nx_service_vi::GetZOrderCountError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::GetZOrderCountError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::GetZOrderCountError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_vi::GetZOrderCountError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_get_z_order_count_max_error_to_rc(err: nx_service_vi::GetZOrderCountMaxError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::GetZOrderCountMaxError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::GetZOrderCountMaxError::Cmif(e) => match e {
-            nx_service_vi::GetZOrderCountError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::GetZOrderCountError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::GetZOrderCountError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_vi::GetZOrderCountError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_create_stray_layer_error_to_rc(err: nx_service_vi::CreateStrayLayerError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::CreateStrayLayerError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::CreateStrayLayerError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::CreateStrayLayerError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::CreateStrayLayerError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_create_managed_layer_error_to_rc(err: nx_service_vi::CreateManagedLayerWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::CreateManagedLayerWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::CreateManagedLayerWrapperError::Cmif(e) => match e {
-            nx_service_vi::CreateManagedLayerError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::CreateManagedLayerError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::CreateManagedLayerError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::CreateManagedLayerError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
@@ -1484,137 +1439,107 @@ fn vi_create_managed_layer_error_to_rc(err: nx_service_vi::CreateManagedLayerWra
 fn vi_destroy_managed_layer_error_to_rc(
     err: nx_service_vi::DestroyManagedLayerWrapperError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::DestroyManagedLayerWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::DestroyManagedLayerWrapperError::Cmif(e) => match e {
-            nx_service_vi::DestroyManagedLayerError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::DestroyManagedLayerError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::DestroyManagedLayerError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::DestroyManagedLayerError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_close_layer_error_to_rc(err: nx_service_vi::CloseLayerError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::CloseLayerError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::CloseLayerError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::CloseLayerError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::CloseLayerError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_open_layer_error_to_rc(err: nx_service_vi::OpenLayerError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::OpenLayerError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::OpenLayerError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::OpenLayerError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::OpenLayerError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_destroy_stray_layer_error_to_rc(err: nx_service_vi::DestroyStrayLayerError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::DestroyStrayLayerError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::DestroyStrayLayerError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::DestroyStrayLayerError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_vi::DestroyStrayLayerError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_set_layer_size_error_to_rc(err: nx_service_vi::SetLayerSizeWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetLayerSizeWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetLayerSizeWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetLayerSizeError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetLayerSizeError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetLayerSizeError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_vi::SetLayerSizeError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_set_layer_z_error_to_rc(err: nx_service_vi::SetLayerZWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetLayerZWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetLayerZWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetLayerZError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetLayerZError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetLayerZError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_vi::SetLayerZError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_set_layer_position_error_to_rc(err: nx_service_vi::SetLayerPositionWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetLayerPositionWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetLayerPositionWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetLayerPositionError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetLayerPositionError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetLayerPositionError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::SetLayerPositionError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_set_layer_scaling_mode_error_to_rc(err: nx_service_vi::SetLayerScalingModeError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::SetLayerScalingModeError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::SetLayerScalingModeError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::SetLayerScalingModeError::ParseResponse(e) => {
             parse_resp_bytes_error_to_rc(e)
         }
-        nx_service_vi::SetLayerScalingModeError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_get_indirect_layer_image_map_error_to_rc(
     err: nx_service_vi::GetIndirectLayerImageMapError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::GetIndirectLayerImageMapError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::GetIndirectLayerImageMapError::SendRequest(e) => send_error_to_rc(e),
         nx_service_vi::GetIndirectLayerImageMapError::ParseResponse(e) => {
             parse_resp_bytes_error_to_rc(e)
         }
-        nx_service_vi::GetIndirectLayerImageMapError::BuildRequest(_) => GENERIC_ERROR,
     }
 }
 
 fn vi_get_indirect_layer_image_required_memory_info_error_to_rc(
     err: nx_service_vi::GetIndirectLayerImageRequiredMemoryInfoError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
-        nx_service_vi::GetIndirectLayerImageRequiredMemoryInfoError::SendRequest(e) => e.to_rc(),
+        nx_service_vi::GetIndirectLayerImageRequiredMemoryInfoError::SendRequest(e) => {
+            send_error_to_rc(e)
+        }
         nx_service_vi::GetIndirectLayerImageRequiredMemoryInfoError::ParseResponse(e) => {
             parse_resp_bytes_error_to_rc(e)
-        }
-        nx_service_vi::GetIndirectLayerImageRequiredMemoryInfoError::BuildRequest(_) => {
-            GENERIC_ERROR
         }
     }
 }
@@ -1622,82 +1547,67 @@ fn vi_get_indirect_layer_image_required_memory_info_error_to_rc(
 fn vi_set_content_visibility_error_to_rc(
     err: nx_service_vi::SetContentVisibilityWrapperError,
 ) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::SetContentVisibilityWrapperError::NotAvailable => {
             libnx_error(LibnxError::NotInitialized)
         }
         nx_service_vi::SetContentVisibilityWrapperError::Cmif(e) => match e {
-            nx_service_vi::SetContentVisibilityError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::SetContentVisibilityError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::SetContentVisibilityError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::SetContentVisibilityError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_prepare_fatal_error_to_rc(err: nx_service_vi::PrepareFatalWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::PrepareFatalWrapperError::NotAvailable => {
             libnx_error(LibnxError::IncompatSysVer)
         }
         nx_service_vi::PrepareFatalWrapperError::Cmif(e) => match e {
-            nx_service_vi::PrepareFatalError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::PrepareFatalError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::PrepareFatalError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_vi::PrepareFatalError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_show_fatal_error_to_rc(err: nx_service_vi::ShowFatalWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::ShowFatalWrapperError::NotAvailable => {
             libnx_error(LibnxError::IncompatSysVer)
         }
         nx_service_vi::ShowFatalWrapperError::Cmif(e) => match e {
-            nx_service_vi::ShowFatalError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::ShowFatalError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::ShowFatalError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_vi::ShowFatalError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_draw_fatal_rectangle_error_to_rc(err: nx_service_vi::DrawFatalRectangleWrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::DrawFatalRectangleWrapperError::NotAvailable => {
             libnx_error(LibnxError::IncompatSysVer)
         }
         nx_service_vi::DrawFatalRectangleWrapperError::Cmif(e) => match e {
-            nx_service_vi::DrawFatalRectangleError::SendRequest(e) => e.to_rc(),
+            nx_service_vi::DrawFatalRectangleError::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::DrawFatalRectangleError::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::DrawFatalRectangleError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn vi_draw_fatal_text32_error_to_rc(err: nx_service_vi::DrawFatalText32WrapperError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         nx_service_vi::DrawFatalText32WrapperError::NotAvailable => {
             libnx_error(LibnxError::IncompatSysVer)
         }
         nx_service_vi::DrawFatalText32WrapperError::Cmif(e) => match e {
-            nx_service_vi::DrawFatalText32Error::SendRequest(e) => e.to_rc(),
+            nx_service_vi::DrawFatalText32Error::SendRequest(e) => send_error_to_rc(e),
             nx_service_vi::DrawFatalText32Error::ParseResponse(e) => {
                 parse_resp_bytes_error_to_rc(e)
             }
-            nx_service_vi::DrawFatalText32Error::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }

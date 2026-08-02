@@ -16,7 +16,7 @@ pub use self::{
     object_id::ObjectId,
     request::{
         CmifCloseRequest, CmifControlRequestBuilder, CmifRequest, CmifRequestBuilder,
-        RequestLayoutError,
+        RequestLayoutError, SendError,
     },
     response::{
         ParseError, Response, parse_response, parse_response_bytes, parse_response_domain,

@@ -2,9 +2,10 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{proto, types::GetSharedFontOut};
 
@@ -17,10 +18,8 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
     let req = cmif::CmifRequestBuilder::new(proto::REQUEST_LOAD)
         .with_data_value(&font_type)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestLoadError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestLoadError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestLoadError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RequestLoadError::ParseResponse)?;
 
@@ -38,10 +37,8 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
     let req = cmif::CmifRequestBuilder::new(proto::GET_LOAD_STATE)
         .with_data_value(&font_type)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetLoadStateError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetLoadStateError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetLoadStateError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(GetLoadStateError::ParseResponse)?;
 
@@ -59,9 +56,8 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
     let req = cmif::CmifRequestBuilder::new(proto::GET_SIZE)
         .with_data_value(&font_type)
         .build();
-    req.write_to(&mut buf).map_err(GetSizeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSizeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSizeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(GetSizeError::ParseResponse)?;
 
@@ -82,10 +78,7 @@ pub fn get_shared_memory_address_offset(
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_ADDRESS_OFFSET)
         .with_data_value(&font_type)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetSharedMemoryAddressOffsetError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetSharedMemoryAddressOffsetError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf)
@@ -105,10 +98,7 @@ pub fn get_shared_memory_native_handle(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_NATIVE_HANDLE).build();
-    req.write_to(&mut buf)
-        .map_err(GetSharedMemoryNativeHandleError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetSharedMemoryNativeHandleError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf)
@@ -144,26 +134,15 @@ pub fn get_shared_font(
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_FONT)
         .with_data_value(&language_code)
-        .add_output_buffer_raw(
-            types.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(types),
+        .add_output_buffer(OutputBuffer::new(types.as_mut_bytes(), BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(
+            offsets.as_mut_bytes(),
             BufferMode::Normal,
-        )
-        .add_output_buffer_raw(
-            offsets.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(offsets),
-            BufferMode::Normal,
-        )
-        .add_output_buffer_raw(
-            sizes.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(sizes),
-            BufferMode::Normal,
-        )
+        ))
+        .add_output_buffer(OutputBuffer::new(sizes.as_mut_bytes(), BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetSharedFontError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSharedFontError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSharedFontError::SendRequest)?;
 
     let resp = cmif::parse_response::<&GetSharedFontOut>(&buf)
         .map_err(GetSharedFontError::ParseResponse)?;
@@ -176,12 +155,9 @@ pub fn get_shared_font(
 /// Error returned by [`request_load`].
 #[derive(Debug, thiserror::Error)]
 pub enum RequestLoadError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -190,12 +166,9 @@ pub enum RequestLoadError {
 /// Error returned by [`get_load_state`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetLoadStateError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -204,12 +177,9 @@ pub enum GetLoadStateError {
 /// Error returned by [`get_size`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSizeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -218,12 +188,9 @@ pub enum GetSizeError {
 /// Error returned by [`get_shared_memory_address_offset`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryAddressOffsetError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -232,12 +199,9 @@ pub enum GetSharedMemoryAddressOffsetError {
 /// Error returned by [`get_shared_memory_native_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryNativeHandleError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -249,12 +213,9 @@ pub enum GetSharedMemoryNativeHandleError {
 /// Error returned by [`get_shared_font`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedFontError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the fan service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -19,10 +16,8 @@ pub fn open_controller(
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_CONTROLLER)
         .with_data_value(&device_code)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenControllerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenControllerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenControllerError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenControllerError::ParseResponse)?;
 
@@ -46,10 +41,8 @@ pub fn set_rotation_speed_level(
     let req = cmif::CmifRequestBuilder::new(proto::SET_ROTATION_SPEED_LEVEL)
         .with_data_value(&level)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetRotationSpeedLevelError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetRotationSpeedLevelError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetRotationSpeedLevelError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetRotationSpeedLevelError::ParseResponse)?;
 
@@ -64,10 +57,8 @@ pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotati
 
     // The get-rotation-speed-level request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(proto::GET_ROTATION_SPEED_LEVEL).build();
-    req.write_to(&mut buf)
-        .map_err(GetRotationSpeedLevelError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetRotationSpeedLevelError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetRotationSpeedLevelError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&f32>(&buf).map_err(GetRotationSpeedLevelError::ParseResponse)?;
@@ -78,12 +69,9 @@ pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotati
 /// Error returned by [`open_controller`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenControllerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -95,12 +83,9 @@ pub enum OpenControllerError {
 /// Error returned by [`set_rotation_speed_level`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetRotationSpeedLevelError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -109,12 +94,9 @@ pub enum SetRotationSpeedLevelError {
 /// Error returned by [`get_rotation_speed_level`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetRotationSpeedLevelError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

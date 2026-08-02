@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the temperature control service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -14,10 +11,8 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::ENABLE_FAN_CONTROL).build();
-    req.write_to(&mut buf)
-        .map_err(EnableFanControlError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(EnableFanControlError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(EnableFanControlError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(EnableFanControlError::ParseResponse)?;
 
@@ -31,10 +26,8 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::DISABLE_FAN_CONTROL).build();
-    req.write_to(&mut buf)
-        .map_err(DisableFanControlError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DisableFanControlError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DisableFanControlError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DisableFanControlError::ParseResponse)?;
 
@@ -48,10 +41,8 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::IS_FAN_CONTROL_ENABLED).build();
-    req.write_to(&mut buf)
-        .map_err(IsFanControlEnabledError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(IsFanControlEnabledError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(IsFanControlEnabledError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&u8>(&buf).map_err(IsFanControlEnabledError::ParseResponse)?;
@@ -68,10 +59,7 @@ pub fn get_skin_temperature_milli_c(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C).build();
-    req.write_to(&mut buf)
-        .map_err(GetSkinTemperatureMilliCError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetSkinTemperatureMilliCError::SendRequest)?;
 
     let resp =
@@ -83,12 +71,9 @@ pub fn get_skin_temperature_milli_c(
 /// Error returned by [`enable_fan_control`].
 #[derive(Debug, thiserror::Error)]
 pub enum EnableFanControlError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -97,12 +82,9 @@ pub enum EnableFanControlError {
 /// Error returned by [`disable_fan_control`].
 #[derive(Debug, thiserror::Error)]
 pub enum DisableFanControlError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -111,12 +93,9 @@ pub enum DisableFanControlError {
 /// Error returned by [`is_fan_control_enabled`].
 #[derive(Debug, thiserror::Error)]
 pub enum IsFanControlEnabledError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -125,12 +104,9 @@ pub enum IsFanControlEnabledError {
 /// Error returned by [`get_skin_temperature_milli_c`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSkinTemperatureMilliCError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

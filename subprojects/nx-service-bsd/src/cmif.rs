@@ -7,16 +7,13 @@
 //! Non-init commands all share the same response prefix `{ int ret; int errno }`
 //! (see libnx's `_bsdDispatchImpl`). When the service returns `ret < 0`, the
 //! caller is informed via the corresponding `Service { ret, errno }` variant in
-//! the per-command error enum — no thread-local `errno` is maintained.
+//! the per-command error enum - no thread-local `errno` is maintained.
 
 use nx_sf::{
     cmif::{self, ParseError},
-    hipc::BufferMode,
+    hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
 };
-use nx_svc::{
-    ipc::{self, Handle as SessionHandle, SendSyncError},
-    mem::tmem::Handle as TmemHandle,
-};
+use nx_svc::{ipc::Handle as SessionHandle, mem::tmem::Handle as TmemHandle};
 use nx_sys_thread_tls::IpcBuffer;
 
 use crate::{
@@ -63,12 +60,10 @@ pub(crate) fn register_client(
         .with_send_pid()
         .add_copy_handle(tmem_handle.to_raw())
         .build();
-    req.write_to(&mut buf)
-        .map_err(RegisterClientError::BuildRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RegisterClientError::SendRequest)?;
 
-    ipc::send_sync_request(session).map_err(RegisterClientError::SendRequest)?;
-
-    // The reply is a CMIF `u64 pid` payload — no extra `{ ret; errno; }` prefix here
+    // The reply is a CMIF `u64 pid` payload - no extra `{ ret; errno; }` prefix here
     // because cmd 0 / cmd 1 don't use the dispatch path that adds it.
     let resp = cmif::parse_response::<&u64>(&buf).map_err(RegisterClientError::ParseResponse)?;
 
@@ -89,10 +84,8 @@ pub(crate) fn start_monitoring(
         .with_data_value(&pid)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(StartMonitoringError::BuildRequest)?;
-
-    ipc::send_sync_request(monitor_session).map_err(StartMonitoringError::SendRequest)?;
+    req.send(&mut buf, monitor_session)
+        .map_err(StartMonitoringError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(StartMonitoringError::ParseResponse)?;
     Ok(())
@@ -181,9 +174,8 @@ pub(crate) fn socket(
     let req = cmif::CmifRequestBuilder::new(cmds::SOCKET)
         .with_data_value(&payload)
         .build();
-    req.write_to(&mut buf).map_err(SocketError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(SocketError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SocketError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&buf, false) }.map_err(|err| match err {
@@ -203,9 +195,8 @@ pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseEr
     let req = cmif::CmifRequestBuilder::new(cmds::CLOSE)
         .with_data_value(&fd_raw)
         .build();
-    req.write_to(&mut buf).map_err(CloseError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(CloseError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CloseError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     unsafe { read_service_response(&buf, false) }.map_err(|err| match err {
@@ -226,7 +217,6 @@ pub(crate) fn bind(
         cmds::BIND,
         sockfd,
         addr,
-        BindError::BuildRequest,
         BindError::SendRequest,
         BindError::ParseResponse,
         |ret, errno| BindError::Service { ret, errno },
@@ -245,7 +235,6 @@ pub(crate) fn connect(
         cmds::CONNECT,
         sockfd,
         addr,
-        ConnectError::BuildRequest,
         ConnectError::SendRequest,
         ConnectError::ParseResponse,
         |ret, errno| ConnectError::Service { ret, errno },
@@ -253,7 +242,7 @@ pub(crate) fn connect(
     .map(|_| ())
 }
 
-/// Shared `bind`/`connect` body — sends `sockfd` plus an in-only sockaddr
+/// Shared `bind`/`connect` body - sends `sockfd` plus an in-only sockaddr
 /// buffer, then drops the standard `{ ret; errno }` reply on the floor.
 #[allow(clippy::too_many_arguments)]
 fn bsd_send_recv_no_buffer_in<E>(
@@ -261,8 +250,7 @@ fn bsd_send_recv_no_buffer_in<E>(
     cmd_id: u32,
     sockfd: BsdSockFd,
     addr: &[u8],
-    mk_build: fn(cmif::RequestLayoutError) -> E,
-    mk_send: fn(SendSyncError) -> E,
+    mk_send: fn(cmif::SendError) -> E,
     mk_parse: fn(ParseError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<i32, E> {
@@ -273,11 +261,9 @@ fn bsd_send_recv_no_buffer_in<E>(
     let sockfd_raw = sockfd.raw();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&sockfd_raw)
-        .add_in_auto_buffer(addr.as_ptr(), addr.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(addr, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf).map_err(mk_build)?;
-
-    ipc::send_sync_request(session).map_err(mk_send)?;
+    req.send(&mut buf, session).map_err(mk_send)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&buf, false) }.map_err(|err| match err {
@@ -287,7 +273,7 @@ fn bsd_send_recv_no_buffer_in<E>(
     Ok(outcome.ret)
 }
 
-/// Shared `accept`/`getsockname`/`getpeername` body — sends `sockfd` and an
+/// Shared `accept`/`getsockname`/`getpeername` body - sends `sockfd` and an
 /// out-only sockaddr buffer, then reads back the actual `socklen_t` length.
 #[allow(clippy::too_many_arguments)]
 fn bsd_cmd_in_sockfd_out_sockaddr<E>(
@@ -295,8 +281,7 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
     cmd_id: u32,
     sockfd: BsdSockFd,
     addr_buf: &mut [u8],
-    mk_build: fn(cmif::RequestLayoutError) -> E,
-    mk_send: fn(SendSyncError) -> E,
+    mk_send: fn(cmif::SendError) -> E,
     mk_parse: fn(ParseError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<(i32, u32), E> {
@@ -307,11 +292,9 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
     let sockfd_raw = sockfd.raw();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&sockfd_raw)
-        .add_out_auto_buffer(addr_buf.as_mut_ptr(), addr_buf.len(), BufferMode::Normal)
+        .add_out_auto_buffer(OutputBuffer::new(addr_buf, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf).map_err(mk_build)?;
-
-    ipc::send_sync_request(session).map_err(mk_send)?;
+    req.send(&mut buf, session).map_err(mk_send)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; out_data carries one u32 with the addrlen.
     let outcome = unsafe { read_service_response(&buf, true) }.map_err(|err| match err {
@@ -335,7 +318,6 @@ pub(crate) fn accept(
         cmds::ACCEPT,
         sockfd,
         addr_buf,
-        AcceptError::BuildRequest,
         AcceptError::SendRequest,
         AcceptError::ParseResponse,
         |ret, errno| AcceptError::Service { ret, errno },
@@ -354,7 +336,6 @@ pub(crate) fn get_sock_name(
         cmds::GET_SOCK_NAME,
         sockfd,
         addr_buf,
-        GetSockNameError::BuildRequest,
         GetSockNameError::SendRequest,
         GetSockNameError::ParseResponse,
         |ret, errno| GetSockNameError::Service { ret, errno },
@@ -373,7 +354,6 @@ pub(crate) fn get_peer_name(
         cmds::GET_PEER_NAME,
         sockfd,
         addr_buf,
-        GetPeerNameError::BuildRequest,
         GetPeerNameError::SendRequest,
         GetPeerNameError::ParseResponse,
         |ret, errno| GetPeerNameError::Service { ret, errno },
@@ -398,9 +378,8 @@ pub(crate) fn listen(
     let req = cmif::CmifRequestBuilder::new(cmds::LISTEN)
         .with_data_value(&payload)
         .build();
-    req.write_to(&mut buf).map_err(ListenError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(ListenError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ListenError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     unsafe { read_service_response(&buf, false) }.map_err(|err| match err {
@@ -427,10 +406,8 @@ pub(crate) fn shutdown(
     let req = cmif::CmifRequestBuilder::new(cmds::SHUTDOWN)
         .with_data_value(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(ShutdownError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(ShutdownError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ShutdownError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     unsafe { read_service_response(&buf, false) }.map_err(|err| match err {
@@ -457,12 +434,10 @@ pub(crate) fn recv(
     };
     let req = cmif::CmifRequestBuilder::new(cmds::RECV)
         .with_data_value(&payload)
-        .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
+        .add_out_auto_buffer(OutputBuffer::new(buf, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(RecvError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(RecvError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(RecvError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -490,13 +465,11 @@ pub(crate) fn recv_from(
     };
     let req = cmif::CmifRequestBuilder::new(cmds::RECV_FROM)
         .with_data_value(&payload)
-        .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
-        .add_out_auto_buffer(src_addr.as_mut_ptr(), src_addr.len(), BufferMode::Normal)
+        .add_out_auto_buffer(OutputBuffer::new(buf, BufferMode::Normal))
+        .add_out_auto_buffer(OutputBuffer::new(src_addr, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(RecvFromError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(RecvFromError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(RecvFromError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; trailing payload is one u32 addrlen.
     let outcome = unsafe { read_service_response(&ipc_buf, true) }.map_err(|err| match err {
@@ -524,12 +497,10 @@ pub(crate) fn send(
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SEND)
         .with_data_value(&payload)
-        .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(buf, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(SendError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(SendError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(SendError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -557,13 +528,11 @@ pub(crate) fn send_to(
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SEND_TO)
         .with_data_value(&payload)
-        .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
-        .add_in_auto_buffer(dest_addr.as_ptr(), dest_addr.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(buf, BufferMode::Normal))
+        .add_in_auto_buffer(InputBuffer::new(dest_addr, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(SendToError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(SendToError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(SendToError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -586,12 +555,10 @@ pub(crate) fn read(
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::READ)
         .with_data_value(&fd_raw)
-        .add_out_auto_buffer(buf.as_mut_ptr(), buf.len(), BufferMode::Normal)
+        .add_out_auto_buffer(OutputBuffer::new(buf, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(ReadError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(ReadError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(ReadError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -614,12 +581,10 @@ pub(crate) fn write(
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::WRITE)
         .with_data_value(&fd_raw)
-        .add_in_auto_buffer(buf.as_ptr(), buf.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(buf, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(WriteError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(WriteError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(WriteError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -648,12 +613,10 @@ pub(crate) fn get_sock_opt(
     };
     let req = cmif::CmifRequestBuilder::new(cmds::GET_SOCK_OPT)
         .with_data_value(&payload)
-        .add_out_auto_buffer(optval.as_mut_ptr(), optval.len(), BufferMode::Normal)
+        .add_out_auto_buffer(OutputBuffer::new(optval, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(GetSockOptError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(GetSockOptError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(GetSockOptError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; one u32 socklen_t trails the prefix.
     let outcome = unsafe { read_service_response(&ipc_buf, true) }.map_err(|err| match err {
@@ -683,12 +646,10 @@ pub(crate) fn set_sock_opt(
     };
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SOCK_OPT)
         .with_data_value(&payload)
-        .add_in_auto_buffer(optval.as_ptr(), optval.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(optval, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(SetSockOptError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(SetSockOptError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(SetSockOptError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -719,10 +680,8 @@ pub(crate) fn fcntl(
     let req = cmif::CmifRequestBuilder::new(cmds::FCNTL)
         .with_data_value(&payload)
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(FcntlError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(FcntlError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(FcntlError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -732,11 +691,11 @@ pub(crate) fn fcntl(
     Ok(outcome.ret)
 }
 
-/// `bsdIoctl` (cmd 19) — generic case only.
+/// `bsdIoctl` (cmd 19) - generic case only.
 ///
 /// `request` encodes both the direction (via `IOC_IN` / `IOC_OUT` bits) and the
 /// payload size (via `IOCPARM_LEN`). This port handles the **generic** path of
-/// libnx's switch table — the `SIOCGIFCONF` / `SIOCGIFMEDIA` / `SIOCGIFXMEDIA`
+/// libnx's switch table - the `SIOCGIFCONF` / `SIOCGIFMEDIA` / `SIOCGIFXMEDIA`
 /// special cases (which reach into the caller's buffer to find sub-buffers)
 /// are not implemented yet.
 pub(crate) fn ioctl(
@@ -770,18 +729,28 @@ pub(crate) fn ioctl(
         request,
         bufcount: if has_inout { 1 } else { 0 },
     };
-    let mut builder = cmif::CmifRequestBuilder::new(cmds::IOCTL).with_data_value(&payload);
-    if has_in {
-        builder = builder.add_in_auto_buffer(data.as_ptr(), payload_len, BufferMode::Normal);
-    }
-    if has_out {
-        builder = builder.add_out_auto_buffer(data.as_mut_ptr(), payload_len, BufferMode::Normal);
-    }
+    let builder = cmif::CmifRequestBuilder::new(cmds::IOCTL).with_data_value(&payload);
+    // When both directions are requested, `data` is attached once through
+    // `add_inout_auto_buffer` - a single descriptor the kernel both reads
+    // and writes - matching libnx's `bsdIoctl` wire shape without aliasing
+    // two descriptors over the same memory.
+    let builder = match (has_in, has_out) {
+        (true, true) => builder.add_inout_auto_buffer(InOutBuffer::new(
+            &mut data[..payload_len],
+            BufferMode::Normal,
+        )),
+        (true, false) => {
+            builder.add_in_auto_buffer(InputBuffer::new(&data[..payload_len], BufferMode::Normal))
+        }
+        (false, true) => builder.add_out_auto_buffer(OutputBuffer::new(
+            &mut data[..payload_len],
+            BufferMode::Normal,
+        )),
+        (false, false) => builder,
+    };
     let req = builder.build();
-    req.write_to(&mut ipc_buf)
-        .map_err(IoctlError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(IoctlError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(IoctlError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -843,19 +812,22 @@ pub(crate) fn select(
     // borrow of the TLS IPC buffer is live.
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
+    // Each fd_set is both read and written by the kernel - libnx's
+    // `bsdSelect` wire shape - so each is attached once through
+    // `add_inout_auto_buffer` instead of aliasing an in-auto-buffer and an
+    // out-auto-buffer over the same memory. This emits the three fd_set
+    // descriptors interleaved (in, out, in, out, in, out) rather than
+    // grouped (in, in, in, out, out, out), but the wire bytes are identical
+    // either way: this crate never attaches pointer-buffers, so descriptor
+    // order carries no addressing information the server depends on.
     let req = cmif::CmifRequestBuilder::new(cmds::SELECT)
         .with_data_value(&payload)
-        .add_in_auto_buffer(readfds.as_ptr(), readfds.len(), BufferMode::Normal)
-        .add_in_auto_buffer(writefds.as_ptr(), writefds.len(), BufferMode::Normal)
-        .add_in_auto_buffer(exceptfds.as_ptr(), exceptfds.len(), BufferMode::Normal)
-        .add_out_auto_buffer(readfds.as_mut_ptr(), readfds.len(), BufferMode::Normal)
-        .add_out_auto_buffer(writefds.as_mut_ptr(), writefds.len(), BufferMode::Normal)
-        .add_out_auto_buffer(exceptfds.as_mut_ptr(), exceptfds.len(), BufferMode::Normal)
+        .add_inout_auto_buffer(InOutBuffer::new(readfds, BufferMode::Normal))
+        .add_inout_auto_buffer(InOutBuffer::new(writefds, BufferMode::Normal))
+        .add_inout_auto_buffer(InOutBuffer::new(exceptfds, BufferMode::Normal))
         .build();
-    req.write_to(&mut ipc_buf)
-        .map_err(SelectError::BuildRequest)?;
-
-    ipc::send_sync_request(session).map_err(SelectError::SendRequest)?;
+    req.send(&mut ipc_buf, session)
+        .map_err(SelectError::SendRequest)?;
 
     // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
     let outcome = unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -883,15 +855,16 @@ pub(crate) fn poll(
             timeout,
             _pad: 0,
         };
+        // `fds` is both read and written by the kernel - libnx's `bsdPoll`
+        // wire shape - so it is attached once through
+        // `add_inout_auto_buffer` instead of aliasing an in-auto-buffer and
+        // an out-auto-buffer over the same memory.
         let req = cmif::CmifRequestBuilder::new(cmds::POLL)
             .with_data_value(&payload)
-            .add_in_auto_buffer(fds.as_ptr(), fds.len(), BufferMode::Normal)
-            .add_out_auto_buffer(fds.as_mut_ptr(), fds.len(), BufferMode::Normal)
+            .add_inout_auto_buffer(InOutBuffer::new(fds, BufferMode::Normal))
             .build();
-        req.write_to(&mut ipc_buf)
-            .map_err(PollError::BuildRequest)?;
-
-        ipc::send_sync_request(session).map_err(PollError::SendRequest)?;
+        req.send(&mut ipc_buf, session)
+            .map_err(PollError::SendRequest)?;
         // SAFETY: the kernel populated the TLS IPC buffer; no other borrow is live.
         let outcome =
             unsafe { read_service_response(&ipc_buf, false) }.map_err(|err| match err {
@@ -905,12 +878,9 @@ pub(crate) fn poll(
 /// Error returned by [`register_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterClientError {
-    /// Failed to build the `RegisterClient` IPC request.
-    #[error("failed to build register_client request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the `RegisterClient` IPC request.
     #[error("failed to send register_client request")]
-    SendRequest(#[source] SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// The CMIF response could not be parsed.
     #[error("failed to parse register_client response")]
     ParseResponse(#[source] ParseError),
@@ -919,28 +889,22 @@ pub enum RegisterClientError {
 /// Error returned by [`start_monitoring`].
 #[derive(Debug, thiserror::Error)]
 pub enum StartMonitoringError {
-    /// Failed to build the `StartMonitoring` IPC request.
-    #[error("failed to build start_monitoring request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the `StartMonitoring` IPC request.
     #[error("failed to send start_monitoring request")]
-    SendRequest(#[source] SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// The CMIF response could not be parsed.
     #[error("failed to parse start_monitoring response")]
     ParseResponse(#[source] ParseError),
 }
 
 macro_rules! define_per_command_error {
-    ($name:ident, $build_msg:literal, $send_msg:literal, $parse_msg:literal, $svc_msg:literal) => {
+    ($name:ident, $send_msg:literal, $parse_msg:literal, $svc_msg:literal) => {
         #[doc = concat!("Error returned by the corresponding BSD command.")]
         #[derive(Debug, thiserror::Error)]
         pub enum $name {
-            /// Failed to build the IPC request.
-            #[error($build_msg)]
-            BuildRequest(#[source] cmif::RequestLayoutError),
             /// Failed to send the IPC request.
             #[error($send_msg)]
-            SendRequest(#[source] SendSyncError),
+            SendRequest(#[source] cmif::SendError),
             /// Failed to parse the CMIF response.
             #[error($parse_msg)]
             ParseResponse(#[source] ParseError),
@@ -954,147 +918,126 @@ macro_rules! define_per_command_error {
 
 define_per_command_error!(
     SocketError,
-    "failed to build socket request",
     "failed to send socket request",
     "failed to parse socket response",
     "bsd socket failed (errno={errno})"
 );
 define_per_command_error!(
     CloseError,
-    "failed to build close request",
     "failed to send close request",
     "failed to parse close response",
     "bsd close failed (errno={errno})"
 );
 define_per_command_error!(
     BindError,
-    "failed to build bind request",
     "failed to send bind request",
     "failed to parse bind response",
     "bsd bind failed (errno={errno})"
 );
 define_per_command_error!(
     ConnectError,
-    "failed to build connect request",
     "failed to send connect request",
     "failed to parse connect response",
     "bsd connect failed (errno={errno})"
 );
 define_per_command_error!(
     ListenError,
-    "failed to build listen request",
     "failed to send listen request",
     "failed to parse listen response",
     "bsd listen failed (errno={errno})"
 );
 define_per_command_error!(
     AcceptError,
-    "failed to build accept request",
     "failed to send accept request",
     "failed to parse accept response",
     "bsd accept failed (errno={errno})"
 );
 define_per_command_error!(
     GetSockNameError,
-    "failed to build getsockname request",
     "failed to send getsockname request",
     "failed to parse getsockname response",
     "bsd getsockname failed (errno={errno})"
 );
 define_per_command_error!(
     GetPeerNameError,
-    "failed to build getpeername request",
     "failed to send getpeername request",
     "failed to parse getpeername response",
     "bsd getpeername failed (errno={errno})"
 );
 define_per_command_error!(
     ShutdownError,
-    "failed to build shutdown request",
     "failed to send shutdown request",
     "failed to parse shutdown response",
     "bsd shutdown failed (errno={errno})"
 );
 define_per_command_error!(
     RecvError,
-    "failed to build recv request",
     "failed to send recv request",
     "failed to parse recv response",
     "bsd recv failed (errno={errno})"
 );
 define_per_command_error!(
     RecvFromError,
-    "failed to build recvfrom request",
     "failed to send recvfrom request",
     "failed to parse recvfrom response",
     "bsd recvfrom failed (errno={errno})"
 );
 define_per_command_error!(
     SendError,
-    "failed to build send request",
     "failed to send send request",
     "failed to parse send response",
     "bsd send failed (errno={errno})"
 );
 define_per_command_error!(
     SendToError,
-    "failed to build sendto request",
     "failed to send sendto request",
     "failed to parse sendto response",
     "bsd sendto failed (errno={errno})"
 );
 define_per_command_error!(
     ReadError,
-    "failed to build read request",
     "failed to send read request",
     "failed to parse read response",
     "bsd read failed (errno={errno})"
 );
 define_per_command_error!(
     WriteError,
-    "failed to build write request",
     "failed to send write request",
     "failed to parse write response",
     "bsd write failed (errno={errno})"
 );
 define_per_command_error!(
     GetSockOptError,
-    "failed to build getsockopt request",
     "failed to send getsockopt request",
     "failed to parse getsockopt response",
     "bsd getsockopt failed (errno={errno})"
 );
 define_per_command_error!(
     SetSockOptError,
-    "failed to build setsockopt request",
     "failed to send setsockopt request",
     "failed to parse setsockopt response",
     "bsd setsockopt failed (errno={errno})"
 );
 define_per_command_error!(
     FcntlError,
-    "failed to build fcntl request",
     "failed to send fcntl request",
     "failed to parse fcntl response",
     "bsd fcntl failed (errno={errno})"
 );
 define_per_command_error!(
     IoctlError,
-    "failed to build ioctl request",
     "failed to send ioctl request",
     "failed to parse ioctl response",
     "bsd ioctl failed (errno={errno})"
 );
 define_per_command_error!(
     SelectError,
-    "failed to build select request",
     "failed to send select request",
     "failed to parse select response",
     "bsd select failed (errno={errno})"
 );
 define_per_command_error!(
     PollError,
-    "failed to build poll request",
     "failed to send poll request",
     "failed to parse poll response",
     "bsd poll failed (errno={errno})"

@@ -1,12 +1,11 @@
 //! CMIF protocol operations for the clkrst service.
 
-use core::mem::size_of_val;
-
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -46,10 +45,8 @@ pub fn open_session(
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenSessionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSessionError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
@@ -70,10 +67,8 @@ pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRat
     let req = cmif::CmifRequestBuilder::new(proto::SET_CLOCK_RATE)
         .with_data_value(&hz)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetClockRateError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetClockRateError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetClockRateError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetClockRateError::ParseResponse)?;
 
@@ -87,10 +82,8 @@ pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> 
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_CLOCK_RATE).build();
-    req.write_to(&mut buf)
-        .map_err(GetClockRateError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetClockRateError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetClockRateError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(GetClockRateError::ParseResponse)?;
 
@@ -121,16 +114,10 @@ pub fn get_possible_clock_rates(
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
         .with_data_value(&max_count)
-        .add_out_auto_buffer(
-            rates.as_mut_ptr().cast::<u8>(),
-            size_of_val(rates),
-            BufferMode::Normal,
-        )
+        .add_out_auto_buffer(OutputBuffer::new(rates.as_mut_bytes(), BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetPossibleClockRatesError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetPossibleClockRatesError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetPossibleClockRatesError::SendRequest)?;
 
     // Response inline data: { i32 type, i32 count }.
     let resp = cmif::parse_response::<&GetPossibleClockRatesOut>(&buf)
@@ -148,12 +135,9 @@ pub fn get_possible_clock_rates(
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -165,12 +149,9 @@ pub enum OpenSessionError {
 /// Error returned by [`set_clock_rate`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetClockRateError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -179,12 +160,9 @@ pub enum SetClockRateError {
 /// Error returned by [`get_clock_rate`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetClockRateError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -193,12 +171,9 @@ pub enum GetClockRateError {
 /// Error returned by [`get_possible_clock_rates`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPossibleClockRatesError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

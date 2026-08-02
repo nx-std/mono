@@ -90,9 +90,16 @@ fn parse_resp_bytes_error_to_rc(err: cmif::ParseError) -> u32 {
 /// Converts a CMIF dispatch failure to its raw libnx result code.
 fn dispatch_error_to_rc(err: DispatchError) -> u32 {
     match err {
-        DispatchError::BuildRequest(_) => GENERIC_ERROR,
-        DispatchError::SendRequest(e) => e.to_rc(),
+        DispatchError::SendRequest(e) => send_error_to_rc(e),
         DispatchError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+    }
+}
+
+/// Converts a request send failure to its raw libnx result code.
+fn send_error_to_rc(err: cmif::SendError) -> u32 {
+    match err {
+        cmif::SendError::Layout(_) => GENERIC_ERROR,
+        cmif::SendError::SendRequest(e) => e.to_rc(),
     }
 }
 
@@ -115,8 +122,7 @@ fn get_rssi_error_to_rc(err: GetRssiError) -> u32 {
 /// Converts an SM `GetService` failure to its raw libnx result code.
 fn sm_get_service_error_to_rc(err: nx_service_sm::GetServiceCmifError) -> u32 {
     match err {
-        nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
-        nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+        nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
         nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
         nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
     }
@@ -127,8 +133,7 @@ fn sm_connect_error_to_rc(err: nx_service_sm::ConnectError) -> u32 {
     match err {
         nx_service_sm::ConnectError::Connect(e) => e.to_rc(),
         nx_service_sm::ConnectError::RegisterClient(e) => match e {
-            nx_service_sm::RegisterClientCmifError::BuildRequest(_) => GENERIC_ERROR,
-            nx_service_sm::RegisterClientCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::RegisterClientCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::RegisterClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
         },
     }

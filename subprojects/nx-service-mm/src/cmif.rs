@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the multimedia service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::{proto, types::MmuModuleId};
 
@@ -44,10 +41,8 @@ pub fn request_initialize(
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestInitializeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestInitializeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestInitializeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestInitializeError::ParseResponse)?;
     let id = *resp.payload;
@@ -58,10 +53,8 @@ pub fn request_initialize(
 /// Error returned by [`request_initialize`].
 #[derive(Debug, thiserror::Error)]
 pub enum RequestInitializeError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -87,10 +80,8 @@ pub fn request_initialize_legacy(
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE_OLD)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestInitializeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestInitializeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestInitializeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestInitializeError::ParseResponse)?;
     let id = *resp.payload;
@@ -110,10 +101,8 @@ pub fn request_finalize(
     let req = cmif::CmifRequestBuilder::new(proto::FINALIZE)
         .with_data_value(&request_id)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestFinalizeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestFinalizeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestFinalizeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RequestFinalizeError::ParseResponse)?;
 
@@ -123,10 +112,8 @@ pub fn request_finalize(
 /// Error returned by [`request_finalize`] / [`request_finalize_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum RequestFinalizeError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -144,10 +131,8 @@ pub fn request_finalize_legacy(
     let req = cmif::CmifRequestBuilder::new(proto::FINALIZE_OLD)
         .with_data_value(&module_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestFinalizeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestFinalizeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestFinalizeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RequestFinalizeError::ParseResponse)?;
 
@@ -173,10 +158,8 @@ pub fn request_set_and_wait(
     let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestSetAndWaitError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestSetAndWaitError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestSetAndWaitError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RequestSetAndWaitError::ParseResponse)?;
 
@@ -186,10 +169,8 @@ pub fn request_set_and_wait(
 /// Error returned by [`request_set_and_wait`] / [`request_set_and_wait_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum RequestSetAndWaitError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -213,10 +194,8 @@ pub fn request_set_and_wait_legacy(
     let req = cmif::CmifRequestBuilder::new(proto::SET_AND_WAIT_OLD)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestSetAndWaitError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestSetAndWaitError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestSetAndWaitError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RequestSetAndWaitError::ParseResponse)?;
 
@@ -232,10 +211,8 @@ pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, Reque
     let req = cmif::CmifRequestBuilder::new(proto::GET)
         .with_data_value(&request_id)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestGetError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestGetError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestGetError::ParseResponse)?;
     let freq_hz = *resp.payload;
@@ -246,10 +223,8 @@ pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, Reque
 /// Error returned by [`request_get`] / [`request_get_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum RequestGetError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -267,10 +242,8 @@ pub fn request_get_legacy(
     let req = cmif::CmifRequestBuilder::new(proto::GET_OLD)
         .with_data_value(&module_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RequestGetError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RequestGetError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RequestGetError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(RequestGetError::ParseResponse)?;
     let freq_hz = *resp.payload;

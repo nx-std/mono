@@ -2,8 +2,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{proto, types::SystemUpdateTaskId};
@@ -20,10 +20,8 @@ pub fn destroy_system_update_task(
     let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
         .with_data_value(task_id)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DestroySystemUpdateTaskError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DestroySystemUpdateTaskError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DestroySystemUpdateTaskError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DestroySystemUpdateTaskError::ParseResponse)?;
 
@@ -48,12 +46,10 @@ pub fn list_system_update_task(
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
     let req = cmif::CmifRequestBuilder::new(proto::LIST_SYSTEM_UPDATE_TASK)
-        .add_output_buffer_raw(out_bytes.as_mut_ptr(), out_bytes.len(), BufferMode::Normal)
+        .add_output_buffer(OutputBuffer::new(out_bytes, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(ListSystemUpdateTaskError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ListSystemUpdateTaskError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ListSystemUpdateTaskError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&i32>(&buf).map_err(ListSystemUpdateTaskError::ParseResponse)?;
@@ -66,12 +62,9 @@ pub fn list_system_update_task(
 /// Error returned by [`destroy_system_update_task`].
 #[derive(Debug, thiserror::Error)]
 pub enum DestroySystemUpdateTaskError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -80,12 +73,9 @@ pub enum DestroySystemUpdateTaskError {
 /// Error returned by [`list_system_update_task`].
 #[derive(Debug, thiserror::Error)]
 pub enum ListSystemUpdateTaskError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

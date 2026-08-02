@@ -3,10 +3,7 @@
 //! This module implements APM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto::{
     CMD_GET_PERFORMANCE_CONFIGURATION, CMD_GET_PERFORMANCE_MODE, CMD_OPEN_SESSION,
@@ -22,10 +19,8 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_OPEN_SESSION).build();
-    req.write_to(&mut buf)
-        .map_err(OpenSessionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSessionError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
@@ -48,10 +43,8 @@ pub fn get_performance_mode(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_MODE).build();
-    req.write_to(&mut buf)
-        .map_err(GetPerformanceModeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetPerformanceModeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetPerformanceModeError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&i32>(&buf).map_err(GetPerformanceModeError::ParseResponse)?;
@@ -84,10 +77,7 @@ pub fn set_performance_configuration(
     let req = cmif::CmifRequestBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
         .with_data_value(&in_data)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetPerformanceConfigurationError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(SetPerformanceConfigurationError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetPerformanceConfigurationError::ParseResponse)?;
@@ -109,10 +99,7 @@ pub fn get_performance_configuration(
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
         .with_data_value(&mode)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetPerformanceConfigurationError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetPerformanceConfigurationError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf)
@@ -124,12 +111,9 @@ pub fn get_performance_configuration(
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -141,12 +125,9 @@ pub enum OpenSessionError {
 /// Error returned by [`get_performance_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPerformanceModeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -158,12 +139,9 @@ pub enum GetPerformanceModeError {
 /// Error returned by [`set_performance_configuration`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetPerformanceConfigurationError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -172,12 +150,9 @@ pub enum SetPerformanceConfigurationError {
 /// Error returned by [`get_performance_configuration`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPerformanceConfigurationError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

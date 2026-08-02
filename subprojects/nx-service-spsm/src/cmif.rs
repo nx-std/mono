@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the spsm service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -18,10 +15,8 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN)
         .with_data_value(&in_data)
         .build();
-    req.write_to(&mut buf)
-        .map_err(ShutdownError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ShutdownError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ShutdownError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ShutdownError::ParseResponse)?;
 
@@ -35,10 +30,8 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::PUT_ERROR_STATE).build();
-    req.write_to(&mut buf)
-        .map_err(PutErrorStateError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(PutErrorStateError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(PutErrorStateError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(PutErrorStateError::ParseResponse)?;
 
@@ -48,12 +41,9 @@ pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError>
 /// Error returned by [`shutdown`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShutdownError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -62,12 +52,9 @@ pub enum ShutdownError {
 /// Error returned by [`put_error_state`].
 #[derive(Debug, thiserror::Error)]
 pub enum PutErrorStateError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
