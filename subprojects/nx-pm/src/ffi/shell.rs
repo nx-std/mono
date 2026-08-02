@@ -1,13 +1,13 @@
 //! `pm:shell` FFI.
 
 use nx_service_pm::{NcmProgramLocation, ProcessEventInfo, ProcessId, ProgramId};
-use nx_sf::ffi::Service;
+use nx_sf::{error::ToResultCode as _, ffi::Service};
 use nx_svc::raw::INVALID_HANDLE;
 
 use super::{
     common::{
-        GENERIC_ERROR, LibnxEvent, RC_INCOMPAT_SYSVER, connect_error_to_rc, dispatch_error_to_rc,
-        hosversion_at_least, hosversion_before, hosversionIsAtmosphere, sm_connect_error_to_rc,
+        GENERIC_ERROR, LibnxEvent, RC_INCOMPAT_SYSVER, hosversion_at_least, hosversion_before,
+        hosversionIsAtmosphere,
     },
     state::{SHELL, SHELL_SRV, clear_shadow, ensure_sm, write_shadow},
 };
@@ -23,7 +23,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_initialize() -> u32 {
     }
 
     if let Err(err) = ensure_sm() {
-        return sm_connect_error_to_rc(err);
+        return err.to_rc();
     }
 
     let sm_guard = super::state::SM.read();
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_initialize() -> u32 {
 
     let svc = match nx_service_pm::connect_shell_cmif(sm) {
         Ok(s) => s,
-        Err(e) => return connect_error_to_rc(e.0),
+        Err(err) => return err.to_rc(),
     };
 
     let mut guard = SHELL.write();
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_launch_program(
             unsafe { *pid = new_pid.to_u64() };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_terminate_process(process_id: u64) -> 
 
     match svc.terminate_process(unsafe { ProcessId::new_unchecked(process_id) }) {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -110,7 +110,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_terminate_program(program_id: u64) -> 
 
     match svc.terminate_program(unsafe { ProgramId::new_unchecked(program_id) }) {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_get_process_event_handle(out: *mut Lib
             }
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_get_process_event_info(
             unsafe { *out = info };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -179,7 +179,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_cleanup_process(pid: u64) -> u32 {
 
     match svc.cleanup_process(unsafe { ProcessId::new_unchecked(pid) }) {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_clear_jit_debug_occured(pid: u64) -> u
 
     match svc.clear_jit_debug_occurred(unsafe { ProcessId::new_unchecked(pid) }) {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -216,7 +216,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_notify_boot_finished() -> u32 {
     };
     match result {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -245,7 +245,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_get_application_process_id_for_shell(
             unsafe { *pid_out = pid.to_u64() };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -270,7 +270,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_boost_system_memory_resource_limit(
     };
     match result {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -288,7 +288,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_boost_application_thread_resource_limi
 
     match svc.boost_application_thread_resource_limit() {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -306,7 +306,7 @@ pub unsafe extern "C" fn __nx_pm__pmshell_boost_system_thread_resource_limit() -
 
     match svc.boost_system_thread_resource_limit() {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -334,6 +334,6 @@ pub unsafe extern "C" fn __nx_pm__pmshell_get_process_id(
             unsafe { *pid_out = pid.to_u64() };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }

@@ -3,7 +3,10 @@
 use core::mem::size_of;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::{DispatchError, Session},
+};
 use static_assertions::const_assert_eq;
 
 use super::{
@@ -186,6 +189,12 @@ pub fn connect_shell_cmif(sm: &SmService) -> Result<PmShellService, ConnectShell
 #[derive(Debug, thiserror::Error)]
 #[error("failed to get pm:shell service")]
 pub struct ConnectShellCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
+
+impl ToResultCode for ConnectShellCmifError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 bitflags::bitflags! {
     /// Launch flags for `pm:shell` `LaunchProgram`.

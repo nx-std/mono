@@ -2,17 +2,15 @@
 
 use core::{cell::UnsafeCell, mem::size_of};
 
-use nx_sf::cmif;
-use nx_svc::error::ToResultCode;
-use static_assertions::const_assert_eq;
-
 /// Generic fallback used when no specific result code is available.
-pub(super) const GENERIC_ERROR: u32 = 0xFFFF;
+pub(super) use nx_sf::error::GENERIC_ERROR;
+use nx_sf::error::{LibnxError, libnx_error};
+use static_assertions::const_assert_eq;
 
 /// `MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer)` — returned by libnx
 /// gating checks when the running firmware predates a command. Mirrors
 /// `nx-rt`'s SM FFI for the same condition.
-pub(super) const RC_INCOMPAT_SYSVER: u32 = 0x8A564;
+pub(super) const RC_INCOMPAT_SYSVER: u32 = libnx_error(LibnxError::IncompatSysVer);
 
 /// Encodes a major/minor/micro firmware version the same way libnx's
 /// `MAKEHOSVERSION` macro does.
@@ -73,73 +71,5 @@ impl<T> SyncUnsafeCell<T> {
 
     pub(super) fn get(&self) -> *mut T {
         self.0.get()
-    }
-}
-
-/// Converts a CMIF dispatch failure to its raw libnx result code.
-pub(super) fn dispatch_error_to_rc(err: nx_sf::service::DispatchError) -> u32 {
-    match err {
-        nx_sf::service::DispatchError::Layout(_) => GENERIC_ERROR,
-        nx_sf::service::DispatchError::SendRequest(e) => e.to_rc(),
-        nx_sf::service::DispatchError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-    }
-}
-
-/// Converts an SM `GetService` failure to its raw libnx result code.
-pub(super) fn sm_get_service_error_to_rc(err: nx_service_sm::GetServiceCmifError) -> u32 {
-    match err {
-        nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-    }
-}
-
-/// Converts an SM connect failure to its raw libnx result code.
-pub(super) fn sm_connect_error_to_rc(err: nx_service_sm::ConnectError) -> u32 {
-    match err {
-        nx_service_sm::ConnectError::Connect(e) => e.to_rc(),
-        nx_service_sm::ConnectError::RegisterClient(e) => match e {
-            nx_service_sm::RegisterClientCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::RegisterClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        },
-    }
-}
-
-/// Converts a request send failure to a raw result code.
-fn send_error_to_rc(err: cmif::SendError) -> u32 {
-    match err {
-        cmif::SendError::Layout(_) => GENERIC_ERROR,
-        cmif::SendError::SendRequest(e) => e.to_rc(),
-    }
-}
-
-/// Translates a `pm:*` service connect error to a raw result code.
-pub(super) fn connect_error_to_rc(err: nx_service_sm::GetServiceCmifError) -> u32 {
-    sm_get_service_error_to_rc(err)
-}
-
-/// Converts a CMIF [`cmif::ParseError`] to a raw libnx result code.
-fn parse_resp_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::InvalidMagic
-        | cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
-    }
-}
-
-/// Converts a CMIF [`cmif::ParseError`] to a raw libnx result code.
-fn parse_resp_bytes_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::InvalidMagic
-        | cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
     }
 }

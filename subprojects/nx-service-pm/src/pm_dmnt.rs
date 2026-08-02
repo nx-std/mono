@@ -1,7 +1,10 @@
 //! `pm:dmnt` (debug/monitor) service wrapper.
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::{DispatchError, Session},
+};
 
 use super::{
     cmif,
@@ -180,6 +183,12 @@ pub fn connect_dmnt_cmif(sm: &SmService) -> Result<PmDmntService, ConnectDmntCmi
 #[derive(Debug, thiserror::Error)]
 #[error("failed to get pm:dmnt service")]
 pub struct ConnectDmntCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
+
+impl ToResultCode for ConnectDmntCmifError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 pub(crate) mod proto {
     use nx_sf::ServiceName;

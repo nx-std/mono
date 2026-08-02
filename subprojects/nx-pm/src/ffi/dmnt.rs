@@ -3,13 +3,13 @@
 use core::slice;
 
 use nx_service_pm::{ProcessId, ProgramId};
-use nx_sf::ffi::Service;
+use nx_sf::{error::ToResultCode as _, ffi::Service};
 use nx_svc::raw::INVALID_HANDLE;
 
 use super::{
     common::{
-        GENERIC_ERROR, LibnxEvent, RC_INCOMPAT_SYSVER, connect_error_to_rc, dispatch_error_to_rc,
-        hosversion_at_least, hosversion_before, hosversionIsAtmosphere, sm_connect_error_to_rc,
+        GENERIC_ERROR, LibnxEvent, RC_INCOMPAT_SYSVER, hosversion_at_least, hosversion_before,
+        hosversionIsAtmosphere,
     },
     state::{DMNT, DMNT_SRV, clear_shadow, ensure_sm, write_shadow},
 };
@@ -25,7 +25,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_initialize() -> u32 {
     }
 
     if let Err(err) = ensure_sm() {
-        return sm_connect_error_to_rc(err);
+        return err.to_rc();
     }
 
     let sm_guard = super::state::SM.read();
@@ -33,7 +33,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_initialize() -> u32 {
 
     let svc = match nx_service_pm::connect_dmnt_cmif(sm) {
         Ok(s) => s,
-        Err(e) => return connect_error_to_rc(e.0),
+        Err(err) => return err.to_rc(),
     };
 
     let mut guard = DMNT.write();
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_get_jit_debug_process_id_list(
             unsafe { *out_count = count };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_start_process(pid: u64) -> u32 {
     };
     match result {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_get_process_id(pid_out: *mut u64, progr
             unsafe { *pid_out = pid.to_u64() };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_hook_to_create_process(
             }
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -201,7 +201,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_get_application_process_id(pid_out: *mu
             unsafe { *pid_out = pid.to_u64() };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_hook_to_create_application_process(
             }
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_clear_hook(which: u32) -> u32 {
 
     match svc.clear_hook(which) {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -277,6 +277,6 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_get_program_id(program_id_out: *mut u64
             unsafe { *program_id_out = program_id.to_u64() };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
