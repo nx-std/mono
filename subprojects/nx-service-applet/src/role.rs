@@ -23,6 +23,9 @@
 //! ones are non-optional, so the type system guarantees they exist whenever a
 //! [`Proxy<R>`](crate::Proxy) is held.
 
+use nx_sf::error::ToResultCode;
+use nx_svc::error::ResultCode;
+
 use crate::{
     AppletCommonFunctions, AppletProxyService, AppletType, ApplicationCreator,
     ApplicationFunctions, GetApplicationFunctionsError, GetSubInterfaceError,
@@ -216,4 +219,13 @@ pub enum DrainExtrasError {
     /// Failed to obtain a role-specific sub-interface.
     #[error("failed to get sub-interface")]
     GetSubInterface(#[source] GetSubInterfaceError),
+}
+
+impl ToResultCode for DrainExtrasError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetApplicationFunctions(err) => err.to_rc(),
+            Self::GetSubInterface(err) => err.to_rc(),
+        }
+    }
 }

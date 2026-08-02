@@ -6,9 +6,10 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif::ParseError,
+    error::{GENERIC_ERROR, ToResultCode},
     service::{BufferAttr, ConvertToDomainError, DispatchError, Domain, DomainObject},
 };
-use nx_svc::{process::Handle as ProcessHandle, thread};
+use nx_svc::{error::ResultCode, process::Handle as ProcessHandle, thread};
 
 use crate::{
     AppletCommonFunctions, AppletProxyService, ApplicationCreator, ApplicationFunctions,
@@ -163,6 +164,17 @@ pub enum OpenProxyError {
     Timeout,
 }
 
+impl ToResultCode for OpenProxyError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidAppletType | Self::MissingObject | Self::Timeout => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Gets the ICommonStateGetter sub-interface from the proxy.
 pub fn get_common_state_getter(
     proxy: &DomainObject<'_>,
@@ -195,6 +207,17 @@ pub enum GetCommonStateGetterError {
     /// Response did not contain the expected domain object.
     #[error("missing domain object in response")]
     MissingObject,
+}
+
+impl ToResultCode for GetCommonStateGetterError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingObject => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Gets the ISelfController sub-interface from the proxy.
@@ -231,6 +254,17 @@ pub enum GetSelfControllerError {
     MissingObject,
 }
 
+impl ToResultCode for GetSelfControllerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingObject => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Gets the IWindowController sub-interface from the proxy.
 pub fn get_window_controller(
     proxy: &DomainObject<'_>,
@@ -265,6 +299,17 @@ pub enum GetWindowControllerError {
     MissingObject,
 }
 
+impl ToResultCode for GetWindowControllerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingObject => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Acquires foreground rights via IWindowController.
 pub fn acquire_foreground_rights(
     window_controller: &DomainObject<'_>,
@@ -285,6 +330,14 @@ pub enum AcquireForegroundRightsError {
     /// Failed to dispatch the request.
     #[error("failed to dispatch request")]
     Dispatch(#[source] DispatchError),
+}
+
+impl ToResultCode for AcquireForegroundRightsError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Sets the focus handling mode on ISelfController.
@@ -353,6 +406,15 @@ pub enum SetFocusHandlingModeError {
     SetOutOfFocusSuspending(#[source] SetOutOfFocusSuspendingEnabledError),
 }
 
+impl ToResultCode for SetFocusHandlingModeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            Self::SetOutOfFocusSuspending(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Sets whether to suspend when out of focus (ISelfController, 2.0.0+).
 pub fn set_out_of_focus_suspending_enabled(
     self_controller: &DomainObject<'_>,
@@ -379,6 +441,14 @@ pub enum SetOutOfFocusSuspendingEnabledError {
     Dispatch(#[source] DispatchError),
 }
 
+impl ToResultCode for SetOutOfFocusSuspendingEnabledError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by [`crate::connect`].
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
@@ -388,6 +458,15 @@ pub enum ConnectError {
     /// Failed to convert service to domain.
     #[error("failed to convert to domain")]
     ConvertToDomain(#[source] ConvertToDomainError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+            Self::ConvertToDomain(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Enables operation mode change notifications (ISelfController, cmd 11).
@@ -419,6 +498,14 @@ pub enum SetOperationModeChangedNotificationError {
     Dispatch(#[source] DispatchError),
 }
 
+impl ToResultCode for SetOperationModeChangedNotificationError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Enables performance mode change notifications (ISelfController, cmd 12).
 ///
 /// When enabled, the applet receives `PerformanceModeChanged` messages
@@ -446,6 +533,14 @@ pub enum SetPerformanceModeChangedNotificationError {
     /// Failed to dispatch the request.
     #[error("failed to dispatch request")]
     Dispatch(#[source] DispatchError),
+}
+
+impl ToResultCode for SetPerformanceModeChangedNotificationError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Gets the applet resource user ID (IWindowController, cmd 1).
@@ -486,6 +581,17 @@ pub enum GetAppletResourceUserIdError {
     InvalidResponse,
 }
 
+impl ToResultCode for GetAppletResourceUserIdError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Gets the IApplicationFunctions sub-interface from the proxy (Application type only).
 pub fn get_application_functions(
     proxy: &DomainObject<'_>,
@@ -518,6 +624,17 @@ pub enum GetApplicationFunctionsError {
     /// Response did not contain the expected domain object.
     #[error("missing domain object in response")]
     MissingObject,
+}
+
+impl ToResultCode for GetApplicationFunctionsError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingObject => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Notifies the system that the application has completed initialization (IApplicationFunctions).
@@ -553,6 +670,17 @@ pub enum NotifyRunningError {
     InvalidResponse,
 }
 
+impl ToResultCode for NotifyRunningError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Creates a managed display layer (ISelfController, cmd 40).
 pub fn create_managed_display_layer(
     self_controller: &DomainObject<'_>,
@@ -586,6 +714,17 @@ pub enum CreateManagedDisplayLayerError {
     InvalidResponse,
 }
 
+impl ToResultCode for CreateManagedDisplayLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Shared error returned by the generic sub-interface getters.
 ///
 /// Used by every `get_*` method on [`AppletProxyService`] except the four
@@ -600,6 +739,17 @@ pub enum GetSubInterfaceError {
     /// Response did not contain the expected domain object.
     #[error("missing domain object in response")]
     MissingObject,
+}
+
+impl ToResultCode for GetSubInterfaceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingObject => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Generic helper: dispatches `cmd_id` and returns the raw object id.
