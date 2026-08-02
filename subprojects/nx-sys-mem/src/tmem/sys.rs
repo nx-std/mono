@@ -24,6 +24,7 @@ use alloc::alloc::{Layout, alloc_zeroed, dealloc};
 use core::{ffi::c_void, ptr::NonNull};
 
 use nx_svc::{
+    error::{KernelError, ResultCode, ToResultCode as _},
     mem::{
         core as memcore, tmem as svc,
         tmem::{Handle, MemoryPermission},
@@ -31,6 +32,8 @@ use nx_svc::{
     thread,
 };
 use nx_sys_virtmem::virtmem;
+
+use crate::error::{_sealed, ToResultCode};
 
 /// Guard region size (0x1000), per libnx.
 const GUARD_SIZE: usize = 0x1000;
@@ -123,6 +126,20 @@ pub enum CreateError {
     #[error(transparent)]
     Svc(#[from] svc::CreateTransferMemoryError),
 }
+
+impl ToResultCode for CreateError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::OutOfMemory => KernelError::OutOfMemory.to_rc(),
+            // Rejected before the SVC, but this is the code the kernel would
+            // have returned for the same address.
+            Self::InvalidAddress => KernelError::InvalidAddress.to_rc(),
+            Self::Svc(err) => err.to_rc(),
+        }
+    }
+}
+
+impl _sealed::Sealed for CreateError {}
 
 /// Populate a [`TransferMemory`] coming from another process.
 #[inline]

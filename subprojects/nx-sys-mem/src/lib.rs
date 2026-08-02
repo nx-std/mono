@@ -7,6 +7,7 @@ extern crate alloc; // The `nx-alloc` crate exposes the `#[global_allocator]` fo
 extern crate nx_alloc;
 
 pub mod buf;
+pub mod error;
 pub mod shmem;
 pub mod stack;
 pub mod tmem;
