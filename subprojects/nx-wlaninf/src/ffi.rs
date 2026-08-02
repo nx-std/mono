@@ -11,19 +11,18 @@
 use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 use nx_service_sm::SmService;
-use nx_service_wlaninf::{DispatchError, GetRssiError, GetStateError, WlaninfService};
-use nx_sf::{cmif, ffi::Service};
+use nx_service_wlaninf::WlaninfService;
+use nx_sf::{
+    error::{GENERIC_ERROR, LibnxError, ToResultCode as _, libnx_error},
+    ffi::Service,
+};
 use nx_std_sync::rwlock::RwLock;
-use nx_svc::error::ToResultCode;
-
-/// Generic fallback used when no specific result code is available.
-const GENERIC_ERROR: u32 = 0xFFFF;
 
 /// `MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer)` — returned when
 /// the running firmware predates the wlan:inf service or it has been
 /// retired (HOS 15.0.0+ removed the service entirely). Matches libnx's
 /// `_wlaninfInitialize` gate.
-const RC_INCOMPAT_SYSVER: u32 = 0x8A564;
+const RC_INCOMPAT_SYSVER: u32 = libnx_error(LibnxError::IncompatSysVer);
 
 /// Encodes a major/minor/micro firmware version the same way libnx's
 /// `MAKEHOSVERSION` macro does.
@@ -58,84 +57,6 @@ impl<T> SyncUnsafeCell<T> {
 
     fn get(&self) -> *mut T {
         self.0.get()
-    }
-}
-
-/// Converts a CMIF [`cmif::ParseError`] to a raw libnx result code.
-fn parse_resp_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::InvalidMagic
-        | cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
-    }
-}
-
-/// Converts a CMIF [`cmif::ParseError`] to a raw libnx result code.
-fn parse_resp_bytes_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::InvalidMagic
-        | cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
-    }
-}
-
-/// Converts a CMIF dispatch failure to its raw libnx result code.
-fn dispatch_error_to_rc(err: DispatchError) -> u32 {
-    match err {
-        DispatchError::SendRequest(e) => send_error_to_rc(e),
-        DispatchError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-    }
-}
-
-/// Converts a request send failure to its raw libnx result code.
-fn send_error_to_rc(err: cmif::SendError) -> u32 {
-    match err {
-        cmif::SendError::Layout(_) => GENERIC_ERROR,
-        cmif::SendError::SendRequest(e) => e.to_rc(),
-    }
-}
-
-/// Converts a `GetState` failure to its raw libnx result code.
-fn get_state_error_to_rc(err: GetStateError) -> u32 {
-    match err {
-        GetStateError::Dispatch(d) => dispatch_error_to_rc(d),
-        // The service returned a value outside the documented WlanInfState
-        // range; map to a generic error since libnx forwards the raw u32
-        // unconditionally and has no equivalent failure path.
-        GetStateError::InvalidState(_) => GENERIC_ERROR,
-    }
-}
-
-/// Converts a `GetRSSI` failure to its raw libnx result code.
-fn get_rssi_error_to_rc(err: GetRssiError) -> u32 {
-    dispatch_error_to_rc(err.0)
-}
-
-/// Converts an SM `GetService` failure to its raw libnx result code.
-fn sm_get_service_error_to_rc(err: nx_service_sm::GetServiceCmifError) -> u32 {
-    match err {
-        nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-    }
-}
-
-/// Converts an SM connect failure to its raw libnx result code.
-fn sm_connect_error_to_rc(err: nx_service_sm::ConnectError) -> u32 {
-    match err {
-        nx_service_sm::ConnectError::Connect(e) => e.to_rc(),
-        nx_service_sm::ConnectError::RegisterClient(e) => match e {
-            nx_service_sm::RegisterClientCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::RegisterClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        },
     }
 }
 
@@ -216,7 +137,7 @@ pub unsafe extern "C" fn __nx_wlaninf__wlaninf_initialize() -> u32 {
     }
 
     if let Err(err) = ensure_sm() {
-        return sm_connect_error_to_rc(err);
+        return err.to_rc();
     }
 
     let sm_guard = SM.read();
@@ -224,7 +145,7 @@ pub unsafe extern "C" fn __nx_wlaninf__wlaninf_initialize() -> u32 {
 
     let svc = match nx_service_wlaninf::connect_cmif(sm) {
         Ok(s) => s,
-        Err(e) => return sm_get_service_error_to_rc(e.0),
+        Err(e) => return e.0.to_rc(),
     };
 
     let mut guard = WLANINF.write();
@@ -292,7 +213,7 @@ pub unsafe extern "C" fn __nx_wlaninf__wlaninf_get_state(out: *mut u32) -> u32 {
             unsafe { *out = state as u32 };
             0
         }
-        Err(e) => get_state_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -320,6 +241,6 @@ pub unsafe extern "C" fn __nx_wlaninf__wlaninf_get_rssi(out: *mut i32) -> u32 {
             unsafe { *out = rssi.dbm() };
             0
         }
-        Err(e) => get_rssi_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }

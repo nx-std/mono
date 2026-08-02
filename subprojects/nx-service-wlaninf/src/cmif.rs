@@ -1,6 +1,10 @@
 //! CMIF protocol operations for the wlan:inf service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    ipc::Handle as SessionHandle,
+};
 
 use crate::proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, WlanInfState};
 
@@ -21,6 +25,17 @@ pub enum GetStateError {
     InvalidState(u32),
 }
 
+impl ToResultCode for GetStateError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // The service reported success and returned a value outside the
+            // documented range, so it named no code for it.
+            Self::InvalidState(_) => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Reads the current [`Rssi`] (cmd 12).
 pub fn get_rssi(session: SessionHandle) -> Result<Rssi, GetRssiError> {
     let raw = dispatch_no_in_u32(session, CMD_GET_RSSI).map_err(GetRssiError)?;
@@ -34,6 +49,12 @@ pub fn get_rssi(session: SessionHandle) -> Result<Rssi, GetRssiError> {
 #[derive(Debug, thiserror::Error)]
 #[error("failed to dispatch GetRSSI")]
 pub struct GetRssiError(#[source] pub DispatchError);
+
+impl ToResultCode for GetRssiError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 /// Sends a CMIF request with no input payload and reads a single `u32` from
 /// the response data area.
@@ -60,4 +81,13 @@ pub enum DispatchError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for DispatchError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

@@ -20,6 +20,12 @@ ffi = [
     "nx-std-sync/ffi",
 ]
 
+# `nx-svc` is a feature-only dependency: the `ffi` feature activates
+# `nx-svc/ffi` so the SVC override symbols are linked, but no source line names
+# the crate now that the result-code mappings live on the errors themselves.
+[package.metadata.cargo-machete]
+ignored = ["nx-svc"]
+
 [dependencies]
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
