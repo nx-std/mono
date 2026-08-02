@@ -35,7 +35,7 @@ use core::{
     ptr::{NonNull, null_mut},
 };
 
-use nx_svc::error::{KernelError, ToRawResultCode};
+use nx_svc::error::{KernelError, ToRawResultCode as _};
 /// Re-export of the ABI-visible AArch64 register-dump structure.
 ///
 /// `nx-svc` already defines the `#[repr(C)]` layout that matches libnx's
@@ -46,6 +46,7 @@ use static_assertions::const_assert_eq;
 
 use super::registry::SideRegistry;
 use crate::{
+    error::ToResultCode as _,
     thread::{self, Builder, CoreId, Priority, StackSpec, ThreadControl},
     tsd,
 };
