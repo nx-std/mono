@@ -3,7 +3,9 @@
 //! This module manages the APM service session and provides a singleton interface
 //! for accessing APM functionality throughout the application lifecycle.
 
+use nx_rt_core::error::{ResultCode, ToResultCode};
 use nx_service_apm::{ApmService, ApmSession};
+use nx_sf::error::ToResultCode as _;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
 use crate::services::sm;
@@ -110,4 +112,13 @@ pub enum ConnectError {
     /// Failed to open APM session.
     #[error("failed to open APM session")]
     OpenSession(#[source] nx_service_apm::OpenSessionError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Connect(err) => err.to_rc(),
+            Self::OpenSession(err) => err.to_rc(),
+        }
+    }
 }

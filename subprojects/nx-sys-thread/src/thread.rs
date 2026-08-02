@@ -31,7 +31,7 @@ use core::{
 };
 
 #[cfg(feature = "ffi")]
-use nx_svc::error::{KernelError, ResultCode, ToRawResultCode};
+use nx_svc::error::{KernelError, ResultCode, ToResultCode as _};
 use nx_svc::{
     mem::{UnmapMemoryError, query_memory, unmap_memory},
     raw::ThreadContext,
@@ -50,6 +50,8 @@ use nx_sys_mem::{
 };
 use static_assertions::const_assert_eq;
 
+#[cfg(feature = "ffi")]
+use crate::error::{_sealed, ToResultCode};
 use crate::{
     detach::{self, DetachState, Detachable},
     tcb::Tcb,
@@ -605,7 +607,7 @@ pub enum CreateError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for CreateError {
+impl ToResultCode for CreateError {
     fn to_rc(self) -> ResultCode {
         match self {
             CreateError::InvalidStackAlignment
@@ -620,6 +622,9 @@ impl ToRawResultCode for CreateError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for CreateError {}
 
 /// Parameters for spawning a Horizon thread that runs a Rust closure.
 ///
@@ -1123,11 +1128,11 @@ pub enum SpawnError {
     Start(#[source] StartError),
 }
 
-// `SpawnError` deliberately carries no `ToRawResultCode` impl: `spawn` is a
+// `SpawnError` deliberately carries no `ToResultCode` impl: `spawn` is a
 // Level-1 idiomatic-Rust API with no C ABI override symbol, so the error never
 // crosses the FFI boundary. This matches `JoinError`, the other Level-1-only
 // error. libnx's separate `threadCreate`/`threadStart` entries map to `create`/
-// `start`, whose `CreateError`/`StartError` already carry `ToRawResultCode`.
+// `start`, whose `CreateError`/`StartError` already carry `ToResultCode`.
 
 /// Monomorphized trampoline that re-joins a closure with its captures on the
 /// spawned thread and records its return value.
@@ -1510,7 +1515,7 @@ pub enum CloseError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for CloseError {
+impl ToResultCode for CloseError {
     fn to_rc(self) -> ResultCode {
         match self {
             CloseError::StillRunning => KernelError::Busy.to_rc(),
@@ -1519,6 +1524,9 @@ impl ToRawResultCode for CloseError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for CloseError {}
 
 /// Transitions a created thread to *runnable*.
 ///
@@ -1624,7 +1632,7 @@ pub enum StartError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for StartError {
+impl ToResultCode for StartError {
     fn to_rc(self) -> ResultCode {
         match self {
             StartError::InvalidHandle => KernelError::InvalidHandle.to_rc(),
@@ -1632,6 +1640,9 @@ impl ToRawResultCode for StartError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for StartError {}
 
 /// Blocks the calling thread until `thread` has exited.
 ///
@@ -1751,7 +1762,7 @@ impl From<WaitSyncError> for WaitError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for WaitError {
+impl ToResultCode for WaitError {
     fn to_rc(self) -> ResultCode {
         match self {
             WaitError::TerminationRequested => KernelError::TerminationRequested.to_rc(),
@@ -1764,6 +1775,9 @@ impl ToRawResultCode for WaitError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for WaitError {}
 
 /// Pauses a running thread.
 ///
@@ -1800,7 +1814,7 @@ pub enum PauseError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for PauseError {
+impl ToResultCode for PauseError {
     fn to_rc(self) -> ResultCode {
         match self {
             PauseError::InvalidHandle => KernelError::InvalidHandle.to_rc(),
@@ -1808,6 +1822,9 @@ impl ToRawResultCode for PauseError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for PauseError {}
 
 /// Resumes a paused thread.
 ///
@@ -1844,7 +1861,7 @@ pub enum ResumeError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for ResumeError {
+impl ToResultCode for ResumeError {
     fn to_rc(self) -> ResultCode {
         match self {
             ResumeError::InvalidHandle => KernelError::InvalidHandle.to_rc(),
@@ -1852,6 +1869,9 @@ impl ToRawResultCode for ResumeError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for ResumeError {}
 
 /// Captures the CPU context of a paused thread.
 ///
@@ -1892,7 +1912,7 @@ pub enum DumpContextError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for DumpContextError {
+impl ToResultCode for DumpContextError {
     fn to_rc(self) -> ResultCode {
         match self {
             DumpContextError::InvalidHandle => KernelError::InvalidHandle.to_rc(),
@@ -1900,6 +1920,9 @@ impl ToRawResultCode for DumpContextError {
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for DumpContextError {}
 
 /// Returns a raw pointer to the calling thread's authoritative
 /// [`ThreadControl`], if it has one.

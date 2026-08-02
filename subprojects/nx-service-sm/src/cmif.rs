@@ -5,8 +5,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{ServiceName, cmif};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ServiceName, cmif,
+    error::{GENERIC_ERROR, ToResultCode},
+};
+use nx_svc::{error::ResultCode, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -51,6 +54,18 @@ pub enum GetServiceError {
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Registers a service with the Service Manager using CMIF protocol.
@@ -113,6 +128,18 @@ pub enum RegisterServiceError {
     MissingHandle,
 }
 
+impl ToResultCode for RegisterServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Unregisters a service from the Service Manager using CMIF protocol.
 #[inline]
 pub fn unregister_service(
@@ -148,6 +175,15 @@ pub enum UnregisterServiceError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for UnregisterServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Detaches the client from the Service Manager using CMIF protocol.
 ///
 /// Only available on HOS 11.0.0-11.0.1.
@@ -181,6 +217,15 @@ pub enum DetachClientError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for DetachClientError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Registers the client with the Service Manager using CMIF protocol.
 ///
 /// Sends the RegisterClient command (cmd 0) with PID.
@@ -212,4 +257,13 @@ pub enum RegisterClientError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for RegisterClientError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

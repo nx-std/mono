@@ -9,7 +9,7 @@
 
 pub use super::raw::{CUR_PROCESS_HANDLE, Handle, INVALID_HANDLE};
 use super::{
-    error::{KernelError, Module, ResultCode, ToRawResultCode},
+    error::{_sealed, KernelError, Module, ResultCode, ToResultCode},
     raw,
     result::{Error, Result, raw::Result as RawResult},
 };
@@ -315,7 +315,7 @@ pub enum GetInfoError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for GetInfoError {
+impl ToResultCode for GetInfoError {
     /// Converts the error into its raw result code representation.
     fn to_rc(self) -> ResultCode {
         match self {
@@ -328,3 +328,5 @@ impl ToRawResultCode for GetInfoError {
         }
     }
 }
+
+impl _sealed::Sealed for GetInfoError {}

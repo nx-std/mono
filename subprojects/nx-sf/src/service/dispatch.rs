@@ -22,12 +22,16 @@
 //! [`OverrideService::dispatch`]: super::OverrideService::dispatch
 //! [`out_objects`]: DomainDispatch::out_objects
 
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_svc::{
+    error::{ResultCode, ToResultCode as _},
+    ipc::Handle as SessionHandle,
+};
 use nx_sys_thread_tls::IpcBuffer;
 
 use super::domain::{Domain, DomainObject};
 use crate::{
     cmif::{self, ObjectId},
+    error::ToResultCode,
     hipc::{self, InOutBuffer, InPointer, InputBuffer, OutPointer, OutputBuffer},
 };
 
@@ -381,6 +385,18 @@ pub enum DispatchError {
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for DispatchError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            DispatchError::Layout(err) => err.to_rc(),
+            // The kernel owns this code, so it resolves through `nx-svc`'s
+            // trait rather than this crate's.
+            DispatchError::SendRequest(err) => err.to_rc(),
+            DispatchError::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Borrowed buffer slot recorded by the dispatch builder.

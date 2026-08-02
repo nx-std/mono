@@ -96,11 +96,10 @@ use nx_service_sm::SmService;
 mod boot_mode;
 mod debug_monitor;
 mod event;
-mod process_info;
-mod shell;
-
 #[cfg(feature = "ffi")]
 pub mod ffi;
+mod process_info;
+mod shell;
 
 pub use self::{
     boot_mode::{BmGetBootModeError, BmSetMaintenanceBootError, BootMode, BootModeService},

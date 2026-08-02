@@ -197,64 +197,105 @@ impl IntoDescription for u32 {
 /// Raw error code type
 pub type ResultCode = u32;
 
-/// Converts an error enum into the raw error code
-// TODO: Seal this trait
-pub trait ToRawResultCode {
-    /// Converts the error enum into a raw error code
+/// Converts an error into the raw result code a C caller receives.
+///
+/// This is the `nx-svc` crate family's conversion contract. Every error type
+/// this crate declares implements it immediately after its own declaration, so
+/// an error states how it renders as a result code exactly once instead of
+/// once per FFI boundary that returns it.
+///
+/// Each crate family owns one such trait, because each answers a different
+/// question. This one answers "which kernel result code describes this
+/// failure" - the codes are the kernel's own, so every mapping here either
+/// names a [`KernelError`] or forwards a code the kernel already produced. A
+/// family layered on top of the kernel (the Service Framework, the runtime)
+/// has its own vocabulary and its own fallback for failures the kernel never
+/// saw, so it declares its own trait rather than widening this one.
+///
+/// A conversion that crosses families imports the other family's trait as `_`,
+/// so the receiver selects the vocabulary and neither trait claims the name.
+///
+/// The trait is sealed. An error declared outside `nx-svc` belongs to another
+/// family and its failures are not kernel failures, so implementing this trait
+/// for one would put a code a caller decodes as a kernel result where no kernel
+/// ever produced it. Such an error declares its family's own trait instead, as
+/// `nx_sys_thread::error::ToResultCode` does.
+pub trait ToResultCode: core::error::Error + _sealed::Sealed {
+    /// Converts the error into a raw result code.
     fn to_rc(self) -> ResultCode;
-}
-
-impl ToRawResultCode for u32 {
-    fn to_rc(self) -> ResultCode {
-        self
-    }
-}
-
-impl ToRawResultCode for (Module, Description) {
-    fn to_rc(self) -> ResultCode {
-        // The description is shifted left by 9 bits, and the module is OR'd with it.
-        (self.0 as u32) | ((self.1 & 0x1FFF) << 9)
-    }
 }
 
 /// Error codes for kernel operations
 ///
 /// This is an enum of all the known error codes returned by the kernel.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[repr(u32)]
 pub enum KernelError {
+    #[error("Out of sessions")]
     OutOfSessions = 7,
+    #[error("Invalid argument")]
     InvalidArgument = 14,
+    #[error("Not implemented")]
     NotImplemented = 33,
+    #[error("No synchronization object")]
     NoSynchronizationObject = 57,
+    #[error("Termination requested")]
     TerminationRequested = 59,
+    #[error("Invalid size")]
     InvalidSize = 101,
+    #[error("Invalid address")]
     InvalidAddress = 102,
+    #[error("Out of resource")]
     OutOfResource = 103,
+    #[error("Out of memory")]
     OutOfMemory = 104,
+    #[error("Out of handles")]
     OutOfHandles = 105,
+    #[error("Invalid current memory")]
     InvalidCurrentMemory = 106,
+    #[error("Invalid new memory permission")]
     InvalidNewMemoryPermission = 108,
+    #[error("Invalid memory region")]
     InvalidMemoryRegion = 110,
+    #[error("Invalid priority")]
     InvalidPriority = 112,
+    #[error("Invalid core id")]
     InvalidCoreId = 113,
+    #[error("Invalid handle")]
     InvalidHandle = 114,
+    #[error("Invalid pointer")]
     InvalidPointer = 115,
+    #[error("Invalid combination")]
     InvalidCombination = 116,
+    #[error("Timed out")]
     TimedOut = 117,
+    #[error("Cancelled")]
     Cancelled = 118,
+    #[error("Out of range")]
     OutOfRange = 119,
+    #[error("Invalid enum value")]
     InvalidEnumValue = 120,
+    #[error("Not found")]
     NotFound = 121,
+    #[error("Busy")]
     Busy = 122,
+    #[error("Session closed")]
     SessionClosed = 123,
+    #[error("Invalid state")]
     InvalidState = 125,
+    #[error("Reserved used")]
     ReservedUsed = 126,
+    #[error("Port closed")]
     PortClosed = 131,
+    #[error("Limit reached")]
     LimitReached = 132,
+    #[error("Receive list broken")]
     ReceiveListBroken = 258,
+    #[error("Out of address space")]
     OutOfAddressSpace = 259,
+    #[error("Message too large")]
     MessageTooLarge = 260,
+    #[error("Invalid id")]
     InvalidId = 519,
 }
 
@@ -278,8 +319,24 @@ impl IntoDescription for KernelError {
     }
 }
 
-impl ToRawResultCode for KernelError {
+impl ToResultCode for KernelError {
     fn to_rc(self) -> ResultCode {
-        (Module::Kernel, self.into_value()).to_rc()
+        pack(Module::Kernel, self.into_value())
     }
+}
+
+impl _sealed::Sealed for KernelError {}
+
+/// Packs a module and a description into the raw result-code encoding.
+///
+/// The description occupies bits 9..22 and the module the low 9 bits, which is
+/// the layout every Horizon OS result code uses.
+const fn pack(module: Module, description: Description) -> ResultCode {
+    (module as u32) | ((description & 0x1FFF) << 9)
+}
+
+pub(crate) mod _sealed {
+    /// Restricts [`ToResultCode`](super::ToResultCode) to this crate's error
+    /// types. Implemented immediately after every `ToResultCode` impl.
+    pub trait Sealed {}
 }

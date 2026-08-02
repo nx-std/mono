@@ -2,13 +2,11 @@
 
 use core::mem::MaybeUninit;
 
-use nx_sf::ffi::Service;
+use nx_rt_core::error::ToResultCode as _;
+use nx_sf::{error::ToResultCode, ffi::Service};
 
 use crate::{
-    ffi::common::{
-        GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
-        parse_tipc_resp_error_to_rc, send_error_to_rc,
-    },
+    ffi::common::{GENERIC_ERROR, SyncUnsafeCell},
     services::set,
 };
 
@@ -26,7 +24,7 @@ static SETSYS_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_setsys_initialize() -> u32 {
     if let Err(err) = set::init() {
-        return setsys_connect_error_to_rc(err);
+        return err.to_rc();
     }
     if let Some(setsys) = set::get_service() {
         // Non-owning FFI view (`own_handle = 0`, `object_id = 0` — libnx's
@@ -93,36 +91,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_setsys_get_firmware_version(
 
     let fw = match setsys.get_firmware_version_cmif() {
         Ok(fw) => fw,
-        Err(err) => return setsys_get_firmware_version_error_to_rc(err),
+        Err(err) => return err.to_rc(),
     };
 
     // SAFETY: Caller guarantees out points to valid memory.
     unsafe { *out = fw };
     0
-}
-
-fn setsys_connect_error_to_rc(err: set::ConnectError) -> u32 {
-    match err {
-        set::ConnectError::Cmif(e) => match e.0 {
-            nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-        },
-        set::ConnectError::Tipc(e) => match e.0 {
-            nx_service_sm::GetServiceTipcError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::GetServiceTipcError::ParseResponse(e) => parse_tipc_resp_error_to_rc(e),
-            nx_service_sm::GetServiceTipcError::MissingHandle => GENERIC_ERROR,
-        },
-    }
-}
-
-fn setsys_get_firmware_version_error_to_rc(
-    err: nx_service_set::GetFirmwareVersionCmifError,
-) -> u32 {
-    match err {
-        nx_service_set::GetFirmwareVersionCmifError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_set::GetFirmwareVersionCmifError::ParseResponse(e) => {
-            parse_resp_bytes_error_to_rc(e)
-        }
-    }
 }

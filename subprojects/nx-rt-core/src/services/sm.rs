@@ -8,11 +8,17 @@ pub use nx_service_sm::ConnectError;
 use nx_service_sm::SmService;
 use nx_sf::ServiceName;
 #[cfg(feature = "ffi")]
+use nx_sf::error::ToResultCode as _;
+#[cfg(feature = "ffi")]
 use nx_sf::ffi::Service;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
+#[cfg(feature = "ffi")]
+use nx_svc::error::ResultCode;
 use nx_svc::ipc::Handle as SessionHandle;
 
 use crate::env::hos_version::{self, HosVersion};
+#[cfg(feature = "ffi")]
+use crate::error::{LibnxError, ToResultCode, libnx_error};
 
 /// Maximum number of service overrides.
 pub const MAX_OVERRIDES: usize = 32;
@@ -78,6 +84,13 @@ pub fn initialize() -> Result<(), InitializeError> {
 #[error("failed to connect to SM")]
 pub struct InitializeError(#[source] pub ConnectError);
 
+#[cfg(feature = "ffi")]
+impl ToResultCode for InitializeError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
+
 /// Closes the Service Manager connection.
 ///
 /// Releases the SM session. After calling this, other SM functions
@@ -131,6 +144,13 @@ pub fn get_service_handle(name: ServiceName) -> Result<SessionHandle, GetService
 #[derive(Debug, thiserror::Error)]
 #[error("protocol error")]
 pub struct GetServiceError(#[source] pub nx_service_sm::GetServiceCmifError);
+
+#[cfg(feature = "ffi")]
+impl ToResultCode for GetServiceError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 /// Registers a new service with SM.
 ///
@@ -187,6 +207,16 @@ pub enum RegisterServiceError {
     Tipc(#[source] nx_service_sm::RegisterServiceTipcError),
 }
 
+#[cfg(feature = "ffi")]
+impl ToResultCode for RegisterServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            Self::Tipc(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Unregisters a service from SM.
 ///
 /// Uses CMIF or TIPC based on system version.
@@ -228,6 +258,16 @@ pub enum UnregisterServiceError {
     /// TIPC protocol error.
     #[error("TIPC protocol error")]
     Tipc(#[source] nx_service_sm::UnregisterServiceTipcError),
+}
+
+#[cfg(feature = "ffi")]
+impl ToResultCode for UnregisterServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            Self::Tipc(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Detaches the current SM client session.
@@ -276,6 +316,19 @@ pub enum DetachClientError {
     Tipc(#[source] nx_service_sm::DetachClientTipcError),
 }
 
+#[cfg(feature = "ffi")]
+impl ToResultCode for DetachClientError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // A refusal this layer decides, so it reports a libnx code: no
+            // request went out and no server named one.
+            Self::IncompatibleVersion => libnx_error(LibnxError::IncompatSysVer),
+            Self::Cmif(err) => err.to_rc(),
+            Self::Tipc(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Returns a read guard to the SM session.
 #[inline]
 pub fn sm_session() -> nx_std_sync::rwlock::RwLockReadGuard<'static, Option<SmService>> {
@@ -306,6 +359,15 @@ pub fn add_override(name: ServiceName, handle: SessionHandle) -> Result<(), TooM
 #[derive(Debug, thiserror::Error)]
 #[error("too many overrides (max 32)")]
 pub struct TooManyOverridesError;
+
+#[cfg(feature = "ffi")]
+impl ToResultCode for TooManyOverridesError {
+    fn to_rc(self) -> ResultCode {
+        // libnx aborts with this code from `smAddOverrideHandle` rather than
+        // returning it; the description is the right one either way.
+        libnx_error(LibnxError::TooManyOverrides)
+    }
+}
 
 /// Gets an override handle for a service name, or `None` if no override exists.
 #[inline]

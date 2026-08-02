@@ -17,7 +17,10 @@
 //! `BinderError` returned by each operation corresponds to libnx
 //! `binderConvertErrorCode`.
 
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    service::Session,
+};
 
 use crate::{
     binder::{Binder, BinderError, TransactError},
@@ -581,6 +584,17 @@ pub enum RequestBufferError {
     Binder(#[source] BinderError),
 }
 
+impl ToResultCode for RequestBufferError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`set_buffer_count`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetBufferCountError {
@@ -590,6 +604,17 @@ pub enum SetBufferCountError {
     Malformed,
     #[error("binder rc indicates failure")]
     Binder(#[source] BinderError),
+}
+
+impl ToResultCode for SetBufferCountError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by [`dequeue_buffer`].
@@ -603,6 +628,17 @@ pub enum DequeueBufferError {
     Binder(#[source] BinderError),
 }
 
+impl ToResultCode for DequeueBufferError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`detach_buffer`].
 #[derive(Debug, thiserror::Error)]
 pub enum DetachBufferError {
@@ -612,6 +648,17 @@ pub enum DetachBufferError {
     Malformed,
     #[error("binder rc indicates failure")]
     Binder(#[source] BinderError),
+}
+
+impl ToResultCode for DetachBufferError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by [`queue_buffer`].
@@ -625,11 +672,32 @@ pub enum QueueBufferError {
     Binder(#[source] BinderError),
 }
 
+impl ToResultCode for QueueBufferError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`cancel_buffer`].
 #[derive(Debug, thiserror::Error)]
 pub enum CancelBufferError {
     #[error("binder transact failed")]
     Transact(#[from] TransactError),
+}
+
+impl ToResultCode for CancelBufferError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by [`query`].
@@ -643,6 +711,17 @@ pub enum QueryError {
     Binder(#[source] BinderError),
 }
 
+impl ToResultCode for QueryError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`connect`].
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
@@ -652,6 +731,17 @@ pub enum ConnectError {
     Malformed,
     #[error("binder rc indicates failure")]
     Binder(#[source] BinderError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by [`disconnect`].
@@ -665,6 +755,17 @@ pub enum DisconnectError {
     Binder(#[source] BinderError),
 }
 
+impl ToResultCode for DisconnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Binder(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::Malformed => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`set_preallocated_buffer`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetPreallocatedBufferError {
@@ -675,4 +776,14 @@ pub enum SetPreallocatedBufferError {
         MAX_GRAPHIC_BUFFER_NATIVE_INTS
     )]
     TooManyHandleInts,
+}
+
+impl ToResultCode for SetPreallocatedBufferError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::Transact(_) | Self::TooManyHandleInts => GENERIC_ERROR,
+        }
+    }
 }

@@ -3,7 +3,7 @@ use core::{ffi::c_void, ptr, ptr::NonNull};
 use bitflags::bitflags;
 
 use crate::{
-    error::{KernelError as KError, ResultCode, ToRawResultCode},
+    error::{_sealed, KernelError as KError, ResultCode, ToResultCode},
     raw,
     result::{Error, raw::Result as RawResult},
 };
@@ -110,7 +110,7 @@ pub enum SetHeapSizeError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for SetHeapSizeError {
+impl ToResultCode for SetHeapSizeError {
     fn to_rc(self) -> ResultCode {
         match self {
             SetHeapSizeError::InvalidSize => KError::InvalidSize.to_rc(),
@@ -127,6 +127,8 @@ impl ToRawResultCode for SetHeapSizeError {
         }
     }
 }
+
+impl _sealed::Sealed for SetHeapSizeError {}
 
 /// Queries information about a memory address.
 ///
@@ -185,7 +187,7 @@ pub enum QueryMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for QueryMemoryError {
+impl ToResultCode for QueryMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -195,6 +197,8 @@ impl ToRawResultCode for QueryMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for QueryMemoryError {}
 
 /// Maps a memory range.
 ///
@@ -262,7 +266,7 @@ pub enum MapMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for MapMemoryError {
+impl ToResultCode for MapMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             MapMemoryError::InvalidAddress => KError::InvalidAddress.to_rc(),
@@ -273,6 +277,8 @@ impl ToRawResultCode for MapMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for MapMemoryError {}
 
 /// Unmaps a memory range.
 ///
@@ -340,7 +346,7 @@ pub enum UnmapMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for UnmapMemoryError {
+impl ToResultCode for UnmapMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             UnmapMemoryError::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -351,6 +357,8 @@ impl ToRawResultCode for UnmapMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for UnmapMemoryError {}
 
 /// Information about a memory region.
 #[derive(Debug, Clone)]

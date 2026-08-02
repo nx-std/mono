@@ -2,7 +2,11 @@
 //!
 //! Available to System and Manager service types.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{ResultCode, ToResultCode},
+    ipc::Handle as SessionHandle,
+};
 
 use crate::{
     cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
@@ -306,6 +310,15 @@ pub enum GetZOrderCountError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for GetZOrderCountError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`get_display_logical_resolution`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayLogicalResolutionError {
@@ -315,6 +328,15 @@ pub enum GetDisplayLogicalResolutionError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for GetDisplayLogicalResolutionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`set_display_magnification`].
@@ -328,6 +350,15 @@ pub enum SetDisplayMagnificationError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetDisplayMagnificationError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`set_layer_position`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerPositionError {
@@ -337,6 +368,15 @@ pub enum SetLayerPositionError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for SetLayerPositionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`set_layer_size`].
@@ -350,6 +390,15 @@ pub enum SetLayerSizeError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetLayerSizeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`set_layer_z`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerZError {
@@ -361,6 +410,15 @@ pub enum SetLayerZError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetLayerZError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`set_layer_visibility`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerVisibilityError {
@@ -370,4 +428,13 @@ pub enum SetLayerVisibilityError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for SetLayerVisibilityError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

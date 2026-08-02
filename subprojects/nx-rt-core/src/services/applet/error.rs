@@ -7,6 +7,14 @@
 //! focus handling mode, calling NotifyRunning, and enabling mode-change
 //! notifications.
 
+#[cfg(feature = "ffi")]
+use nx_sf::error::ToResultCode as _;
+#[cfg(feature = "ffi")]
+use nx_svc::error::{ResultCode, ToResultCode as _};
+
+#[cfg(feature = "ffi")]
+use crate::error::ToResultCode;
+
 /// Error returned by [`super::init`].
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
@@ -48,4 +56,23 @@ pub enum ConnectError {
     SetPerformanceModeNotification(
         #[source] nx_service_applet::SetPerformanceModeChangedNotificationError,
     ),
+}
+
+#[cfg(feature = "ffi")]
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Open(err) => err.to_rc(),
+            Self::GetEventHandle(err) => err.to_rc(),
+            Self::GetFocusState(err) => err.to_rc(),
+            Self::GetOperationMode(err) => err.to_rc(),
+            Self::GetPerformanceMode(err) => err.to_rc(),
+            Self::WaitSynchronization(err) => err.to_rc(),
+            Self::AcquireForegroundRights(err) => err.to_rc(),
+            Self::SetFocusHandlingMode(err) => err.to_rc(),
+            Self::NotifyRunning(err) => err.to_rc(),
+            Self::SetOperationModeNotification(err) => err.to_rc(),
+            Self::SetPerformanceModeNotification(err) => err.to_rc(),
+        }
+    }
 }

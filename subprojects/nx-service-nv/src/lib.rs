@@ -14,14 +14,21 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_applet::{AppletType, aruid::Aruid};
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::{
+    error::ToResultCode as _,
     ipc::Handle as SessionHandle,
     mem::tmem::{Handle as TmemHandle, MemoryPermission},
     process::Handle as ProcessHandle,
     raw::Handle as RawHandle,
 };
-use nx_sys_mem::tmem::{self, TransferMemoryBacking};
+use nx_sys_mem::{
+    error::ToResultCode as _,
+    tmem::{self, TransferMemoryBacking},
+};
 
 mod cmif;
 pub mod fd;
@@ -380,4 +387,16 @@ pub enum ConnectError {
     /// Failed to clone session.
     #[error("failed to clone session")]
     CloneSession(#[source] nx_sf::service::CloneObjectExError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+            Self::CreateTransferMemory(err) => err.to_rc(),
+            Self::Initialize(err) => err.to_rc(),
+            Self::CloseTransferMemHandle(err) => err.to_rc(),
+            Self::CloneSession(err) => err.to_rc(),
+        }
+    }
 }

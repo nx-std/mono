@@ -13,7 +13,7 @@
 //! [`nx_rt_core::ffi::libnx::applet`]; the `rt_nso_libnx_service_applet.ld` fragment binds
 //! it for an NSO link just as it does for an NRO one.
 
-use nx_rt_core::ffi::libnx::applet::applet_connect_error_to_rc;
+use nx_rt_core::error::ToResultCode as _;
 use nx_svc::process::Handle as ProcessHandle;
 
 use crate::{applet as nso_applet, env};
@@ -52,7 +52,7 @@ pub unsafe extern "C" fn __nx_rt_nso__libnx_applet_initialize() -> u32 {
     // maps it to the libnx result code the C ABI carries.
     match nso_applet::applet_init(process_handle) {
         Ok(()) => 0,
-        Err(err) => applet_connect_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 

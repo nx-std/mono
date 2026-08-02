@@ -15,7 +15,7 @@
 use core::ffi::CStr;
 
 use crate::{
-    error::{KernelError as KError, ToRawResultCode},
+    error::{_sealed, KernelError as KError, ToResultCode},
     raw,
     result::{Error, ResultCode, raw::Result as RawResult},
 };
@@ -77,7 +77,7 @@ pub enum ConnectError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for ConnectError {
+impl ToResultCode for ConnectError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::OutOfRange => KError::OutOfRange.to_rc(),
@@ -90,6 +90,8 @@ impl ToRawResultCode for ConnectError {
         }
     }
 }
+
+impl _sealed::Sealed for ConnectError {}
 
 /// Connects to an anonymous port handle and returns a session handle.
 pub fn connect_to_port(port: Handle) -> Result<Handle, ConnectToPortError> {
@@ -131,7 +133,7 @@ pub enum ConnectToPortError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for ConnectToPortError {
+impl ToResultCode for ConnectToPortError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::OutOfSessions => KError::OutOfSessions.to_rc(),
@@ -143,6 +145,8 @@ impl ToRawResultCode for ConnectToPortError {
         }
     }
 }
+
+impl _sealed::Sealed for ConnectToPortError {}
 
 /// Sends a synchronous IPC request on a session.
 ///
@@ -193,7 +197,7 @@ pub enum SendSyncError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for SendSyncError {
+impl ToResultCode for SendSyncError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::TerminationRequested => KError::TerminationRequested.to_rc(),
@@ -204,6 +208,8 @@ impl ToRawResultCode for SendSyncError {
         }
     }
 }
+
+impl _sealed::Sealed for SendSyncError {}
 
 /// Sends a light synchronous IPC request on a session.
 ///
@@ -245,7 +251,7 @@ pub enum SendSyncLightError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for SendSyncLightError {
+impl ToResultCode for SendSyncLightError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::TerminationRequested => KError::TerminationRequested.to_rc(),
@@ -257,6 +263,8 @@ impl ToRawResultCode for SendSyncLightError {
         }
     }
 }
+
+impl _sealed::Sealed for SendSyncLightError {}
 
 /// Sends a synchronous IPC request using a user-provided buffer.
 ///
@@ -329,7 +337,7 @@ pub enum SendSyncWithBufferError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for SendSyncWithBufferError {
+impl ToResultCode for SendSyncWithBufferError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::TerminationRequested => KError::TerminationRequested.to_rc(),
@@ -345,6 +353,8 @@ impl ToRawResultCode for SendSyncWithBufferError {
         }
     }
 }
+
+impl _sealed::Sealed for SendSyncWithBufferError {}
 
 define_waitable_handle_type! {
     /// A handle to an IPC completion event.
@@ -444,7 +454,7 @@ pub enum SendAsyncWithBufferError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for SendAsyncWithBufferError {
+impl ToResultCode for SendAsyncWithBufferError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::TerminationRequested => KError::TerminationRequested.to_rc(),
@@ -464,6 +474,8 @@ impl ToRawResultCode for SendAsyncWithBufferError {
         }
     }
 }
+
+impl _sealed::Sealed for SendAsyncWithBufferError {}
 
 /// Closes a session handle, decrementing the kernel reference count.
 pub fn close_handle(handle: Handle) -> Result<(), CloseHandleError> {
@@ -489,7 +501,7 @@ pub enum CloseHandleError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CloseHandleError {
+impl ToResultCode for CloseHandleError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -497,3 +509,5 @@ impl ToRawResultCode for CloseHandleError {
         }
     }
 }
+
+impl _sealed::Sealed for CloseHandleError {}

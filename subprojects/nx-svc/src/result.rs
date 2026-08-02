@@ -21,7 +21,7 @@
 //! - [Switchbrew Wiki: SVC](https://switchbrew.org/wiki/SVC)
 //! - [Switchbrew Wiki: Error Codes](https://switchbrew.org/wiki/Error_codes)
 
-use crate::error::{Module, ToRawResultCode};
+use crate::error::{_sealed, Module, ToResultCode};
 
 /// Type alias for Result with [`Error`] as the error type.
 ///
@@ -82,12 +82,14 @@ impl Error {
     }
 }
 
-impl ToRawResultCode for Error {
+impl ToResultCode for Error {
     /// Converts the error code into a raw `u32` value.
     fn to_rc(self) -> ResultCode {
         self.0.to_raw()
     }
 }
+
+impl _sealed::Sealed for Error {}
 
 impl core::fmt::Display for Error {
     /// Formats the error code as a `2XXX-YYYY` string.

@@ -1,9 +1,9 @@
 //! `pm:bm` (boot mode) FFI.
 
-use nx_sf::ffi::Service;
+use nx_sf::{error::ToResultCode as _, ffi::Service};
 
 use super::{
-    common::{GENERIC_ERROR, connect_error_to_rc, dispatch_error_to_rc, sm_connect_error_to_rc},
+    common::GENERIC_ERROR,
     state::{BM, BM_SRV, clear_shadow, ensure_sm, write_shadow},
 };
 
@@ -18,7 +18,7 @@ pub unsafe extern "C" fn __nx_pm__pmbm_initialize() -> u32 {
     }
 
     if let Err(err) = ensure_sm() {
-        return sm_connect_error_to_rc(err);
+        return err.to_rc();
     }
 
     let sm_guard = super::state::SM.read();
@@ -26,7 +26,7 @@ pub unsafe extern "C" fn __nx_pm__pmbm_initialize() -> u32 {
 
     let svc = match nx_service_pm::connect_bm_cmif(sm) {
         Ok(s) => s,
-        Err(e) => return connect_error_to_rc(e.0),
+        Err(err) => return err.to_rc(),
     };
 
     let mut guard = BM.write();
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn __nx_pm__pmbm_get_boot_mode(out: *mut u32) -> u32 {
             unsafe { *out = mode as u32 };
             0
         }
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }
 
@@ -87,6 +87,6 @@ pub unsafe extern "C" fn __nx_pm__pmbm_set_maintenance_boot() -> u32 {
 
     match svc.set_maintenance_boot() {
         Ok(()) => 0,
-        Err(e) => dispatch_error_to_rc(e),
+        Err(e) => e.to_rc(),
     }
 }

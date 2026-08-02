@@ -8,7 +8,7 @@ use core::{ffi::c_void, ptr::NonNull};
 use bitflags::bitflags;
 
 use crate::{
-    error::{KernelError as KError, ToRawResultCode},
+    error::{_sealed, KernelError as KError, ToResultCode},
     raw,
     result::{Error, ResultCode, raw::Result as RawResult},
 };
@@ -137,7 +137,7 @@ pub enum CreateTransferMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CreateTransferMemoryError {
+impl ToResultCode for CreateTransferMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidSize => KError::InvalidSize.to_rc(),
@@ -149,6 +149,8 @@ impl ToRawResultCode for CreateTransferMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for CreateTransferMemoryError {}
 
 #[derive(Debug, thiserror::Error)]
 pub enum MapTransferMemoryError {
@@ -168,7 +170,7 @@ pub enum MapTransferMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for MapTransferMemoryError {
+impl ToResultCode for MapTransferMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -181,6 +183,8 @@ impl ToRawResultCode for MapTransferMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for MapTransferMemoryError {}
 
 #[derive(Debug, thiserror::Error)]
 pub enum UnmapTransferMemoryError {
@@ -198,7 +202,7 @@ pub enum UnmapTransferMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for UnmapTransferMemoryError {
+impl ToResultCode for UnmapTransferMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -211,6 +215,8 @@ impl ToRawResultCode for UnmapTransferMemoryError {
     }
 }
 
+impl _sealed::Sealed for UnmapTransferMemoryError {}
+
 #[derive(Debug, thiserror::Error)]
 pub enum CloseHandleError {
     #[error("Invalid handle")]
@@ -219,7 +225,7 @@ pub enum CloseHandleError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CloseHandleError {
+impl ToResultCode for CloseHandleError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -227,3 +233,5 @@ impl ToRawResultCode for CloseHandleError {
         }
     }
 }
+
+impl _sealed::Sealed for CloseHandleError {}

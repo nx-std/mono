@@ -25,10 +25,15 @@
 
 use core::{ffi::c_void, ptr::NonNull};
 
-use nx_svc::mem::shmem::{
-    self as svc, Handle, LocalShmemPermission, MemoryPermission, RemoteShmemPermission,
+use nx_svc::{
+    error::{KernelError, ResultCode, ToResultCode as _},
+    mem::shmem::{
+        self as svc, Handle, LocalShmemPermission, MemoryPermission, RemoteShmemPermission,
+    },
 };
 use nx_sys_virtmem::virtmem;
+
+use crate::error::{_sealed, ToResultCode};
 
 /// Size of the guard region for shared memory mappings (4 KiB).
 ///
@@ -208,6 +213,19 @@ pub enum MapError {
     #[error(transparent)]
     Svc(#[from] svc::MapSharedMemoryError),
 }
+
+impl ToResultCode for MapError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // No SVC was issued: the reservation found no free range in the
+            // process address space, which the kernel never learns about.
+            Self::VirtAddressAllocFailed => KernelError::OutOfAddressSpace.to_rc(),
+            Self::Svc(err) => err.to_rc(),
+        }
+    }
+}
+
+impl _sealed::Sealed for MapError {}
 
 /// Error that occurs when unmapping shared memory fails.
 ///
@@ -427,7 +445,7 @@ where
 impl CreateError {
     /// Converts the error into the raw `u32` result-code expected by C callers.
     pub fn into_rc(self) -> u32 {
-        use nx_svc::error::ToRawResultCode;
+        use nx_svc::error::ToResultCode;
 
         self.0.to_rc()
     }

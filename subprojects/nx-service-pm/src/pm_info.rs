@@ -3,7 +3,10 @@
 use core::mem::size_of;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::{DispatchError, Session},
+};
 use static_assertions::const_assert_eq;
 
 use super::{
@@ -71,6 +74,12 @@ pub fn connect_info_cmif(sm: &SmService) -> Result<PmInfoService, ConnectInfoCmi
 #[derive(Debug, thiserror::Error)]
 #[error("failed to get pm:info service")]
 pub struct ConnectInfoCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
+
+impl ToResultCode for ConnectInfoCmifError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 /// Resource limit values returned by `pm:info` `GetApplet*ResourceLimitValues`.
 #[repr(C)]

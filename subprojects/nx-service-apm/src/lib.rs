@@ -14,7 +14,10 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -130,4 +133,12 @@ pub enum ConnectError {
     /// Failed to get service handle from SM.
     #[error("failed to get service")]
     GetService(#[source] nx_service_sm::GetServiceCmifError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+        }
+    }
 }

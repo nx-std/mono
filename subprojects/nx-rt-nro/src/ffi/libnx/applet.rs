@@ -9,7 +9,7 @@
 //! and lives in [`nx_rt_core::ffi::libnx::applet`]; the `rt_nro_libnx_service_applet.ld`
 //! fragment binds it for this link.
 
-use nx_rt_core::ffi::libnx::applet::applet_connect_error_to_rc;
+use nx_rt_core::error::ToResultCode as _;
 use nx_svc::process::Handle as ProcessHandle;
 
 use crate::{env, ffi::common::GENERIC_ERROR, services::applet};
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_applet_initialize() -> u32 {
         .unwrap_or_else(ProcessHandle::current_process);
 
     if let Err(err) = applet::init(applet_type, process_handle) {
-        return applet_connect_error_to_rc(err);
+        return err.to_rc();
     }
 
     0

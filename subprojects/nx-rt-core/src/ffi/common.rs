@@ -1,19 +1,22 @@
 //! Common FFI helpers shared across the `nx-rt-*` runtime crates.
 //!
 //! `nx-rt-core` is the single authoritative home for the kind-agnostic FFI
-//! helpers: the generic error code, the `SyncUnsafeCell` static-storage
-//! wrapper, the CMIF/TIPC parse-error → result-code converters, and the
-//! `nx-sf` dispatch/domain error converters. The per-output-kind entry crates
-//! (`nx-rt-nro`, …) re-export these from here rather than re-defining them, so
-//! the nx-sf parse-error → libnx result-code mapping lives in exactly one
-//! place.
+//! helpers: the generic error code and the `SyncUnsafeCell` static-storage
+//! wrapper. The per-output-kind entry crates (`nx-rt-nro`, …) re-export these
+//! from here rather than re-defining them.
+//!
+//! The per-error converters that used to live here are gone: every error now
+//! maps itself through its own family's `ToResultCode`, so an adapter calls
+//! `.to_rc()` instead of a function that knew how to take another crate's
+//! error apart.
 
 use core::cell::UnsafeCell;
 
-use nx_sf::{cmif, tipc};
-
 /// Generic error code for FFI when no specific result code is available.
-pub const GENERIC_ERROR: u32 = 0xFFFF;
+///
+/// Re-exported so the adapters keep a single import site; the value is the
+/// Service Framework family's fallback.
+pub use crate::error::GENERIC_ERROR;
 
 /// Wrapper to make UnsafeCell Sync for static storage.
 #[repr(transparent)]
@@ -39,74 +42,5 @@ impl<T> SyncUnsafeCell<T> {
 
     pub fn get(&self) -> *mut T {
         self.0.get()
-    }
-}
-
-/// Converts a CMIF [`cmif::ParseError`] to a raw result code.
-pub fn parse_resp_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::InvalidMagic
-        | cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
-    }
-}
-
-/// Converts a TIPC [`tipc::ParseResponseError`] to a raw result code.
-pub fn parse_tipc_resp_error_to_rc(err: tipc::ParseResponseError) -> u32 {
-    match err {
-        tipc::ParseResponseError::ServiceError(code) => code,
-        tipc::ParseResponseError::Hipc(_)
-        | tipc::ParseResponseError::TruncatedResult
-        | tipc::ParseResponseError::TruncatedPayload => GENERIC_ERROR,
-    }
-}
-
-/// Converts a CMIF [`cmif::ParseError`] to a raw result code.
-pub fn parse_resp_bytes_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::InvalidMagic
-        | cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
-    }
-}
-
-/// Converts an `nx-sf` [`DispatchError`](nx_sf::service::DispatchError) to a
-/// raw result code.
-pub fn dispatch_error_to_rc(err: nx_sf::service::DispatchError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
-    match err {
-        nx_sf::service::DispatchError::Layout(_) => GENERIC_ERROR,
-        nx_sf::service::DispatchError::SendRequest(e) => e.to_rc(),
-        nx_sf::service::DispatchError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-    }
-}
-
-/// Converts an `nx-sf` [`ConvertToDomainError`](nx_sf::service::ConvertToDomainError)
-/// to a raw result code.
-pub fn convert_to_domain_error_to_rc(err: nx_sf::service::ConvertToDomainError) -> u32 {
-    match err {
-        nx_sf::service::ConvertToDomainError::SendRequest(e) => send_error_to_rc(e),
-        nx_sf::service::ConvertToDomainError::ParseResponse(e) => parse_resp_error_to_rc(e),
-    }
-}
-
-/// Converts an `nx-sf` request [`SendError`](cmif::SendError) to a raw
-/// result code. Covers both CMIF and TIPC requests - the two aliases name
-/// the same HIPC-level type.
-pub fn send_error_to_rc(err: cmif::SendError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
-    match err {
-        cmif::SendError::Layout(_) => GENERIC_ERROR,
-        cmif::SendError::SendRequest(e) => e.to_rc(),
     }
 }

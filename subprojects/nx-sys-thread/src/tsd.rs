@@ -34,9 +34,11 @@ use core::{
 };
 
 #[cfg(feature = "ffi")]
-use nx_svc::error::{KernelError, ResultCode, ToRawResultCode};
+use nx_svc::error::{KernelError, ResultCode, ToResultCode as _};
 use nx_sys_sync::data::RwLock;
 
+#[cfg(feature = "ffi")]
+use crate::error::{_sealed, ToResultCode};
 use crate::{thread::ThreadControl, thread_list};
 
 /// Number of runtime TSD key slots — musl libc's `PTHREAD_KEYS_MAX` (128).
@@ -202,13 +204,16 @@ pub enum TsdAllocError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for TsdAllocError {
+impl ToResultCode for TsdAllocError {
     fn to_rc(self) -> ResultCode {
         match self {
             TsdAllocError::NoSlotsAvailable => KernelError::OutOfResource.to_rc(),
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for TsdAllocError {}
 
 /// Reads the calling thread's value for a TSD slot.
 ///
@@ -315,13 +320,16 @@ pub enum TsdFreeError {
 }
 
 #[cfg(feature = "ffi")]
-impl ToRawResultCode for TsdFreeError {
+impl ToResultCode for TsdFreeError {
     fn to_rc(self) -> ResultCode {
         match self {
             TsdFreeError::UnallocatedSlot => KernelError::InvalidState.to_rc(),
         }
     }
 }
+
+#[cfg(feature = "ffi")]
+impl _sealed::Sealed for TsdFreeError {}
 
 /// Runs the TSD destructor pass for an exiting thread.
 ///

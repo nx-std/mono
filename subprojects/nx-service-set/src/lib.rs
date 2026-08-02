@@ -17,7 +17,10 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -114,6 +117,12 @@ pub fn connect_cmif(sm: &SmService) -> Result<SetSysService, ConnectCmifError> {
 #[error("failed to get set:sys service")]
 pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
 
+impl ToResultCode for ConnectCmifError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
+
 /// Connects to the set:sys (System Settings) service using TIPC.
 ///
 /// Obtains a service handle from the Service Manager using TIPC protocol.
@@ -132,3 +141,9 @@ pub fn connect_tipc(sm: &SmService) -> Result<SetSysService, ConnectTipcError> {
 #[derive(Debug, thiserror::Error)]
 #[error("failed to get set:sys service")]
 pub struct ConnectTipcError(#[source] pub nx_service_sm::GetServiceTipcError);
+
+impl ToResultCode for ConnectTipcError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}

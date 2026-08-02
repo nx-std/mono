@@ -3,7 +3,11 @@
 //! This module implements APM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    ipc::Handle as SessionHandle,
+};
 
 use crate::proto::{
     CMD_GET_PERFORMANCE_CONFIGURATION, CMD_GET_PERFORMANCE_MODE, CMD_OPEN_SESSION,
@@ -122,6 +126,18 @@ pub enum OpenSessionError {
     MissingHandle,
 }
 
+impl ToResultCode for OpenSessionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`get_performance_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPerformanceModeError {
@@ -136,6 +152,18 @@ pub enum GetPerformanceModeError {
     InvalidMode(i32),
 }
 
+impl ToResultCode for GetPerformanceModeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidMode(_) => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`set_performance_configuration`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetPerformanceConfigurationError {
@@ -147,6 +175,15 @@ pub enum SetPerformanceConfigurationError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetPerformanceConfigurationError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by [`get_performance_configuration`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPerformanceConfigurationError {
@@ -156,4 +193,13 @@ pub enum GetPerformanceConfigurationError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for GetPerformanceConfigurationError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

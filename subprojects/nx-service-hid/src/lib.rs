@@ -20,9 +20,15 @@ use core::ptr::NonNull;
 
 use nx_service_applet::aruid::Aruid;
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::ipc::Handle as SessionHandle;
-use nx_sys_mem::shmem::{self as sys_shmem, Mapped, Permissions};
+use nx_sys_mem::{
+    error::ToResultCode as _,
+    shmem::{self as sys_shmem, Mapped, Permissions},
+};
 
 mod cmif;
 mod proto;
@@ -192,4 +198,18 @@ pub enum ConnectError {
     /// Null pointer from mapped memory.
     #[error("null pointer from mapped memory")]
     NullPointer,
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+            Self::CreateAppletResource(err) => err.to_rc(),
+            Self::GetSharedMemoryHandle(err) => err.to_rc(),
+            Self::MapSharedMemory(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NullPointer => GENERIC_ERROR,
+        }
+    }
 }

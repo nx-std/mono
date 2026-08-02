@@ -6,6 +6,7 @@
 use nx_service_applet::aruid::Aruid;
 use nx_sf::{
     cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
     ipc::Handle as SessionHandle,
 };
@@ -410,6 +411,16 @@ pub enum OpenError {
     NvError(#[source] OpenNvError),
 }
 
+impl ToResultCode for OpenError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            Self::NvError(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by ioctl operation.
 #[derive(Debug, thiserror::Error)]
 pub enum IoctlError {
@@ -422,6 +433,16 @@ pub enum IoctlError {
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
+}
+
+impl ToResultCode for IoctlError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            Self::NvError(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error returned by ioctl2 operation.
@@ -438,6 +459,16 @@ pub enum Ioctl2Error {
     NvError(#[source] IoctlNvError),
 }
 
+impl ToResultCode for Ioctl2Error {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            Self::NvError(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by ioctl3 operation.
 #[derive(Debug, thiserror::Error)]
 pub enum Ioctl3Error {
@@ -450,6 +481,16 @@ pub enum Ioctl3Error {
     /// NV driver returned an error.
     #[error("NV driver error")]
     NvError(#[source] IoctlNvError),
+}
+
+impl ToResultCode for Ioctl3Error {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            Self::NvError(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error returned by close operation.
@@ -466,6 +507,16 @@ pub enum CloseError {
     NvError(#[source] CloseNvError),
 }
 
+impl ToResultCode for CloseError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            Self::NvError(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by initialize operation.
 #[derive(Debug, thiserror::Error)]
 pub enum InitializeError {
@@ -475,6 +526,15 @@ pub enum InitializeError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for InitializeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error returned by query_event operation.
@@ -494,6 +554,19 @@ pub enum QueryEventError {
     MissingHandle,
 }
 
+impl ToResultCode for QueryEventError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            Self::NvError(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by set_client_pid operation.
 #[derive(Debug, thiserror::Error)]
 pub enum SetClientPidError {
@@ -503,4 +576,13 @@ pub enum SetClientPidError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for SetClientPidError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

@@ -6,7 +6,7 @@
 //! that depends on other threads.
 
 use nx_svc::{
-    error::ToRawResultCode,
+    error::ToResultCode,
     raw::Handle,
     result::ResultCode,
     sync::{WaitProcessWideKeyError, signal_process_wide_key, wait_process_wide_key_atomic},
@@ -68,7 +68,7 @@ impl Condvar {
         }
 
         // Map result to return codes
-        result.map_or_else(ToRawResultCode::to_rc, |_| 0)
+        result.map_or_else(ToResultCode::to_rc, |_| 0)
     }
 
     /// Waits on the condition variable indefinitely until notified.

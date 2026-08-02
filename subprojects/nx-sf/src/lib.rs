@@ -42,6 +42,7 @@ extern crate nx_panic_handler;
 mod array_vec;
 pub mod cmif;
 mod cursor;
+pub mod error;
 pub mod hipc;
 pub mod ipc;
 pub mod service;

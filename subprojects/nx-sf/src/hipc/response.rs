@@ -2,12 +2,15 @@
 
 use core::mem::size_of;
 
-use nx_svc::raw::Handle as RawHandle;
+use nx_svc::{error::ResultCode, raw::Handle as RawHandle};
 
 use super::wire::{
     Header, MIN_PREFIX_BUF_SIZE, RECV_LIST_WIRE_NONE, SpecialHeader, StaticDescriptor,
 };
-use crate::cursor::{Cursor, ResponsePayload};
+use crate::{
+    cursor::{Cursor, ResponsePayload},
+    error::{GENERIC_ERROR, ToResultCode},
+};
 
 /// Parses a full HIPC response into the envelope plus a typed payload.
 ///
@@ -128,6 +131,14 @@ pub enum ResponseParseError {
     /// Data-words region too small to hold the caller-requested payload.
     #[error("HIPC response too small for payload")]
     TruncatedPayload,
+}
+
+impl ToResultCode for ResponseParseError {
+    fn to_rc(self) -> ResultCode {
+        // Every variant is a malformed reply this crate rejected on its own;
+        // the server returned success, so it named no code to forward.
+        GENERIC_ERROR
+    }
 }
 
 /// Parsed HIPC response with a typed payload.

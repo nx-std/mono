@@ -3,7 +3,11 @@
 //! This module implements Time commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    ipc::Handle as SessionHandle,
+};
 
 use crate::{
     proto::{static_service_cmds, system_clock_cmds, timezone_service_cmds},
@@ -187,6 +191,18 @@ pub enum GetSystemClockError {
     MissingHandle,
 }
 
+impl ToResultCode for GetSystemClockError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by steady clock retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSteadyClockError {
@@ -199,6 +215,18 @@ pub enum GetSteadyClockError {
     /// Missing session handle in response.
     #[error("missing session handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetSteadyClockError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by timezone service retrieval operation.
@@ -215,6 +243,18 @@ pub enum GetTimeZoneServiceError {
     MissingHandle,
 }
 
+impl ToResultCode for GetTimeZoneServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by shared memory retrieval operation.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryError {
@@ -227,6 +267,18 @@ pub enum GetSharedMemoryError {
     /// Missing shared memory handle in response.
     #[error("missing shared memory handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetSharedMemoryError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by get current time operation.
@@ -249,6 +301,20 @@ pub enum GetCurrentTimeError {
     SourceIdMismatch,
 }
 
+impl ToResultCode for GetCurrentTimeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NetworkClockUnavailable
+            | Self::LocalClockNotSupported
+            | Self::SourceIdMismatch => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by calendar time conversion operation.
 #[derive(Debug, thiserror::Error)]
 pub enum ToCalendarTimeError {
@@ -258,4 +324,13 @@ pub enum ToCalendarTimeError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for ToCalendarTimeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

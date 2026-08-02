@@ -22,7 +22,8 @@
 use core::marker::PhantomData;
 
 use nx_service_sm::SmService;
-use nx_svc::process::Handle as ProcessHandle;
+use nx_sf::error::{GENERIC_ERROR, ToResultCode};
+use nx_svc::{error::ResultCode, process::Handle as ProcessHandle};
 
 use crate::{
     AcquireForegroundRightsError, AppletFocusHandlingMode, AppletProxyService, AppletService,
@@ -387,6 +388,23 @@ pub enum OpenError {
     /// Failed to drain role-specific extras.
     #[error("failed to drain role-specific extras")]
     DrainExtras(#[source] DrainExtrasError),
+}
+
+impl ToResultCode for OpenError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Connect(err) => err.to_rc(),
+            Self::OpenProxy(err) => err.to_rc(),
+            Self::GetCommonStateGetter(err) => err.to_rc(),
+            Self::GetSelfController(err) => err.to_rc(),
+            Self::GetWindowController(err) => err.to_rc(),
+            Self::GetSubInterface(err) => err.to_rc(),
+            Self::DrainExtras(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NoneAppletType => GENERIC_ERROR,
+        }
+    }
 }
 
 impl<R: Role> Proxy<R> {

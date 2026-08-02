@@ -1,7 +1,10 @@
 //! `pm:bm` (boot mode) service wrapper.
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::{DispatchError, Session},
+};
 
 use super::cmif;
 
@@ -51,6 +54,12 @@ pub fn connect_bm_cmif(sm: &SmService) -> Result<PmBmService, ConnectBmCmifError
 #[derive(Debug, thiserror::Error)]
 #[error("failed to get pm:bm service")]
 pub struct ConnectBmCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
+
+impl ToResultCode for ConnectBmCmifError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 /// Boot mode returned by `pm:bm` `GetBootMode`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

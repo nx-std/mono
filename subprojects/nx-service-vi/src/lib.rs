@@ -12,7 +12,10 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::ipc::Handle as SessionHandle;
 
 pub mod binder;
@@ -853,6 +856,17 @@ pub enum GetZOrderCountMinError {
     Cmif(#[source] GetZOrderCountError),
 }
 
+impl ToResultCode for GetZOrderCountMinError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for operations requiring System service.
 #[derive(Debug, thiserror::Error)]
 pub enum GetZOrderCountMaxError {
@@ -862,6 +876,17 @@ pub enum GetZOrderCountMaxError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] GetZOrderCountError),
+}
+
+impl ToResultCode for GetZOrderCountMaxError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for `create_stray_layer_system` / `create_stray_layer_manager`.
@@ -879,6 +904,17 @@ pub enum CreateStrayLayerWrapperError {
     Cmif(#[source] CreateStrayLayerError),
 }
 
+impl ToResultCode for CreateStrayLayerWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for get_display_logical_resolution wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayLogicalResolutionWrapperError {
@@ -888,6 +924,17 @@ pub enum GetDisplayLogicalResolutionWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] GetDisplayLogicalResolutionError),
+}
+
+impl ToResultCode for GetDisplayLogicalResolutionWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for set_display_magnification wrapper.
@@ -901,6 +948,17 @@ pub enum SetDisplayMagnificationWrapperError {
     Cmif(#[source] SetDisplayMagnificationError),
 }
 
+impl ToResultCode for SetDisplayMagnificationWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for set_layer_position wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerPositionWrapperError {
@@ -910,6 +968,17 @@ pub enum SetLayerPositionWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] SetLayerPositionError),
+}
+
+impl ToResultCode for SetLayerPositionWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for set_layer_size wrapper.
@@ -923,6 +992,17 @@ pub enum SetLayerSizeWrapperError {
     Cmif(#[source] SetLayerSizeError),
 }
 
+impl ToResultCode for SetLayerSizeWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for set_layer_z wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerZWrapperError {
@@ -932,6 +1012,17 @@ pub enum SetLayerZWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] SetLayerZError),
+}
+
+impl ToResultCode for SetLayerZWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for set_layer_visibility wrapper.
@@ -945,6 +1036,17 @@ pub enum SetLayerVisibilityWrapperError {
     Cmif(#[source] SetLayerVisibilityError),
 }
 
+impl ToResultCode for SetLayerVisibilityWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for create_managed_layer wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum CreateManagedLayerWrapperError {
@@ -954,6 +1056,17 @@ pub enum CreateManagedLayerWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] CreateManagedLayerError),
+}
+
+impl ToResultCode for CreateManagedLayerWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for destroy_managed_layer wrapper.
@@ -967,6 +1080,17 @@ pub enum DestroyManagedLayerWrapperError {
     Cmif(#[source] DestroyManagedLayerError),
 }
 
+impl ToResultCode for DestroyManagedLayerWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for set_display_alpha wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayAlphaWrapperError {
@@ -976,6 +1100,17 @@ pub enum SetDisplayAlphaWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] SetDisplayAlphaError),
+}
+
+impl ToResultCode for SetDisplayAlphaWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for set_display_layer_stack wrapper.
@@ -989,6 +1124,17 @@ pub enum SetDisplayLayerStackWrapperError {
     Cmif(#[source] SetDisplayLayerStackError),
 }
 
+impl ToResultCode for SetDisplayLayerStackWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for set_display_power_state wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayPowerStateWrapperError {
@@ -998,6 +1144,17 @@ pub enum SetDisplayPowerStateWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] SetDisplayPowerStateError),
+}
+
+impl ToResultCode for SetDisplayPowerStateWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for set_content_visibility wrapper.
@@ -1011,6 +1168,17 @@ pub enum SetContentVisibilityWrapperError {
     Cmif(#[source] SetContentVisibilityError),
 }
 
+impl ToResultCode for SetContentVisibilityWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for prepare_fatal wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum PrepareFatalWrapperError {
@@ -1020,6 +1188,17 @@ pub enum PrepareFatalWrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] PrepareFatalError),
+}
+
+impl ToResultCode for PrepareFatalWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error for show_fatal wrapper.
@@ -1033,6 +1212,17 @@ pub enum ShowFatalWrapperError {
     Cmif(#[source] ShowFatalError),
 }
 
+impl ToResultCode for ShowFatalWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for draw_fatal_rectangle wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalRectangleWrapperError {
@@ -1044,6 +1234,17 @@ pub enum DrawFatalRectangleWrapperError {
     Cmif(#[source] DrawFatalRectangleError),
 }
 
+impl ToResultCode for DrawFatalRectangleWrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error for draw_fatal_text32 wrapper.
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalText32WrapperError {
@@ -1053,6 +1254,17 @@ pub enum DrawFatalText32WrapperError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] DrawFatalText32Error),
+}
+
+impl ToResultCode for DrawFatalText32WrapperError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotAvailable => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by [`connect`].
@@ -1070,4 +1282,17 @@ pub enum ConnectError {
     /// Failed to get sub-service.
     #[error("failed to get sub-service")]
     GetSubService(#[source] GetSubServiceError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+            Self::GetDisplayService(err) => err.to_rc(),
+            Self::GetSubService(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NoServiceAvailable => GENERIC_ERROR,
+        }
+    }
 }

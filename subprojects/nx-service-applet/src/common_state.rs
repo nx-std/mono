@@ -6,8 +6,11 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{DispatchError, DomainObject, OutHandleAttr};
-use nx_svc::sync::EventHandle;
+use nx_sf::{
+    error::{GENERIC_ERROR, ToResultCode},
+    service::{DispatchError, DomainObject, OutHandleAttr},
+};
+use nx_svc::{error::ResultCode, sync::EventHandle};
 
 use crate::proto::{
     AppletFocusState, AppletMessage, AppletOperationMode, AppletPerformanceMode,
@@ -52,6 +55,17 @@ pub enum GetEventHandleError {
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetEventHandleError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Receives a pending message from ICommonStateGetter.
@@ -104,6 +118,17 @@ pub enum ReceiveMessageError {
     InvalidResponse,
 }
 
+impl ToResultCode for ReceiveMessageError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Gets the current operation mode from ICommonStateGetter.
 pub fn get_operation_mode(
     csg: &DomainObject<'_>,
@@ -136,6 +161,17 @@ pub enum GetOperationModeError {
     /// Operation mode value was unknown.
     #[error("unknown operation mode value: {0}")]
     InvalidValue(u8),
+}
+
+impl ToResultCode for GetOperationModeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse | Self::InvalidValue(_) => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Gets the current performance mode from ICommonStateGetter.
@@ -173,6 +209,17 @@ pub enum GetPerformanceModeError {
     InvalidValue(u32),
 }
 
+impl ToResultCode for GetPerformanceModeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse | Self::InvalidValue(_) => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Gets the current focus state from ICommonStateGetter.
 pub fn get_current_focus_state(
     csg: &DomainObject<'_>,
@@ -205,4 +252,15 @@ pub enum GetCurrentFocusStateError {
     /// Focus state value was unknown.
     #[error("unknown focus state value: {0}")]
     InvalidValue(u8),
+}
+
+impl ToResultCode for GetCurrentFocusStateError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::InvalidResponse | Self::InvalidValue(_) => GENERIC_ERROR,
+        }
+    }
 }

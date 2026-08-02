@@ -4,6 +4,7 @@
 
 use nx_sf::{
     cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::{BufferMode, InputBuffer, OutputBuffer},
     ipc::Handle as SessionHandle,
 };
@@ -149,6 +150,15 @@ pub enum TransactParcelError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for TransactParcelError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`adjust_refcount`].
 #[derive(Debug, thiserror::Error)]
 pub enum AdjustRefcountError {
@@ -158,6 +168,15 @@ pub enum AdjustRefcountError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for AdjustRefcountError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`get_native_handle`].
@@ -172,4 +191,16 @@ pub enum GetNativeHandleError {
     /// Missing handle in response.
     #[error("missing handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetNativeHandleError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }

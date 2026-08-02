@@ -61,10 +61,11 @@
 extern crate alloc;
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-#[cfg(feature = "ffi")]
-pub mod ffi;
-
 pub mod argv;
 pub mod env;
+#[cfg(feature = "ffi")]
+pub mod error;
+#[cfg(feature = "ffi")]
+pub mod ffi;
 pub mod init;
 pub mod services;

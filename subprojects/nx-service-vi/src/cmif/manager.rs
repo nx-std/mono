@@ -2,7 +2,11 @@
 //!
 //! Available only to Manager service type.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{ResultCode, ToResultCode},
+    ipc::Handle as SessionHandle,
+};
 
 use crate::{
     cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
@@ -261,6 +265,15 @@ pub enum CreateManagedLayerError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for CreateManagedLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`destroy_managed_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum DestroyManagedLayerError {
@@ -270,6 +283,15 @@ pub enum DestroyManagedLayerError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for DestroyManagedLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`set_display_alpha`].
@@ -283,6 +305,15 @@ pub enum SetDisplayAlphaError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetDisplayAlphaError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`set_display_layer_stack`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayLayerStackError {
@@ -292,6 +323,15 @@ pub enum SetDisplayLayerStackError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for SetDisplayLayerStackError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`set_display_power_state`].
@@ -305,6 +345,15 @@ pub enum SetDisplayPowerStateError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetDisplayPowerStateError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`add_to_layer_stack`].
 #[derive(Debug, thiserror::Error)]
 pub enum AddToLayerStackError {
@@ -316,6 +365,15 @@ pub enum AddToLayerStackError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for AddToLayerStackError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`set_content_visibility`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetContentVisibilityError {
@@ -325,4 +383,13 @@ pub enum SetContentVisibilityError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for SetContentVisibilityError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

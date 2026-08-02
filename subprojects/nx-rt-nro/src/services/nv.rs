@@ -3,7 +3,9 @@
 //! This module manages the NV service session and provides a singleton interface
 //! for accessing NVIDIA driver functionality throughout the application lifecycle.
 
+use nx_rt_core::error::{ResultCode, ToResultCode};
 use nx_service_nv::{NvConfig, NvService, NvServiceType};
+use nx_sf::error::ToResultCode as _;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
 use crate::{
@@ -118,6 +120,12 @@ impl core::ops::Deref for NvServiceRef {
 #[derive(Debug, thiserror::Error)]
 #[error("failed to connect to NV service")]
 pub struct ConnectError(#[source] pub nx_service_nv::ConnectError);
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 /// Global configuration storage.
 ///

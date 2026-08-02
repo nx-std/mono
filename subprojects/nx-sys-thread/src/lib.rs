@@ -22,11 +22,11 @@ extern crate alloc;
 // `nx-alloc` exposes the `#[global_allocator]` backing `alloc` for this crate.
 extern crate nx_alloc;
 
+mod detach;
+#[cfg(feature = "ffi")]
+pub mod error;
 #[cfg(feature = "ffi")]
 pub mod ffi;
-
-mod detach;
-
 pub mod pthread;
 pub mod tcb;
 pub mod thread;

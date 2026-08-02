@@ -4,6 +4,7 @@
 
 use nx_sf::{
     cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::{BufferMode, OutputBuffer},
     ipc::Handle as SessionHandle,
     service::Session,
@@ -531,6 +532,18 @@ pub enum GetSubServiceError {
     MissingHandle,
 }
 
+impl ToResultCode for GetSubServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error from [`open_display`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenDisplayError {
@@ -540,6 +553,15 @@ pub enum OpenDisplayError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for OpenDisplayError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`close_display`].
@@ -553,6 +575,15 @@ pub enum CloseDisplayError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for CloseDisplayError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`get_display_resolution`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayResolutionError {
@@ -562,6 +593,15 @@ pub enum GetDisplayResolutionError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for GetDisplayResolutionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`open_layer`].
@@ -575,6 +615,15 @@ pub enum OpenLayerError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for OpenLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`close_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloseLayerError {
@@ -584,6 +633,15 @@ pub enum CloseLayerError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for CloseLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`create_stray_layer`].
@@ -597,6 +655,15 @@ pub enum CreateStrayLayerError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for CreateStrayLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`destroy_stray_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum DestroyStrayLayerError {
@@ -606,6 +673,15 @@ pub enum DestroyStrayLayerError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for DestroyStrayLayerError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`set_layer_scaling_mode`].
@@ -619,6 +695,15 @@ pub enum SetLayerScalingModeError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetLayerScalingModeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`get_indirect_layer_image_map`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetIndirectLayerImageMapError {
@@ -630,6 +715,15 @@ pub enum GetIndirectLayerImageMapError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for GetIndirectLayerImageMapError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`get_indirect_layer_image_required_memory_info`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetIndirectLayerImageRequiredMemoryInfoError {
@@ -639,6 +733,15 @@ pub enum GetIndirectLayerImageRequiredMemoryInfoError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for GetIndirectLayerImageRequiredMemoryInfoError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`get_display_vsync_event`].
@@ -653,4 +756,16 @@ pub enum GetDisplayVsyncEventError {
     /// Missing event handle in response.
     #[error("missing event handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetDisplayVsyncEventError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
