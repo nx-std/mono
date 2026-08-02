@@ -315,7 +315,7 @@ fn clear_sm_ffi_session() {
 }
 
 fn sm_initialize_error_to_rc(err: sm::InitializeError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
+    use nx_svc::error::ToResultCode;
 
     match err.0 {
         nx_service_sm::ConnectError::Connect(e) => e.to_rc(),

@@ -17,7 +17,7 @@
 //!
 //! # Why not `nx-svc`'s trait
 //!
-//! These impls previously sat on [`nx_svc::error::ToRawResultCode`]. That trait
+//! These impls previously sat on [`nx_svc::error::ToResultCode`]. That trait
 //! answers "which kernel result code describes this failure", and its
 //! implementors are the kernel's own errors. A thread failure is not a kernel
 //! failure: `CreateError::StackTooSmall` and `TsdAllocError::NoSlotsAvailable`

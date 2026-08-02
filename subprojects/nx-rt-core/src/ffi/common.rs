@@ -81,7 +81,7 @@ pub fn parse_resp_bytes_error_to_rc(err: cmif::ParseError) -> u32 {
 /// Converts an `nx-sf` [`DispatchError`](nx_sf::service::DispatchError) to a
 /// raw result code.
 pub fn dispatch_error_to_rc(err: nx_sf::service::DispatchError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
+    use nx_svc::error::ToResultCode;
 
     match err {
         nx_sf::service::DispatchError::Layout(_) => GENERIC_ERROR,
@@ -103,7 +103,7 @@ pub fn convert_to_domain_error_to_rc(err: nx_sf::service::ConvertToDomainError) 
 /// result code. Covers both CMIF and TIPC requests - the two aliases name
 /// the same HIPC-level type.
 pub fn send_error_to_rc(err: cmif::SendError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
+    use nx_svc::error::ToResultCode;
 
     match err {
         cmif::SendError::Layout(_) => GENERIC_ERROR,

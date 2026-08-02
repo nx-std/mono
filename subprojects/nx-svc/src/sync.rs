@@ -1,7 +1,7 @@
 //! Synchronization primitives
 
 use crate::{
-    error::{KernelError as KError, ResultCode, ToRawResultCode},
+    error::{_sealed, KernelError as KError, ResultCode, ToResultCode},
     handle::{Reset, Waitable},
     raw::{self, Handle},
     result::{Error, Result, raw::Result as RawResult},
@@ -113,6 +113,19 @@ pub enum ArbitrateLockError {
     Unknown(Error),
 }
 
+impl ToResultCode for ArbitrateLockError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::InvalidMemState => KError::InvalidAddress.to_rc(),
+            Self::ThreadTerminating => KError::TerminationRequested.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for ArbitrateLockError {}
+
 /// Arbitrates a mutex unlock operation in userspace
 ///
 /// Releases a mutex by arbitrating the unlock operation with waiting threads.
@@ -166,6 +179,17 @@ pub enum ArbitrateUnlockError {
     #[error("Unknown error: {0}")]
     Unknown(Error),
 }
+
+impl ToResultCode for ArbitrateUnlockError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidMemState => KError::InvalidAddress.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for ArbitrateUnlockError {}
 
 /// Atomically releases a mutex and waits on a condition variable
 ///
@@ -246,7 +270,7 @@ pub enum WaitProcessWideKeyError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for WaitProcessWideKeyError {
+impl ToResultCode for WaitProcessWideKeyError {
     fn to_rc(self) -> ResultCode {
         match self {
             WaitProcessWideKeyError::InvalidMemState => KError::InvalidAddress.to_rc(),
@@ -256,6 +280,8 @@ impl ToRawResultCode for WaitProcessWideKeyError {
         }
     }
 }
+
+impl _sealed::Sealed for WaitProcessWideKeyError {}
 
 /// Signals a condition variable to wake waiting threads
 ///
@@ -487,7 +513,7 @@ pub enum WaitSyncError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for WaitSyncError {
+impl ToResultCode for WaitSyncError {
     fn to_rc(self) -> ResultCode {
         match self {
             WaitSyncError::TerminationRequested => KError::TerminationRequested.to_rc(),
@@ -500,6 +526,8 @@ impl ToRawResultCode for WaitSyncError {
         }
     }
 }
+
+impl _sealed::Sealed for WaitSyncError {}
 
 /// Resets a signaled synchronization object.
 ///
@@ -541,7 +569,7 @@ pub enum ResetSignalError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for ResetSignalError {
+impl ToResultCode for ResetSignalError {
     fn to_rc(self) -> ResultCode {
         match self {
             ResetSignalError::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -550,3 +578,5 @@ impl ToRawResultCode for ResetSignalError {
         }
     }
 }
+
+impl _sealed::Sealed for ResetSignalError {}

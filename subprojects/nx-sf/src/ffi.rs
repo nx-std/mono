@@ -20,7 +20,7 @@
 
 use core::mem::{self, size_of};
 
-use nx_svc::{error::ToRawResultCode, ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
+use nx_svc::{error::ToResultCode, ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
 use static_assertions::const_assert_eq;
 
 use crate::{

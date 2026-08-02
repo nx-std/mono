@@ -35,7 +35,7 @@ use core::{
     ptr::{NonNull, null_mut},
 };
 
-use nx_svc::error::{KernelError, ToRawResultCode as _};
+use nx_svc::error::{KernelError, ToResultCode as _};
 /// Re-export of the ABI-visible AArch64 register-dump structure.
 ///
 /// `nx-svc` already defines the `#[repr(C)]` layout that matches libnx's

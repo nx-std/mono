@@ -8,7 +8,7 @@
 use core::ffi::c_void;
 
 use crate::{
-    error::{KernelError as KError, ToRawResultCode},
+    error::{_sealed, KernelError as KError, ToResultCode},
     raw,
     result::{Error, ResultCode, raw::Result as RawResult},
 };
@@ -107,7 +107,7 @@ pub enum CreateThreadError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CreateThreadError {
+impl ToResultCode for CreateThreadError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::OutOfMemory => KError::OutOfMemory.to_rc(),
@@ -120,6 +120,8 @@ impl ToRawResultCode for CreateThreadError {
         }
     }
 }
+
+impl _sealed::Sealed for CreateThreadError {}
 
 /// Transitions a thread from the *created* state to *runnable*.
 ///
@@ -146,7 +148,7 @@ pub enum StartThreadError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for StartThreadError {
+impl ToResultCode for StartThreadError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -154,6 +156,8 @@ impl ToRawResultCode for StartThreadError {
         }
     }
 }
+
+impl _sealed::Sealed for StartThreadError {}
 
 /// Pauses a thread.
 ///
@@ -179,7 +183,7 @@ pub enum PauseThreadError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for PauseThreadError {
+impl ToResultCode for PauseThreadError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -187,6 +191,8 @@ impl ToRawResultCode for PauseThreadError {
         }
     }
 }
+
+impl _sealed::Sealed for PauseThreadError {}
 
 /// Resumes a previously paused thread.
 ///
@@ -212,7 +218,7 @@ pub enum ResumeThreadError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for ResumeThreadError {
+impl ToResultCode for ResumeThreadError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -220,6 +226,8 @@ impl ToRawResultCode for ResumeThreadError {
         }
     }
 }
+
+impl _sealed::Sealed for ResumeThreadError {}
 
 /// Exits the current thread and never returns.
 ///
@@ -256,7 +264,7 @@ pub enum CloseHandleError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CloseHandleError {
+impl ToResultCode for CloseHandleError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -264,6 +272,8 @@ impl ToRawResultCode for CloseHandleError {
         }
     }
 }
+
+impl _sealed::Sealed for CloseHandleError {}
 
 /// Dumps the CPU context of a *paused* thread into `ctx`.
 ///
@@ -286,7 +296,7 @@ pub enum GetContext3Error {
     Unknown(Error),
 }
 
-impl ToRawResultCode for GetContext3Error {
+impl ToResultCode for GetContext3Error {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -294,6 +304,8 @@ impl ToRawResultCode for GetContext3Error {
         }
     }
 }
+
+impl _sealed::Sealed for GetContext3Error {}
 
 /// Suspends the current thread for *at least* the specified number of
 /// nanoseconds.
@@ -531,6 +543,17 @@ pub enum SpecificCoreAffinityError {
     InvalidAffinityMask(#[from] InvalidAffinityMaskError),
 }
 
+impl ToResultCode for SpecificCoreAffinityError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidCore(err) => err.to_rc(),
+            Self::InvalidAffinityMask(err) => err.to_rc(),
+        }
+    }
+}
+
+impl _sealed::Sealed for SpecificCoreAffinityError {}
+
 /// Configuration for running a thread on any core in the affinity mask.
 ///
 /// The thread has no preferred core and the scheduler will choose
@@ -601,6 +624,16 @@ pub struct InvalidCoreError {
     pub core: u8,
 }
 
+impl ToResultCode for InvalidCoreError {
+    fn to_rc(self) -> ResultCode {
+        // Caught locally, but the code is the one the kernel would have
+        // returned had the core number reached `svcSetThreadCoreMask`.
+        KError::InvalidCoreId.to_rc()
+    }
+}
+
+impl _sealed::Sealed for InvalidCoreError {}
+
 /// Error type for invalid affinity masks.
 #[derive(Debug, thiserror::Error)]
 #[error(
@@ -610,6 +643,16 @@ pub struct InvalidAffinityMaskError {
     /// The invalid affinity mask that was provided.
     pub mask: u32,
 }
+
+impl ToResultCode for InvalidAffinityMaskError {
+    fn to_rc(self) -> ResultCode {
+        // Caught locally, but the code is the one the kernel would have
+        // returned had the mask reached `svcSetThreadCoreMask`.
+        KError::InvalidCombination.to_rc()
+    }
+}
+
+impl _sealed::Sealed for InvalidAffinityMaskError {}
 
 bitflags::bitflags! {
     /// CPU core affinity mask for thread scheduling.
@@ -657,7 +700,7 @@ pub enum SetCoreMaskError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for SetCoreMaskError {
+impl ToResultCode for SetCoreMaskError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -668,6 +711,8 @@ impl ToRawResultCode for SetCoreMaskError {
         }
     }
 }
+
+impl _sealed::Sealed for SetCoreMaskError {}
 
 mod _priv {
     /// Sealed trait to prevent external implementations.

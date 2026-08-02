@@ -8,7 +8,7 @@ use core::{ffi::c_void, ptr::NonNull};
 use bitflags::bitflags;
 
 use crate::{
-    error::{KernelError as KError, ToRawResultCode},
+    error::{_sealed, KernelError as KError, ToResultCode},
     raw,
     result::{Error, ResultCode, raw::Result as RawResult},
 };
@@ -48,7 +48,7 @@ pub enum CreateSharedMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CreateSharedMemoryError {
+impl ToResultCode for CreateSharedMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::OutOfMemory => KError::OutOfMemory.to_rc(),
@@ -57,6 +57,8 @@ impl ToRawResultCode for CreateSharedMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for CreateSharedMemoryError {}
 
 /// Maps a shared memory object into the current process.
 pub fn map_shared_memory(
@@ -103,7 +105,7 @@ pub enum MapSharedMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for MapSharedMemoryError {
+impl ToResultCode for MapSharedMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -118,6 +120,8 @@ impl ToRawResultCode for MapSharedMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for MapSharedMemoryError {}
 
 /// Unmaps a previously mapped shared memory kernel object.
 pub fn unmap_shared_memory(
@@ -151,7 +155,7 @@ pub enum UnmapSharedMemoryError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for UnmapSharedMemoryError {
+impl ToResultCode for UnmapSharedMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidCurrentMemory => KError::InvalidCurrentMemory.to_rc(),
@@ -162,6 +166,8 @@ impl ToRawResultCode for UnmapSharedMemoryError {
         }
     }
 }
+
+impl _sealed::Sealed for UnmapSharedMemoryError {}
 
 /// Closes a shared memory kernel object handle.
 pub fn close_handle(handle: Handle) -> Result<(), CloseHandleError> {
@@ -180,7 +186,7 @@ pub enum CloseHandleError {
     Unknown(Error),
 }
 
-impl ToRawResultCode for CloseHandleError {
+impl ToResultCode for CloseHandleError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
@@ -188,6 +194,8 @@ impl ToRawResultCode for CloseHandleError {
         }
     }
 }
+
+impl _sealed::Sealed for CloseHandleError {}
 
 bitflags! {
     /// Local shared memory permissions

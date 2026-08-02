@@ -3,7 +3,7 @@
 use core::{cell::UnsafeCell, mem::size_of};
 
 use nx_sf::cmif;
-use nx_svc::error::ToRawResultCode;
+use nx_svc::error::ToResultCode;
 use static_assertions::const_assert_eq;
 
 /// Generic fallback used when no specific result code is available.

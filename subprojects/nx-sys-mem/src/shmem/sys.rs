@@ -427,7 +427,7 @@ where
 impl CreateError {
     /// Converts the error into the raw `u32` result-code expected by C callers.
     pub fn into_rc(self) -> u32 {
-        use nx_svc::error::ToRawResultCode;
+        use nx_svc::error::ToResultCode;
 
         self.0.to_rc()
     }

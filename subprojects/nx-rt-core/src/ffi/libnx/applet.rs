@@ -370,7 +370,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_create_managed_display_layer
 /// converter so the rich error is reported faithfully rather than collapsed to
 /// [`GENERIC_ERROR`].
 pub fn applet_connect_error_to_rc(err: applet::ConnectError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
+    use nx_svc::error::ToResultCode;
 
     match err {
         applet::ConnectError::Open(e) => open_error_to_rc(e),

@@ -9,7 +9,7 @@ use core::{
 };
 
 use nx_svc::{
-    error::{KernelError, ToRawResultCode},
+    error::{KernelError, ToResultCode},
     mem::shmem::Handle,
     raw::{Handle as RawHandle, INVALID_HANDLE},
 };

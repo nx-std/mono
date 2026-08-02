@@ -14,7 +14,7 @@ use nx_service_sm::SmService;
 use nx_service_wlaninf::{DispatchError, GetRssiError, GetStateError, WlaninfService};
 use nx_sf::{cmif, ffi::Service};
 use nx_std_sync::rwlock::RwLock;
-use nx_svc::error::ToRawResultCode;
+use nx_svc::error::ToResultCode;
 
 /// Generic fallback used when no specific result code is available.
 const GENERIC_ERROR: u32 = 0xFFFF;

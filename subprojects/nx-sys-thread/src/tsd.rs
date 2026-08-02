@@ -34,7 +34,7 @@ use core::{
 };
 
 #[cfg(feature = "ffi")]
-use nx_svc::error::{KernelError, ResultCode, ToRawResultCode as _};
+use nx_svc::error::{KernelError, ResultCode, ToResultCode as _};
 use nx_sys_sync::data::RwLock;
 
 #[cfg(feature = "ffi")]
