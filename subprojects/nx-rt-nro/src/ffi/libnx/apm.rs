@@ -2,14 +2,12 @@
 
 use core::mem::MaybeUninit;
 
+use nx_rt_core::error::ToResultCode as _;
 use nx_service_apm;
-use nx_sf::ffi::Service;
+use nx_sf::{error::ToResultCode, ffi::Service};
 
 use crate::{
-    ffi::common::{
-        GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
-        send_error_to_rc,
-    },
+    ffi::common::{GENERIC_ERROR, SyncUnsafeCell},
     services::apm,
 };
 
@@ -33,7 +31,7 @@ static APM_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_initialize() -> u32 {
     if let Err(err) = apm::init() {
-        return apm_connect_error_to_rc(err);
+        return err.to_rc();
     }
 
     // Populate FFI service buffers from the owned Session wrappers as
@@ -108,7 +106,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_get_performance_mode(out: *mut i
             unsafe { *out = mode as i32 };
             0
         }
-        Err(err) => apm_get_performance_mode_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -134,7 +132,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_set_performance_configuration(
 
     match session.set_performance_configuration(perf_mode, config) {
         Ok(()) => 0,
-        Err(err) => apm_set_performance_configuration_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -168,7 +166,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_get_performance_configuration(
             unsafe { *out = config };
             0
         }
-        Err(err) => apm_get_performance_configuration_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -194,55 +192,4 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_get_service_session() -> *mut Se
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_get_service_session_session() -> *mut Service {
     APM_FFI_SESSION.get().cast::<Service>()
-}
-
-fn apm_connect_error_to_rc(err: apm::ConnectError) -> u32 {
-    match err {
-        apm::ConnectError::Connect(e) => match e {
-            nx_service_apm::ConnectError::GetService(e) => match e {
-                nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-                nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-                nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-            },
-        },
-        apm::ConnectError::OpenSession(e) => match e {
-            nx_service_apm::OpenSessionError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_apm::OpenSessionError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-            nx_service_apm::OpenSessionError::MissingHandle => GENERIC_ERROR,
-        },
-    }
-}
-
-fn apm_get_performance_mode_error_to_rc(err: nx_service_apm::GetPerformanceModeError) -> u32 {
-    match err {
-        nx_service_apm::GetPerformanceModeError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_apm::GetPerformanceModeError::ParseResponse(e) => {
-            parse_resp_bytes_error_to_rc(e)
-        }
-        nx_service_apm::GetPerformanceModeError::InvalidResponse => GENERIC_ERROR,
-        nx_service_apm::GetPerformanceModeError::InvalidMode(_) => GENERIC_ERROR,
-    }
-}
-
-fn apm_set_performance_configuration_error_to_rc(
-    err: nx_service_apm::SetPerformanceConfigurationError,
-) -> u32 {
-    match err {
-        nx_service_apm::SetPerformanceConfigurationError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_apm::SetPerformanceConfigurationError::ParseResponse(e) => {
-            parse_resp_bytes_error_to_rc(e)
-        }
-    }
-}
-
-fn apm_get_performance_configuration_error_to_rc(
-    err: nx_service_apm::GetPerformanceConfigurationError,
-) -> u32 {
-    match err {
-        nx_service_apm::GetPerformanceConfigurationError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_apm::GetPerformanceConfigurationError::ParseResponse(e) => {
-            parse_resp_bytes_error_to_rc(e)
-        }
-        nx_service_apm::GetPerformanceConfigurationError::InvalidResponse => GENERIC_ERROR,
-    }
 }

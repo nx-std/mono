@@ -3,10 +3,12 @@
 //! This module manages the VI service session and provides a singleton interface
 //! for accessing display and layer functionality throughout the application lifecycle.
 
+use nx_rt_core::error::{ResultCode, ToResultCode};
 use nx_service_vi::{
     ConnectOptions, ViService,
     types::{ViLayerFlags, ViServiceType},
 };
+use nx_sf::error::ToResultCode as _;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
 use crate::{
@@ -131,6 +133,12 @@ impl core::ops::Deref for ViServiceRef {
 #[derive(Debug, thiserror::Error)]
 #[error("failed to connect to VI service")]
 pub struct ConnectError(#[source] pub nx_service_vi::ConnectError);
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}
 
 /// Global configuration storage for VI service type.
 ///

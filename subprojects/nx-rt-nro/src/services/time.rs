@@ -3,7 +3,9 @@
 //! This module manages the Time service session and provides a singleton interface
 //! for accessing time functionality throughout the application lifecycle.
 
+use nx_rt_core::error::{ResultCode, ToResultCode};
 use nx_service_time::{TimeService, TimeServiceType};
+use nx_sf::error::ToResultCode as _;
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 
 use crate::services::sm;
@@ -76,3 +78,9 @@ impl core::ops::Deref for TimeServiceRef {
 #[derive(Debug, thiserror::Error)]
 #[error("failed to connect to Time service")]
 pub struct ConnectError(#[source] pub nx_service_time::ConnectError);
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        self.0.to_rc()
+    }
+}

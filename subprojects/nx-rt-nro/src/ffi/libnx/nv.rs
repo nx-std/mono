@@ -5,13 +5,11 @@ use core::{
     mem::MaybeUninit,
 };
 
+use nx_rt_core::error::ToResultCode as _;
 use nx_service_nv::fd::Fd;
-use nx_sf::ffi::Service;
+use nx_sf::{error::ToResultCode, ffi::Service};
 
-use crate::ffi::common::{
-    GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
-    send_error_to_rc,
-};
+use crate::ffi::common::{GENERIC_ERROR, SyncUnsafeCell};
 
 /// Static buffer for NV FFI session access. Updated on `nv_initialize()` and `nv_exit()`.
 static NV_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
@@ -49,7 +47,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_initialize() -> u32 {
             }
             0
         }
-        Err(err) => nv_connect_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -99,7 +97,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_open(
             unsafe { *fd = opened_fd.to_raw() };
             0
         }
-        Err(err) => nv_open_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -131,7 +129,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_ioctl(
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
     match service.ioctl(unsafe { Fd::new_unchecked(fd) }, request, argp_slice) {
         Ok(()) => 0,
-        Err(err) => nv_ioctl_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -243,7 +241,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_close(fd: u32) -> u32 {
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
     match service.close_fd(unsafe { Fd::new_unchecked(fd) }) {
         Ok(()) => 0,
-        Err(err) => nv_close_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -270,7 +268,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_query_event(
             unsafe { *event_out = handle };
             0
         }
-        Err(err) => nv_query_event_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -296,24 +294,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_convert_error(rc: i32) -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_get_service_session() -> *mut Service {
     NV_FFI_SESSION.get().cast::<Service>()
-}
-
-fn nv_connect_error_to_rc(err: crate::services::nv::ConnectError) -> u32 {
-    let crate::services::nv::ConnectError(e) = err;
-    match e {
-        nx_service_nv::ConnectError::GetService(sm_err) => match sm_err {
-            nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-        },
-        nx_service_nv::ConnectError::CreateTransferMemory(_) => GENERIC_ERROR,
-        nx_service_nv::ConnectError::Initialize(e) => match e {
-            nx_service_nv::InitializeError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_nv::InitializeError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        },
-        nx_service_nv::ConnectError::CloseTransferMemHandle(_) => GENERIC_ERROR,
-        nx_service_nv::ConnectError::CloneSession(_) => GENERIC_ERROR,
-    }
 }
 
 /// Converts an NV error code to a libnx-compatible result code.
@@ -349,51 +329,18 @@ fn nv_error_to_result_code(code: u32) -> u32 {
     (MODULE_LIBNX_NVIDIA & 0x1FF) | ((desc & 0x1FFF) << 9)
 }
 
-fn nv_open_error_to_rc(err: nx_service_nv::OpenError) -> u32 {
-    match err {
-        nx_service_nv::OpenError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_nv::OpenError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_nv::OpenError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
-    }
-}
-
-fn nv_ioctl_error_to_rc(err: nx_service_nv::IoctlError) -> u32 {
-    match err {
-        nx_service_nv::IoctlError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_nv::IoctlError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_nv::IoctlError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
-    }
-}
-
 fn nv_ioctl2_error_to_rc(err: nx_service_nv::Ioctl2Error) -> u32 {
     match err {
-        nx_service_nv::Ioctl2Error::SendRequest(e) => send_error_to_rc(e),
-        nx_service_nv::Ioctl2Error::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::Ioctl2Error::SendRequest(e) => e.to_rc(),
+        nx_service_nv::Ioctl2Error::ParseResponse(e) => e.to_rc(),
         nx_service_nv::Ioctl2Error::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
     }
 }
 
 fn nv_ioctl3_error_to_rc(err: nx_service_nv::Ioctl3Error) -> u32 {
     match err {
-        nx_service_nv::Ioctl3Error::SendRequest(e) => send_error_to_rc(e),
-        nx_service_nv::Ioctl3Error::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
+        nx_service_nv::Ioctl3Error::SendRequest(e) => e.to_rc(),
+        nx_service_nv::Ioctl3Error::ParseResponse(e) => e.to_rc(),
         nx_service_nv::Ioctl3Error::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
-    }
-}
-
-fn nv_close_error_to_rc(err: nx_service_nv::CloseError) -> u32 {
-    match err {
-        nx_service_nv::CloseError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_nv::CloseError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_nv::CloseError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
-    }
-}
-
-fn nv_query_event_error_to_rc(err: nx_service_nv::QueryEventError) -> u32 {
-    match err {
-        nx_service_nv::QueryEventError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_nv::QueryEventError::ParseResponse(e) => parse_resp_bytes_error_to_rc(e),
-        nx_service_nv::QueryEventError::NvError(nv_err) => nv_error_to_result_code(nv_err.to_raw()),
-        nx_service_nv::QueryEventError::MissingHandle => GENERIC_ERROR,
     }
 }

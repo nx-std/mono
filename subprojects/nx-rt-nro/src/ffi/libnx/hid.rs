@@ -3,8 +3,9 @@
 use core::ffi::c_void;
 
 use nx_service_hid;
+use nx_sf::error::ToResultCode;
 
-use crate::ffi::common::{GENERIC_ERROR, parse_resp_error_to_rc, send_error_to_rc};
+use crate::ffi::common::GENERIC_ERROR;
 
 /// Initializes the HID service.
 ///
@@ -18,25 +19,17 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize() -> u32 {
             let crate::services::hid::ConnectError(conn_err) = err;
             match conn_err {
                 nx_service_hid::ConnectError::GetService(sm_err) => match sm_err {
-                    nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
+                    nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
                     _ => GENERIC_ERROR,
                 },
                 nx_service_hid::ConnectError::CreateAppletResource(ar_err) => match ar_err {
-                    nx_service_hid::CreateAppletResourceError::SendRequest(e) => {
-                        send_error_to_rc(e)
-                    }
-                    nx_service_hid::CreateAppletResourceError::ParseResponse(e) => {
-                        parse_resp_error_to_rc(e)
-                    }
+                    nx_service_hid::CreateAppletResourceError::SendRequest(e) => e.to_rc(),
+                    nx_service_hid::CreateAppletResourceError::ParseResponse(e) => e.to_rc(),
                     nx_service_hid::CreateAppletResourceError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_hid::ConnectError::GetSharedMemoryHandle(sh_err) => match sh_err {
-                    nx_service_hid::GetSharedMemoryHandleError::SendRequest(e) => {
-                        send_error_to_rc(e)
-                    }
-                    nx_service_hid::GetSharedMemoryHandleError::ParseResponse(e) => {
-                        parse_resp_error_to_rc(e)
-                    }
+                    nx_service_hid::GetSharedMemoryHandleError::SendRequest(e) => e.to_rc(),
+                    nx_service_hid::GetSharedMemoryHandleError::ParseResponse(e) => e.to_rc(),
                     nx_service_hid::GetSharedMemoryHandleError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_hid::ConnectError::MapSharedMemory(_) => GENERIC_ERROR,
@@ -87,12 +80,8 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_set_supported_npad_style_set(
         Some(service) => match service.set_supported_npad_style_set(style_set) {
             Ok(()) => 0,
             Err(err) => match err {
-                nx_service_hid::SetSupportedNpadStyleSetError::SendRequest(e) => {
-                    send_error_to_rc(e)
-                }
-                nx_service_hid::SetSupportedNpadStyleSetError::ParseResponse(e) => {
-                    parse_resp_error_to_rc(e)
-                }
+                nx_service_hid::SetSupportedNpadStyleSetError::SendRequest(e) => e.to_rc(),
+                nx_service_hid::SetSupportedNpadStyleSetError::ParseResponse(e) => e.to_rc(),
             },
         },
         None => GENERIC_ERROR,
@@ -118,10 +107,8 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_set_supported_npad_id_type(
         Some(service) => match service.set_supported_npad_id_type(ids_slice) {
             Ok(()) => 0,
             Err(err) => match err {
-                nx_service_hid::SetSupportedNpadIdTypeError::SendRequest(e) => send_error_to_rc(e),
-                nx_service_hid::SetSupportedNpadIdTypeError::ParseResponse(e) => {
-                    parse_resp_error_to_rc(e)
-                }
+                nx_service_hid::SetSupportedNpadIdTypeError::SendRequest(e) => e.to_rc(),
+                nx_service_hid::SetSupportedNpadIdTypeError::ParseResponse(e) => e.to_rc(),
             },
         },
         None => GENERIC_ERROR,

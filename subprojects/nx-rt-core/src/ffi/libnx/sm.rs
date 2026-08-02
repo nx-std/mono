@@ -5,10 +5,8 @@ use core::mem::MaybeUninit;
 use nx_sf::{ServiceName, ffi::Service};
 
 use crate::{
-    ffi::common::{
-        GENERIC_ERROR, SyncUnsafeCell, parse_resp_error_to_rc, parse_tipc_resp_error_to_rc,
-        send_error_to_rc,
-    },
+    error::ToResultCode as _,
+    ffi::common::{GENERIC_ERROR, SyncUnsafeCell},
     services::sm,
 };
 
@@ -22,7 +20,7 @@ static SM_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_initialize() -> u32 {
     if let Err(err) = sm::initialize() {
-        return sm_initialize_error_to_rc(err);
+        return err.to_rc();
     }
     set_sm_ffi_session();
     0
@@ -55,7 +53,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_get_service_wrapper(
 
     let srv = match sm::get_service(name) {
         Ok(srv) => srv,
-        Err(err) => return sm_get_service_error_to_rc(err),
+        Err(err) => return err.to_rc(),
     };
 
     // SAFETY: Caller guarantees service_out points to valid memory.
@@ -81,7 +79,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_get_service_original(
 
     let handle = match sm::get_service_handle(name) {
         Ok(handle) => handle,
-        Err(err) => return sm_get_service_error_to_rc(err),
+        Err(err) => return err.to_rc(),
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
@@ -137,7 +135,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service(
 
     let handle = match sm::register_service(name, is_light, max_sessions) {
         Ok(handle) => handle,
-        Err(err) => return sm_register_service_error_to_rc(err),
+        Err(err) => return err.to_rc(),
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
@@ -165,7 +163,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service_cmif(
 
     let handle = match sm::register_service_cmif(name, is_light, max_sessions) {
         Ok(handle) => handle,
-        Err(err) => return sm_register_service_error_to_rc(err),
+        Err(err) => return err.to_rc(),
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
@@ -193,7 +191,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service_tipc(
 
     let handle = match sm::register_service_tipc(name, is_light, max_sessions) {
         Ok(handle) => handle,
-        Err(err) => return sm_register_service_error_to_rc(err),
+        Err(err) => return err.to_rc(),
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
@@ -207,7 +205,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service_tipc(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_unregister_service(name: ServiceName) -> u32 {
     if let Err(err) = sm::unregister_service(name) {
-        return sm_unregister_service_error_to_rc(err);
+        return err.to_rc();
     }
 
     0
@@ -219,7 +217,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_unregister_service(name: Service
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_unregister_service_cmif(name: ServiceName) -> u32 {
     if let Err(err) = sm::unregister_service_cmif(name) {
-        return sm_unregister_service_error_to_rc(err);
+        return err.to_rc();
     }
 
     0
@@ -231,7 +229,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_unregister_service_cmif(name: Se
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_unregister_service_tipc(name: ServiceName) -> u32 {
     if let Err(err) = sm::unregister_service_tipc(name) {
-        return sm_unregister_service_error_to_rc(err);
+        return err.to_rc();
     }
 
     0
@@ -243,7 +241,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_unregister_service_tipc(name: Se
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_detach_client() -> u32 {
     if let Err(err) = sm::detach_client() {
-        return sm_detach_client_error_to_rc(err);
+        return err.to_rc();
     }
 
     0
@@ -255,7 +253,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_detach_client() -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_detach_client_cmif() -> u32 {
     if let Err(err) = sm::detach_client_cmif() {
-        return sm_detach_client_error_to_rc(err);
+        return err.to_rc();
     }
 
     0
@@ -267,7 +265,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_detach_client_cmif() -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_sm_detach_client_tipc() -> u32 {
     if let Err(err) = sm::detach_client_tipc() {
-        return sm_detach_client_error_to_rc(err);
+        return err.to_rc();
     }
 
     0
@@ -311,77 +309,5 @@ fn clear_sm_ffi_session() {
     // SAFETY: Called only during exit.
     unsafe {
         SM_FFI_SESSION.get().write(MaybeUninit::zeroed());
-    }
-}
-
-fn sm_initialize_error_to_rc(err: sm::InitializeError) -> u32 {
-    use nx_svc::error::ToResultCode;
-
-    match err.0 {
-        nx_service_sm::ConnectError::Connect(e) => e.to_rc(),
-        nx_service_sm::ConnectError::RegisterClient(e) => match e {
-            nx_service_sm::RegisterClientCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::RegisterClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        },
-    }
-}
-
-fn sm_get_service_error_to_rc(err: sm::GetServiceError) -> u32 {
-    match err.0 {
-        nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
-    }
-}
-
-fn sm_register_service_error_to_rc(err: sm::RegisterServiceError) -> u32 {
-    match err {
-        sm::RegisterServiceError::Cmif(e) => match e {
-            nx_service_sm::RegisterServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::RegisterServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::RegisterServiceCmifError::MissingHandle => GENERIC_ERROR,
-        },
-        sm::RegisterServiceError::Tipc(e) => match e {
-            nx_service_sm::RegisterServiceTipcError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::RegisterServiceTipcError::ParseResponse(e) => {
-                parse_tipc_resp_error_to_rc(e)
-            }
-            nx_service_sm::RegisterServiceTipcError::MissingHandle => GENERIC_ERROR,
-        },
-    }
-}
-
-fn sm_unregister_service_error_to_rc(err: sm::UnregisterServiceError) -> u32 {
-    match err {
-        sm::UnregisterServiceError::Cmif(e) => match e {
-            nx_service_sm::UnregisterServiceCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::UnregisterServiceCmifError::ParseResponse(e) => {
-                parse_resp_error_to_rc(e)
-            }
-        },
-        sm::UnregisterServiceError::Tipc(e) => match e {
-            nx_service_sm::UnregisterServiceTipcError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::UnregisterServiceTipcError::ParseResponse(e) => {
-                parse_tipc_resp_error_to_rc(e)
-            }
-        },
-    }
-}
-
-fn sm_detach_client_error_to_rc(err: sm::DetachClientError) -> u32 {
-    match err {
-        // LibnxError_IncompatSysVer = 0x64 (100) in module 345
-        // MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer) = 0x8A564
-        sm::DetachClientError::IncompatibleVersion => 0x8A564,
-        sm::DetachClientError::Cmif(e) => match e {
-            nx_service_sm::DetachClientCmifError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::DetachClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        },
-        sm::DetachClientError::Tipc(e) => match e {
-            nx_service_sm::DetachClientTipcError::SendRequest(e) => send_error_to_rc(e),
-            nx_service_sm::DetachClientTipcError::ParseResponse(e) => {
-                parse_tipc_resp_error_to_rc(e)
-            }
-        },
     }
 }
