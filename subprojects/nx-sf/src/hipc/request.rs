@@ -36,6 +36,7 @@
 use core::mem::{size_of, size_of_val};
 
 use nx_svc::{
+    error::{ResultCode, ToResultCode as _},
     ipc::{Handle as SessionHandle, SendSyncError},
     raw::Handle as RawHandle,
 };
@@ -45,7 +46,10 @@ use super::wire::{
     BufferDescriptor, Header, MessageType, RECV_LIST_WIRE_NONE, RECV_LIST_WIRE_SINGLE_BUFFER,
     RecvListEntry, SpecialHeader, StaticDescriptor,
 };
-use crate::array_vec::ArrayVec;
+use crate::{
+    array_vec::ArrayVec,
+    error::{GENERIC_ERROR, ToResultCode},
+};
 
 /// Maximum descriptors of any single kind that fit in an HIPC header
 /// (each `num_*` field is 4 bits wide).
@@ -190,6 +194,14 @@ pub struct WriteError {
     pub limit: usize,
 }
 
+impl ToResultCode for WriteError {
+    fn to_rc(self) -> ResultCode {
+        // Caught before the syscall, so no server saw the request and there is
+        // no service code to forward.
+        GENERIC_ERROR
+    }
+}
+
 /// Error returned by [`HipcRequest::send_inner`] and the protocol-level
 /// `send` methods built on it (CMIF and TIPC).
 #[derive(Debug, thiserror::Error)]
@@ -207,6 +219,17 @@ pub enum SendError {
     /// `u8`s).
     #[error("failed to send the IPC request")]
     SendRequest(#[source] SendSyncError),
+}
+
+impl ToResultCode for SendError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            SendError::Layout(err) => err.to_rc(),
+            // The kernel owns this code, so it resolves through `nx-svc`'s
+            // trait rather than this crate's.
+            SendError::SendRequest(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Fluent builder for an [`HipcRequest`].

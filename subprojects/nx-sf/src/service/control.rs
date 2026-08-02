@@ -9,9 +9,15 @@
 //! releasing its resources. Drop impls and the FFI close symbols both invoke
 //! these.
 
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_svc::{
+    error::ResultCode,
+    ipc::{self, Handle as SessionHandle},
+};
 
-use crate::cmif::{self, CmifCloseRequest, CmifControlRequestBuilder, ObjectId};
+use crate::{
+    cmif::{self, CmifCloseRequest, CmifControlRequestBuilder, ObjectId},
+    error::{GENERIC_ERROR, ToResultCode},
+};
 
 /// Control request: convert session to domain.
 const CTRL_CONVERT_TO_DOMAIN: u32 = 0;
@@ -53,6 +59,15 @@ pub enum QueryPointerBufferSizeError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for QueryPointerBufferSizeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            QueryPointerBufferSizeError::SendRequest(err) => err.to_rc(),
+            QueryPointerBufferSizeError::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Clones the current session via control request 2.
 pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, CloneObjectError> {
     // SAFETY: IPC operations are serialized on this thread.
@@ -86,6 +101,18 @@ pub enum CloneObjectError {
     /// The server returned success but no move handle.
     #[error("missing move handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for CloneObjectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            CloneObjectError::SendRequest(err) => err.to_rc(),
+            CloneObjectError::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            CloneObjectError::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Clones the current session with a session manager tag via control request 4.
@@ -128,6 +155,18 @@ pub enum CloneObjectExError {
     MissingHandle,
 }
 
+impl ToResultCode for CloneObjectExError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            CloneObjectExError::SendRequest(err) => err.to_rc(),
+            CloneObjectExError::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            CloneObjectExError::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Converts the current session to a domain via control request 0.
 pub fn convert_current_object_to_domain(
     session: SessionHandle,
@@ -155,6 +194,15 @@ pub enum ConvertToDomainError {
     /// The response header did not pass CMIF validation.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for ConvertToDomainError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            ConvertToDomainError::SendRequest(err) => err.to_rc(),
+            ConvertToDomainError::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Copies a domain object to a new standalone session via control request 1.
@@ -195,6 +243,18 @@ pub enum CopyFromDomainError {
     /// The server returned success but no move handle.
     #[error("missing move handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for CopyFromDomainError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            CopyFromDomainError::SendRequest(err) => err.to_rc(),
+            CopyFromDomainError::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            CopyFromDomainError::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Sends a CMIF session-close request and closes the local handle.

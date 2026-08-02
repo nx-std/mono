@@ -1,10 +1,12 @@
 //! CMIF response parsing.
 
+use nx_svc::error::ResultCode;
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
 
 use super::wire::{CMIF_HEADER_ALIGN, DomainOutHeader, OUT_HEADER_MAGIC, OutHeader};
 use crate::{
     cursor::{Cursor, ResponsePayload},
+    error::{GENERIC_ERROR, LibnxError, ToResultCode, libnx_error},
     hipc,
 };
 
@@ -160,4 +162,21 @@ pub enum ParseError {
     /// Response too small to contain the domain object IDs.
     #[error("CMIF response too small for domain objects")]
     TruncatedDomainObjects,
+}
+
+impl ToResultCode for ParseError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // The only variant carrying a code the server chose; every other
+            // one is a shape this crate rejected after a successful reply.
+            ParseError::ServiceError(code) => code,
+            ParseError::Hipc(err) => err.to_rc(),
+            // The one local failure libnx also detects, and it reports this.
+            ParseError::InvalidMagic => libnx_error(LibnxError::InvalidCmifOutHeader),
+            ParseError::TruncatedOutHeader
+            | ParseError::TruncatedDomainHeader
+            | ParseError::TruncatedPayload
+            | ParseError::TruncatedDomainObjects => GENERIC_ERROR,
+        }
+    }
 }

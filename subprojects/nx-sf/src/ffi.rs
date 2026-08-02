@@ -20,16 +20,10 @@
 
 use core::mem::{self, size_of};
 
-use nx_svc::{error::ToResultCode, ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
+use nx_svc::{ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
 use static_assertions::const_assert_eq;
 
-use crate::{
-    cmif::{self, ObjectId},
-    service::{self, CloneObjectError, CloneObjectExError, ConvertToDomainError},
-};
-
-/// Generic error code for FFI when no specific result code is available.
-const GENERIC_ERROR: u32 = 0xFFFF;
+use crate::{cmif::ObjectId, error::ToResultCode as _, service};
 
 /// libnx-compatible `Service` struct.
 ///
@@ -200,7 +194,7 @@ pub unsafe extern "C" fn __nx_sf__service_clone(s: *const Service, out_s: *mut S
             };
             0
         }
-        Err(err) => clone_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -229,7 +223,7 @@ pub unsafe extern "C" fn __nx_sf__service_clone_ex(
             };
             0
         }
-        Err(err) => clone_object_ex_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -251,7 +245,7 @@ pub unsafe extern "C" fn __nx_sf__service_convert_to_domain(s: *mut Service) -> 
                 srv.session = new_handle;
                 srv.own_handle = 1;
             }
-            Err(err) => return clone_object_ex_error_to_rc(err),
+            Err(err) => return err.to_rc(),
         }
     }
 
@@ -260,7 +254,7 @@ pub unsafe extern "C" fn __nx_sf__service_convert_to_domain(s: *mut Service) -> 
             srv.object_id = object_id.to_raw();
             0
         }
-        Err(err) => convert_to_domain_error_to_rc(err),
+        Err(err) => err.to_rc(),
     }
 }
 
@@ -332,51 +326,4 @@ pub unsafe extern "C" fn __nx_sf__service_get_object_id(s: *const Service) -> u3
     }
     // SAFETY: Caller guarantees s is null or points to valid Service.
     unsafe { (*s).object_id }
-}
-
-/// Converts a clone object error to a raw result code for FFI.
-fn clone_error_to_rc(err: CloneObjectError) -> u32 {
-    match err {
-        CloneObjectError::SendRequest(e) => send_error_to_rc(e),
-        CloneObjectError::ParseResponse(e) => parse_response_error_to_rc(e),
-        CloneObjectError::MissingHandle => GENERIC_ERROR,
-    }
-}
-
-/// Converts a request send error to a raw result code.
-fn send_error_to_rc(err: cmif::SendError) -> u32 {
-    match err {
-        cmif::SendError::Layout(_) => GENERIC_ERROR,
-        cmif::SendError::SendRequest(e) => e.to_rc(),
-    }
-}
-
-/// Converts a parse response error to a raw result code.
-fn parse_response_error_to_rc(err: cmif::ParseError) -> u32 {
-    match err {
-        cmif::ParseError::InvalidMagic => GENERIC_ERROR,
-        cmif::ParseError::ServiceError(code) => code,
-        cmif::ParseError::Hipc(_)
-        | cmif::ParseError::TruncatedOutHeader
-        | cmif::ParseError::TruncatedDomainHeader
-        | cmif::ParseError::TruncatedPayload
-        | cmif::ParseError::TruncatedDomainObjects => GENERIC_ERROR,
-    }
-}
-
-/// Converts a clone object ex error to a raw result code for FFI.
-fn clone_object_ex_error_to_rc(err: CloneObjectExError) -> u32 {
-    match err {
-        CloneObjectExError::SendRequest(e) => send_error_to_rc(e),
-        CloneObjectExError::ParseResponse(e) => parse_response_error_to_rc(e),
-        CloneObjectExError::MissingHandle => GENERIC_ERROR,
-    }
-}
-
-/// Converts a convert to domain error to a raw result code for FFI.
-fn convert_to_domain_error_to_rc(err: ConvertToDomainError) -> u32 {
-    match err {
-        ConvertToDomainError::SendRequest(e) => send_error_to_rc(e),
-        ConvertToDomainError::ParseResponse(e) => parse_response_error_to_rc(e),
-    }
 }

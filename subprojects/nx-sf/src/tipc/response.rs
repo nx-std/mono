@@ -1,11 +1,12 @@
 //! TIPC response parsing.
 
-use nx_svc::raw::Handle as RawHandle;
+use nx_svc::{error::ResultCode, raw::Handle as RawHandle};
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
 use zerocopy::little_endian::U32;
 
 use crate::{
     cursor::{Cursor, ResponsePayload},
+    error::{GENERIC_ERROR, ToResultCode},
     hipc,
 };
 
@@ -59,6 +60,20 @@ pub enum ParseResponseError {
     /// Response too small to contain the caller-requested payload.
     #[error("TIPC response too small for payload")]
     TruncatedPayload,
+}
+
+impl ToResultCode for ParseResponseError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // The only variant carrying a code the server chose; every other
+            // one is a shape this crate rejected after a successful reply.
+            ParseResponseError::ServiceError(code) => code,
+            ParseResponseError::Hipc(err) => err.to_rc(),
+            ParseResponseError::TruncatedResult | ParseResponseError::TruncatedPayload => {
+                GENERIC_ERROR
+            }
+        }
+    }
 }
 
 /// Parsed TIPC response with a typed payload.
