@@ -1,7 +1,7 @@
 ---
 name: "meson-linker-script"
 description: "`*_override.ld` linker scripts that redirect symbols (from `libnx`, `newlib`, or any other static archive) to a crate's `__nx_<aspect>__*` Rust implementations, plus the Meson wiring that exposes the script to downstream consumers. Load when adding, modifying, or auditing an `<aspect>_override.ld` file or its `<crate>_ld_override` Meson variable"
-type: arch
+type: "arch"
 scope: "global"
 ---
 
@@ -245,12 +245,6 @@ Use this layout only when fragments are genuinely independent. If overrides simp
 
 ---
 
-## References
-
-- [rust-ffi](rust-ffi.md) - Related: The `ffi` Cargo feature that defines the `__nx_<aspect>__*` symbols this script targets
-- [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
-- [meson-subproject](meson-subproject.md) - Related: Generic Meson subproject conventions
-
 ## Checklist
 
 Before committing changes to an `<aspect>_override.ld` or its Meson wiring, verify:
@@ -271,3 +265,9 @@ Before committing changes to an `<aspect>_override.ld` or its Meson wiring, veri
 - [ ] The variable is placed immediately above `declare_dependency(...)`, preceded by a one-line descriptive comment.
 - [ ] The override is NOT added to `link_args` or `link_with` inside the producer's own `declare_dependency()`.
 - [ ] Multi-fragment crates expose a plural `<crate>_ld_overrides` list and conditionally append per-feature fragments.
+
+## References
+
+- [rust-ffi](rust-ffi.md) - Related: The `ffi` Cargo feature that defines the `__nx_<aspect>__*` symbols this script targets
+- [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
+- [meson-subproject](meson-subproject.md) - Related: Generic Meson subproject conventions

@@ -22,20 +22,22 @@ nx-std is a Meson-based monorepo implementing a Rust replacement for `libnx` (th
 
 **If you're an AI agent working on this codebase, here's what you need to know immediately:**
 
-1. **Invoke `/code-guidelines` FIRST** → Before planning OR coding (applies in Plan mode too), load the relevant guidelines for the affected crate(s). Skipping this leads to plans that violate project conventions and cause rework.
-2. **Use Skills for operations** → Invoke skills (`/code-format`, `/code-check`, `/code-build`, `/code-test`, `/code-deploy`, `/code-review`) instead of running commands directly.
+1. **Invoke `/code-rules` FIRST** → Before planning OR coding (applies in Plan mode too), load the `docs/code/` rules that govern the affected crate(s). Skipping this leads to plans that violate project conventions and cause rework.
+2. **Use Skills for operations** → Invoke skills (`/code-format`, `/code-check`, `/code-build`, `/code-test`, `/code-deploy`, `/code-rules-check`, `/code-review`) instead of running commands directly.
+
 3. **Skills wrap justfile/meson tasks** → Skills provide the interface to `just` and `meson` commands with proper guidance.
-4. **Follow the workflow** → Format → Check → Clippy → Build → Hardware Test (when applicable).
+4. **Follow the workflow** → Format → Check → Clippy → Build → Hardware Test (when applicable) → Rules check.
+
 5. **Fix ALL warnings** → Zero tolerance for clippy warnings.
 
-**Your first action**: Invoke `/code-guidelines` to load guidelines before drafting a plan or writing any code. For commands, invoke the relevant Skill.
+**Your first action**: Invoke `/code-rules` to load the governing rules before drafting a plan or writing any code. For commands, invoke the relevant Skill.
 
 **Testing default**: Hardware tests run only after `/code-format` and `/code-check` are green. Tests are compiled as Switch homebrew (NRO) and validated on-device or emulator via `/code-deploy` + `/code-test`.
 
 ## Table of Contents
 
 1. [Principles](#1-principles) — Core design principles guiding this codebase
-2. [Code Guidelines](#2-code-guidelines) — Understanding coding standards via `/code-guidelines` skill
+2. [Code Rules](#2-code-rules) — Understanding coding standards via the `/code-rules` skill
 3. [Architecture](#3-architecture) — Crate hierarchy, FFI integration, libnx integration
 4. [Build System](#4-build-system) — Hybrid Meson + Cargo, prerequisites, cross-compilation
 5. [Development Workflow](#5-development-workflow) — How to develop with this codebase
@@ -44,53 +46,47 @@ nx-std is a Meson-based monorepo implementing a Rust replacement for `libnx` (th
 
 ## 1. Principles
 
-**MANDATORY**: Before writing any code, read and internalize these core design principles. Full details, examples, and checklists are in the linked docs — read them every time.
+The `principle-*` documents in `docs/code/` are the design rules. Their `/code-rules` catalog descriptions
+state each rule in full, so loading the catalog gives you all of them; read a full document when you need its
+examples or its Pragmatism Caveat to argue a decision.
 
-| Principle                   | One-liner                                                        | Full doc                                              |
-|-----------------------------|------------------------------------------------------------------|-------------------------------------------------------|
-| **Single Responsibility**   | One struct = one reason to change                                | @docs/code/principle-single-responsibility.md         |
-| **Open/Closed**             | Extend via new types/trait impls, don't modify existing code     | @docs/code/principle-open-closed.md                   |
-| **Law of Demeter**          | Only talk to immediate collaborators — no `a.b().c().d()` chains | @docs/code/principle-law-of-demeter.md                |
-| **Validate at the Edge**    | Hard shell (boundary validates), soft core (domain trusts)       | @docs/code/principle-validate-at-edge.md              |
-| **Type-Driven Design**      | Make illegal states unrepresentable via the type system          | @docs/code/principle-type-driven-design.md            |
-| **Idempotency**             | Operations safe to retry — same effect whether run once or N×    | @docs/code/principle-idempotency.md                   |
-| **Inversion of Control**    | Depend on abstractions, not concretions                          | @docs/code/principle-inversion-of-control.md          |
-| **Least Surprise**          | Code behaves the way readers expect from its name and signature  | @docs/code/principle-least-surprise.md                |
-| **DRY/WET balance**         | Deduplicate real knowledge; tolerate incidental similarity       | @docs/code/principle-dry-wet.md                       |
-
-Use `/code-guidelines principles` to load these on demand when relevant to your task.
+Use `/code-rules principles` to read them all and summarise.
 
 
-## 2. Code Guidelines
+## 2. Code Rules
 
-Code guideline documentation lives in `docs/code/` with YAML frontmatter for dynamic discovery.
+The code rules live in `docs/code/`, with YAML frontmatter for dynamic discovery. "Code rules" and "code
+guidelines" name the same corpus.
 
-**Guideline docs are authoritative**: Guideline docs define how code should be written. All implementations MUST follow the patterns. If code doesn't follow a pattern, either fix the code or update the pattern (with team approval).
+**Rule documents are authoritative**: they define how code should be written. All implementations MUST follow
+them. If code diverges from a rule, either fix the code or update the rule (with team approval).
 
-### Guideline Types
+### Rule Types
 
 | Type               | Scope          | Purpose                                                          |
 |--------------------|----------------|------------------------------------------------------------------|
 | **Principle**      | `global`       | Universal software principles and best practices                 |
-| **Core**           | `global`       | Fundamental coding standards (error handling, logging, modules)  |
+| **Core**           | `global`       | Fundamental coding standards (error handling, modules, docs)     |
 | **Architectural**  | `global`       | High-level patterns (workspace structure, crate layout)          |
-| **Pattern**        | `global`       | Reusable design patterns (builder, typestate)                    |
-| **Crate-specific** | `crate:<name>` | Patterns for specific crates (nx-svc, nx-alloc, etc.)            |
+| **Pattern**        | `global`       | Reusable design patterns (builder, newtype, typestate)           |
+| **Crate-specific** | `crate:<name>` | Rules for specific crates (nx-svc, nx-alloc, etc.)               |
 | **Meta**           | `global`       | Documentation format specifications (`docs/__meta__/`)           |
 
 ### Skill Invocation
 
-| When You Need To                                                  | Invoke This Skill   |
-|-------------------------------------------------------------------|---------------------|
-| Understand code guidelines before implementing                    | `/code-guidelines`  |
-| "How should I handle errors?", "What's the pattern for X?"        | `/code-guidelines`  |
-| Load crate-specific guidelines for `nx-svc`, `nx-alloc`, etc.     | `/code-guidelines`  |
-| Review code changes for guideline compliance                      | `/code-review`      |
+| When You Need To                                                  | Invoke This Skill    |
+|-------------------------------------------------------------------|----------------------|
+| Load the code rules before implementing                           | `/code-rules`        |
+| "How should I handle errors?", "What's the pattern for X?"        | `/code-rules`        |
+| Load crate-specific rules for `nx-svc`, `nx-alloc`, etc.          | `/code-rules`        |
+| Check a finished changeset against the rules                      | `/code-rules-check`  |
+| Deep review before a PR (bugs, regressions, soundness)            | `/code-review`       |
+| Validate a rule document's own format                             | `/docs-fmt-check`    |
 
 **Navigation:**
 
-- Need to understand patterns? → `/code-guidelines`
-- All guidelines located in `docs/code/`
+- Need to understand a convention? → `/code-rules`
+- All rule documents live in `docs/code/`
 - Documentation format specs in `docs/__meta__/`
 
 ### Code Style
@@ -193,13 +189,13 @@ This project uses three complementary documentation systems. Understanding their
 |--------------------------------|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
 | **AGENTS.md** (this file)      | **WHY** and **WHAT**     | Project architecture, policies, goals, and principles. Answers "What is this project?" and "Why do we do things this way?"                   |
 | **Skills** (`.agents/skills/`) | **HOW** and **WHEN**     | Command-line operations and just/meson usage. Answers "How do I run commands?" and "When should I use each command?"                         |
-| **Guidelines** (`docs/code/`)  | **HOW** (implementation) | Code implementation guidelines and standards (see [Code Guidelines](#2-code-guidelines)). Answers "How do I write quality, conventional code?"|
+| **Code rules** (`docs/code/`)  | **HOW** (implementation) | Code implementation rules and standards (see [Code Rules](#2-code-rules)). Answers "How do I write quality, conventional code?"|
 
 **Navigation Guide for AI Agents:**
 
 - Need to understand the project? → Read this file (AGENTS.md)
 - Need to run a command? → Invoke the appropriate Skill (`/code-format`, `/code-check`, `/code-build`, `/code-test`, `/code-deploy`)
-- Need to write code? → Use `/code-guidelines` to load relevant guidelines
+- Need to write code? → Use `/code-rules` to load the governing rules
 
 ### Core Operating Principle
 
@@ -276,8 +272,10 @@ Available skills and their purposes:
 - **Building**: `/code-build` — Configure/reconfigure Meson and build NRO/NSP artifacts
 - **Testing**: `/code-test` — Build the test NRO and run on Switch hardware
 - **Deploying**: `/code-deploy` — Push built artifacts to the Switch via cargo-nx link
-- **Guidelines**: `/code-guidelines` — Load relevant code guidelines and patterns
-- **Reviewing**: `/code-review` — Review changes for bugs, guideline violations, security
+- **Code rules**: `/code-rules` — Load the code rules that govern the work at hand
+- **Rules check**: `/code-rules-check` — Check a finished changeset against those rules
+- **Doc format**: `/docs-fmt-check` — Validate a rule document's own format
+- **Reviewing**: `/code-review` — Deep review for bugs, regressions, security, and soundness
 
 Each Skill provides:
 
@@ -294,7 +292,7 @@ Each Skill provides:
 **BEFORE drafting a plan OR writing ANY code, you MUST:**
 
 1. **Understand the task** — Research the codebase and identify affected crate(s)
-2. **🚨 MANDATORY: Load implementation guidelines FIRST** — Invoke `/code-guidelines` before drafting any plan or writing any code. This applies equally in Plan mode: the plan itself MUST be grounded in the loaded guidelines, not in assumptions about conventions.
+2. **🚨 MANDATORY: Load the code rules FIRST** — Invoke `/code-rules` before drafting any plan or writing any code. This applies equally in Plan mode: the plan itself MUST be grounded in the loaded rules, not in assumptions about conventions.
 3. **Follow crate-specific guidelines** — Guideline discovery loads crate-specific and core guidelines automatically
 4. **Rationale** — Skipping this step leads to plans that violate conventions (e.g., module layout, error handling patterns, FFI surface design), causing avoidable rework.
 
@@ -307,11 +305,11 @@ Each Skill provides:
 - Understand the codebase and existing guidelines
 - Identify related modules and dependencies (use the [Crate Hierarchy](#crate-hierarchy))
 - Review test files and usage examples in `subprojects/tests/`
-- Use `/code-guidelines` to load relevant implementation guidelines
+- Use `/code-rules` to load the rules that govern the work
 
 #### 2. Planning Phase
 
-**🚨 MANDATORY FIRST STEP (including in Plan mode):** Invoke `/code-guidelines` to load the guidelines for the affected crate(s) BEFORE drafting the plan. The plan's structure, module layout, error handling, and type design decisions MUST reflect the loaded guidelines. Never draft a plan from assumptions about project conventions.
+**🚨 MANDATORY FIRST STEP (including in Plan mode):** Invoke `/code-rules` to load the rules for the affected crate(s) BEFORE drafting the plan. The plan's structure, module layout, error handling, and type design decisions MUST reflect the loaded rules. Never draft a plan from assumptions about project conventions.
 
 - Create the implementation plan on top of the loaded guidelines
 - Ensure plan follows required patterns (error handling, type design, module structure, FFI surface)
@@ -327,7 +325,7 @@ Each Skill provides:
 
 ```
 Development Progress:
-- [ ] Step 1: Write code following guidelines (use /code-guidelines)
+- [ ] Step 1: Write code following the rules (use /code-rules)
 - [ ] Step 2: Format code (use /code-format skill)
 - [ ] Step 3: Check compilation (use /code-check skill)
 - [ ] Step 4: Fix all compilation errors
@@ -335,12 +333,14 @@ Development Progress:
 - [ ] Step 6: Fix ALL clippy warnings
 - [ ] Step 7: Build artifacts when applicable (use /code-build skill)
 - [ ] Step 8: Run hardware tests when warranted (use /code-test skill)
-- [ ] Step 9: All required checks pass ✅
+- [ ] Step 9: Check the changeset against the rules (use /code-rules-check skill)
+- [ ] Step 10: Fix every violation, or record why the deviation is deliberate
+- [ ] Step 11: All required checks pass ✅
 ```
 
 **Detailed workflow for each work chunk (and before committing):**
 
-1. **Write code** following guidelines from [Code Guidelines](#2-code-guidelines) (loaded via `/code-guidelines`)
+1. **Write code** following the rules from [Code Rules](#2-code-rules) (loaded via `/code-rules`)
 
 2. **Format before checks/commit**:
    - **Use**: `/code-format` skill when you finish a coherent chunk of work
@@ -366,7 +366,11 @@ Development Progress:
    - **When to run**: FFI surface changes, allocator/memory/sync/thread changes, or anything that crosses the C/Rust boundary.
    - **Validation**: Fix failures or record why tests were skipped.
 
-7. **Iterate**: If any validation fails → fix → return to step 2
+7. **Rules check (once the implementation is complete)**:
+   - **Use**: `/code-rules-check` skill — it checks the changeset against `docs/code/` and reports each violation with the document behind it.
+   - **Must pass**: Fix every finding, or record why the deviation is deliberate.
+
+8. **Iterate**: If any validation fails → fix → return to step 2
 
 **Visual Workflow:**
 
@@ -383,6 +387,8 @@ Edit File → /code-format skill
           ↓
     /code-test skill (hardware validation when warranted)
           ↓              ↓ Fix failure?
+    /code-rules-check skill (audit the changeset)
+          ↓              ↓ Violation?
     All Pass ✅     (loop back to /code-format)
 ```
 
@@ -390,9 +396,9 @@ Edit File → /code-format skill
 
 #### 4. Completion Phase
 
-- Ensure all required checks pass (format, check, clippy, build, and any hardware tests run)
+- Ensure all required checks pass (format, check, clippy, build, any hardware tests run, and `/code-rules-check`)
 - If hardware tests were skipped, document why and the risk assessment
-- Review changes against guidelines (use `/code-review`)
+- Use `/code-review` when the change is large or risky enough to need bugs, regressions, security, and soundness examined as well
 - Document any warnings you couldn't fix and why
 
 ### Core Development Principles
@@ -400,8 +406,8 @@ Edit File → /code-format skill
 **ALL AI agents MUST follow these principles:**
 
 - **Research → Plan → Implement**: Never jump straight to coding
-- **Guidelines before planning**: `/code-guidelines` is a prerequisite for both planning AND Plan mode, not just implementation. A plan written without loaded guidelines is considered incomplete.
-- **Guideline compliance**: Follow guidelines from [Code Guidelines](#2-code-guidelines)
+- **Rules before planning**: `/code-rules` is a prerequisite for both planning AND Plan mode, not just implementation. A plan written without the loaded rules is considered incomplete.
+- **Rule compliance**: Follow the rules from [Code Rules](#2-code-rules), and audit the result with `/code-rules-check`
 - **Zero tolerance for errors**: All automated checks must pass
 - **Clarity over cleverness**: Choose clear, maintainable solutions
 - **FFI safety first**: The C/Rust boundary is unforgiving — uphold soundness invariants and validate at the edge
@@ -419,22 +425,24 @@ Edit File → /code-format skill
 
 | What                | Where                                  | When                                                  |
 |---------------------|----------------------------------------|-------------------------------------------------------|
-| **Plan work**       | `/code-guidelines`                     | BEFORE creating any plan                              |
+| **Plan work**       | `/code-rules`                          | BEFORE creating any plan                              |
 | **Run commands**    | `.agents/skills/`                      | Check Skills BEFORE any command                       |
-| **Write code**      | [Code Guidelines](#2-code-guidelines)  | Load guidelines before implementation                 |
+| **Write code**      | [Code Rules](#2-code-rules)            | Load the rules before implementation                  |
 | **Format**          | `/code-format`                         | Before checks or before committing                    |
 | **Check**           | `/code-check`                          | After formatting                                      |
 | **Lint**            | `/code-check`                          | Fix ALL warnings                                      |
 | **Build artifacts** | `/code-build`                          | When NRO/NSP outputs are needed                       |
 | **Deploy**          | `/code-deploy`                         | Push built NRO to the Switch                          |
 | **Test (hardware)** | `/code-test`                           | Only after checks green; on FFI/foundation changes    |
-| **Review**          | `/code-review`                         | Before commits / PRs                                  |
+| **Rules check**     | `/code-rules-check`                    | Once the implementation is complete                   |
+| **Doc format**      | `/docs-fmt-check`                      | After editing `docs/code/` or `docs/__meta__/`        |
+| **Review**          | `/code-review`                         | Before commits / PRs, when the change is large or risky |
 
 **Golden Rules:**
 
 1. ✅ Invoke Skills for all common operations
 2. ✅ Skills wrap just/meson tasks with proper guidance
-3. ✅ Follow the workflow: Format → Check → Clippy → Build → Hardware Test (when needed)
+3. ✅ Follow the workflow: Format → Check → Clippy → Build → Hardware Test (when needed) → Rules check
 4. ✅ Zero tolerance for errors and warnings
 5. ✅ Every change improves the codebase
 
@@ -447,6 +455,6 @@ For more detailed information about the project:
 
 - **Build system**: See [`docs/build_system.md`](docs/build_system.md)
 - **libnx symbol overrides**: See [`docs/libnx_overrides.md`](docs/libnx_overrides.md)
-- **Code guidelines**: Browse `docs/code/` (load via `/code-guidelines`)
+- **Code rules**: Browse `docs/code/` (load via `/code-rules`)
 - **Documentation format specs**: See `docs/__meta__/`
 - **Tests**: C tests in `subprojects/tests/` link against Rust crates to verify FFI correctness

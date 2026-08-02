@@ -1,7 +1,7 @@
 ---
 name: "rust-ffi"
 description: "The `ffi` Cargo feature contract for subproject crates: declaration, source gating, `__nx_<aspect>__*` symbol naming, and producer/consumer activation split. Load when designing or modifying a crate's C-FFI surface, adding an `ffi` module, or defining new `__nx_*` symbols"
-type: arch
+type: "arch"
 scope: "global"
 ---
 
@@ -45,7 +45,7 @@ ffi = []
 
 - The feature value is empty (`[]`) — it gates a compile-time `#[cfg(...)]` branch in the producer crate and contributes nothing else.
 - No transitive feature activation belongs in this list. The `ffi` feature MUST NOT pull in additional crates or enable other features.
-- The `# Enable the __nx_<aspect> FFI` comment is the canonical descriptor and must accompany the feature declaration ([rust-crate](rust-crate.md)).
+- The `# Enable the __nx_<aspect> FFI` comment is the canonical descriptor and must accompany the feature declaration ([rust-crates](rust-crates.md)).
 
 ---
 
@@ -154,12 +154,6 @@ Do NOT add `ffi = []` "for symmetry" — its presence is a strong signal that an
 
 ---
 
-## References
-
-- [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts that consume the symbols defined here
-- [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
-- [rust-crate](rust-crate.md) - Related: `Cargo.toml` feature naming and ordering rules
-
 ## Checklist
 
 Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
@@ -172,3 +166,9 @@ Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
 - [ ] Symbol signatures match the upstream archive's prototype exactly (integer widths, signedness, pointer mutability).
 - [ ] The producer's `meson.build` does NOT pass `--features ffi` to `cargo build`.
 - [ ] Crates without a C-FFI surface do NOT declare an `ffi` feature.
+
+## References
+
+- [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts that consume the symbols defined here
+- [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
+- [rust-crates](rust-crates.md) - Related: `Cargo.toml` feature naming and ordering rules

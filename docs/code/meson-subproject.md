@@ -1,7 +1,7 @@
 ---
 name: "meson-subproject"
 description: "Generic Meson subproject conventions: directory layout, `meson.build` section banners, `meson.options` format, project header, variable naming, and setup-time option style. Load when creating or editing any `subprojects/<name>/meson.build` or `meson.options`, regardless of whether the subproject wraps Rust, C, or a prebuilt library"
-type: arch
+type: "arch"
 scope: "global"
 ---
 
@@ -245,12 +245,6 @@ Every top-level section is introduced by a three-line banner of `#` characters. 
 
 ---
 
-## References
-
-- [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate specialization of this layout
-- [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts exposed as subproject variables
-- [../workspace](../workspace.md) - See also: Workspace-level Meson root and crate categorization
-
 ## Checklist
 
 Before committing a new or modified `subprojects/<name>/meson.build` or `meson.options`, verify:
@@ -282,3 +276,9 @@ Before committing a new or modified `subprojects/<name>/meson.build` or `meson.o
 - [ ] Exported variables use the `<name>_` snake_case prefix (`<name>_proj`, `<name>_dep`, `<name>_tgt`, `<name>_ld_override`, …).
 - [ ] Section banners use the 81-char `#---` form and Title Case section names from the canonical list.
 - [ ] Inline comments explain why, not what; trailing comments are limited to unit / annotation use.
+
+## References
+
+- [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate specialization of this layout
+- [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts exposed as subproject variables
+- [../workspace](../workspace.md) - See also: Workspace-level Meson root and crate categorization

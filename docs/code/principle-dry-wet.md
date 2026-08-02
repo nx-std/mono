@@ -1,222 +1,187 @@
 ---
 name: "principle-dry-wet"
-description: "DRY and WET balance — when to deduplicate and when duplication is preferable to wrong abstraction. Load when extracting shared code, creating abstractions, or reviewing duplicated logic"
+description: "DRY vs WET — deduplicate knowledge, tolerate coincidental similarity. Load when extracting shared helpers, creating abstractions, or reviewing duplicated-looking code"
 type: "principle"
 scope: "global"
 ---
 
 # DRY/WET Balance (Don't Repeat Yourself vs. Write Everything Twice)
 
-**MANDATORY for ALL code in the workspace**
-
 ## Rule
 
-Every piece of **knowledge** must have a single, unambiguous, authoritative representation within the system. Deduplicate when two pieces of code encode the same business rule, invariant, or decision. Do **not** deduplicate when two pieces of code merely look similar but represent independent concerns that will evolve separately.
+Every piece of **knowledge** — a formula, a wire format, a register layout, a policy — has exactly one
+authoritative representation. Deduplicate knowledge. Do **not** deduplicate code that merely looks alike but
+belongs to independent concerns that will diverge.
 
-Before extracting shared code, apply these checks:
+Before extracting a shared helper, apply these checks:
 
-1. **Same knowledge, not same shape**: The duplication encodes the same domain concept — a calculation formula, a validation rule, a protocol constraint. If two code blocks happen to look alike but serve different stakeholders or change for different reasons, they are coincidental duplication and should stay separate.
-2. **Rule of Three**: Resist extracting on the first or second occurrence. Wait until you see the pattern a third time so you have enough evidence that the duplication is structural, not coincidental.
-3. **Inline test for wrong abstraction**: If the shared code already has parameters or conditionals that toggle behavior per call-site, the abstraction may be wrong. Prefer inlining the code back into each caller and letting each evolve independently over adding another flag.
+1. **Same knowledge, not same shape**: does the duplication encode the same fact? The CMIF in-header layout is
+   one fact about the IPC wire format. Two service clients that each send one request are two facts that
+   happen to look alike.
+2. **Rule of Three**: resist extracting on the second occurrence. Wait for the third, when you can see which
+   parts actually vary.
+3. **Inline test for a wrong abstraction**: if the shared function has a parameter or conditional whose only
+   job is to pick a caller's behavior, the abstraction is wrong. Inline it back and let each caller evolve.
 
-When in doubt, **duplication is far cheaper than the wrong abstraction** (Sandi Metz). Inlining a premature abstraction and tolerating temporary duplication is progress, not retreat.
+**Duplication is far cheaper than the wrong abstraction.** Inlining a premature abstraction is progress.
 
 ## Examples
 
-1. **Same knowledge — deduplicate**
-Both functions compute the same discount formula. This is the same business rule duplicated.
+1. **Same knowledge — one authoritative representation**
+   The CMIF in-header layout is a fact about the wire format; every service client that builds a request
+   needs it.
 
 ```rust
-// Bad — same discount formula duplicated in two places
-fn online_price(base: f64) -> f64 {
-    base * 0.9 // 10% discount
-}
+// ❌ Bad — the header-packing rule is re-derived in each service crate. Adding the
+// context token to the header means finding every hand-packed word, and missing one
+// leaves that service sending a request the sysmodule rejects with 0xF601 at runtime,
+// on hardware, with no compile error to point at the crate that got it wrong.
+let words = [
+    SFCI_MAGIC,
+    CMIF_VERSION,
+    request_id,
+    0, // token
+];
+// ...and again in the settings client
+let words = [SFCI_MAGIC, CMIF_VERSION, cmd, 0];
+// ...and again in the fs client, this time packing the version into the high half-word
+let hdr = (SFCI_MAGIC as u64) | ((CMIF_VERSION as u64) << 32);
+```
 
-fn in_store_price(base: f64) -> f64 {
-    base * 0.9 // 10% discount
+```rust
+// ✅ Good — one type in nx-sf owns the fact; every service client asks for it. Adding
+// the context token becomes a one-line change to a single struct instead of a sweep
+// across dozens of nx-service-* crates.
+/// In-band CMIF request header, exactly as it appears in the data-words region.
+#[repr(C)]
+#[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
+pub struct InHeader {
+    magic: U32<LittleEndian>,
+    version: U32<LittleEndian>,
+    request_id: U32<LittleEndian>,
+    token: U32<LittleEndian>,
+}
+```
+
+2. **Coincidental similarity — keep them separate**
+   Two service clients, structurally identical today, encoding different service contracts.
+
+```rust
+// ❌ Bad — one shared entry point, because "both clients just send one request".
+// `service` and `request_id` are not shared knowledge; they are each service's own
+// contract. The first command that needs an output buffer, a copied handle, or a
+// domain object gets bolted on as another parameter, and every service client
+// inherits the widened signature — plus the panic path for arguments its own
+// service can never produce.
+pub fn send_simple(session: SessionHandle, request_id: u32) -> Result<(), SendError> {
+    // one body, N services' assumptions
 }
 ```
 
 ```rust
-// Good — single authoritative representation of the discount rule
-fn apply_standard_discount(base: f64) -> f64 {
-    base * 0.9
+// ✅ Good — two functions, two service contracts, free to diverge. The bodies look
+// alike; the knowledge does not. Note this stays hand-written: a `macro_rules!`
+// generator would collapse both into one expansion site and hide exactly the
+// per-service differences (error type, buffer mode, request id) that the next
+// command is going to introduce.
+/// Clears the pending fatal report. Takes no arguments and returns nothing.
+pub fn clear_report(session: SessionHandle) -> Result<(), ClearReportError> {
+    // ...
+}
+
+/// Cancels the in-flight clock adjustment. Takes no arguments and returns nothing.
+pub fn cancel_adjustment(session: SessionHandle) -> Result<(), CancelAdjustmentError> {
+    // ...
 }
 ```
 
-2. **Coincidental similarity — keep separate**
-Two validation functions look alike today but serve different domains that will diverge.
+3. **Wrong abstraction — inline it back**
+   One builder serializes a **CMIF** request, another a **TIPC** request. They look almost identical. They are
+   not the same knowledge.
 
 ```rust
-// Bad — forced into one abstraction because the code looks similar
-fn validate_input(value: &str, kind: &str) -> Result<String> {
-    let trimmed = value.trim().to_string();
-    if trimmed.is_empty() {
-        return Err(anyhow!("{kind} must not be empty"));
-    }
-    if kind == "username" && trimmed.len() > 32 {
-        return Err(anyhow!("username too long"));
-    }
-    if kind == "email" && !trimmed.contains('@') {
-        return Err(anyhow!("invalid email"));
-    }
-    // More kind-specific branches accumulate here over time
-    Ok(trimmed)
-}
-```
-
-```rust
-// Good — independent concerns stay separate, each free to evolve
-fn validate_username(value: &str) -> Result<Username> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(anyhow!("username must not be empty"));
-    }
-    if trimmed.len() > 32 {
-        return Err(anyhow!("username too long"));
-    }
-    Ok(Username(trimmed.to_owned()))
-}
-
-fn validate_email(value: &str) -> Result<Email> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(anyhow!("email must not be empty"));
-    }
-    if !trimmed.contains('@') {
-        return Err(anyhow!("invalid email"));
-    }
-    Ok(Email(trimmed.to_owned()))
-}
-```
-
-3. **Wrong abstraction — inline and restart**
-A shared helper has accumulated conditionals to serve diverging call-sites. Inline it back.
-
-```rust
-// Bad — wrong abstraction with growing conditional complexity
-fn build_query(table: &str, filters: &[Filter], include_deleted: bool, use_cache: bool) -> String {
-    let mut q = format!("SELECT * FROM {table}");
-    if !filters.is_empty() {
-        q.push_str(" WHERE ");
-        q.push_str(&filters.iter().map(|f| f.to_sql()).collect::<Vec<_>>().join(" AND "));
-    }
-    if !include_deleted {
-        let keyword = if filters.is_empty() { " WHERE " } else { " AND " };
-        q.push_str(&format!("{keyword}deleted_at IS NULL"));
-    }
-    if use_cache {
-        q.push_str(" /* cached */");
-    }
-    q
+// ❌ Bad — one "universal" builder with a protocol flag. The two protocols already differ
+// (CMIF carries the SFCI in-header, a version word and a context token, and pads the data
+// words to 16 bytes; TIPC has no in-header at all and encodes the request id in the HIPC
+// command type). Every protocol change adds another flag, and each flag is a chance to
+// break the other caller on hardware only.
+fn build_request(
+    request_id: u32,
+    proto: Protocol,
+    options: BuildOptions, // { emit_in_header, align_data_words, request_id_in_command_type }
+) -> Result<(), WriteError> {
+    // ~80 lines of `if proto == Protocol::Cmif { ... } else { ... }`
 }
 ```
 
 ```rust
-// Good — each caller builds its own query, no shared conditional mess
-fn build_user_query(filters: &[Filter]) -> String {
-    let mut q = "SELECT * FROM users WHERE deleted_at IS NULL".to_string();
-    for f in filters {
-        q.push_str(&format!(" AND {}", f.to_sql()));
-    }
-    q
+// ✅ Good — two builders, each owning one protocol's rules, each independently testable.
+// A change to CMIF's in-header cannot reach the TIPC builder or its tests.
+/// Build a CMIF request: SFCI in-header, version, context token, 16-byte-aligned words.
+pub fn build_cmif(request_id: u32, payload: &[u8]) -> Result<CmifRequest<'_>, WriteError> {
+    // ...
 }
 
-fn build_audit_query(filters: &[Filter]) -> String {
-    // Audit queries include deleted records, different structure
-    let mut q = "SELECT * FROM audit_log".to_string();
-    if !filters.is_empty() {
-        q.push_str(" WHERE ");
-        q.push_str(&filters.iter().map(|f| f.to_sql()).collect::<Vec<_>>().join(" AND "));
-    }
-    q
-}
-```
-
-4. **Extract shared knowledge into a trait**
-When the shared concept is behavior rather than data, a trait provides a single authoritative definition without forcing unrelated call-sites together.
-
-```rust
-// Bad — retry logic duplicated across services
-async fn fetch_prices(client: &Client, url: &str) -> Result<Prices> {
-    for attempt in 0..3 {
-        match client.get(url).send().await {
-            Ok(resp) => return resp.json().await.map_err(Into::into),
-            Err(e) if attempt < 2 => tokio::time::sleep(Duration::from_millis(100 << attempt)).await,
-            Err(e) => return Err(e.into()),
-        }
-    }
-    unreachable!()
-}
-
-async fn fetch_inventory(client: &Client, url: &str) -> Result<Inventory> {
-    for attempt in 0..3 {
-        match client.get(url).send().await {
-            Ok(resp) => return resp.json().await.map_err(Into::into),
-            Err(e) if attempt < 2 => tokio::time::sleep(Duration::from_millis(100 << attempt)).await,
-            Err(e) => return Err(e.into()),
-        }
-    }
-    unreachable!()
-}
-```
-
-```rust
-// Good — retry knowledge encoded once, reused via generic function
-async fn with_retries<T, F, Fut>(max_attempts: u32, mut f: F) -> Result<T>
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T>>,
-{
-    for attempt in 0..max_attempts {
-        match f().await {
-            Ok(val) => return Ok(val),
-            Err(e) if attempt + 1 < max_attempts => {
-                tokio::time::sleep(Duration::from_millis(100 << attempt)).await;
-            }
-            Err(e) => return Err(e),
-        }
-    }
-    unreachable!()
-}
-
-// Each caller stays focused on its own concern
-async fn fetch_prices(client: &Client, url: &str) -> Result<Prices> {
-    with_retries(3, || async { Ok(client.get(url).send().await?.json().await?) }).await
+/// Build a TIPC request: no in-band header; the request id rides in the HIPC command type.
+pub fn build_tipc(request_id: u32, payload: &[u8]) -> Result<TipcRequest<'_>, WriteError> {
+    // ...
 }
 ```
 
 ## Why It Matters
 
-Genuine duplication — the same business rule written in multiple places — means a change to that rule requires coordinated edits. Miss one and you have an inconsistency bug. Extracting shared knowledge into a single representation eliminates this class of defect.
+Duplicated knowledge means coordinated edits. Miss one copy of a header layout and that one service client
+sends a malformed request the kernel happily delivers — a failure that shows up as a `ResultCode` on a console,
+not as a compile error and not as a test failure on the host.
 
-However, premature deduplication is equally harmful. When code that merely *looks* alike is forced into a shared abstraction, every caller becomes coupled to every other caller's requirements. The abstraction accumulates parameters and conditionals to serve diverging needs, becoming harder to understand and modify than the original duplication ever was. Undoing a wrong abstraction is more expensive than never creating it.
-
-The balance: deduplicate knowledge, tolerate duplicated code shapes.
+Duplicated _shape_ forced into one abstraction costs more. A shared `build_request(id, proto, options)` couples
+CMIF to TIPC: a change on one side touches code the other side's tests cover, and the flags grow until nobody
+can say what the function does without reading every branch. Undoing that is harder than never building it.
 
 ## Pragmatism Caveat
 
-The Rule of Three is a guideline, not a law. Sometimes two occurrences clearly encode the same invariant and the third will never come — deduplicating at two is fine when you are confident the knowledge is shared, not coincidentally similar. Conversely, even three occurrences should stay separate if they represent independent stakeholders likely to diverge.
+The Rule of Three is a heuristic. Two occurrences of an unmistakable fact (a wire-format constant, a magic
+number from the IPC spec, an SVC number) can be extracted immediately; three occurrences that serve three
+protocols should stay apart.
 
-When you choose to tolerate duplication intentionally, add a brief comment noting that the similarity is coincidental and the code should evolve independently. When you extract an abstraction, make sure it names the shared *concept*, not just the shared *shape*. An undocumented decision to deduplicate or to keep duplication is always wrong.
+Small helpers duplicated across module or crate boundaries are usually correct. A four-line result-code
+conversion copied into two sibling service crates is not a violation: promoting it to `pub(crate)` or hoisting
+it into `nx-sf` to save eight lines widens an API surface and stops the two crates changing independently.
+Prefer the private copy. The same reasoning rules out a `macro_rules!` written purely to collapse repeated
+forwarding methods: the macro removes the lines but also removes the place where a per-caller difference would
+be visible.
+
+When you keep duplication on purpose, say so in a comment. When you extract, make sure the name describes the
+shared _concept_ (`InHeader`), not the shared _shape_ (`build_request`, `send_simple`). An undocumented
+decision either way is always wrong.
 
 ## Checklist
 
-- [ ] Shared code encodes the same domain knowledge, not merely similar-looking syntax
-- [ ] Extractions waited for at least three occurrences (or two with documented confidence)
-- [ ] Shared abstractions have zero call-site-specific conditionals or behavior toggles
-- [ ] Intentionally duplicated code has a comment explaining why it should remain separate
-- [ ] Existing shared code is reviewed for wrong-abstraction signals before adding new callers
+Before committing code, verify:
+
+- [ ] Extracted code encodes one fact, not one syntax shape
+- [ ] No shared helper takes a flag, mode, or `kind` parameter that exists only to select a caller's behavior
+- [ ] Wire-format constants, header and register layouts, and spec values have exactly one definition
+- [ ] Similar-looking code that serves two protocols or two service contracts stays in two places
+- [ ] Deliberate duplication carries a comment explaining that the similarity is coincidental
+- [ ] Cross-crate hoisting is justified by shared knowledge, not by line count
 
 ## References
 
-- [principle-single-responsibility](principle-single-responsibility.md) - Related: SRP helps identify when an abstraction serves multiple concerns
-- [principle-open-closed](principle-open-closed.md) - Related: OCP extension points are the right place for shared behavior
+- [principle-single-responsibility](principle-single-responsibility.md) - Related: A helper serving two concerns
+  is the wrong abstraction by definition
+- [principle-open-closed](principle-open-closed.md) - Related: Registries and extension points are where
+  genuinely shared behavior belongs; flags are not
+- [principle-least-surprise](principle-least-surprise.md) - Related: An abstraction named for its shape rather
+  than its concept surprises every caller
+- [principle-symmetry](principle-symmetry.md) - Related: Make near-duplicates symmetric first; only then is it
+  visible whether they are one fact or two
+- [principle-rate-of-change](principle-rate-of-change.md) - Related: Two copies that change on different
+  schedules are two facts, whatever their shape says
 
 ## External References
 
 - [The Wrong Abstraction — Sandi Metz](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction)
+- [DRY is about Knowledge (Verraes)](https://verraes.net/2014/08/dry-is-about-knowledge/)
 - [Caught in a Bad Abstraction — Israeli Tech Radar](https://medium.com/israeli-tech-radar/caught-in-a-bad-abstraction-55bfe6634b83)
 - [DRY: Most Over-rated Programming Principle — Gordon C](https://gordonc.bearblog.dev/dry-most-over-rated-programming-principle/)
-- [DRY Principle in Rust — CodeSignal](https://codesignal.com/learn/courses/applying-clean-code-principles-in-rust/lessons/applying-clean-code-principles-in-rust-understanding-and-implementing-the-dry-principle)
-- [12 Design Principles in Rust — Bagwan Pankaj](https://blog.bagwanpankaj.com/architecture/12-design-principles-you-can-implement-in-rust)
