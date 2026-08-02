@@ -1,9 +1,8 @@
 //! Time service FFI
 
 use nx_service_time;
-use nx_svc::error::ToRawResultCode;
 
-use crate::ffi::common::{GENERIC_ERROR, parse_resp_bytes_error_to_rc};
+use crate::ffi::common::{GENERIC_ERROR, parse_resp_bytes_error_to_rc, send_error_to_rc};
 
 /// Initializes the Time service.
 ///
@@ -17,31 +16,28 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_time_initialize() -> u32 {
             let crate::services::time::ConnectError(conn_err) = err;
             match conn_err {
                 nx_service_time::ConnectError::GetService(sm_err) => match sm_err {
-                    nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+                    nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
                     _ => GENERIC_ERROR,
                 },
                 nx_service_time::ConnectError::GetUserSystemClock(clock_err) => match clock_err {
-                    nx_service_time::GetSystemClockError::SendRequest(e) => e.to_rc(),
+                    nx_service_time::GetSystemClockError::SendRequest(e) => send_error_to_rc(e),
                     nx_service_time::GetSystemClockError::ParseResponse(e) => {
                         parse_resp_bytes_error_to_rc(e)
                     }
-                    nx_service_time::GetSystemClockError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_time::GetSystemClockError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_time::ConnectError::GetSteadyClock(steady_err) => match steady_err {
-                    nx_service_time::GetSteadyClockError::SendRequest(e) => e.to_rc(),
+                    nx_service_time::GetSteadyClockError::SendRequest(e) => send_error_to_rc(e),
                     nx_service_time::GetSteadyClockError::ParseResponse(e) => {
                         parse_resp_bytes_error_to_rc(e)
                     }
-                    nx_service_time::GetSteadyClockError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_time::GetSteadyClockError::MissingHandle => GENERIC_ERROR,
                 },
                 nx_service_time::ConnectError::GetTimeZoneService(tz_err) => match tz_err {
-                    nx_service_time::GetTimeZoneServiceError::SendRequest(e) => e.to_rc(),
+                    nx_service_time::GetTimeZoneServiceError::SendRequest(e) => send_error_to_rc(e),
                     nx_service_time::GetTimeZoneServiceError::ParseResponse(e) => {
                         parse_resp_bytes_error_to_rc(e)
                     }
-                    nx_service_time::GetTimeZoneServiceError::BuildRequest(_) => GENERIC_ERROR,
                     nx_service_time::GetTimeZoneServiceError::MissingHandle => GENERIC_ERROR,
                 },
             }
@@ -83,11 +79,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_time_get_current_time(
                 0
             }
             Err(err) => match err {
-                nx_service_time::GetCurrentTimeError::SendRequest(e) => e.to_rc(),
+                nx_service_time::GetCurrentTimeError::SendRequest(e) => send_error_to_rc(e),
                 nx_service_time::GetCurrentTimeError::ParseResponse(e) => {
                     parse_resp_bytes_error_to_rc(e)
                 }
-                nx_service_time::GetCurrentTimeError::BuildRequest(_) => GENERIC_ERROR,
                 nx_service_time::GetCurrentTimeError::NetworkClockUnavailable => GENERIC_ERROR,
                 nx_service_time::GetCurrentTimeError::LocalClockNotSupported => GENERIC_ERROR,
                 nx_service_time::GetCurrentTimeError::SourceIdMismatch => GENERIC_ERROR,
@@ -120,11 +115,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_time_to_calendar_time_with_my_rule(
                 0
             }
             Err(err) => match err {
-                nx_service_time::ToCalendarTimeError::SendRequest(e) => e.to_rc(),
+                nx_service_time::ToCalendarTimeError::SendRequest(e) => send_error_to_rc(e),
                 nx_service_time::ToCalendarTimeError::ParseResponse(e) => {
                     parse_resp_bytes_error_to_rc(e)
                 }
-                nx_service_time::ToCalendarTimeError::BuildRequest(_) => GENERIC_ERROR,
             },
         },
         None => GENERIC_ERROR,

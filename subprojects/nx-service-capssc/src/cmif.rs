@@ -3,8 +3,8 @@
 use nx_service_vi::ViLayerStack;
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{
@@ -48,16 +48,10 @@ pub fn capture_raw_image_with_timeout(
     };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
         .with_data(data)
-        .add_output_buffer_raw(
-            out_image.as_mut_ptr(),
-            out_image.len(),
-            BufferMode::NonSecure,
-        )
+        .add_output_buffer(OutputBuffer::new(out_image, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(CaptureRawImageError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CaptureRawImageError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CaptureRawImageError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(CaptureRawImageError::ParseResponse)?;
 
@@ -101,10 +95,8 @@ pub fn open_raw_screen_shot_read_stream(
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
         .with_data(data)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenReadStreamError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenReadStreamError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenReadStreamError::SendRequest)?;
 
     let resp = cmif::parse_response::<&OpenReadStreamOut>(&buf)
         .map_err(OpenReadStreamError::ParseResponse)?;
@@ -127,10 +119,8 @@ pub fn close_raw_screen_shot_read_stream(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM).build();
-    req.write_to(&mut buf)
-        .map_err(CloseReadStreamError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CloseReadStreamError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CloseReadStreamError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(CloseReadStreamError::ParseResponse)?;
 
@@ -151,12 +141,10 @@ pub fn read_raw_screen_shot_read_stream(
 
     let req = cmif::CmifRequestBuilder::new(proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
         .with_data_value(&offset)
-        .add_output_buffer_raw(out_buf.as_mut_ptr(), out_buf.len(), BufferMode::Normal)
+        .add_output_buffer(OutputBuffer::new(out_buf, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(ReadStreamError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ReadStreamError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ReadStreamError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(ReadStreamError::ParseResponse)?;
 
@@ -194,12 +182,10 @@ pub fn capture_jpeg_screen_shot(
     };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_JPEG_SCREEN_SHOT)
         .with_data(data)
-        .add_output_buffer_raw(out_jpeg.as_mut_ptr(), out_jpeg.len(), BufferMode::NonSecure)
+        .add_output_buffer(OutputBuffer::new(out_jpeg, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(CaptureJpegError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CaptureJpegError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CaptureJpegError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(CaptureJpegError::ParseResponse)?;
 
@@ -211,12 +197,9 @@ pub fn capture_jpeg_screen_shot(
 /// Error returned by [`capture_raw_image_with_timeout`].
 #[derive(Debug, thiserror::Error)]
 pub enum CaptureRawImageError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -225,12 +208,9 @@ pub enum CaptureRawImageError {
 /// Error returned by [`open_raw_screen_shot_read_stream`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenReadStreamError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -239,12 +219,9 @@ pub enum OpenReadStreamError {
 /// Error returned by [`close_raw_screen_shot_read_stream`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloseReadStreamError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -253,12 +230,9 @@ pub enum CloseReadStreamError {
 /// Error returned by [`read_raw_screen_shot_read_stream`].
 #[derive(Debug, thiserror::Error)]
 pub enum ReadStreamError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -267,12 +241,9 @@ pub enum ReadStreamError {
 /// Error returned by [`capture_jpeg_screen_shot`].
 #[derive(Debug, thiserror::Error)]
 pub enum CaptureJpegError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

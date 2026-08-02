@@ -2,10 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 use static_assertions::const_assert_eq;
 
 use crate::proto;
@@ -155,10 +152,8 @@ fn dispatch_pid_delay(
     let req = cmif::CmifRequestBuilder::new(cmd)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SuspendResumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SuspendResumeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SuspendResumeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SuspendResumeError::ParseResponse)?;
 
@@ -173,10 +168,8 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
     let req = cmif::CmifRequestBuilder::new(cmd)
         .with_data_value(&pid)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetVolumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetVolumeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetVolumeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&f32>(&buf).map_err(GetVolumeError::ParseResponse)?;
 
@@ -204,10 +197,8 @@ fn dispatch_set_volume(
     let req = cmif::CmifRequestBuilder::new(cmd)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetVolumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetVolumeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetVolumeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetVolumeError::ParseResponse)?;
 
@@ -217,12 +208,9 @@ fn dispatch_set_volume(
 /// Error returned by suspend/resume operations.
 #[derive(Debug, thiserror::Error)]
 pub enum SuspendResumeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -231,12 +219,9 @@ pub enum SuspendResumeError {
 /// Error returned by get-volume operations.
 #[derive(Debug, thiserror::Error)]
 pub enum GetVolumeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -245,12 +230,9 @@ pub enum GetVolumeError {
 /// Error returned by set-volume operations.
 #[derive(Debug, thiserror::Error)]
 pub enum SetVolumeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

@@ -2,8 +2,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{proto, types::MiiimgImageAttribute};
@@ -19,10 +19,8 @@ pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeErro
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
         .with_data_value(&mode)
         .build();
-    req.write_to(&mut buf)
-        .map_err(InitializeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(InitializeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(InitializeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(InitializeError::ParseResponse)?;
     let out = *resp.payload;
@@ -37,9 +35,8 @@ pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::RELOAD).build();
-    req.write_to(&mut buf).map_err(ReloadError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ReloadError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ReloadError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ReloadError::ParseResponse)?;
 
@@ -53,10 +50,8 @@ pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_COUNT).build();
-    req.write_to(&mut buf)
-        .map_err(GetCountError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetCountError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetCountError::SendRequest)?;
 
     let resp = cmif::parse_response::<&i32>(&buf).map_err(GetCountError::ParseResponse)?;
     let count = *resp.payload;
@@ -71,9 +66,8 @@ pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::IS_EMPTY).build();
-    req.write_to(&mut buf).map_err(IsEmptyError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(IsEmptyError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(IsEmptyError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(IsEmptyError::ParseResponse)?;
     let val = *resp.payload;
@@ -88,9 +82,8 @@ pub fn is_full(session: SessionHandle) -> Result<bool, IsFullError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::IS_FULL).build();
-    req.write_to(&mut buf).map_err(IsFullError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(IsFullError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(IsFullError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(IsFullError::ParseResponse)?;
     let val = *resp.payload;
@@ -110,10 +103,8 @@ pub fn get_attribute(
     let req = cmif::CmifRequestBuilder::new(proto::GET_ATTRIBUTE)
         .with_data_value(&index)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetAttributeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetAttributeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetAttributeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&MiiimgImageAttribute>(&buf)
         .map_err(GetAttributeError::ParseResponse)?;
@@ -134,12 +125,10 @@ pub fn load_image(
 
     let req = cmif::CmifRequestBuilder::new(proto::LOAD_IMAGE)
         .with_data_value(&id)
-        .add_output_buffer_raw(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
+        .add_output_buffer(OutputBuffer::new(dst, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(LoadImageError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(LoadImageError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(LoadImageError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(LoadImageError::ParseResponse)?;
 
@@ -149,12 +138,9 @@ pub fn load_image(
 /// Error returned by [`initialize`].
 #[derive(Debug, thiserror::Error)]
 pub enum InitializeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -163,12 +149,9 @@ pub enum InitializeError {
 /// Error returned by [`reload`].
 #[derive(Debug, thiserror::Error)]
 pub enum ReloadError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -177,12 +160,9 @@ pub enum ReloadError {
 /// Error returned by [`get_count`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetCountError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -191,12 +171,9 @@ pub enum GetCountError {
 /// Error returned by [`is_empty`].
 #[derive(Debug, thiserror::Error)]
 pub enum IsEmptyError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -205,12 +182,9 @@ pub enum IsEmptyError {
 /// Error returned by [`is_full`].
 #[derive(Debug, thiserror::Error)]
 pub enum IsFullError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -219,12 +193,9 @@ pub enum IsFullError {
 /// Error returned by [`get_attribute`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetAttributeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -233,12 +204,9 @@ pub enum GetAttributeError {
 /// Error returned by [`load_image`].
 #[derive(Debug, thiserror::Error)]
 pub enum LoadImageError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

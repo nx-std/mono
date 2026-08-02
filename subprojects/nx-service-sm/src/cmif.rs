@@ -5,7 +5,7 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{ServiceName, cmif, ipc};
+use nx_sf::{ServiceName, cmif};
 use nx_svc::ipc::Handle as SessionHandle;
 
 use crate::proto;
@@ -26,10 +26,8 @@ pub fn get_service_handle(
     let req = cmif::CmifRequestBuilder::new(proto::GET_SERVICE_HANDLE)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetServiceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetServiceError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetServiceError::ParseResponse)?;
 
@@ -44,12 +42,9 @@ pub fn get_service_handle(
 /// Error returned by [`get_service_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetServiceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -91,10 +86,8 @@ pub fn register_service(
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_SERVICE)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(RegisterServiceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RegisterServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RegisterServiceError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(RegisterServiceError::ParseResponse)?;
 
@@ -109,12 +102,9 @@ pub fn register_service(
 /// Error returned by [`register_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterServiceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -139,9 +129,8 @@ pub fn unregister_service(
     let req = cmif::CmifRequestBuilder::new(proto::UNREGISTER_SERVICE)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(UnregisterServiceError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(UnregisterServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(UnregisterServiceError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(UnregisterServiceError::ParseResponse)?;
 
@@ -151,12 +140,9 @@ pub fn unregister_service(
 /// Error returned by [`unregister_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum UnregisterServiceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -176,9 +162,8 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
         .with_data(&payload)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(DetachClientError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DetachClientError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DetachClientError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DetachClientError::ParseResponse)?;
 
@@ -188,12 +173,9 @@ pub fn detach_client(session: SessionHandle) -> Result<(), DetachClientError> {
 /// Error returned by [`detach_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum DetachClientError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -213,9 +195,8 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
         .with_data(&payload)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(RegisterClientError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(RegisterClientError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RegisterClientError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RegisterClientError::ParseResponse)?;
 
@@ -225,12 +206,9 @@ pub fn register_client(session: SessionHandle) -> Result<(), RegisterClientError
 /// Error returned by [`register_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterClientError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

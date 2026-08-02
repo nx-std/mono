@@ -4,7 +4,12 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{cmif, hipc::BufferMode, ipc, ipc::Handle, service::Session, tipc};
+use nx_sf::{
+    hipc::{BufferMode, InputBuffer},
+    ipc::Handle,
+    service::Session,
+    tipc,
+};
 
 use crate::{
     proto,
@@ -24,9 +29,8 @@ fn dispatch_in_u64(session: Handle, cmd_id: u32, value: u64) -> Result<(), Dispa
     let req = tipc::TipcRequestBuilder::new(cmd_id)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     tipc::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -44,9 +48,8 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     let req = tipc::TipcRequestBuilder::new(cmd_id)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     tipc::parse_response::<()>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -60,9 +63,8 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchError> 
 
     tipc::TipcRequestBuilder::new(cmd_id)
         .build()
-        .write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+        .send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = tipc::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -78,9 +80,8 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchError
 
     tipc::TipcRequestBuilder::new(cmd_id)
         .build()
-        .write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+        .send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = tipc::parse_response::<&u8>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -89,10 +90,8 @@ fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchError
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] tipc::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] tipc::ParseResponseError),
 }
@@ -121,9 +120,8 @@ pub fn launch_program(
     let req = tipc::TipcRequestBuilder::new(proto::LAUNCH_PROGRAM)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = tipc::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -152,15 +150,10 @@ pub fn launch_program_from_host(
     unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), pm_launch_flags) };
     let req = tipc::TipcRequestBuilder::new(proto::LAUNCH_PROGRAM_FROM_HOST)
         .with_data(&payload)
-        .add_input_buffer_raw(
-            content_path.as_ptr(),
-            content_path.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = tipc::parse_response::<&u64>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -179,15 +172,10 @@ pub fn get_host_content_meta_info(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = tipc::TipcRequestBuilder::new(proto::GET_HOST_CONTENT_META_INFO)
-        .add_input_buffer_raw(
-            content_path.as_ptr(),
-            content_path.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp =
         tipc::parse_response::<&ContentMetaInfo>(&buf).map_err(DispatchError::ParseResponse)?;
@@ -219,9 +207,8 @@ pub fn is_process_tracked(session: Handle, pid: u64) -> Result<bool, DispatchErr
     let req = tipc::TipcRequestBuilder::new(proto::IS_PROCESS_TRACKED)
         .with_data(&payload)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = tipc::parse_response::<&u8>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -258,9 +245,8 @@ pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverEr
 
     tipc::TipcRequestBuilder::new(proto::GET_EVENT_OBSERVER)
         .build()
-        .write_to(&mut buf)
-        .map_err(GetEventObserverError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(GetEventObserverError::SendRequest)?;
+        .send(&mut buf, session)
+        .map_err(GetEventObserverError::SendRequest)?;
 
     let resp = tipc::parse_response::<()>(&buf).map_err(GetEventObserverError::ParseResponse)?;
 
@@ -279,10 +265,8 @@ pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverEr
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetEventObserverError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] tipc::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] tipc::ParseResponseError),
     #[error("missing observer handle in response")]
@@ -297,9 +281,8 @@ pub fn observer_get_process_event(session: Handle) -> Result<u32, GetProcessEven
 
     tipc::TipcRequestBuilder::new(proto::OBSERVER_GET_PROCESS_EVENT)
         .build()
-        .write_to(&mut buf)
-        .map_err(GetProcessEventError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(GetProcessEventError::SendRequest)?;
+        .send(&mut buf, session)
+        .map_err(GetProcessEventError::SendRequest)?;
 
     let resp = tipc::parse_response::<()>(&buf).map_err(GetProcessEventError::ParseResponse)?;
 
@@ -314,10 +297,8 @@ pub fn observer_get_process_event(session: Handle) -> Result<u32, GetProcessEven
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetProcessEventError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] tipc::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] tipc::ParseResponseError),
     #[error("missing event handle in response")]
@@ -332,9 +313,8 @@ pub fn observer_get_process_event_info(session: Handle) -> Result<ProcessEventIn
 
     tipc::TipcRequestBuilder::new(proto::OBSERVER_GET_PROCESS_EVENT_INFO)
         .build()
-        .write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+        .send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp =
         tipc::parse_response::<&ProcessEventInfo>(&buf).map_err(DispatchError::ParseResponse)?;

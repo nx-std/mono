@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the temperature measurement service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -21,10 +18,8 @@ pub fn get_temperature_range(
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_RANGE)
         .with_data_value(&location)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetTemperatureRangeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureRangeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetTemperatureRangeError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&[i32; 2]>(&buf).map_err(GetTemperatureRangeError::ParseResponse)?;
@@ -43,10 +38,8 @@ pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetT
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE)
         .with_data_value(&location)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetTemperatureError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetTemperatureError::SendRequest)?;
 
     let resp = cmif::parse_response::<&i32>(&buf).map_err(GetTemperatureError::ParseResponse)?;
 
@@ -65,10 +58,8 @@ pub fn get_temperature_milli_c(
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_MILLI_C)
         .with_data_value(&location)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetTemperatureMilliCError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetTemperatureMilliCError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetTemperatureMilliCError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&i32>(&buf).map_err(GetTemperatureMilliCError::ParseResponse)?;
@@ -90,10 +81,8 @@ pub fn open_session(
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&device_code)
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenSessionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenSessionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenSessionError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(OpenSessionError::ParseResponse)?;
 
@@ -112,10 +101,8 @@ pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGet
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SESSION_GET_TEMPERATURE).build();
-    req.write_to(&mut buf)
-        .map_err(SessionGetTemperatureError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SessionGetTemperatureError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SessionGetTemperatureError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&f32>(&buf).map_err(SessionGetTemperatureError::ParseResponse)?;
@@ -126,12 +113,9 @@ pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGet
 /// Error returned by [`get_temperature_range`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetTemperatureRangeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -140,12 +124,9 @@ pub enum GetTemperatureRangeError {
 /// Error returned by [`get_temperature`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetTemperatureError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -154,12 +135,9 @@ pub enum GetTemperatureError {
 /// Error returned by [`get_temperature_milli_c`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetTemperatureMilliCError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -168,12 +146,9 @@ pub enum GetTemperatureMilliCError {
 /// Error returned by [`open_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenSessionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -185,12 +160,9 @@ pub enum OpenSessionError {
 /// Error returned by [`session_get_temperature`].
 #[derive(Debug, thiserror::Error)]
 pub enum SessionGetTemperatureError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

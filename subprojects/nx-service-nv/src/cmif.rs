@@ -6,8 +6,8 @@
 use nx_service_applet::aruid::Aruid;
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 use nx_svc::{
     mem::tmem::Handle as TmemHandle, process::Handle as ProcessHandle, raw::Handle as RawHandle,
@@ -28,11 +28,10 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError>
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::OPEN)
-        .add_input_buffer_raw(device_path.as_ptr(), device_path.len(), BufferMode::Normal)
+        .add_input_buffer(InputBuffer::new(device_path, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf).map_err(OpenError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenError::SendRequest)?;
 
     // Response contains: fd (u32), error (u32).
     #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
@@ -81,21 +80,37 @@ pub fn ioctl(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    {
-        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).with_data_value(&input);
-        if in_size > 0 {
-            builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+    // Both halves target the same `argp` region when in_size == out_size and both are
+    // requested - the nv ioctl ABI never mixes an in-only and an out-only size over
+    // shared memory, so a single inout descriptor pair covers that case.
+    let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL).with_data_value(&input);
+    builder = match (in_size > 0, out_size > 0) {
+        (true, true) => {
+            // SAFETY: nv ioctl ABI - the caller of __nx_nv_ioctl* guarantees argp is
+            // valid for in_size (== out_size) bytes for the duration of this call, and
+            // exclusively borrowed since the request reads then writes through it.
+            let buf = unsafe { InOutBuffer::from_raw_parts(argp, in_size, BufferMode::Normal) };
+            builder.add_inout_auto_buffer(buf)
         }
-        if out_size > 0 {
-            builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+        (true, false) => {
+            // SAFETY: nv ioctl ABI - the caller of __nx_nv_ioctl* guarantees argp is
+            // valid for in_size bytes for the duration of this call.
+            let buf = unsafe { InputBuffer::from_raw_parts(argp, in_size, BufferMode::Normal) };
+            builder.add_in_auto_buffer(buf)
         }
-        builder
-            .build()
-            .write_to(&mut buf)
-            .map_err(IoctlError::BuildRequest)?
+        (false, true) => {
+            // SAFETY: nv ioctl ABI - the caller of __nx_nv_ioctl* guarantees argp is
+            // valid for out_size bytes for the duration of this call.
+            let buf = unsafe { OutputBuffer::from_raw_parts(argp, out_size, BufferMode::Normal) };
+            builder.add_out_auto_buffer(buf)
+        }
+        (false, false) => builder,
     };
 
-    ipc::send_sync_request(&mut buf, session).map_err(IoctlError::SendRequest)?;
+    builder
+        .build()
+        .send(&mut buf, session)
+        .map_err(IoctlError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(IoctlError::ParseResponse)?;
     let error = *resp.payload;
@@ -138,23 +153,42 @@ pub fn ioctl2(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    {
-        // Auto buffers in order: argp in (if applicable), extra in, argp out (if applicable).
-        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).with_data_value(&input);
-        if in_size > 0 {
-            builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+    // Auto buffers in order: argp in (if applicable), extra in, argp out (if
+    // applicable). The in/out descriptor lists are tracked independently by the
+    // builder, so folding argp's in and out halves into one inout descriptor here
+    // does not disturb that order.
+    let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL2).with_data_value(&input);
+    builder = match (in_size > 0, out_size > 0) {
+        (true, true) => {
+            // SAFETY: nv ioctl2 ABI - the caller of __nx_nv_ioctl2* guarantees argp is
+            // valid for in_size (== out_size) bytes for the duration of this call, and
+            // exclusively borrowed since the request reads then writes through it.
+            let buf = unsafe { InOutBuffer::from_raw_parts(argp, in_size, BufferMode::Normal) };
+            builder.add_inout_auto_buffer(buf)
         }
-        builder = builder.add_in_auto_buffer(extra_in, extra_in_size, BufferMode::Normal);
-        if out_size > 0 {
-            builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+        (true, false) => {
+            // SAFETY: nv ioctl2 ABI - the caller of __nx_nv_ioctl2* guarantees argp is
+            // valid for in_size bytes for the duration of this call.
+            let buf = unsafe { InputBuffer::from_raw_parts(argp, in_size, BufferMode::Normal) };
+            builder.add_in_auto_buffer(buf)
         }
-        builder
-            .build()
-            .write_to(&mut buf)
-            .map_err(Ioctl2Error::BuildRequest)?
+        (false, true) => {
+            // SAFETY: nv ioctl2 ABI - the caller of __nx_nv_ioctl2* guarantees argp is
+            // valid for out_size bytes for the duration of this call.
+            let buf = unsafe { OutputBuffer::from_raw_parts(argp, out_size, BufferMode::Normal) };
+            builder.add_out_auto_buffer(buf)
+        }
+        (false, false) => builder,
     };
 
-    ipc::send_sync_request(&mut buf, session).map_err(Ioctl2Error::SendRequest)?;
+    // SAFETY: nv ioctl2 ABI - the caller of __nx_nv_ioctl2* guarantees extra_in is
+    // valid for extra_in_size bytes for the duration of this call.
+    let extra_in_buf =
+        unsafe { InputBuffer::from_raw_parts(extra_in, extra_in_size, BufferMode::Normal) };
+    let req = builder.add_in_auto_buffer(extra_in_buf).build();
+
+    req.send(&mut buf, session)
+        .map_err(Ioctl2Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(Ioctl2Error::ParseResponse)?;
     let error = *resp.payload;
@@ -197,23 +231,42 @@ pub fn ioctl3(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    {
-        // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra out.
-        let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).with_data_value(&input);
-        if in_size > 0 {
-            builder = builder.add_in_auto_buffer(argp, in_size, BufferMode::Normal);
+    // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra
+    // out. The in/out descriptor lists are tracked independently by the builder, so
+    // folding argp's in and out halves into one inout descriptor here does not
+    // disturb that order.
+    let mut builder = cmif::CmifRequestBuilder::new(nv_cmds::IOCTL3).with_data_value(&input);
+    builder = match (in_size > 0, out_size > 0) {
+        (true, true) => {
+            // SAFETY: nv ioctl3 ABI - the caller of __nx_nv_ioctl3* guarantees argp is
+            // valid for in_size (== out_size) bytes for the duration of this call, and
+            // exclusively borrowed since the request reads then writes through it.
+            let buf = unsafe { InOutBuffer::from_raw_parts(argp, in_size, BufferMode::Normal) };
+            builder.add_inout_auto_buffer(buf)
         }
-        if out_size > 0 {
-            builder = builder.add_out_auto_buffer(argp, out_size, BufferMode::Normal);
+        (true, false) => {
+            // SAFETY: nv ioctl3 ABI - the caller of __nx_nv_ioctl3* guarantees argp is
+            // valid for in_size bytes for the duration of this call.
+            let buf = unsafe { InputBuffer::from_raw_parts(argp, in_size, BufferMode::Normal) };
+            builder.add_in_auto_buffer(buf)
         }
-        builder = builder.add_out_auto_buffer(extra_out, extra_out_size, BufferMode::Normal);
-        builder
-            .build()
-            .write_to(&mut buf)
-            .map_err(Ioctl3Error::BuildRequest)?
+        (false, true) => {
+            // SAFETY: nv ioctl3 ABI - the caller of __nx_nv_ioctl3* guarantees argp is
+            // valid for out_size bytes for the duration of this call.
+            let buf = unsafe { OutputBuffer::from_raw_parts(argp, out_size, BufferMode::Normal) };
+            builder.add_out_auto_buffer(buf)
+        }
+        (false, false) => builder,
     };
 
-    ipc::send_sync_request(&mut buf, session).map_err(Ioctl3Error::SendRequest)?;
+    // SAFETY: nv ioctl3 ABI - the caller of __nx_nv_ioctl3* guarantees extra_out is
+    // valid for extra_out_size bytes for the duration of this call.
+    let extra_out_buf =
+        unsafe { OutputBuffer::from_raw_parts(extra_out, extra_out_size, BufferMode::Normal) };
+    let req = builder.add_out_auto_buffer(extra_out_buf).build();
+
+    req.send(&mut buf, session)
+        .map_err(Ioctl3Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(Ioctl3Error::ParseResponse)?;
     let error = *resp.payload;
@@ -237,9 +290,8 @@ pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
     let req = cmif::CmifRequestBuilder::new(nv_cmds::CLOSE)
         .with_data_value(&fd_raw)
         .build();
-    req.write_to(&mut buf).map_err(CloseError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CloseError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CloseError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(CloseError::ParseResponse)?;
     let error = *resp.payload;
@@ -269,10 +321,8 @@ pub fn initialize(
         .add_copy_handle(process_handle.to_raw())
         .add_copy_handle(tmem_handle.to_raw())
         .build();
-    req.write_to(&mut buf)
-        .map_err(InitializeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(InitializeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(InitializeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(InitializeError::ParseResponse)?;
 
@@ -307,10 +357,8 @@ pub fn query_event(
     let req = cmif::CmifRequestBuilder::new(nv_cmds::QUERY_EVENT)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(QueryEventError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(QueryEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(QueryEventError::SendRequest)?;
 
     // Response contains error code (u32) and a copy handle for the event.
     let resp = cmif::parse_response::<&u32>(&buf).map_err(QueryEventError::ParseResponse)?;
@@ -340,10 +388,8 @@ pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetCli
         .with_data_value(&aruid_raw)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetClientPidError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetClientPidError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetClientPidError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetClientPidError::ParseResponse)?;
 
@@ -353,12 +399,9 @@ pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetCli
 /// Error returned by open operation.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -370,12 +413,9 @@ pub enum OpenError {
 /// Error returned by ioctl operation.
 #[derive(Debug, thiserror::Error)]
 pub enum IoctlError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -387,12 +427,9 @@ pub enum IoctlError {
 /// Error returned by ioctl2 operation.
 #[derive(Debug, thiserror::Error)]
 pub enum Ioctl2Error {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -404,12 +441,9 @@ pub enum Ioctl2Error {
 /// Error returned by ioctl3 operation.
 #[derive(Debug, thiserror::Error)]
 pub enum Ioctl3Error {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -421,12 +455,9 @@ pub enum Ioctl3Error {
 /// Error returned by close operation.
 #[derive(Debug, thiserror::Error)]
 pub enum CloseError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -438,12 +469,9 @@ pub enum CloseError {
 /// Error returned by initialize operation.
 #[derive(Debug, thiserror::Error)]
 pub enum InitializeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -452,12 +480,9 @@ pub enum InitializeError {
 /// Error returned by query_event operation.
 #[derive(Debug, thiserror::Error)]
 pub enum QueryEventError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -472,12 +497,9 @@ pub enum QueryEventError {
 /// Error returned by set_client_pid operation.
 #[derive(Debug, thiserror::Error)]
 pub enum SetClientPidError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

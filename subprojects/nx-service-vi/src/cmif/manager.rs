@@ -2,10 +2,7 @@
 //!
 //! Available only to Manager service type.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::{
     cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
@@ -43,10 +40,8 @@ pub fn create_managed_layer(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::CREATE_MANAGED_LAYER)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(CreateManagedLayerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CreateManagedLayerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CreateManagedLayerError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&u64>(&buf).map_err(CreateManagedLayerError::ParseResponse)?;
@@ -69,10 +64,8 @@ pub fn destroy_managed_layer(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
         .with_data_value(&layer_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DestroyManagedLayerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DestroyManagedLayerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DestroyManagedLayerError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DestroyManagedLayerError::ParseResponse)?;
 
@@ -120,10 +113,8 @@ pub fn set_display_alpha(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_ALPHA)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetDisplayAlphaError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayAlphaError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetDisplayAlphaError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetDisplayAlphaError::ParseResponse)?;
 
@@ -157,10 +148,8 @@ pub fn set_display_layer_stack(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_LAYER_STACK)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetDisplayLayerStackError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayLayerStackError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetDisplayLayerStackError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetDisplayLayerStackError::ParseResponse)?;
 
@@ -194,10 +183,8 @@ pub fn set_display_power_state(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_DISPLAY_POWER_STATE)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetDisplayPowerStateError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayPowerStateError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetDisplayPowerStateError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetDisplayPowerStateError::ParseResponse)?;
 
@@ -232,10 +219,8 @@ pub fn add_to_layer_stack(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::ADD_TO_LAYER_STACK)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(AddToLayerStackError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(AddToLayerStackError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(AddToLayerStackError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(AddToLayerStackError::ParseResponse)?;
 
@@ -255,10 +240,8 @@ pub fn set_content_visibility(
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY)
         .with_data_value(&visible_u8)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetContentVisibilityError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetContentVisibilityError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetContentVisibilityError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetContentVisibilityError::ParseResponse)?;
 
@@ -270,12 +253,9 @@ pub fn set_content_visibility(
 /// Error from [`create_managed_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateManagedLayerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -284,12 +264,9 @@ pub enum CreateManagedLayerError {
 /// Error from [`destroy_managed_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum DestroyManagedLayerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -298,12 +275,9 @@ pub enum DestroyManagedLayerError {
 /// Error from [`set_display_alpha`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayAlphaError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -312,12 +286,9 @@ pub enum SetDisplayAlphaError {
 /// Error from [`set_display_layer_stack`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayLayerStackError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -326,12 +297,9 @@ pub enum SetDisplayLayerStackError {
 /// Error from [`set_display_power_state`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayPowerStateError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -340,12 +308,9 @@ pub enum SetDisplayPowerStateError {
 /// Error from [`add_to_layer_stack`].
 #[derive(Debug, thiserror::Error)]
 pub enum AddToLayerStackError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -354,12 +319,9 @@ pub enum AddToLayerStackError {
 /// Error from [`set_content_visibility`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetContentVisibilityError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

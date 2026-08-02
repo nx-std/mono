@@ -22,17 +22,17 @@ pub const MIN_PREFIX_BUF_SIZE: usize =
 /// The Horizon kernel defines four cases for the receive-list field (yuzu/suyu
 /// `ReceiveListCountType`):
 ///
-/// - `0` — no recv-list; the server may not return Type-X pointer data.
-/// - `1` — `ToMessageBuffer`: server places returned pointer data inside the
+/// - `0` - no recv-list; the server may not return Type-X pointer data.
+/// - `1` - `ToMessageBuffer`: server places returned pointer data inside the
 ///   client's TLS message buffer; no wire slot is reserved.
-/// - `2` — `ToSingleBuffer`: one wire slot the server may subdivide for all
+/// - `2` - `ToSingleBuffer`: one wire slot the server may subdivide for all
 ///   returned pointer data.
-/// - `2 + n` for `n ∈ 1..=13` — per-pointer recv-list of `n` entries; entry
+/// - `2 + n` for `n ∈ 1..=13` - per-pointer recv-list of `n` entries; entry
 ///   `i` destinations the `i`-th out-pointer descriptor.
 pub const RECV_LIST_WIRE_NONE: u8 = 0;
-/// See [`RECV_LIST_WIRE_NONE`].
-pub const RECV_LIST_WIRE_TO_MESSAGE_BUFFER: u8 = 1;
-/// See [`RECV_LIST_WIRE_NONE`].
+/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `1` ("to message buffer") sits
+/// between these two values; it is a server-side receive pattern with no
+/// client-side constant.
 pub const RECV_LIST_WIRE_SINGLE_BUFFER: u8 = 2;
 
 /// HIPC message header (8 bytes).
@@ -53,7 +53,7 @@ pub const RECV_LIST_WIRE_SINGLE_BUFFER: u8 = 2;
 /// ║                              ║    (4)    │    (4)    ║    (4)    │    (4)    ║
 /// ╚══════════════════════════════╩═══════════╧═══════════╩═══════════╧═══════════╝
 ///
-/// Word 1 (bits 32..63) — all internal field splits fall inside a byte
+/// Word 1 (bits 32..63) - all internal field splits fall inside a byte
 ///  32                41 42        45 46            51 52                  62     63
 /// ╔══════════════════╤════════════╤════════════════╤══════════════════════╤══════╗
 /// ║  num_data_words  │  recv_st.  │    padding     │   recv_list_offset   │ `S`  ║
@@ -200,7 +200,7 @@ const_assert_eq!(size_of::<StaticDescriptor>(), 8);
 
 impl StaticDescriptor {
     /// Creates a static descriptor for sending data.
-    pub fn new_send(buffer: *const u8, size: usize, index: u8) -> Self {
+    pub(crate) fn new_send(buffer: *const u8, size: usize, index: u8) -> Self {
         let addr = buffer as usize;
         Self::new()
             .with_index(index & 0x3F)
@@ -284,7 +284,7 @@ const_assert_eq!(size_of::<BufferDescriptor>(), 12);
 
 impl BufferDescriptor {
     /// Creates a buffer descriptor with the given mode.
-    pub fn new_buffer(buffer: *const u8, size: usize, mode: BufferMode) -> Self {
+    pub(crate) fn new_buffer(buffer: *const u8, size: usize, mode: BufferMode) -> Self {
         let addr = buffer as usize;
         Self::new()
             .with_mode(mode)
@@ -373,7 +373,7 @@ const_assert_eq!(size_of::<RecvListEntry>(), 8);
 
 impl RecvListEntry {
     /// Creates a _receive list entry_.
-    pub fn new_recv(buffer: *mut u8, size: usize) -> Self {
+    pub(crate) fn new_recv(buffer: *mut u8, size: usize) -> Self {
         let addr = buffer as usize;
         Self::new()
             .with_address_low(addr as u32)

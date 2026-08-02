@@ -2,8 +2,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::proto;
@@ -49,12 +49,10 @@ pub fn pull_context(
 
     let req = cmif::CmifRequestBuilder::new(proto::PULL_CONTEXT)
         .with_data_value(&input)
-        .add_output_buffer_raw(dst.as_mut_ptr(), dst.len(), BufferMode::Normal)
+        .add_output_buffer(OutputBuffer::new(dst, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(PullContextError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(PullContextError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(PullContextError::SendRequest)?;
 
     let resp = cmif::parse_response::<&Output>(&buf).map_err(PullContextError::ParseResponse)?;
 
@@ -70,12 +68,9 @@ pub fn pull_context(
 /// Error returned by [`pull_context`].
 #[derive(Debug, thiserror::Error)]
 pub enum PullContextError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

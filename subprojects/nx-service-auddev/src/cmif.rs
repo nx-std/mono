@@ -1,11 +1,9 @@
 //! CMIF protocol operations for the IAudioDevice service.
 
-use core::mem::size_of;
-
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{proto, types::AudioDeviceName};
@@ -24,10 +22,8 @@ pub fn get_audio_device_service(
     let req = cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_SERVICE)
         .with_data_value(&aruid)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetAudioDeviceServiceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetAudioDeviceServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetAudioDeviceServiceError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<()>(&buf).map_err(GetAudioDeviceServiceError::ParseResponse)?;
@@ -43,10 +39,8 @@ pub fn get_audio_device_service(
 /// Error returned by [`get_audio_device_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetAudioDeviceServiceError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing session handle in response")]
@@ -64,16 +58,19 @@ pub fn list_audio_device_name(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME).add_out_auto_buffer(
-        names.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(names),
-        BufferMode::Normal,
-    );
+    // SAFETY: `AudioDeviceName` is `#[repr(C)]` wrapping `[u8; 0x100]`, so the
+    // typed slice can be reinterpreted as a byte slice for the call duration.
+    let names_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            names.as_mut_ptr().cast::<u8>(),
+            core::mem::size_of_val(names),
+        )
+    };
+    let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME)
+        .add_out_auto_buffer(OutputBuffer::new(names_bytes, BufferMode::Normal));
     req.build()
-        .write_to(&mut buf)
-        .map_err(ListAudioDeviceNameError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ListAudioDeviceNameError::SendRequest)?;
+        .send(&mut buf, session)
+        .map_err(ListAudioDeviceNameError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&i32>(&buf).map_err(ListAudioDeviceNameError::ParseResponse)?;
@@ -94,17 +91,19 @@ pub fn list_audio_device_name_legacy(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME_OLD)
-        .add_output_buffer_raw(
+    // SAFETY: `AudioDeviceName` is `#[repr(C)]` wrapping `[u8; 0x100]`, so the
+    // typed slice can be reinterpreted as a byte slice for the call duration.
+    let names_bytes = unsafe {
+        core::slice::from_raw_parts_mut(
             names.as_mut_ptr().cast::<u8>(),
             core::mem::size_of_val(names),
-            BufferMode::Normal,
         )
+    };
+    let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME_OLD)
+        .add_output_buffer(OutputBuffer::new(names_bytes, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(ListAudioDeviceNameError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ListAudioDeviceNameError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ListAudioDeviceNameError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&i32>(&buf).map_err(ListAudioDeviceNameError::ParseResponse)?;
@@ -117,10 +116,8 @@ pub fn list_audio_device_name_legacy(
 /// Error returned by [`list_audio_device_name`] / [`list_audio_device_name_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum ListAudioDeviceNameError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -137,16 +134,9 @@ pub fn set_audio_device_output_volume(
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME)
         .with_data_value(&volume)
-        .add_in_auto_buffer(
-            (device_name as *const AudioDeviceName).cast::<u8>(),
-            size_of::<AudioDeviceName>(),
-            BufferMode::Normal,
-        )
+        .add_in_auto_buffer(InputBuffer::new(&device_name.name, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetAudioDeviceOutputVolumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
@@ -166,16 +156,9 @@ pub fn set_audio_device_output_volume_legacy(
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
         .with_data_value(&volume)
-        .add_input_buffer_raw(
-            (device_name as *const AudioDeviceName).cast::<u8>(),
-            size_of::<AudioDeviceName>(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(&device_name.name, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetAudioDeviceOutputVolumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(SetAudioDeviceOutputVolumeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetAudioDeviceOutputVolumeError::ParseResponse)?;
@@ -186,10 +169,8 @@ pub fn set_audio_device_output_volume_legacy(
 /// Error returned by [`set_audio_device_output_volume`] / [`set_audio_device_output_volume_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetAudioDeviceOutputVolumeError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -204,16 +185,9 @@ pub fn get_audio_device_output_volume(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME)
-        .add_in_auto_buffer(
-            (device_name as *const AudioDeviceName).cast::<u8>(),
-            size_of::<AudioDeviceName>(),
-            BufferMode::Normal,
-        )
+        .add_in_auto_buffer(InputBuffer::new(&device_name.name, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetAudioDeviceOutputVolumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&f32>(&buf)
@@ -234,16 +208,9 @@ pub fn get_audio_device_output_volume_legacy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_AUDIO_DEVICE_OUTPUT_VOLUME_OLD)
-        .add_input_buffer_raw(
-            (device_name as *const AudioDeviceName).cast::<u8>(),
-            size_of::<AudioDeviceName>(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(&device_name.name, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetAudioDeviceOutputVolumeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetAudioDeviceOutputVolumeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&f32>(&buf)
@@ -257,10 +224,8 @@ pub fn get_audio_device_output_volume_legacy(
 /// Error returned by [`get_audio_device_output_volume`] / [`get_audio_device_output_volume_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetAudioDeviceOutputVolumeError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -275,16 +240,9 @@ pub fn get_active_audio_device_name(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_ACTIVE_AUDIO_DEVICE_NAME)
-        .add_out_auto_buffer(
-            (device_name as *mut AudioDeviceName).cast::<u8>(),
-            size_of::<AudioDeviceName>(),
-            BufferMode::Normal,
-        )
+        .add_out_auto_buffer(OutputBuffer::new(&mut device_name.name, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetActiveAudioDeviceNameError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetActiveAudioDeviceNameError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
@@ -302,16 +260,9 @@ pub fn get_active_audio_device_name_legacy(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_ACTIVE_AUDIO_DEVICE_NAME_OLD)
-        .add_output_buffer_raw(
-            (device_name as *mut AudioDeviceName).cast::<u8>(),
-            size_of::<AudioDeviceName>(),
-            BufferMode::Normal,
-        )
+        .add_output_buffer(OutputBuffer::new(&mut device_name.name, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetActiveAudioDeviceNameError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetActiveAudioDeviceNameError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(GetActiveAudioDeviceNameError::ParseResponse)?;
@@ -322,10 +273,8 @@ pub fn get_active_audio_device_name_legacy(
 /// Error returned by [`get_active_audio_device_name`] / [`get_active_audio_device_name_legacy`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetActiveAudioDeviceNameError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }

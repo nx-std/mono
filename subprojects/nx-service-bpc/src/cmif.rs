@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the BPC service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::{proto, types::SleepButtonState};
 
@@ -14,10 +11,8 @@ pub fn shutdown_system(session: SessionHandle) -> Result<(), ShutdownSystemError
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN_SYSTEM).build();
-    req.write_to(&mut buf)
-        .map_err(ShutdownSystemError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ShutdownSystemError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ShutdownSystemError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ShutdownSystemError::ParseResponse)?;
 
@@ -31,10 +26,8 @@ pub fn reboot_system(session: SessionHandle) -> Result<(), RebootSystemError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::REBOOT_SYSTEM).build();
-    req.write_to(&mut buf)
-        .map_err(RebootSystemError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(RebootSystemError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(RebootSystemError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(RebootSystemError::ParseResponse)?;
 
@@ -53,10 +46,8 @@ pub fn get_sleep_button_state(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SLEEP_BUTTON_STATE).build();
-    req.write_to(&mut buf)
-        .map_err(GetSleepButtonStateError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSleepButtonStateError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSleepButtonStateError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&u8>(&buf).map_err(GetSleepButtonStateError::ParseResponse)?;
@@ -76,10 +67,8 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_POWER_BUTTON).build();
-    req.write_to(&mut buf)
-        .map_err(GetPowerButtonError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetPowerButtonError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetPowerButtonError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(GetPowerButtonError::ParseResponse)?;
 
@@ -91,10 +80,8 @@ pub fn get_power_button(session: SessionHandle) -> Result<bool, GetPowerButtonEr
 /// Error returned by [`shutdown_system`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShutdownSystemError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -102,10 +89,8 @@ pub enum ShutdownSystemError {
 /// Error returned by [`reboot_system`].
 #[derive(Debug, thiserror::Error)]
 pub enum RebootSystemError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -113,10 +98,8 @@ pub enum RebootSystemError {
 /// Error returned by [`get_sleep_button_state`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSleepButtonStateError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("unknown sleep button state: {0}")]
@@ -126,10 +109,8 @@ pub enum GetSleepButtonStateError {
 /// Error returned by [`get_power_button`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetPowerButtonError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }

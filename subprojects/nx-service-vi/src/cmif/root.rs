@@ -3,11 +3,7 @@
 //! The root service is used to get IApplicationDisplayService and
 //! fatal display commands (16.0.0+ Manager only).
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-    service::Session,
-};
+use nx_sf::{cmif, hipc::InputBuffer, ipc::Handle as SessionHandle, service::Session};
 
 use crate::proto::root_cmds;
 
@@ -37,10 +33,8 @@ pub fn get_display_service(
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&inval)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetDisplayServiceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetDisplayServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetDisplayServiceError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetDisplayServiceError::ParseResponse)?;
 
@@ -66,10 +60,8 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::PREPARE_FATAL).build();
-    req.write_to(&mut buf)
-        .map_err(PrepareFatalError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(PrepareFatalError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(PrepareFatalError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(PrepareFatalError::ParseResponse)?;
 
@@ -85,10 +77,8 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::SHOW_FATAL).build();
-    req.write_to(&mut buf)
-        .map_err(ShowFatalError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ShowFatalError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ShowFatalError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ShowFatalError::ParseResponse)?;
 
@@ -110,7 +100,7 @@ pub fn draw_fatal_rectangle(
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
-    // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` — naturally
+    // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` - naturally
     // aligned, total 20 bytes (u16 + 2 bytes padding + 4 * s32).
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -135,10 +125,8 @@ pub fn draw_fatal_rectangle(
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_RECTANGLE)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DrawFatalRectangleError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DrawFatalRectangleError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DrawFatalRectangleError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DrawFatalRectangleError::ParseResponse)?;
 
@@ -202,16 +190,13 @@ pub fn draw_fatal_text32(
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_TEXT32)
         .with_data_value(&input)
-        .add_input_buffer_raw(
-            codepoints_bytes.as_ptr(),
-            codepoints_bytes.len(),
+        .add_input_buffer(InputBuffer::new(
+            codepoints_bytes,
             nx_sf::hipc::BufferMode::Normal,
-        )
+        ))
         .build();
-    req.write_to(&mut buf)
-        .map_err(DrawFatalText32Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DrawFatalText32Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DrawFatalText32Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&i32>(&buf).map_err(DrawFatalText32Error::ParseResponse)?;
 
@@ -224,12 +209,9 @@ pub fn draw_fatal_text32(
 /// Error from [`get_display_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayServiceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -241,12 +223,9 @@ pub enum GetDisplayServiceError {
 /// Error from [`prepare_fatal`].
 #[derive(Debug, thiserror::Error)]
 pub enum PrepareFatalError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -255,12 +234,9 @@ pub enum PrepareFatalError {
 /// Error from [`show_fatal`].
 #[derive(Debug, thiserror::Error)]
 pub enum ShowFatalError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -269,12 +245,9 @@ pub enum ShowFatalError {
 /// Error from [`draw_fatal_rectangle`].
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalRectangleError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -283,12 +256,9 @@ pub enum DrawFatalRectangleError {
 /// Error from [`draw_fatal_text32`].
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalText32Error {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

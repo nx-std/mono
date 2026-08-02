@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the wlan:inf service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, WlanInfState};
 
@@ -46,10 +43,8 @@ fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispat
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(DispatchError::ParseResponse)?;
 
@@ -59,12 +54,9 @@ fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, Dispat
 /// Low-level error returned by [`dispatch_no_in_u32`].
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

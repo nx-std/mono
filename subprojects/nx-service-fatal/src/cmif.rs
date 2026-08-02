@@ -1,11 +1,9 @@
 //! CMIF protocol operations for the fatal service.
 
-use core::mem::size_of;
-
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::{
@@ -33,10 +31,8 @@ pub fn throw_fatal_with_policy(
         .with_data_value(&input)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(ThrowFatalError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ThrowFatalError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ThrowFatalError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ThrowFatalError::ParseResponse)?;
 
@@ -63,16 +59,20 @@ pub fn throw_fatal_with_context(
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_CONTEXT)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer_raw(
-            (ctx as *const FatalCpuContext).cast::<u8>(),
-            size_of::<FatalCpuContext>(),
+        .add_input_buffer(InputBuffer::new(
+            // SAFETY: `FatalCpuContext` is `#[repr(C)]` plain data; reinterpreting
+            // as a byte slice for the IPC wire is sound.
+            unsafe {
+                core::slice::from_raw_parts(
+                    (ctx as *const FatalCpuContext).cast::<u8>(),
+                    core::mem::size_of::<FatalCpuContext>(),
+                )
+            },
             BufferMode::Normal,
-        )
+        ))
         .build();
-    req.write_to(&mut buf)
-        .map_err(ThrowFatalError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(ThrowFatalError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(ThrowFatalError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(ThrowFatalError::ParseResponse)?;
 
@@ -82,12 +82,9 @@ pub fn throw_fatal_with_context(
 /// Error returned by fatal throw operations.
 #[derive(Debug, thiserror::Error)]
 pub enum ThrowFatalError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

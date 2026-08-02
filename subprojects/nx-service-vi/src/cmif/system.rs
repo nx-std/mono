@@ -2,10 +2,7 @@
 //!
 //! Available to System and Manager service types.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::{
     cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
@@ -40,10 +37,8 @@ pub fn get_z_order_count_min(
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MIN)
         .with_data_value(&display_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetZOrderCountError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetZOrderCountError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetZOrderCountError::SendRequest)?;
 
     let resp = cmif::parse_response::<&i64>(&buf).map_err(GetZOrderCountError::ParseResponse)?;
 
@@ -65,10 +60,8 @@ pub fn get_z_order_count_max(
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MAX)
         .with_data_value(&display_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetZOrderCountError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetZOrderCountError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetZOrderCountError::SendRequest)?;
 
     let resp = cmif::parse_response::<&i64>(&buf).map_err(GetZOrderCountError::ParseResponse)?;
 
@@ -99,10 +92,7 @@ pub fn get_display_logical_resolution(
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
         .with_data_value(&display_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetDisplayLogicalResolutionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetDisplayLogicalResolutionError::SendRequest)?;
 
     #[repr(C)]
@@ -155,10 +145,8 @@ pub fn set_display_magnification(
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_DISPLAY_MAGNIFICATION)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetDisplayMagnificationError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetDisplayMagnificationError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetDisplayMagnificationError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetDisplayMagnificationError::ParseResponse)?;
 
@@ -193,10 +181,8 @@ pub fn set_layer_position(
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_POSITION)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetLayerPositionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetLayerPositionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetLayerPositionError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetLayerPositionError::ParseResponse)?;
 
@@ -231,10 +217,8 @@ pub fn set_layer_size(
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_SIZE)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetLayerSizeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetLayerSizeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetLayerSizeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetLayerSizeError::ParseResponse)?;
 
@@ -266,10 +250,8 @@ pub fn set_layer_z(
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_Z)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetLayerZError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetLayerZError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetLayerZError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetLayerZError::ParseResponse)?;
 
@@ -303,10 +285,8 @@ pub fn set_layer_visibility(
     let req = cmif::CmifRequestBuilder::new(system_cmds::SET_LAYER_VISIBILITY)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetLayerVisibilityError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetLayerVisibilityError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetLayerVisibilityError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetLayerVisibilityError::ParseResponse)?;
 
@@ -318,12 +298,9 @@ pub fn set_layer_visibility(
 /// Error from Z-order count operations.
 #[derive(Debug, thiserror::Error)]
 pub enum GetZOrderCountError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -332,12 +309,9 @@ pub enum GetZOrderCountError {
 /// Error from [`get_display_logical_resolution`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayLogicalResolutionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -346,12 +320,9 @@ pub enum GetDisplayLogicalResolutionError {
 /// Error from [`set_display_magnification`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetDisplayMagnificationError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -360,12 +331,9 @@ pub enum SetDisplayMagnificationError {
 /// Error from [`set_layer_position`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerPositionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -374,12 +342,9 @@ pub enum SetLayerPositionError {
 /// Error from [`set_layer_size`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerSizeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -388,12 +353,9 @@ pub enum SetLayerSizeError {
 /// Error from [`set_layer_z`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerZError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -402,12 +364,9 @@ pub enum SetLayerZError {
 /// Error from [`set_layer_visibility`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerVisibilityError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

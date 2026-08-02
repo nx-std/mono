@@ -2,11 +2,11 @@
 //!
 //! Two builder types match the operating mode of their originating wrapper:
 //!
-//! - [`Dispatch`] — produced by [`Session::dispatch`] and
+//! - [`Dispatch`] - produced by [`Session::dispatch`] and
 //!   [`OverrideService::dispatch`]. Non-domain mode: the response cannot carry
 //!   output domain objects, so there is no `out_objects` builder method and
 //!   [`DispatchResult`] does not carry an `objects` field.
-//! - [`DomainDispatch`] — produced by [`Domain::dispatch`] and
+//! - [`DomainDispatch`] - produced by [`Domain::dispatch`] and
 //!   [`DomainObject::dispatch`]. Domain mode: exposes [`out_objects`] and the
 //!   resulting [`DomainDispatchResult`] hands back ready-to-use
 //!   [`DomainObject`] instances, each constructed exactly once per dispatch
@@ -22,15 +22,13 @@
 //! [`OverrideService::dispatch`]: super::OverrideService::dispatch
 //! [`out_objects`]: DomainDispatch::out_objects
 
-use core::ptr;
-
 use nx_svc::ipc::Handle as SessionHandle;
 use nx_sys_thread_tls::IpcBuffer;
 
 use super::domain::{Domain, DomainObject};
 use crate::{
     cmif::{self, ObjectId},
-    hipc, ipc,
+    hipc::{self, InOutBuffer, InPointer, InputBuffer, OutPointer, OutputBuffer},
 };
 
 /// Maximum number of buffers in a single dispatch.
@@ -93,29 +91,17 @@ pub enum OutHandleAttr {
     Move = 2,
 }
 
-/// Buffer descriptor for dispatch.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Buffer {
-    /// Pointer to buffer data.
-    pub ptr: *const u8,
-    /// Size of buffer in bytes.
-    pub size: usize,
-}
-
 /// Builder for dispatching a single CMIF request.
 #[derive(Debug)]
 pub struct Dispatch<'a> {
     session: SessionHandle,
     pointer_buffer_size: u16,
     object_id: Option<ObjectId>,
-    _borrow: core::marker::PhantomData<&'a ()>,
     request_id: u32,
     context: u32,
-    in_data: *const u8,
-    in_data_size: usize,
+    in_data: &'a [u8],
     out_data_size: usize,
-    buffer_attrs: [BufferAttr; MAX_BUFFERS],
-    buffers: [Buffer; MAX_BUFFERS],
+    buffers: [Option<(BufferAttr, BufferSlot<'a>)>; MAX_BUFFERS],
     buffer_count: usize,
     in_objects: [Option<ObjectId>; MAX_IN_OBJECTS],
     in_object_count: usize,
@@ -139,14 +125,11 @@ impl<'a> Dispatch<'a> {
             session,
             pointer_buffer_size,
             object_id,
-            _borrow: core::marker::PhantomData,
             request_id,
             context: 0,
-            in_data: ptr::null(),
-            in_data_size: 0,
+            in_data: &[],
             out_data_size: 0,
-            buffer_attrs: [BufferAttr::default(); MAX_BUFFERS],
-            buffers: [Buffer::default(); MAX_BUFFERS],
+            buffers: [const { None }; MAX_BUFFERS],
             buffer_count: 0,
             in_objects: [None; MAX_IN_OBJECTS],
             in_object_count: 0,
@@ -165,12 +148,11 @@ impl<'a> Dispatch<'a> {
         self
     }
 
-    /// Sets the input data for the request. The slice must remain valid
-    /// until [`send`](Self::send) returns; the borrow is enforced via `'a`.
+    /// Sets the input data for the request. The borrow is held until
+    /// [`send`](Self::send) returns.
     #[inline]
     pub fn in_raw(mut self, data: &'a [u8]) -> Self {
-        self.in_data = data.as_ptr();
-        self.in_data_size = data.len();
+        self.in_data = data;
         self
     }
 
@@ -188,14 +170,14 @@ impl<'a> Dispatch<'a> {
     /// slots are full.
     #[inline]
     pub fn in_buffer(self, data: &'a [u8], attr: BufferAttr) -> Self {
-        self.push_buffer(data.as_ptr(), data.len(), attr.or(BufferAttr::IN))
+        self.push_buffer(BufferSlot::In(data), attr.or(BufferAttr::IN))
     }
 
     /// Adds an OUT buffer. [`BufferAttr::OUT`] is set automatically.
     /// Silently ignored once [`MAX_BUFFERS`] slots are full.
     #[inline]
     pub fn out_buffer(self, data: &'a mut [u8], attr: BufferAttr) -> Self {
-        self.push_buffer(data.as_mut_ptr(), data.len(), attr.or(BufferAttr::OUT))
+        self.push_buffer(BufferSlot::Out(data), attr.or(BufferAttr::OUT))
     }
 
     /// Adds an IN/OUT buffer. Both [`BufferAttr::IN`] and [`BufferAttr::OUT`]
@@ -204,19 +186,17 @@ impl<'a> Dispatch<'a> {
     #[inline]
     pub fn inout_buffer(self, data: &'a mut [u8], attr: BufferAttr) -> Self {
         self.push_buffer(
-            data.as_mut_ptr(),
-            data.len(),
+            BufferSlot::InOut(data),
             attr.or(BufferAttr::IN).or(BufferAttr::OUT),
         )
     }
 
-    /// Records a buffer descriptor in the internal table. Silently ignored
-    /// once [`MAX_BUFFERS`] slots are full.
+    /// Records a buffer slot in the internal table. Silently ignored once
+    /// [`MAX_BUFFERS`] slots are full.
     #[inline]
-    fn push_buffer(mut self, ptr: *const u8, size: usize, attr: BufferAttr) -> Self {
+    fn push_buffer(mut self, slot: BufferSlot<'a>, attr: BufferAttr) -> Self {
         if self.buffer_count < MAX_BUFFERS {
-            self.buffers[self.buffer_count] = Buffer { ptr, size };
-            self.buffer_attrs[self.buffer_count] = attr;
+            self.buffers[self.buffer_count] = Some((attr, slot));
             self.buffer_count += 1;
         }
         self
@@ -268,6 +248,13 @@ impl<'a> Dispatch<'a> {
     /// the caller-provided token, so the borrow checker enforces that the
     /// response is fully consumed before the next IPC operation reuses
     /// `buf`.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds if a buffer registered via
+    /// [`inout_buffer`](Self::inout_buffer) carries
+    /// [`BufferAttr::HIPC_POINTER`]; the combination is unsupported and the
+    /// slot is skipped in release builds.
     pub fn send<'b>(self, buf: &'b mut IpcBuffer) -> Result<DispatchResult<'b>, DispatchError> {
         let resp = self.send_response(buf)?;
         Ok(DispatchResult {
@@ -288,88 +275,85 @@ impl<'a> Dispatch<'a> {
     ) -> Result<cmif::Response<'b, &'b [u8]>, DispatchError> {
         let is_domain = self.object_id.is_some();
 
-        {
-            let mut cb = cmif::CmifRequestBuilder::new(self.request_id)
-                .with_pointer_buffer_size(self.pointer_buffer_size as usize)
-                .with_context(self.context);
+        let mut cb = cmif::CmifRequestBuilder::new(self.request_id)
+            .with_pointer_buffer_size(self.pointer_buffer_size)
+            .with_context(self.context)
+            .with_data(self.in_data);
 
-            let in_slice: &[u8] = if !self.in_data.is_null() && self.in_data_size > 0 {
-                // SAFETY: caller of `in_raw` guarantees `in_data` is valid for
-                // `in_data_size` bytes.
-                unsafe { core::slice::from_raw_parts(self.in_data, self.in_data_size) }
-            } else {
-                &[]
-            };
-            cb = cb.with_data(in_slice);
-
-            if let Some(object_id) = self.object_id {
-                cb = cb.with_object_id(object_id);
-            }
-            if self.send_pid {
-                cb = cb.with_send_pid();
-            }
-
-            for i in 0..self.buffer_count {
-                let buf_desc = &self.buffers[i];
-                let attr = self.buffer_attrs[i];
-                let is_in = attr.contains(BufferAttr::IN);
-                let is_out = attr.contains(BufferAttr::OUT);
-
-                let mode = if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE) {
-                    hipc::BufferMode::NonSecure
-                } else if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_DEVICE) {
-                    hipc::BufferMode::NonDevice
-                } else {
-                    hipc::BufferMode::Normal
-                };
-
-                if attr.contains(BufferAttr::HIPC_AUTO_SELECT) {
-                    if is_in {
-                        cb = cb.add_in_auto_buffer(buf_desc.ptr, buf_desc.size, mode);
-                    }
-                    if is_out {
-                        cb = cb.add_out_auto_buffer(buf_desc.ptr as *mut u8, buf_desc.size, mode);
-                    }
-                } else if attr.contains(BufferAttr::HIPC_MAP_ALIAS) {
-                    if is_in && is_out {
-                        cb = cb.add_inout_buffer_raw(buf_desc.ptr as *mut u8, buf_desc.size, mode);
-                    } else if is_in {
-                        cb = cb.add_input_buffer_raw(buf_desc.ptr, buf_desc.size, mode);
-                    } else if is_out {
-                        cb = cb.add_output_buffer_raw(buf_desc.ptr as *mut u8, buf_desc.size, mode);
-                    }
-                } else if attr.contains(BufferAttr::HIPC_POINTER) {
-                    if is_in {
-                        cb = cb.add_in_pointer(buf_desc.ptr, buf_desc.size);
-                    } else if is_out {
-                        if attr.contains(BufferAttr::FIXED_SIZE) {
-                            cb = cb.add_out_fixed_pointer(buf_desc.ptr as *mut u8, buf_desc.size);
-                        } else {
-                            cb = cb.add_out_pointer(buf_desc.ptr as *mut u8, buf_desc.size);
-                        }
-                    }
-                }
-            }
-
-            for i in 0..self.in_object_count {
-                if let Some(obj) = self.in_objects[i] {
-                    cb = cb.add_object(obj);
-                }
-            }
-
-            for i in 0..self.in_handle_count {
-                cb = cb.add_copy_handle(self.in_handles[i]);
-            }
-
-            let req = cb.build();
-            req.write_to(buf).map_err(DispatchError::Layout)?;
+        if let Some(object_id) = self.object_id {
+            cb = cb.with_object_id(object_id);
+        }
+        if self.send_pid {
+            cb = cb.with_send_pid();
         }
 
-        // Reborrows `buf` uniquely: the borrow checker invalidates any
-        // outstanding `&[u8; N]` derived from `buf` (e.g. from the request
-        // builder above) before the syscall runs. After this call returns,
-        // fresh borrows from `buf` observe the kernel-written response.
-        ipc::send_sync_request(buf, self.session).map_err(DispatchError::SendRequest)?;
+        // Each slot moves its loan into the matching builder wrapper; the
+        // request DTO then holds every borrow until `send` returns.
+        for (attr, slot) in self.buffers.into_iter().flatten() {
+            let mode = if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE) {
+                hipc::BufferMode::NonSecure
+            } else if attr.contains(BufferAttr::MAP_TRANSFER_ALLOWS_NON_DEVICE) {
+                hipc::BufferMode::NonDevice
+            } else {
+                hipc::BufferMode::Normal
+            };
+
+            if attr.contains(BufferAttr::HIPC_AUTO_SELECT) {
+                cb = match slot {
+                    BufferSlot::In(data) => cb.add_in_auto_buffer(InputBuffer::new(data, mode)),
+                    BufferSlot::Out(data) => cb.add_out_auto_buffer(OutputBuffer::new(data, mode)),
+                    BufferSlot::InOut(data) => {
+                        cb.add_inout_auto_buffer(InOutBuffer::new(data, mode))
+                    }
+                };
+            } else if attr.contains(BufferAttr::HIPC_MAP_ALIAS) {
+                cb = match slot {
+                    BufferSlot::In(data) => cb.add_input_buffer(InputBuffer::new(data, mode)),
+                    BufferSlot::Out(data) => cb.add_output_buffer(OutputBuffer::new(data, mode)),
+                    BufferSlot::InOut(data) => cb.add_inout_buffer(InOutBuffer::new(data, mode)),
+                };
+            } else if attr.contains(BufferAttr::HIPC_POINTER) {
+                cb = match slot {
+                    BufferSlot::In(data) => cb.add_in_pointer(InPointer::new(data)),
+                    BufferSlot::Out(data) => {
+                        if attr.contains(BufferAttr::FIXED_SIZE) {
+                            cb.add_out_fixed_pointer(OutPointer::new(data))
+                        } else {
+                            cb.add_out_pointer(OutPointer::new(data))
+                        }
+                    }
+                    BufferSlot::InOut(_) => {
+                        // libnx encodes this as an aliased X + C pair over
+                        // the same memory, which one exclusive loan cannot
+                        // express. No service uses the combination; reject
+                        // it loudly in debug builds and skip the slot
+                        // otherwise.
+                        debug_assert!(false, "inout_buffer with HIPC_POINTER is not supported");
+                        cb
+                    }
+                };
+            }
+        }
+
+        for i in 0..self.in_object_count {
+            if let Some(obj) = self.in_objects[i] {
+                cb = cb.add_object(obj);
+            }
+        }
+
+        for i in 0..self.in_handle_count {
+            cb = cb.add_copy_handle(self.in_handles[i]);
+        }
+
+        // The consuming `send` holds every buffer loan across the syscall
+        // and uniquely reborrows `buf`, so no stale borrow of the TLS bytes
+        // survives into the kernel's response write.
+        cb.build()
+            .send(buf, self.session)
+            .map_err(|err| match err {
+                cmif::SendError::Layout(err) => DispatchError::Layout(err),
+                cmif::SendError::SendRequest(err) => DispatchError::SendRequest(err),
+            })?;
 
         // Response bytes borrow from `buf`; lifetime `'b` propagates to the
         // caller, who must consume the response before the next IPC
@@ -399,6 +383,23 @@ pub enum DispatchError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+/// Borrowed buffer slot recorded by the dispatch builder.
+///
+/// The variant fixes the transfer direction, so the kernel-facing role of
+/// every buffer is carried by a real loan (`&`/`&mut`) instead of a raw
+/// pointer. The paired [`BufferAttr`] supplies only the transport bits
+/// (map-alias / pointer / auto-select, mode, fixed-size).
+#[derive(Debug)]
+enum BufferSlot<'a> {
+    /// Kernel-read buffer registered via [`Dispatch::in_buffer`].
+    In(&'a [u8]),
+    /// Kernel-written buffer registered via [`Dispatch::out_buffer`].
+    Out(&'a mut [u8]),
+    /// Kernel-read-then-written buffer registered via
+    /// [`Dispatch::inout_buffer`].
+    InOut(&'a mut [u8]),
+}
+
 /// Result of a successful non-domain dispatch operation.
 ///
 /// Non-domain sessions cannot receive output domain objects, so this type
@@ -419,7 +420,7 @@ impl<'a> DispatchResult<'a> {
     ///
     /// Infallible by construction: the caller of [`Dispatch::out_size`]
     /// declares `size_of::<T>()`, and the underlying CMIF parser yields a
-    /// 16-byte-aligned `data` slice — sufficient for any `T` whose
+    /// 16-byte-aligned `data` slice - sufficient for any `T` whose
     /// `align_of` is ≤ 16. Panics only if those invariants do not hold.
     #[inline]
     pub fn value<T>(&self) -> &'a T
@@ -562,6 +563,13 @@ impl<'d> DomainDispatch<'d> {
     /// [`DomainObject<'d>`] instances bound to the originating
     /// [`Domain`]. Each server-emitted [`ObjectId`] becomes exactly one
     /// [`DomainObject`].
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds if a buffer registered via
+    /// [`inout_buffer`](Self::inout_buffer) carries
+    /// [`BufferAttr::HIPC_POINTER`]; the combination is unsupported and the
+    /// slot is skipped in release builds.
     pub fn send<'b>(
         self,
         buf: &'b mut IpcBuffer,
@@ -618,7 +626,7 @@ impl<'d, 'b> DomainDispatchResult<'d, 'b> {
     ///
     /// Infallible by construction: the caller of
     /// [`DomainDispatch::out_size`] declares `size_of::<T>()`, and the
-    /// underlying CMIF parser yields a 16-byte-aligned `data` slice —
+    /// underlying CMIF parser yields a 16-byte-aligned `data` slice -
     /// sufficient for any `T` whose `align_of` is ≤ 16. Panics only if
     /// those invariants do not hold.
     #[inline]

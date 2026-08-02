@@ -5,12 +5,10 @@
 //! addrinfo wire format) are returned as a serialized byte count; decoding
 //! the wire format is the caller's responsibility.
 
-use core::ptr;
-
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 
 use crate::proto::{
@@ -54,7 +52,7 @@ pub fn get_host_by_name(
         pid_placeholder: 0,
     };
 
-    let (name_ptr, name_len) = ptr_or_null(name);
+    let name_slice = name.unwrap_or(&[]);
 
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -63,17 +61,11 @@ pub fn get_host_by_name(
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_NAME)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer_raw(name_ptr, name_len, BufferMode::Normal)
-        .add_output_buffer_raw(
-            out_buffer.as_mut_ptr(),
-            out_buffer.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(name_slice, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out_buffer, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetHostByNameError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetHostByNameError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetHostByNameError::SendRequest)?;
 
     let resp = cmif::parse_response::<&GetHostByNameOut>(&buf)
         .map_err(GetHostByNameError::ParseResponse)?;
@@ -90,12 +82,9 @@ pub fn get_host_by_name(
 /// Error returned by [`get_host_by_name`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetHostByNameError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -134,17 +123,11 @@ pub fn get_host_by_addr(
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_ADDR)
         .with_data_value(&input)
-        .add_input_buffer_raw(addr.as_ptr(), addr.len(), BufferMode::Normal)
-        .add_output_buffer_raw(
-            out_buffer.as_mut_ptr(),
-            out_buffer.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(addr, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out_buffer, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetHostByAddrError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetHostByAddrError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetHostByAddrError::SendRequest)?;
 
     let resp = cmif::parse_response::<&GetHostByAddrOut>(&buf)
         .map_err(GetHostByAddrError::ParseResponse)?;
@@ -161,12 +144,9 @@ pub fn get_host_by_addr(
 /// Error returned by [`get_host_by_addr`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetHostByAddrError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -178,22 +158,18 @@ pub fn get_host_string_error(
     err: u32,
     out_str: &mut [u8],
 ) -> Result<(), GetHostStringErrorError> {
-    string_error_impl(session, CMD_GET_HOST_STRING_ERROR, err, out_str).map_err(|e| match e {
-        StringErrorError::BuildRequest(e) => GetHostStringErrorError::BuildRequest(e),
-        StringErrorError::SendRequest(e) => GetHostStringErrorError::SendRequest(e),
-        StringErrorError::ParseResponse(e) => GetHostStringErrorError::ParseResponse(e),
+    string_error_impl(session, CMD_GET_HOST_STRING_ERROR, err, out_str).map_err(|err| match err {
+        StringErrorError::SendRequest(err) => GetHostStringErrorError::SendRequest(err),
+        StringErrorError::ParseResponse(err) => GetHostStringErrorError::ParseResponse(err),
     })
 }
 
 /// Error returned by [`get_host_string_error`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetHostStringErrorError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -205,22 +181,18 @@ pub fn get_gai_string_error(
     err: u32,
     out_str: &mut [u8],
 ) -> Result<(), GetGaiStringErrorError> {
-    string_error_impl(session, CMD_GET_GAI_STRING_ERROR, err, out_str).map_err(|e| match e {
-        StringErrorError::BuildRequest(e) => GetGaiStringErrorError::BuildRequest(e),
-        StringErrorError::SendRequest(e) => GetGaiStringErrorError::SendRequest(e),
-        StringErrorError::ParseResponse(e) => GetGaiStringErrorError::ParseResponse(e),
+    string_error_impl(session, CMD_GET_GAI_STRING_ERROR, err, out_str).map_err(|err| match err {
+        StringErrorError::SendRequest(err) => GetGaiStringErrorError::SendRequest(err),
+        StringErrorError::ParseResponse(err) => GetGaiStringErrorError::ParseResponse(err),
     })
 }
 
 /// Error returned by [`get_gai_string_error`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetGaiStringErrorError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -256,9 +228,9 @@ pub fn get_addr_info(
         pid_placeholder: 0,
     };
 
-    let (node_ptr, node_len) = ptr_or_null(node);
-    let (svc_ptr, svc_len) = ptr_or_null(service);
-    let (hints_ptr, hints_len) = ptr_or_null(hints);
+    let node_slice = node.unwrap_or(&[]);
+    let svc_slice = service.unwrap_or(&[]);
+    let hints_slice = hints.unwrap_or(&[]);
 
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -267,19 +239,13 @@ pub fn get_addr_info(
     let req = cmif::CmifRequestBuilder::new(CMD_GET_ADDR_INFO)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer_raw(node_ptr, node_len, BufferMode::Normal)
-        .add_input_buffer_raw(svc_ptr, svc_len, BufferMode::Normal)
-        .add_input_buffer_raw(hints_ptr, hints_len, BufferMode::Normal)
-        .add_output_buffer_raw(
-            out_buffer.as_mut_ptr(),
-            out_buffer.len(),
-            BufferMode::Normal,
-        )
+        .add_input_buffer(InputBuffer::new(node_slice, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(svc_slice, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(hints_slice, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out_buffer, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetAddrInfoError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetAddrInfoError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetAddrInfoError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&GetAddrInfoOut>(&buf).map_err(GetAddrInfoError::ParseResponse)?;
@@ -296,12 +262,9 @@ pub fn get_addr_info(
 /// Error returned by [`get_addr_info`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetAddrInfoError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -338,14 +301,12 @@ pub fn get_name_info(
     let req = cmif::CmifRequestBuilder::new(CMD_GET_NAME_INFO)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer_raw(sockaddr.as_ptr(), sockaddr.len(), BufferMode::Normal)
-        .add_output_buffer_raw(host.as_mut_ptr(), host.len(), BufferMode::Normal)
-        .add_output_buffer_raw(serv.as_mut_ptr(), serv.len(), BufferMode::Normal)
+        .add_input_buffer(InputBuffer::new(sockaddr, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(host, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(serv, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetNameInfoError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetNameInfoError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetNameInfoError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&GetNameInfoOut>(&buf).map_err(GetNameInfoError::ParseResponse)?;
@@ -361,12 +322,9 @@ pub fn get_name_info(
 /// Error returned by [`get_name_info`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetNameInfoError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -385,10 +343,8 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
         .with_data_value(&pid_placeholder)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetCancelHandleError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetCancelHandleError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetCancelHandleError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(GetCancelHandleError::ParseResponse)?;
 
@@ -400,12 +356,9 @@ pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCanc
 /// Error returned by [`get_cancel_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetCancelHandleError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -427,9 +380,8 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
         .with_data_value(&input)
         .with_send_pid()
         .build();
-    req.write_to(&mut buf).map_err(CancelError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CancelError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CancelError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(CancelError::ParseResponse)?;
 
@@ -439,12 +391,9 @@ pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), Cancel
 /// Error returned by [`cancel`].
 #[derive(Debug, thiserror::Error)]
 pub enum CancelError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -458,17 +407,8 @@ fn cancel_token(handle: Option<CancelHandle>) -> u32 {
     }
 }
 
-#[inline]
-fn ptr_or_null<T>(slice: Option<&[T]>) -> (*const u8, usize) {
-    match slice {
-        Some(s) => (s.as_ptr().cast::<u8>(), core::mem::size_of_val(s)),
-        None => (ptr::null(), 0),
-    }
-}
-
 enum StringErrorError {
-    BuildRequest(cmif::RequestLayoutError),
-    SendRequest(ipc::SendSyncError),
+    SendRequest(cmif::SendError),
     ParseResponse(cmif::ParseError),
 }
 
@@ -484,12 +424,10 @@ fn string_error_impl(
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&err)
-        .add_output_buffer_raw(out_str.as_mut_ptr(), out_str.len(), BufferMode::Normal)
+        .add_output_buffer(OutputBuffer::new(out_str, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(StringErrorError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(StringErrorError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(StringErrorError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(StringErrorError::ParseResponse)?;
 

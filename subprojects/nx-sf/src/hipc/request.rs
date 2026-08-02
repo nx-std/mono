@@ -1,6 +1,6 @@
 //! HIPC request building (client side).
 //!
-//! Only the build path is implemented in this crate — see the parent module's
+//! Only the build path is implemented in this crate - see the parent module's
 //! "Server-side request parsing" section for why a `parse_request` counterpart
 //! is intentionally absent.
 //!
@@ -9,7 +9,7 @@
 //! [`HipcRequestBuilder`] accumulates HIPC-level descriptors (statics, buffers,
 //! handles, recv-list) and finalizes into a [`HipcRequest`] DTO via
 //! [`HipcRequestBuilder::build`]. The DTO carries every input needed to
-//! serialize the request — descriptors, handles, recv-list configuration,
+//! serialize the request - descriptors, handles, recv-list configuration,
 //! send-PID flag, and the in-band payload `P`.
 //!
 //! # In-band payloads
@@ -22,24 +22,28 @@
 //!
 //! Built-in payloads cover the common cases:
 //!
-//! - `()` — no in-band data; the data-words region is empty.
-//! - `&[u8]` — raw byte slice copied verbatim.
+//! - `()` - no in-band data; the data-words region is empty.
+//! - `&[u8]` - raw byte slice copied verbatim.
 //!
 //! Higher-level protocols (CMIF, TIPC) define their own payload types and
 //! implement [`HipcPayload`] for them, so HIPC drives the whole write without
 //! reaching back into the data region after the fact.
 //!
 //! Descriptor counts are bounded by the HIPC header's 4-bit fields, so the
-//! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage — no heap, no dynamic
+//! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage - no heap, no dynamic
 //! allocation.
 
 use core::mem::{size_of, size_of_val};
 
-use nx_svc::raw::Handle as RawHandle;
+use nx_svc::{
+    ipc::{Handle as SessionHandle, SendSyncError},
+    raw::Handle as RawHandle,
+};
+use nx_sys_thread_tls::IpcBuffer;
 
 use super::wire::{
     BufferDescriptor, Header, MessageType, RECV_LIST_WIRE_NONE, RECV_LIST_WIRE_SINGLE_BUFFER,
-    RECV_LIST_WIRE_TO_MESSAGE_BUFFER, RecvListEntry, SpecialHeader, StaticDescriptor,
+    RecvListEntry, SpecialHeader, StaticDescriptor,
 };
 use crate::array_vec::ArrayVec;
 
@@ -104,7 +108,7 @@ impl<P: HipcPayload> HipcRequest<P> {
     /// the next 4-byte boundary, zero-filled, then handed to
     /// [`HipcPayload::write_to`]. The total layout size must fit in `N`;
     /// otherwise [`WriteError`] is returned.
-    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), WriteError> {
+    pub(crate) fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), WriteError> {
         // Round the payload's byte length up to a whole number of 4-byte
         // data words, the unit HIPC headers count in.
         let num_data_words = self.payload.encoded_len().div_ceil(size_of::<u32>());
@@ -136,6 +140,30 @@ impl<P: HipcPayload> HipcRequest<P> {
 
         Ok(())
     }
+
+    /// Serializes the request into `buf` and issues the synchronous IPC
+    /// syscall on `session`.
+    ///
+    /// Consuming `self` keeps every descriptor loan attached to the request
+    /// alive across the syscall: the kernel reads and writes the loaned
+    /// buffers while this function runs, and the borrows are released only
+    /// when it returns. This is the sole path from a request value to the
+    /// kernel - the serialize-then-send sequence is indivisible, so the
+    /// descriptor bytes in the TLS buffer can never outlive the loans that
+    /// justify them.
+    pub(crate) fn send_inner(
+        self,
+        buf: &mut IpcBuffer,
+        session: SessionHandle,
+    ) -> Result<(), SendError> {
+        self.write_to(buf.as_array_mut())
+            .map_err(SendError::Layout)?;
+        // SAFETY: every descriptor just serialized into `buf` derives from a
+        // loan held in `self`, which lives until this function returns -
+        // after the syscall has completed.
+        unsafe { crate::ipc::send_sync_request(buf, session) }.map_err(SendError::SendRequest)
+        // `self` - and with it every buffer loan - drops here.
+    }
 }
 
 /// Error returned by [`HipcRequest::write_to`] when the destination buffer
@@ -151,7 +179,7 @@ impl<P: HipcPayload> HipcRequest<P> {
 /// and the buffer capacity so callers can either size their IPC buffer
 /// to fit or drop descriptors/payload to fit the available space.
 ///
-/// Building a [`HipcRequest`] is infallible — this error only surfaces at
+/// Building a [`HipcRequest`] is infallible - this error only surfaces at
 /// serialization time, when the destination buffer is known.
 #[derive(Debug, thiserror::Error)]
 #[error("request layout requires {needed} bytes, IPC buffer holds {limit}")]
@@ -162,13 +190,32 @@ pub struct WriteError {
     pub limit: usize,
 }
 
+/// Error returned by [`HipcRequest::send_inner`] and the protocol-level
+/// `send` methods built on it (CMIF and TIPC).
+#[derive(Debug, thiserror::Error)]
+pub enum SendError {
+    /// The encoded request layout does not fit in the IPC buffer.
+    ///
+    /// Detected before the syscall is issued; nothing was sent and the
+    /// TLS buffer holds no complete request.
+    #[error("request layout exceeds the IPC buffer")]
+    Layout(#[source] WriteError),
+    /// The kernel rejected the underlying `SendSyncRequest`.
+    ///
+    /// The request was serialized and the syscall was issued; output
+    /// buffer contents are unspecified (any bit pattern, still valid
+    /// `u8`s).
+    #[error("failed to send the IPC request")]
+    SendRequest(#[source] SendSyncError),
+}
+
 /// Fluent builder for an [`HipcRequest`].
 ///
 /// Accumulates HIPC-level descriptors via `with_*` methods. The in-band
 /// payload is attached via [`with_payload`](Self::with_payload), which
 /// type-changes the builder from `HipcRequestBuilder<P>` to
 /// `HipcRequestBuilder<Q>`. Finalize via [`build`](Self::build).
-pub struct HipcRequestBuilder<P: HipcPayload = ()> {
+pub(crate) struct HipcRequestBuilder<P: HipcPayload = ()> {
     message_type: MessageType,
     send_statics: ArrayVec<StaticDescriptor, HIPC_MAX_DESCRIPTORS>,
     send_buffers: ArrayVec<BufferDescriptor, HIPC_MAX_DESCRIPTORS>,
@@ -184,7 +231,7 @@ pub struct HipcRequestBuilder<P: HipcPayload = ()> {
 impl HipcRequestBuilder {
     /// Starts a new builder for the given message type with no in-band payload.
     ///
-    /// `message_type` accepts any value convertible into [`MessageType`] —
+    /// `message_type` accepts any value convertible into [`MessageType`] -
     /// typically a CMIF or TIPC `CommandType`. Attach a payload via
     /// [`with_payload`](Self::with_payload).
     pub fn new(message_type: impl Into<MessageType>) -> Self {
@@ -291,66 +338,13 @@ impl<P: HipcPayload> HipcRequestBuilder<P> {
         self
     }
 
-    /// Configures the receive-list to [`RecvListMode::ToMessageBuffer`] (wire
-    /// mode `1`): the server places returned pointer data inside the client's
-    /// TLS message buffer; no wire slot is reserved.
-    ///
-    /// # Panics
-    ///
-    /// Debug-panics if entries were already pushed via
-    /// [`with_recv_list_entry`](Self::with_recv_list_entry); the two shapes are
-    /// mutually exclusive on the wire.
-    #[inline]
-    pub fn with_recv_list_to_message_buffer(mut self) -> Self {
-        debug_assert!(
-            !matches!(self.recv_list_mode, RecvListMode::Entries(_)),
-            "with_recv_list_to_message_buffer would discard pushed recv-list entries",
-        );
-        self.recv_list_mode = RecvListMode::ToMessageBuffer;
-        self
-    }
-
-    /// Configures the receive-list to [`RecvListMode::SingleBuffer`] (wire
-    /// mode `2`): one wire slot is reserved that the server may subdivide for
-    /// all returned pointer data.
-    ///
-    /// # Panics
-    ///
-    /// Debug-panics if entries were already pushed via
-    /// [`with_recv_list_entry`](Self::with_recv_list_entry); the two shapes are
-    /// mutually exclusive on the wire.
-    #[inline]
-    pub fn with_recv_list_single_buffer(mut self) -> Self {
-        debug_assert!(
-            !matches!(self.recv_list_mode, RecvListMode::Entries(_)),
-            "with_recv_list_single_buffer would discard pushed recv-list entries",
-        );
-        self.recv_list_mode = RecvListMode::SingleBuffer;
-        self
-    }
-
     /// Appends a per-pointer recv-list entry, transitioning the builder into
     /// [`RecvListMode::Entries`] (wire mode `2 + n`).
-    ///
-    /// # Panics
-    ///
-    /// Debug-panics if the current mode is [`RecvListMode::ToMessageBuffer`]
-    /// or [`RecvListMode::SingleBuffer`]; those zero-entry shapes are mutually
-    /// exclusive with the per-pointer shape on the wire.
     #[inline]
     pub fn with_recv_list_entry(mut self, entry: RecvListEntry) -> Self {
         match &mut self.recv_list_mode {
             RecvListMode::Entries(v) => v.push(entry),
             RecvListMode::None => {
-                let mut v = ArrayVec::new();
-                v.push(entry);
-                self.recv_list_mode = RecvListMode::Entries(v);
-            }
-            RecvListMode::ToMessageBuffer | RecvListMode::SingleBuffer => {
-                debug_assert!(
-                    false,
-                    "with_recv_list_entry called after a zero-entry recv-list mode was set",
-                );
                 let mut v = ArrayVec::new();
                 v.push(entry);
                 self.recv_list_mode = RecvListMode::Entries(v);
@@ -387,13 +381,13 @@ impl<P: HipcPayload> HipcRequestBuilder<P> {
 ///
 /// [`HipcRequest::write_to`] computes the data-words region as
 /// `encoded_len().next_multiple_of(4)` and hands the impl a `dst` slice of
-/// exactly that length. The region is **not** pre-zeroed — IPC is on the
+/// exactly that length. The region is **not** pre-zeroed - IPC is on the
 /// hot path, and the previous global fill duplicated writes the impl
 /// already performs for its sections. Bytes in `dst` that the impl does
 /// not overwrite (alignment slack, trailing word padding) are transmitted
 /// as-is from the caller's TLS buffer; well-behaved servers parse by
 /// structure layout and ignore them. Impls that need deterministic wire
-/// bytes must zero those regions themselves. Encoding is infallible — the
+/// bytes must zero those regions themselves. Encoding is infallible - the
 /// destination slice is guaranteed large enough by construction, and
 /// CMIF/TIPC wire-format bodies have no other failure modes.
 pub trait HipcPayload {
@@ -435,9 +429,11 @@ impl HipcPayload for &[u8] {
 
 /// Receive-list (Type C) configuration for the HIPC header.
 ///
-/// Lowered to the 4-bit `recv_static_mode` field on the build path. Variants
-/// mirror the four kernel-defined cases — see [`RECV_LIST_WIRE_NONE`] in the
-/// wire module for the authoritative wire-encoding table.
+/// Lowered to the 4-bit `recv_static_mode` field on the build path - see
+/// [`RECV_LIST_WIRE_NONE`] in the wire module for the authoritative
+/// wire-encoding table. Only the two client-side shapes are modeled; the
+/// wire-legal "to message buffer" (mode `1`) and "single buffer" (mode `2`)
+/// shapes are server-side receive patterns with no client use.
 ///
 /// The default is [`RecvListMode::None`].
 #[derive(Debug, Default, Clone)]
@@ -446,13 +442,6 @@ pub(crate) enum RecvListMode {
     /// `0`).
     #[default]
     None,
-    /// Server places returned pointer data inside the client's TLS message
-    /// buffer, after the data words (wire mode `1`). No wire slot is reserved.
-    ToMessageBuffer,
-    /// One wire slot the server may subdivide for all returned pointer data
-    /// (wire mode `2`). libnx fills the slot on receipt with the session's
-    /// pointer buffer.
-    SingleBuffer,
     /// Per-pointer recv-list: entry `i` is the destination of the `i`-th
     /// out-pointer descriptor (wire mode `2 + n`, `n = entries.len()`).
     ///
@@ -466,8 +455,7 @@ impl RecvListMode {
     #[inline]
     pub fn wire_slot_count(&self) -> usize {
         match self {
-            RecvListMode::None | RecvListMode::ToMessageBuffer => 0,
-            RecvListMode::SingleBuffer => 1,
+            RecvListMode::None => 0,
             RecvListMode::Entries(v) => v.len(),
         }
     }
@@ -477,8 +465,6 @@ impl RecvListMode {
     pub fn to_raw(&self) -> u8 {
         match self {
             RecvListMode::None => RECV_LIST_WIRE_NONE,
-            RecvListMode::ToMessageBuffer => RECV_LIST_WIRE_TO_MESSAGE_BUFFER,
-            RecvListMode::SingleBuffer => RECV_LIST_WIRE_SINGLE_BUFFER,
             RecvListMode::Entries(v) => RECV_LIST_WIRE_SINGLE_BUFFER + v.len() as u8,
         }
     }
@@ -518,7 +504,7 @@ fn write_special_header<'a, P: HipcPayload>(
     let buf = write_section(buf, &special);
 
     if request.send_pid {
-        // Reserved PID slot — the kernel fills it on transmission.
+        // Reserved PID slot - the kernel fills it on transmission.
         let (_, rest) = buf.split_at_mut(size_of::<u64>());
         rest
     } else {
@@ -546,8 +532,7 @@ fn write_data_words<'a, P: HipcPayload>(
 fn write_recv_list<'a>(buf: &'a mut [u8], mode: &RecvListMode) -> &'a mut [u8] {
     match mode {
         RecvListMode::Entries(v) => write_section(buf, v.as_slice()),
-        RecvListMode::SingleBuffer => write_section(buf, &RecvListEntry::default()),
-        RecvListMode::None | RecvListMode::ToMessageBuffer => buf,
+        RecvListMode::None => buf,
     }
 }
 

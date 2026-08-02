@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the INS services.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -16,10 +13,8 @@ pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTick
     let req = cmif::CmifRequestBuilder::new(proto::GET_LAST_TICK)
         .with_data_value(&id)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetLastTickError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetLastTickError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetLastTickError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(GetLastTickError::ParseResponse)?;
 
@@ -55,10 +50,8 @@ pub fn get_readable_event(
     let req = cmif::CmifRequestBuilder::new(proto::GET_READABLE_EVENT)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetReadableEventError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetReadableEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetReadableEventError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetReadableEventError::ParseResponse)?;
 
@@ -87,10 +80,8 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
     let req = cmif::CmifRequestBuilder::new(proto::GET_WRITABLE_EVENT)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetWritableEventError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetWritableEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetWritableEventError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetWritableEventError::ParseResponse)?;
 
@@ -106,12 +97,9 @@ pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWri
 /// Error returned by [`get_last_tick`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetLastTickError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -120,12 +108,9 @@ pub enum GetLastTickError {
 /// Error returned by [`get_readable_event`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetReadableEventError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -137,12 +122,9 @@ pub enum GetReadableEventError {
 /// Error returned by [`get_writable_event`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetWritableEventError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the operation mode manager service.
 
-use nx_sf::{
-    cmif,
-    ipc::{self, Handle as SessionHandle},
-};
+use nx_sf::{cmif, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -17,10 +14,8 @@ pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationMode
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_OPERATION_MODE).build();
-    req.write_to(&mut buf)
-        .map_err(GetOperationModeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetOperationModeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetOperationModeError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u8>(&buf).map_err(GetOperationModeError::ParseResponse)?;
 
@@ -30,12 +25,9 @@ pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationMode
 /// Error returned by [`get_operation_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetOperationModeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -53,10 +45,8 @@ pub fn set_operation_mode_policy(
     let req = cmif::CmifRequestBuilder::new(proto::SET_OPERATION_MODE_POLICY)
         .with_data_value(&policy)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetOperationModePolicyError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetOperationModePolicyError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetOperationModePolicyError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetOperationModePolicyError::ParseResponse)?;
 
@@ -66,12 +56,9 @@ pub fn set_operation_mode_policy(
 /// Error returned by [`set_operation_mode_policy`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetOperationModePolicyError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -88,10 +75,7 @@ pub fn get_default_display_resolution(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_DEFAULT_DISPLAY_RESOLUTION).build();
-    req.write_to(&mut buf)
-        .map_err(GetDefaultDisplayResolutionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetDefaultDisplayResolutionError::SendRequest)?;
 
     let resp = cmif::parse_response::<&[i32; 2]>(&buf)
@@ -105,12 +89,9 @@ pub fn get_default_display_resolution(
 /// Error returned by [`get_default_display_resolution`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDefaultDisplayResolutionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send the IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

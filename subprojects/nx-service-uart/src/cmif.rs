@@ -4,7 +4,7 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     cmif,
-    ipc::{self, Handle},
+    ipc::Handle,
     service::{BufferAttr, DispatchError, OutHandleAttr, Session},
 };
 
@@ -25,10 +25,8 @@ fn dispatch_in_u32_out_bool(
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInU32OutBoolError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchInU32OutBoolError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchInU32OutBoolError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<&u8>(&buf).map_err(DispatchInU32OutBoolError::ParseResponse)?;
@@ -38,10 +36,8 @@ fn dispatch_in_u32_out_bool(
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInU32OutBoolError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -68,10 +64,7 @@ fn dispatch_in_two_u32s_out_bool(
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DispatchInTwoU32sOutBoolError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(DispatchInTwoU32sOutBoolError::SendRequest)?;
 
     let resp =
@@ -82,10 +75,8 @@ fn dispatch_in_two_u32s_out_bool(
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchInTwoU32sOutBoolError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -96,10 +87,8 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(DispatchOutU64Error::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DispatchOutU64Error::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DispatchOutU64Error::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(DispatchOutU64Error::ParseResponse)?;
 
@@ -108,10 +97,8 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64E
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchOutU64Error {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
 }
@@ -179,10 +166,8 @@ pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSession
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(proto::CREATE_PORT_SESSION).build();
-    req.write_to(&mut buf)
-        .map_err(CreatePortSessionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CreatePortSessionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CreatePortSessionError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(CreatePortSessionError::ParseResponse)?;
 
@@ -632,10 +617,8 @@ pub fn port_unbind_port_event(
 /// Error returned by [`create_port_session`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreatePortSessionError {
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
     #[error("missing session handle in response")]

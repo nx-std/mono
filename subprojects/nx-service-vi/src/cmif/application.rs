@@ -4,8 +4,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, OutputBuffer},
+    ipc::Handle as SessionHandle,
     service::Session,
 };
 use nx_svc::raw::Handle as RawHandle;
@@ -50,10 +50,8 @@ fn get_sub_service_no_params(
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
-    req.write_to(&mut buf)
-        .map_err(GetSubServiceError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetSubServiceError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetSubServiceError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetSubServiceError::ParseResponse)?;
 
@@ -83,10 +81,8 @@ pub fn open_display(
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_DISPLAY)
         .with_data(name.as_bytes())
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenDisplayError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenDisplayError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenDisplayError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(OpenDisplayError::ParseResponse)?;
 
@@ -109,10 +105,8 @@ pub fn close_display(
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_DISPLAY)
         .with_data_value(&display_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(CloseDisplayError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CloseDisplayError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CloseDisplayError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(CloseDisplayError::ParseResponse)?;
 
@@ -141,10 +135,8 @@ pub fn get_display_resolution(
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_RESOLUTION)
         .with_data_value(&display_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetDisplayResolutionError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetDisplayResolutionError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetDisplayResolutionError::SendRequest)?;
 
     #[repr(C)]
     #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
@@ -205,16 +197,10 @@ pub fn open_layer(
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_LAYER)
         .with_data_value(&input)
         .with_send_pid()
-        .add_output_buffer_raw(
-            native_window.as_mut_ptr(),
-            NATIVE_WINDOW_SIZE,
-            BufferMode::Normal,
-        )
+        .add_output_buffer(OutputBuffer::new(&mut native_window, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(OpenLayerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(OpenLayerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(OpenLayerError::SendRequest)?;
 
     let resp = cmif::parse_response::<&u64>(&buf).map_err(OpenLayerError::ParseResponse)?;
 
@@ -237,10 +223,8 @@ pub fn close_layer(session: SessionHandle, layer_id: LayerId) -> Result<(), Clos
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_LAYER)
         .with_data_value(&layer_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(CloseLayerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CloseLayerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CloseLayerError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(CloseLayerError::ParseResponse)?;
 
@@ -311,16 +295,10 @@ pub(crate) fn create_stray_layer_dispatch(
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&input)
-        .add_output_buffer_raw(
-            native_window.as_mut_ptr(),
-            NATIVE_WINDOW_SIZE,
-            BufferMode::Normal,
-        )
+        .add_output_buffer(OutputBuffer::new(&mut native_window, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(CreateStrayLayerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(CreateStrayLayerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(CreateStrayLayerError::SendRequest)?;
 
     #[repr(C)]
     #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
@@ -352,10 +330,8 @@ pub fn destroy_stray_layer(
     let req = cmif::CmifRequestBuilder::new(application_cmds::DESTROY_STRAY_LAYER)
         .with_data_value(&layer_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(DestroyStrayLayerError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(DestroyStrayLayerError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(DestroyStrayLayerError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(DestroyStrayLayerError::ParseResponse)?;
 
@@ -389,10 +365,8 @@ pub fn set_layer_scaling_mode(
     let req = cmif::CmifRequestBuilder::new(application_cmds::SET_LAYER_SCALING_MODE)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(SetLayerScalingModeError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(SetLayerScalingModeError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(SetLayerScalingModeError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(SetLayerScalingModeError::ParseResponse)?;
 
@@ -442,12 +416,9 @@ pub fn get_indirect_layer_image_map(
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_INDIRECT_LAYER_IMAGE_MAP)
         .with_data_value(&input)
         .with_send_pid()
-        .add_output_buffer_raw(buffer.as_mut_ptr(), buffer.len(), BufferMode::NonSecure)
+        .add_output_buffer(OutputBuffer::new(buffer, BufferMode::NonSecure))
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetIndirectLayerImageMapError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetIndirectLayerImageMapError::SendRequest)?;
 
     #[repr(C)]
@@ -499,10 +470,7 @@ pub fn get_indirect_layer_image_required_memory_info(
     )
     .with_data_value(&input)
     .build();
-    req.write_to(&mut buf)
-        .map_err(GetIndirectLayerImageRequiredMemoryInfoError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session)
+    req.send(&mut buf, session)
         .map_err(GetIndirectLayerImageRequiredMemoryInfoError::SendRequest)?;
 
     #[repr(C)]
@@ -534,10 +502,8 @@ pub fn get_display_vsync_event(
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_VSYNC_EVENT)
         .with_data_value(&display_id_raw)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetDisplayVsyncEventError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetDisplayVsyncEventError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetDisplayVsyncEventError::SendRequest)?;
 
     let resp =
         cmif::parse_response::<()>(&buf).map_err(GetDisplayVsyncEventError::ParseResponse)?;
@@ -554,12 +520,9 @@ pub fn get_display_vsync_event(
 /// Error from sub-service acquisition.
 #[derive(Debug, thiserror::Error)]
 pub enum GetSubServiceError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -571,12 +534,9 @@ pub enum GetSubServiceError {
 /// Error from [`open_display`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenDisplayError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -585,12 +545,9 @@ pub enum OpenDisplayError {
 /// Error from [`close_display`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloseDisplayError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -599,12 +556,9 @@ pub enum CloseDisplayError {
 /// Error from [`get_display_resolution`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayResolutionError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -613,12 +567,9 @@ pub enum GetDisplayResolutionError {
 /// Error from [`open_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpenLayerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -627,12 +578,9 @@ pub enum OpenLayerError {
 /// Error from [`close_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloseLayerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -641,12 +589,9 @@ pub enum CloseLayerError {
 /// Error from [`create_stray_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateStrayLayerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -655,12 +600,9 @@ pub enum CreateStrayLayerError {
 /// Error from [`destroy_stray_layer`].
 #[derive(Debug, thiserror::Error)]
 pub enum DestroyStrayLayerError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -669,12 +611,9 @@ pub enum DestroyStrayLayerError {
 /// Error from [`set_layer_scaling_mode`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetLayerScalingModeError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -683,12 +622,9 @@ pub enum SetLayerScalingModeError {
 /// Error from [`get_indirect_layer_image_map`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetIndirectLayerImageMapError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -697,12 +633,9 @@ pub enum GetIndirectLayerImageMapError {
 /// Error from [`get_indirect_layer_image_required_memory_info`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetIndirectLayerImageRequiredMemoryInfoError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -711,12 +644,9 @@ pub enum GetIndirectLayerImageRequiredMemoryInfoError {
 /// Error from [`get_display_vsync_event`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetDisplayVsyncEventError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

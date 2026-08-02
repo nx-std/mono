@@ -145,9 +145,24 @@ impl ToRawResultCode for ConnectToPortError {
 }
 
 /// Sends a synchronous IPC request on a session.
-pub fn send_sync_request(handle: Handle) -> Result<(), SendSyncError> {
-    // SAFETY: The kernel validates the session handle and returns an error if invalid.
-    // The IPC message is read from the thread-local storage buffer.
+///
+/// The request is read from - and the response written to - the current
+/// thread's TLS IPC buffer. Buffer descriptors inside that message carry raw
+/// addresses that the kernel maps, reads, and writes for the duration of the
+/// call.
+///
+/// # Safety
+///
+/// Every buffer descriptor currently serialized in the TLS IPC buffer must
+/// point to memory that is live, correctly sized, and appropriately loaned -
+/// exclusively borrowed for kernel-written roles, not mutated for
+/// kernel-read roles - for the whole duration of this call. No reference
+/// into the TLS IPC buffer may be held across it: the kernel overwrites the
+/// buffer with the response.
+pub unsafe fn send_sync_request(handle: Handle) -> Result<(), SendSyncError> {
+    // SAFETY: The kernel validates the session handle. The memory contract
+    // for the TLS message and its descriptor targets is the caller's, per
+    // this function's `# Safety` section.
     let rc = unsafe { raw::send_sync_request(handle.to_raw()) };
     RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::TerminationRequested == desc => SendSyncError::TerminationRequested,
@@ -464,7 +479,7 @@ pub fn close_handle(handle: Handle) -> Result<(), CloseHandleError> {
 /// Error returned by [`close_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloseHandleError {
-    /// The supplied handle is not a valid session handle —
+    /// The supplied handle is not a valid session handle -
     /// `KernelError::InvalidHandle` (raw code `0xE401`).
     #[error("Invalid handle")]
     InvalidHandle,

@@ -21,7 +21,8 @@ use core::{
     ptr,
 };
 
-use nx_svc::raw::Handle as RawHandle;
+use nx_svc::{ipc::Handle as SessionHandle, raw::Handle as RawHandle};
+use nx_sys_thread_tls::IpcBuffer;
 
 use super::{
     object_id::ObjectId,
@@ -33,18 +34,24 @@ use super::{
 use crate::{
     array_vec::ArrayVec,
     hipc::{
-        self, BufferDescriptor, BufferMode, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest,
-        HipcRequestBuilder, RecvListEntry, StaticDescriptor,
+        self, BufferDescriptor, BufferMode, HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload,
+        HipcRequest, HipcRequestBuilder, InOutBuffer, InPointer, InputBuffer, OutPointer,
+        OutputBuffer, RecvListEntry, StaticDescriptor,
     },
 };
 
 /// Layout error for CMIF request serialization.
 ///
-/// CMIF body encoders cannot fail — HIPC reserves
+/// CMIF body encoders cannot fail - HIPC reserves
 /// `encoded_len.next_multiple_of(4)` bytes, so the destination slice is
 /// always large enough by construction. Layout failures come from the
 /// underlying HIPC request size check ([`hipc::WriteError`]).
 pub type RequestLayoutError = hipc::WriteError;
+
+/// Send error for CMIF requests.
+///
+/// Alias for the underlying HIPC send error ([`hipc::SendError`]).
+pub type SendError = hipc::SendError;
 
 /// Value-type description of a full CMIF request body.
 ///
@@ -52,6 +59,26 @@ pub type RequestLayoutError = hipc::WriteError;
 /// [`HipcRequest::write_to`]. Most callers construct one through
 /// [`CmifRequestBuilder`].
 pub type CmifRequest<'a> = HipcRequest<CmifBody<'a>>;
+
+impl CmifRequest<'_> {
+    /// Serializes the request into `buf` and sends it on `session`.
+    ///
+    /// Consuming the request keeps every attached buffer loan alive until
+    /// the kernel finishes the syscall, and releases them all when this
+    /// returns. The in-band payload borrow deliberately rides along even
+    /// though its bytes are copied at serialization time. Parse the
+    /// response from `buf` afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SendError::Layout`] when the encoded request does not fit
+    /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
+    /// when the kernel rejects the underlying `SendSyncRequest`.
+    #[inline]
+    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+        self.send_inner(buf, session)
+    }
+}
 
 /// Fluent builder for a full CMIF request.
 ///
@@ -65,12 +92,19 @@ pub struct CmifRequestBuilder<'a> {
     context: u32,
     object_id: Option<ObjectId>,
     payload: &'a [u8],
-    num_out_auto_buffers: u32,
-    num_out_pointers: u32,
     objects: ArrayVec<ObjectId, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
     server_pointer_size: usize,
     cur_in_ptr_id: u8,
+    // Borrowed buffer wrappers held until the request DTO is dropped, so the
+    // borrow checker tracks per-slice exclusivity across the entire chain of
+    // `add_*` calls and rejects aliasing combinations (e.g. an input and an
+    // output descriptor pointing at the same slice).
+    input_buffers: ArrayVec<InputBuffer<'a>, HIPC_MAX_DESCRIPTORS>,
+    output_buffers: ArrayVec<OutputBuffer<'a>, HIPC_MAX_DESCRIPTORS>,
+    inout_buffers: ArrayVec<InOutBuffer<'a>, HIPC_MAX_DESCRIPTORS>,
+    in_pointers: ArrayVec<InPointer<'a>, HIPC_MAX_DESCRIPTORS>,
+    out_pointers: ArrayVec<OutPointer<'a>, HIPC_MAX_RECV_LIST>,
 }
 
 impl<'a> CmifRequestBuilder<'a> {
@@ -83,22 +117,28 @@ impl<'a> CmifRequestBuilder<'a> {
             context: 0,
             object_id: None,
             payload: &[],
-            num_out_auto_buffers: 0,
-            num_out_pointers: 0,
             objects: ArrayVec::new(),
             out_pointer_sizes: ArrayVec::new(),
             server_pointer_size: 0,
             cur_in_ptr_id: 0,
+            input_buffers: ArrayVec::new(),
+            output_buffers: ArrayVec::new(),
+            inout_buffers: ArrayVec::new(),
+            in_pointers: ArrayVec::new(),
+            out_pointers: ArrayVec::new(),
         }
     }
 
     /// Sets the server pointer-buffer capacity used by auto-buffer selection.
     ///
     /// Auto-buffers use inline pointer descriptors while enough pointer-buffer
-    /// capacity remains, then fall back to mapped buffer descriptors.
+    /// capacity remains, then fall back to mapped buffer descriptors. The
+    /// capacity is a `u16` because that is how the server advertises it
+    /// (CMIF control request 3); the bound also keeps every inline-path
+    /// size representable in the 16-bit OPT wire entries.
     #[inline]
-    pub fn with_pointer_buffer_size(mut self, size: usize) -> Self {
-        self.server_pointer_size = size;
+    pub fn with_pointer_buffer_size(mut self, size: u16) -> Self {
+        self.server_pointer_size = usize::from(size);
         self
     }
 
@@ -144,103 +184,144 @@ impl<'a> CmifRequestBuilder<'a> {
     }
 
     /// Adds a mapped input buffer using a Type-A HIPC descriptor.
+    ///
+    /// Empty slices encode a null descriptor instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_input_buffer_raw(
-        mut self,
-        buffer: *const u8,
-        size: usize,
-        mode: BufferMode,
-    ) -> Self {
+    pub fn add_input_buffer(mut self, buf: InputBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let slice = buf.as_slice();
+        let len = slice.len();
+        let ptr = if slice.is_empty() {
+            ptr::null()
+        } else {
+            slice.as_ptr()
+        };
+
         self.hipc = self
             .hipc
-            .with_send_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
+            .with_send_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+        self.input_buffers.push(buf);
         self
     }
 
     /// Adds a mapped output buffer using a Type-B HIPC descriptor.
+    ///
+    /// Empty slices encode a null descriptor instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_output_buffer_raw(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
+    pub fn add_output_buffer(mut self, mut buf: OutputBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
+            ptr::null_mut()
+        } else {
+            buf.as_mut_slice().as_mut_ptr()
+        };
+
         self.hipc = self
             .hipc
-            .with_recv_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
+            .with_recv_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+        self.output_buffers.push(buf);
         self
     }
 
     /// Adds a mapped bidirectional buffer using a Type-W HIPC descriptor.
-    #[inline]
-    pub fn add_inout_buffer_raw(mut self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
-        self.hipc = self
-            .hipc
-            .with_exch_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
-        self
-    }
-
-    /// Adds a mapped input buffer from a byte slice.
     ///
     /// Empty slices encode a null descriptor instead of taking a dangling
     /// pointer from the slice.
     #[inline]
-    pub fn add_input_buffer(self, buffer: &[u8], mode: BufferMode) -> Self {
-        let ptr = if buffer.is_empty() {
-            ptr::null()
-        } else {
-            buffer.as_ptr()
-        };
-        self.add_input_buffer_raw(ptr, buffer.len(), mode)
-    }
-
-    /// Adds a mapped output buffer from a mutable byte slice.
-    ///
-    /// Empty slices encode a null descriptor instead of taking a dangling
-    /// pointer from the slice.
-    #[inline]
-    pub fn add_output_buffer(self, buffer: &mut [u8], mode: BufferMode) -> Self {
-        let ptr = if buffer.is_empty() {
+    pub fn add_inout_buffer(mut self, mut buf: InOutBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
             ptr::null_mut()
         } else {
-            buffer.as_mut_ptr()
+            buf.as_mut_slice().as_mut_ptr()
         };
-        self.add_output_buffer_raw(ptr, buffer.len(), mode)
+
+        self.hipc = self
+            .hipc
+            .with_exch_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+        self.inout_buffers.push(buf);
+        self
     }
 
     /// Adds an input pointer using a Type-X send-static descriptor.
     ///
     /// The pointer consumes one server pointer-buffer slot and advances the
     /// CMIF input pointer index.
+    ///
+    /// Empty slices encode a null descriptor instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_in_pointer(mut self, buffer: *const u8, size: usize) -> Self {
+    pub fn add_in_pointer(mut self, buf: InPointer<'a>) -> Self {
+        let slice = buf.as_slice();
+        let len = slice.len();
+        let ptr = if slice.is_empty() {
+            ptr::null()
+        } else {
+            slice.as_ptr()
+        };
         let id = self.cur_in_ptr_id;
+
         self.hipc = self
             .hipc
-            .with_send_static(StaticDescriptor::new_send(buffer, size, id));
+            .with_send_static(StaticDescriptor::new_send(ptr, len, id));
         self.cur_in_ptr_id += 1;
-        self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
+        self.server_pointer_size = self.server_pointer_size.saturating_sub(len);
+        self.in_pointers.push(buf);
         self
     }
 
     /// Adds a fixed-size output pointer using a Type-C recv-list entry.
     ///
     /// Fixed pointers do not add an out-pointer-size table entry.
+    ///
+    /// Empty slices encode a null descriptor instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_out_fixed_pointer(mut self, buffer: *mut u8, size: usize) -> Self {
+    pub fn add_out_fixed_pointer(mut self, mut buf: OutPointer<'a>) -> Self {
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
+            ptr::null_mut()
+        } else {
+            buf.as_mut_slice().as_mut_ptr()
+        };
+
         self.hipc = self
             .hipc
-            .with_recv_list_entry(RecvListEntry::new_recv(buffer, size));
-        self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
+            .with_recv_list_entry(RecvListEntry::new_recv(ptr, len));
+        self.server_pointer_size = self.server_pointer_size.saturating_sub(len);
+        self.out_pointers.push(buf);
         self
     }
 
     /// Adds a variable-size output pointer using a Type-C recv-list entry.
     ///
     /// The pointer size is recorded in the CMIF out-pointer-size table.
+    ///
+    /// Empty slices encode a null descriptor instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_out_pointer(mut self, buffer: *mut u8, size: usize) -> Self {
+    pub fn add_out_pointer(mut self, mut buf: OutPointer<'a>) -> Self {
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
+            ptr::null_mut()
+        } else {
+            buf.as_mut_slice().as_mut_ptr()
+        };
+
         self.hipc = self
             .hipc
-            .with_recv_list_entry(RecvListEntry::new_recv(buffer, size));
-        self.out_pointer_sizes.push(size as u16);
-        self.num_out_pointers += 1;
-        self.server_pointer_size = self.server_pointer_size.saturating_sub(size);
+            .with_recv_list_entry(RecvListEntry::new_recv(ptr, len));
+        // OPT entries are 16-bit on the wire (Type-C pointers cap at 64 KiB);
+        // an out-pointer larger than that cannot be encoded, so the entry
+        // saturates at the wire maximum.
+        self.out_pointer_sizes
+            .push(u16::try_from(len).unwrap_or(u16::MAX));
+        self.server_pointer_size = self.server_pointer_size.saturating_sub(len);
+        self.out_pointers.push(buf);
         self
     }
 
@@ -250,30 +331,23 @@ impl<'a> CmifRequestBuilder<'a> {
     /// pointer buffer, otherwise as a mapped buffer. The paired unused HIPC
     /// descriptor is still reserved with a zero descriptor to match CMIF
     /// layout rules.
+    ///
+    /// Empty slices encode null descriptors instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_in_auto_buffer(self, buffer: *const u8, size: usize, mode: BufferMode) -> Self {
-        let mut s = self;
-        if s.server_pointer_size > 0 && size <= s.server_pointer_size {
-            let id = s.cur_in_ptr_id;
-            s.hipc = s
-                .hipc
-                .with_send_static(StaticDescriptor::new_send(buffer, size, id));
-            s.cur_in_ptr_id += 1;
-            s.hipc = s
-                .hipc
-                .with_send_buffer(BufferDescriptor::new_buffer(ptr::null(), 0, mode));
-            s.server_pointer_size = s.server_pointer_size.saturating_sub(size);
+    pub fn add_in_auto_buffer(mut self, buf: InputBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let slice = buf.as_slice();
+        let len = slice.len();
+        let ptr = if slice.is_empty() {
+            ptr::null()
         } else {
-            let id = s.cur_in_ptr_id;
-            s.hipc = s
-                .hipc
-                .with_send_static(StaticDescriptor::new_send(ptr::null(), 0, id));
-            s.cur_in_ptr_id += 1;
-            s.hipc = s
-                .hipc
-                .with_send_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
-        }
-        s
+            slice.as_ptr()
+        };
+
+        self = self.push_in_auto_descriptors(ptr, len, mode);
+        self.input_buffers.push(buf);
+        self
     }
 
     /// Adds an output auto-buffer.
@@ -281,29 +355,112 @@ impl<'a> CmifRequestBuilder<'a> {
     /// The buffer is encoded as an inline output pointer when it fits in the
     /// server pointer buffer, otherwise as a mapped output buffer. The OPT
     /// entry records the inline size or zero for the mapped path.
+    ///
+    /// Empty slices encode null descriptors instead of taking a dangling
+    /// pointer from the slice.
     #[inline]
-    pub fn add_out_auto_buffer(self, buffer: *mut u8, size: usize, mode: BufferMode) -> Self {
-        let mut s = self;
-        s.num_out_auto_buffers += 1;
-        if s.server_pointer_size > 0 && size <= s.server_pointer_size {
-            s.hipc = s
-                .hipc
-                .with_recv_list_entry(RecvListEntry::new_recv(buffer, size));
-            s.hipc = s
-                .hipc
-                .with_recv_buffer(BufferDescriptor::new_buffer(ptr::null(), 0, mode));
-            s.out_pointer_sizes.push(size as u16);
-            s.server_pointer_size = s.server_pointer_size.saturating_sub(size);
+    pub fn add_out_auto_buffer(mut self, mut buf: OutputBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
+            ptr::null_mut()
         } else {
-            s.hipc = s
+            buf.as_mut_slice().as_mut_ptr()
+        };
+
+        self = self.push_out_auto_descriptors(ptr, len, mode);
+        self.output_buffers.push(buf);
+        self
+    }
+
+    /// Adds a bidirectional auto-buffer from a single exclusive loan.
+    ///
+    /// Encodes the input half and then the output half over the same memory,
+    /// mirroring how libnx processes one buffer attributed
+    /// `In | Out | AutoSelect` (nvdrv ioctls, bsd poll/select). The input
+    /// half's pointer-buffer budget deduction happens before the output
+    /// half's fit check, so the two halves may pick different encodings.
+    ///
+    /// When several inout auto-buffers are attached, their in/out halves
+    /// draw on the budget interleaved (in 0, out 0, in 1, out 1, ...),
+    /// whereas attaching separate input and output buffers groups the
+    /// halves. The wire bytes are identical whenever the server
+    /// pointer-buffer budget is zero; under a non-zero budget the deduction
+    /// order may select different encodings.
+    ///
+    /// Empty slices encode null descriptors instead of taking a dangling
+    /// pointer from the slice.
+    #[inline]
+    pub fn add_inout_auto_buffer(mut self, mut buf: InOutBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
+            ptr::null_mut()
+        } else {
+            buf.as_mut_slice().as_mut_ptr()
+        };
+
+        self = self.push_in_auto_descriptors(ptr, len, mode);
+        self = self.push_out_auto_descriptors(ptr, len, mode);
+        self.inout_buffers.push(buf);
+        self
+    }
+
+    /// Encodes the input half of an auto-buffer: an inline send-static plus
+    /// a null send-buffer when the data fits in the remaining server
+    /// pointer-buffer budget, otherwise a null send-static plus a mapped
+    /// send-buffer. Either way one input pointer index is consumed.
+    fn push_in_auto_descriptors(mut self, ptr: *const u8, len: usize, mode: BufferMode) -> Self {
+        let id = self.cur_in_ptr_id;
+        self.cur_in_ptr_id += 1;
+
+        if self.server_pointer_size > 0 && len <= self.server_pointer_size {
+            self.hipc = self
+                .hipc
+                .with_send_static(StaticDescriptor::new_send(ptr, len, id));
+            self.hipc =
+                self.hipc
+                    .with_send_buffer(BufferDescriptor::new_buffer(ptr::null(), 0, mode));
+            self.server_pointer_size = self.server_pointer_size.saturating_sub(len);
+        } else {
+            self.hipc = self
+                .hipc
+                .with_send_static(StaticDescriptor::new_send(ptr::null(), 0, id));
+            self.hipc = self
+                .hipc
+                .with_send_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+        }
+        self
+    }
+
+    /// Encodes the output half of an auto-buffer: an inline recv-list entry
+    /// plus a null recv-buffer when the data fits in the remaining server
+    /// pointer-buffer budget (the OPT entry records the size), otherwise a
+    /// null recv-list entry plus a mapped recv-buffer (the OPT entry records
+    /// zero).
+    fn push_out_auto_descriptors(mut self, ptr: *mut u8, len: usize, mode: BufferMode) -> Self {
+        if self.server_pointer_size > 0 && len <= self.server_pointer_size {
+            self.hipc = self
+                .hipc
+                .with_recv_list_entry(RecvListEntry::new_recv(ptr, len));
+            self.hipc =
+                self.hipc
+                    .with_recv_buffer(BufferDescriptor::new_buffer(ptr::null(), 0, mode));
+            // This branch requires `len <= server_pointer_size`, which
+            // `with_pointer_buffer_size` bounds to `u16`, so the cast is
+            // lossless.
+            self.out_pointer_sizes.push(len as u16);
+            self.server_pointer_size = self.server_pointer_size.saturating_sub(len);
+        } else {
+            self.hipc = self
                 .hipc
                 .with_recv_list_entry(RecvListEntry::new_recv(ptr::null_mut(), 0));
-            s.hipc = s
+            self.hipc = self
                 .hipc
-                .with_recv_buffer(BufferDescriptor::new_buffer(buffer, size, mode));
-            s.out_pointer_sizes.push(0);
+                .with_recv_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+            self.out_pointer_sizes.push(0);
         }
-        s
+        self
     }
 
     /// Adds a domain input object ID to pass with the request.
@@ -341,8 +498,11 @@ impl<'a> CmifRequestBuilder<'a> {
             payload: self.payload,
             objects: self.objects,
             out_pointer_sizes: self.out_pointer_sizes,
-            num_out_auto_buffers: self.num_out_auto_buffers,
-            num_out_pointers: self.num_out_pointers,
+            _input_buffers: self.input_buffers,
+            _output_buffers: self.output_buffers,
+            _inout_buffers: self.inout_buffers,
+            _in_pointers: self.in_pointers,
+            _out_pointers: self.out_pointers,
         };
         self.hipc
             .set_message_type(message_type)
@@ -357,6 +517,23 @@ impl<'a> CmifRequestBuilder<'a> {
 /// Control requests are used for operations such as domain conversion,
 /// cloning, and pointer-buffer-size queries.
 pub type CmifControlRequest<'a> = HipcRequest<CmifControlBody<'a>>;
+
+impl CmifControlRequest<'_> {
+    /// Serializes the control request into `buf` and sends it on `session`.
+    ///
+    /// Consuming the request keeps the payload borrow alive until the
+    /// syscall returns. Parse the response from `buf` afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SendError::Layout`] when the encoded request does not fit
+    /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
+    /// when the kernel rejects the underlying `SendSyncRequest`.
+    #[inline]
+    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+        self.send_inner(buf, session)
+    }
+}
 
 /// Fluent builder for a CMIF control request.
 ///
@@ -425,11 +602,18 @@ impl CmifCloseRequest {
         )
     }
 
-    /// Writes the close request into `dst`.
-    pub fn write_to<const N: usize>(&self, dst: &mut [u8; N]) -> Result<(), RequestLayoutError> {
+    /// Serializes the close request into `buf` and sends it on `session`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SendError::Layout`] when the encoded request does not fit
+    /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
+    /// when the kernel rejects the underlying `SendSyncRequest`.
+    #[inline]
+    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
         match self {
-            Self::Session(hipc) => hipc.write_to(dst),
-            Self::DomainObject(hipc) => hipc.write_to(dst),
+            Self::Session(hipc) => hipc.send_inner(buf, session),
+            Self::DomainObject(hipc) => hipc.send_inner(buf, session),
         }
     }
 }
@@ -439,7 +623,13 @@ impl CmifCloseRequest {
 /// Encodes (optionally) the `DomainInHeader`, the `InHeader`, the raw rpc
 /// payload, the input-object id tail, and the out-pointer-size table at the
 /// region tail.
-#[derive(Debug, Clone)]
+///
+/// The body also owns the borrowed buffer wrappers attached to the request
+/// (`input_buffers`, `output_buffers`, ...). They do not contribute to the
+/// encoded data-words region; they ride along so each per-slice borrow
+/// stays live until the request DTO is dropped, preserving per-slice
+/// exclusivity through the borrow checker.
+#[derive(Debug)]
 pub struct CmifBody<'a> {
     request_id: u32,
     context: u32,
@@ -447,13 +637,23 @@ pub struct CmifBody<'a> {
     payload: &'a [u8],
     objects: ArrayVec<ObjectId, CMIF_MAX_OBJECTS>,
     out_pointer_sizes: ArrayVec<u16, HIPC_MAX_RECV_LIST>,
-    num_out_auto_buffers: u32,
-    num_out_pointers: u32,
+    // Held (never read) to keep each per-slice borrow alive until the
+    // request DTO is dropped. The borrow checker sees them as live borrows
+    // and enforces per-slice exclusivity across the whole add_*-then-build
+    // chain. The raw pointers serialized into the HIPC descriptors derive
+    // from these held borrows; because the wrappers are never touched
+    // again, those pointers keep valid provenance until the syscall that
+    // consumes the request returns.
+    _input_buffers: ArrayVec<InputBuffer<'a>, HIPC_MAX_DESCRIPTORS>,
+    _output_buffers: ArrayVec<OutputBuffer<'a>, HIPC_MAX_DESCRIPTORS>,
+    _inout_buffers: ArrayVec<InOutBuffer<'a>, HIPC_MAX_DESCRIPTORS>,
+    _in_pointers: ArrayVec<InPointer<'a>, HIPC_MAX_DESCRIPTORS>,
+    _out_pointers: ArrayVec<OutPointer<'a>, HIPC_MAX_RECV_LIST>,
 }
 
 impl CmifBody<'_> {
     fn opt_size(&self) -> usize {
-        size_of::<u16>() * (self.num_out_auto_buffers + self.num_out_pointers) as usize
+        size_of::<u16>() * self.out_pointer_sizes.len()
     }
 
     fn cmif_version(&self) -> u32 {
@@ -489,8 +689,8 @@ impl HipcPayload for CmifBody<'_> {
     /// Writes the CMIF in-band body for a plain or domain request.
     ///
     /// Splits the out-pointer-size table off the region tail, skips the
-    /// [`CMIF_HEADER_ALIGN`] alignment pad at the head, then writes — in
-    /// order — the optional `DomainInHeader`, the `InHeader`, the raw rpc
+    /// [`CMIF_HEADER_ALIGN`] alignment pad at the head, then writes - in
+    /// order - the optional `DomainInHeader`, the `InHeader`, the raw rpc
     /// payload, and the trailing input-object id table for domain requests.
     fn write_to(&self, dst: &mut [u8]) {
         let body_len = self.encoded_len();

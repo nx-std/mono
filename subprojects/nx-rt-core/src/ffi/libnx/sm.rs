@@ -7,6 +7,7 @@ use nx_sf::{ServiceName, ffi::Service};
 use crate::{
     ffi::common::{
         GENERIC_ERROR, SyncUnsafeCell, parse_resp_error_to_rc, parse_tipc_resp_error_to_rc,
+        send_error_to_rc,
     },
     services::sm,
 };
@@ -319,84 +320,68 @@ fn sm_initialize_error_to_rc(err: sm::InitializeError) -> u32 {
     match err.0 {
         nx_service_sm::ConnectError::Connect(e) => e.to_rc(),
         nx_service_sm::ConnectError::RegisterClient(e) => match e {
-            nx_service_sm::RegisterClientCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::RegisterClientCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::RegisterClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::RegisterClientCmifError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn sm_get_service_error_to_rc(err: sm::GetServiceError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err.0 {
-        nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+        nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
         nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-        nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
         nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
     }
 }
 
 fn sm_register_service_error_to_rc(err: sm::RegisterServiceError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         sm::RegisterServiceError::Cmif(e) => match e {
-            nx_service_sm::RegisterServiceCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::RegisterServiceCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::RegisterServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::RegisterServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::RegisterServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
         sm::RegisterServiceError::Tipc(e) => match e {
-            nx_service_sm::RegisterServiceTipcError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::RegisterServiceTipcError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::RegisterServiceTipcError::ParseResponse(e) => {
                 parse_tipc_resp_error_to_rc(e)
             }
-            nx_service_sm::RegisterServiceTipcError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::RegisterServiceTipcError::MissingHandle => GENERIC_ERROR,
         },
     }
 }
 
 fn sm_unregister_service_error_to_rc(err: sm::UnregisterServiceError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         sm::UnregisterServiceError::Cmif(e) => match e {
-            nx_service_sm::UnregisterServiceCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::UnregisterServiceCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::UnregisterServiceCmifError::ParseResponse(e) => {
                 parse_resp_error_to_rc(e)
             }
-            nx_service_sm::UnregisterServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
         },
         sm::UnregisterServiceError::Tipc(e) => match e {
-            nx_service_sm::UnregisterServiceTipcError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::UnregisterServiceTipcError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::UnregisterServiceTipcError::ParseResponse(e) => {
                 parse_tipc_resp_error_to_rc(e)
             }
-            nx_service_sm::UnregisterServiceTipcError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }
 
 fn sm_detach_client_error_to_rc(err: sm::DetachClientError) -> u32 {
-    use nx_svc::error::ToRawResultCode;
-
     match err {
         // LibnxError_IncompatSysVer = 0x64 (100) in module 345
         // MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer) = 0x8A564
         sm::DetachClientError::IncompatibleVersion => 0x8A564,
         sm::DetachClientError::Cmif(e) => match e {
-            nx_service_sm::DetachClientCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::DetachClientCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::DetachClientCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::DetachClientCmifError::BuildRequest(_) => GENERIC_ERROR,
         },
         sm::DetachClientError::Tipc(e) => match e {
-            nx_service_sm::DetachClientTipcError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::DetachClientTipcError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::DetachClientTipcError::ParseResponse(e) => {
                 parse_tipc_resp_error_to_rc(e)
             }
-            nx_service_sm::DetachClientTipcError::BuildRequest(_) => GENERIC_ERROR,
         },
     }
 }

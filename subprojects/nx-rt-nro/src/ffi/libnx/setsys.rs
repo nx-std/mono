@@ -3,12 +3,11 @@
 use core::mem::MaybeUninit;
 
 use nx_sf::ffi::Service;
-use nx_svc::error::ToRawResultCode;
 
 use crate::{
     ffi::common::{
         GENERIC_ERROR, SyncUnsafeCell, parse_resp_bytes_error_to_rc, parse_resp_error_to_rc,
-        parse_tipc_resp_error_to_rc,
+        parse_tipc_resp_error_to_rc, send_error_to_rc,
     },
     services::set,
 };
@@ -105,15 +104,13 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_setsys_get_firmware_version(
 fn setsys_connect_error_to_rc(err: set::ConnectError) -> u32 {
     match err {
         set::ConnectError::Cmif(e) => match e.0 {
-            nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::GetServiceCmifError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::GetServiceCmifError::ParseResponse(e) => parse_resp_error_to_rc(e),
-            nx_service_sm::GetServiceCmifError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::GetServiceCmifError::MissingHandle => GENERIC_ERROR,
         },
         set::ConnectError::Tipc(e) => match e.0 {
-            nx_service_sm::GetServiceTipcError::SendRequest(e) => e.to_rc(),
+            nx_service_sm::GetServiceTipcError::SendRequest(e) => send_error_to_rc(e),
             nx_service_sm::GetServiceTipcError::ParseResponse(e) => parse_tipc_resp_error_to_rc(e),
-            nx_service_sm::GetServiceTipcError::BuildRequest(_) => GENERIC_ERROR,
             nx_service_sm::GetServiceTipcError::MissingHandle => GENERIC_ERROR,
         },
     }
@@ -123,10 +120,9 @@ fn setsys_get_firmware_version_error_to_rc(
     err: nx_service_set::GetFirmwareVersionCmifError,
 ) -> u32 {
     match err {
-        nx_service_set::GetFirmwareVersionCmifError::SendRequest(e) => e.to_rc(),
+        nx_service_set::GetFirmwareVersionCmifError::SendRequest(e) => send_error_to_rc(e),
         nx_service_set::GetFirmwareVersionCmifError::ParseResponse(e) => {
             parse_resp_bytes_error_to_rc(e)
         }
-        nx_service_set::GetFirmwareVersionCmifError::BuildRequest(_) => GENERIC_ERROR,
     }
 }

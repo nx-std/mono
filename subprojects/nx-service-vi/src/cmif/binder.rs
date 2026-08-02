@@ -4,8 +4,8 @@
 
 use nx_sf::{
     cmif,
-    hipc::BufferMode,
-    ipc::{self, Handle as SessionHandle},
+    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    ipc::Handle as SessionHandle,
 };
 use nx_svc::raw::Handle as RawHandle;
 
@@ -50,13 +50,11 @@ pub fn transact_parcel(
     // Add auto-select buffers (Normal mode)
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&input)
-        .add_in_auto_buffer(in_data.as_ptr(), in_data.len(), BufferMode::Normal)
-        .add_out_auto_buffer(out_data.as_mut_ptr(), out_data.len(), BufferMode::Normal)
+        .add_in_auto_buffer(InputBuffer::new(in_data, BufferMode::Normal))
+        .add_out_auto_buffer(OutputBuffer::new(out_data, BufferMode::Normal))
         .build();
-    req.write_to(&mut buf)
-        .map_err(TransactParcelError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(TransactParcelError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(TransactParcelError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(TransactParcelError::ParseResponse)?;
 
@@ -95,10 +93,8 @@ pub fn adjust_refcount(
     let req = cmif::CmifRequestBuilder::new(binder_cmds::ADJUST_REFCOUNT)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(AdjustRefcountError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(AdjustRefcountError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(AdjustRefcountError::SendRequest)?;
 
     cmif::parse_response::<()>(&buf).map_err(AdjustRefcountError::ParseResponse)?;
 
@@ -130,10 +126,8 @@ pub fn get_native_handle(
     let req = cmif::CmifRequestBuilder::new(binder_cmds::GET_NATIVE_HANDLE)
         .with_data_value(&input)
         .build();
-    req.write_to(&mut buf)
-        .map_err(GetNativeHandleError::BuildRequest)?;
-
-    ipc::send_sync_request(&mut buf, session).map_err(GetNativeHandleError::SendRequest)?;
+    req.send(&mut buf, session)
+        .map_err(GetNativeHandleError::SendRequest)?;
 
     let resp = cmif::parse_response::<()>(&buf).map_err(GetNativeHandleError::ParseResponse)?;
 
@@ -147,12 +141,9 @@ pub fn get_native_handle(
 /// Error from [`transact_parcel`].
 #[derive(Debug, thiserror::Error)]
 pub enum TransactParcelError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -161,12 +152,9 @@ pub enum TransactParcelError {
 /// Error from [`adjust_refcount`].
 #[derive(Debug, thiserror::Error)]
 pub enum AdjustRefcountError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
@@ -175,12 +163,9 @@ pub enum AdjustRefcountError {
 /// Error from [`get_native_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetNativeHandleError {
-    /// Failed to build the CMIF request.
-    #[error("failed to build request")]
-    BuildRequest(#[source] cmif::RequestLayoutError),
     /// Failed to send IPC request.
     #[error("failed to send request")]
-    SendRequest(#[source] ipc::SendSyncError),
+    SendRequest(#[source] cmif::SendError),
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),

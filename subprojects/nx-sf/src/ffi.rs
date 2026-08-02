@@ -337,10 +337,17 @@ pub unsafe extern "C" fn __nx_sf__service_get_object_id(s: *const Service) -> u3
 /// Converts a clone object error to a raw result code for FFI.
 fn clone_error_to_rc(err: CloneObjectError) -> u32 {
     match err {
-        CloneObjectError::SendRequest(e) => e.to_rc(),
+        CloneObjectError::SendRequest(e) => send_error_to_rc(e),
         CloneObjectError::ParseResponse(e) => parse_response_error_to_rc(e),
         CloneObjectError::MissingHandle => GENERIC_ERROR,
-        CloneObjectError::Layout(_) => GENERIC_ERROR,
+    }
+}
+
+/// Converts a request send error to a raw result code.
+fn send_error_to_rc(err: cmif::SendError) -> u32 {
+    match err {
+        cmif::SendError::Layout(_) => GENERIC_ERROR,
+        cmif::SendError::SendRequest(e) => e.to_rc(),
     }
 }
 
@@ -360,18 +367,16 @@ fn parse_response_error_to_rc(err: cmif::ParseError) -> u32 {
 /// Converts a clone object ex error to a raw result code for FFI.
 fn clone_object_ex_error_to_rc(err: CloneObjectExError) -> u32 {
     match err {
-        CloneObjectExError::SendRequest(e) => e.to_rc(),
+        CloneObjectExError::SendRequest(e) => send_error_to_rc(e),
         CloneObjectExError::ParseResponse(e) => parse_response_error_to_rc(e),
         CloneObjectExError::MissingHandle => GENERIC_ERROR,
-        CloneObjectExError::Layout(_) => GENERIC_ERROR,
     }
 }
 
 /// Converts a convert to domain error to a raw result code for FFI.
 fn convert_to_domain_error_to_rc(err: ConvertToDomainError) -> u32 {
     match err {
-        ConvertToDomainError::SendRequest(e) => e.to_rc(),
+        ConvertToDomainError::SendRequest(e) => send_error_to_rc(e),
         ConvertToDomainError::ParseResponse(e) => parse_response_error_to_rc(e),
-        ConvertToDomainError::Layout(_) => GENERIC_ERROR,
     }
 }

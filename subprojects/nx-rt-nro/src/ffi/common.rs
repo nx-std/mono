@@ -33,6 +33,15 @@ pub use nx_rt_core::ffi::common::parse_resp_bytes_error_to_rc;
 pub use nx_rt_core::ffi::common::parse_resp_error_to_rc;
 #[cfg(feature = "service-set")]
 pub use nx_rt_core::ffi::common::parse_tipc_resp_error_to_rc;
+#[cfg(any(
+    feature = "service-apm",
+    feature = "service-hid",
+    feature = "service-nv",
+    feature = "service-set",
+    feature = "service-time",
+    feature = "service-vi",
+))]
+pub use nx_rt_core::ffi::common::send_error_to_rc;
 
 /// libnx error enumeration for MAKERESULT(Module_Libnx, error).
 ///
