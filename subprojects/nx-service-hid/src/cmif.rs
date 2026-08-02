@@ -4,7 +4,12 @@
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
 use nx_service_applet::aruid::{Aruid, NO_ARUID};
-use nx_sf::{cmif, hipc::InPointer, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    hipc::InPointer,
+    ipc::Handle as SessionHandle,
+};
 use nx_svc::mem::shmem::Handle as ShmemHandle;
 
 use crate::proto::{applet_resource_cmds, cmds};
@@ -314,6 +319,18 @@ pub enum CreateAppletResourceError {
     MissingHandle,
 }
 
+impl ToResultCode for CreateAppletResourceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`get_shared_memory_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetSharedMemoryHandleError {
@@ -328,6 +345,18 @@ pub enum GetSharedMemoryHandleError {
     MissingHandle,
 }
 
+impl ToResultCode for GetSharedMemoryHandleError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error returned by [`activate_npad`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateNpadError {
@@ -337,6 +366,15 @@ pub enum ActivateNpadError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for ActivateNpadError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error returned by [`set_supported_npad_style_set`].
@@ -350,6 +388,15 @@ pub enum SetSupportedNpadStyleSetError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for SetSupportedNpadStyleSetError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by [`set_supported_npad_id_type`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetSupportedNpadIdTypeError {
@@ -359,6 +406,15 @@ pub enum SetSupportedNpadIdTypeError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for SetSupportedNpadIdTypeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error returned by [`activate_touch_screen`].
@@ -372,6 +428,15 @@ pub enum ActivateTouchScreenError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for ActivateTouchScreenError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by [`activate_keyboard`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateKeyboardError {
@@ -381,6 +446,15 @@ pub enum ActivateKeyboardError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for ActivateKeyboardError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error returned by [`activate_mouse`].
@@ -394,6 +468,15 @@ pub enum ActivateMouseError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for ActivateMouseError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by [`activate_gesture`].
 #[derive(Debug, thiserror::Error)]
 pub enum ActivateGestureError {
@@ -403,4 +486,13 @@ pub enum ActivateGestureError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for ActivateGestureError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

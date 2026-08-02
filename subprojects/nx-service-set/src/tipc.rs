@@ -6,6 +6,7 @@
 use core::{mem::size_of, slice};
 
 use nx_sf::{
+    error::{ResultCode, ToResultCode},
     hipc::{BufferMode, OutputBuffer},
     ipc::Handle as SessionHandle,
     tipc,
@@ -77,4 +78,13 @@ pub enum GetFirmwareVersionError {
     /// Failed to parse the TIPC response.
     #[error("failed to parse response")]
     ParseResponse(#[source] tipc::ParseResponseError),
+}
+
+impl ToResultCode for GetFirmwareVersionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

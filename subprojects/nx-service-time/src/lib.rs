@@ -16,7 +16,10 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 use core::ptr::NonNull;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::ipc::Handle as SessionHandle;
 use nx_sys_mem::shmem::{self as sys_shmem, Mapped, Permissions};
 
@@ -279,4 +282,15 @@ pub enum ConnectError {
     /// Failed to get timezone service.
     #[error("failed to get timezone service")]
     GetTimeZoneService(#[source] GetTimeZoneServiceError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+            Self::GetUserSystemClock(err) => err.to_rc(),
+            Self::GetSteadyClock(err) => err.to_rc(),
+            Self::GetTimeZoneService(err) => err.to_rc(),
+        }
+    }
 }

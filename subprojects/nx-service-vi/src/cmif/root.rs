@@ -3,7 +3,13 @@
 //! The root service is used to get IApplicationDisplayService and
 //! fatal display commands (16.0.0+ Manager only).
 
-use nx_sf::{cmif, hipc::InputBuffer, ipc::Handle as SessionHandle, service::Session};
+use nx_sf::{
+    cmif,
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    hipc::InputBuffer,
+    ipc::Handle as SessionHandle,
+    service::Session,
+};
 
 use crate::proto::root_cmds;
 
@@ -220,6 +226,18 @@ pub enum GetDisplayServiceError {
     MissingHandle,
 }
 
+impl ToResultCode for GetDisplayServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error from [`prepare_fatal`].
 #[derive(Debug, thiserror::Error)]
 pub enum PrepareFatalError {
@@ -229,6 +247,15 @@ pub enum PrepareFatalError {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for PrepareFatalError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Error from [`show_fatal`].
@@ -242,6 +269,15 @@ pub enum ShowFatalError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for ShowFatalError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`draw_fatal_rectangle`].
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalRectangleError {
@@ -253,6 +289,15 @@ pub enum DrawFatalRectangleError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
+impl ToResultCode for DrawFatalRectangleError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error from [`draw_fatal_text32`].
 #[derive(Debug, thiserror::Error)]
 pub enum DrawFatalText32Error {
@@ -262,4 +307,13 @@ pub enum DrawFatalText32Error {
     /// Failed to parse CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for DrawFatalText32Error {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

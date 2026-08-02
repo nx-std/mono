@@ -1,5 +1,7 @@
 //! NV service data types.
 
+use nx_sf::error::{GENERIC_ERROR, ResultCode, ToResultCode};
+
 /// NV service type selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(i32)]
@@ -51,6 +53,19 @@ pub enum OpenNvError {
     Unknown(u32),
 }
 
+impl ToResultCode for OpenNvError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotSupported
+            | Self::NotInitialized
+            | Self::FileOperationFailed
+            | Self::Unknown(_) => GENERIC_ERROR,
+        }
+    }
+}
+
 impl OpenNvError {
     /// Converts a raw NV error code to an `OpenNvError`.
     pub fn from_raw(code: u32) -> Self {
@@ -91,6 +106,18 @@ pub enum CloseNvError {
     /// Unknown or undocumented error code.
     #[error("unknown error code: {0:#x}")]
     Unknown(u32),
+}
+
+impl ToResultCode for CloseNvError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotImplemented | Self::NotInitialized | Self::InvalidState | Self::Unknown(_) => {
+                GENERIC_ERROR
+            }
+        }
+    }
 }
 
 impl CloseNvError {
@@ -136,6 +163,20 @@ pub enum QueryEventNvError {
     /// Unknown or undocumented error code.
     #[error("unknown error code: {0:#x}")]
     Unknown(u32),
+}
+
+impl ToResultCode for QueryEventNvError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotImplemented
+            | Self::NotInitialized
+            | Self::BadParameter
+            | Self::InvalidState
+            | Self::Unknown(_) => GENERIC_ERROR,
+        }
+    }
 }
 
 impl QueryEventNvError {
@@ -196,6 +237,24 @@ pub enum IoctlNvError {
     /// Unknown or device-specific error code.
     #[error("unknown error code: {0:#x}")]
     Unknown(u32),
+}
+
+impl ToResultCode for IoctlNvError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotImplemented
+            | Self::NotInitialized
+            | Self::BadParameter
+            | Self::Timeout
+            | Self::InsufficientMemory
+            | Self::InvalidState
+            | Self::BadValue
+            | Self::Busy
+            | Self::Unknown(_) => GENERIC_ERROR,
+        }
+    }
 }
 
 impl IoctlNvError {

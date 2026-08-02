@@ -5,7 +5,12 @@
 
 use core::{mem::size_of, slice};
 
-use nx_sf::{cmif, hipc::OutPointer, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    error::{ResultCode, ToResultCode},
+    hipc::OutPointer,
+    ipc::Handle as SessionHandle,
+};
 
 use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, FirmwareVersion};
 
@@ -69,4 +74,13 @@ pub enum GetFirmwareVersionError {
     /// Failed to parse the CMIF response.
     #[error("failed to parse response")]
     ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for GetFirmwareVersionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

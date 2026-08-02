@@ -3,7 +3,10 @@
 //! The Binder protocol is used to communicate with graphics buffer producers
 //! via parcel-based transactions.
 
-use nx_sf::service::Session;
+use nx_sf::{
+    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    service::Session,
+};
 use nx_svc::raw::Handle as RawHandle;
 
 use crate::{
@@ -205,6 +208,18 @@ pub enum InitSessionError {
     IncreaseStrongRef(#[source] cmif::binder::AdjustRefcountError),
 }
 
+impl ToResultCode for InitSessionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::IncreaseWeakRef(err) => err.to_rc(),
+            Self::IncreaseStrongRef(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::AlreadyInitialized => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Error from [`Binder::transact`].
 #[derive(Debug, thiserror::Error)]
 pub enum TransactError {
@@ -222,6 +237,18 @@ pub enum TransactError {
     Cmif(#[from] cmif::binder::TransactParcelError),
 }
 
+impl ToResultCode for TransactError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotInitialized | Self::InputTooLarge | Self::InvalidResponse | Self::Cmif(_) => {
+                GENERIC_ERROR
+            }
+        }
+    }
+}
+
 /// Error from [`Binder::get_native_handle`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetNativeHandleError {
@@ -231,6 +258,17 @@ pub enum GetNativeHandleError {
     /// CMIF operation failed.
     #[error("CMIF operation failed")]
     Cmif(#[source] cmif::binder::GetNativeHandleError),
+}
+
+impl ToResultCode for GetNativeHandleError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Cmif(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::NotInitialized => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Binder error codes (Android-compatible).
@@ -287,6 +325,32 @@ pub enum BinderError {
     /// Unknown error code.
     #[error("unknown binder error: {0}")]
     Unknown(i32),
+}
+
+impl ToResultCode for BinderError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::PermissionDenied
+            | Self::NameNotFound
+            | Self::WouldBlock
+            | Self::NoMemory
+            | Self::AlreadyExists
+            | Self::NoInit
+            | Self::BadValue
+            | Self::DeadObject
+            | Self::InvalidOperation
+            | Self::NotEnoughData
+            | Self::UnknownTransaction
+            | Self::BadIndex
+            | Self::TimedOut
+            | Self::FdsNotAllowed
+            | Self::FailedTransaction
+            | Self::BadType
+            | Self::Unknown(_) => GENERIC_ERROR,
+        }
+    }
 }
 
 impl BinderError {
