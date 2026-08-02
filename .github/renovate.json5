@@ -1,0 +1,38 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    ':semanticCommits',
+    ':semanticCommitTypeAll(chore)',
+    'helpers:pinGitHubActionDigests',
+  ],
+  schedule: [
+    // At 05:00AM on day-of-month 1 and 15
+    '* 5 1,15 * *',
+  ],
+  configMigration: true,
+  rebaseWhen: 'behind-base-branch',
+  lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
+    automergeType: 'branch',
+  },
+  enabledManagers: [
+    'cargo',
+    'github-actions',
+    'custom.regex',
+  ],
+  customManagers: [
+    // Pinned tool versions installed by CI steps, marked up with a
+    // `# renovate: datasource=<ds> depName=<dep>` comment above the step.
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^\\.github/workflows/[^/]+\\.ya?ml$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)[\\s\\S]*?==(?<currentValue>[0-9][0-9a-zA-Z.-]*)',
+      ],
+    },
+  ],
+}

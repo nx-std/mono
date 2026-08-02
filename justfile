@@ -83,6 +83,19 @@ clippy *EXTRA_FLAGS:
 clippy-crate CRATE *EXTRA_FLAGS:
     cargo clippy --target {{target}} --target-dir {{cargo_target_dir}} --package {{CRATE}} --no-deps {{EXTRA_FLAGS}}
 
+# Check the meson build definition (statically interprets every meson.build/meson.options)
+[group: 'check']
+check-meson:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # `meson introspect` on the source tree runs meson's static interpreter over
+    # the whole project (root + every subproject), so it catches syntax errors,
+    # unknown functions and bad kwargs without needing the devkitPro toolchain.
+    # The JSON payload is noise here; the diagnostics go to stderr.
+    meson introspect --projectinfo meson.build > /dev/null
+    meson introspect --buildoptions meson.build > /dev/null
+
 alias check-deps := check-unused-deps
 
 # Check for unused Rust dependencies (cargo machete)
