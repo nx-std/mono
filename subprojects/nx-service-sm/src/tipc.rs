@@ -5,8 +5,12 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::{ServiceName, tipc};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ServiceName,
+    error::{GENERIC_ERROR, ToResultCode},
+    tipc,
+};
+use nx_svc::{error::ResultCode, ipc::Handle as SessionHandle};
 
 use crate::proto;
 
@@ -55,6 +59,18 @@ pub enum GetServiceError {
     /// Response did not contain the expected handle.
     #[error("missing handle in response")]
     MissingHandle,
+}
+
+impl ToResultCode for GetServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Registers a service with the Service Manager using TIPC protocol.
@@ -117,6 +133,18 @@ pub enum RegisterServiceError {
     MissingHandle,
 }
 
+impl ToResultCode for RegisterServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // The server reported success, so it named no code for a reply
+            // that then arrived without the handle it promised.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
+}
+
 /// Unregisters a service from the Service Manager using TIPC protocol.
 #[inline]
 pub fn unregister_service(
@@ -154,6 +182,15 @@ pub enum UnregisterServiceError {
     ParseResponse(#[source] tipc::ParseResponseError),
 }
 
+impl ToResultCode for UnregisterServiceError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Detaches the client from the Service Manager using TIPC protocol.
 ///
 /// Only available on Atmosphere.
@@ -186,6 +223,15 @@ pub enum DetachClientError {
     /// Failed to parse the TIPC response.
     #[error("failed to parse response")]
     ParseResponse(#[source] tipc::ParseResponseError),
+}
+
+impl ToResultCode for DetachClientError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Registers the client with the Service Manager using TIPC protocol.
@@ -221,4 +267,13 @@ pub enum RegisterClientError {
     /// Failed to parse the TIPC response.
     #[error("failed to parse response")]
     ParseResponse(#[source] tipc::ParseResponseError),
+}
+
+impl ToResultCode for RegisterClientError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
 }

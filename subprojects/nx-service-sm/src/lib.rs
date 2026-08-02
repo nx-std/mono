@@ -51,8 +51,11 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 pub use nx_sf::ServiceName;
-use nx_sf::service::Session;
-use nx_svc::ipc::{self, Handle as SessionHandle};
+use nx_sf::{error::ToResultCode, service::Session};
+use nx_svc::{
+    error::{ResultCode, ToResultCode as _},
+    ipc::{self, Handle as SessionHandle},
+};
 
 mod cmif;
 mod proto;
@@ -210,4 +213,15 @@ pub enum ConnectError {
     /// Failed to register client with SM.
     #[error("failed to register client")]
     RegisterClient(#[source] cmif::RegisterClientError),
+}
+
+impl ToResultCode for ConnectError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            // The kernel rejected the port connection, so it owns this code
+            // and it resolves through `nx-svc`'s trait rather than `nx-sf`'s.
+            Self::Connect(err) => err.to_rc(),
+            Self::RegisterClient(err) => err.to_rc(),
+        }
+    }
 }
