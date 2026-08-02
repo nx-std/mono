@@ -1,7 +1,7 @@
 ---
 name: "meson-subproject-crate"
 description: "Rust-crate specialization of the Meson subproject layout: required directory layout (Cargo.toml, src/lib.rs), Cargo manifest baseline, `custom_target` invocation of cargo, and Cargo/Meson dependency mirroring. Load when creating a new subproject crate, editing `subprojects/<crate>/meson.build`, or wiring a Cargo workspace member into Meson"
-type: arch
+type: "arch"
 scope: "global"
 ---
 
@@ -73,7 +73,7 @@ The `<aspect>` slug used by the linker override filename and the FFI prefix is t
 
 ## 3. `Cargo.toml` Conventions
 
-Subproject `Cargo.toml` files follow [rust-crate](rust-crate.md) section ordering, with the additional constraints below.
+Subproject `Cargo.toml` files follow [rust-crates](rust-crates.md) section ordering, with the additional constraints below.
 
 ### `[package]`
 
@@ -103,7 +103,7 @@ bench = false
 
 ### `[features]`
 
-The `[features]` section is OPTIONAL ([rust-crate](rust-crate.md)). The canonical feature for this workspace is `ffi`; its declaration, source-gating, and symbol-naming rules live in [rust-ffi](rust-ffi.md).
+The `[features]` section is OPTIONAL ([rust-crates](rust-crates.md)). The canonical feature for this workspace is `ffi`; its declaration, source-gating, and symbol-naming rules live in [rust-ffi](rust-ffi.md).
 
 ### `[dependencies]` — Workspace Siblings
 
@@ -258,15 +258,6 @@ Cargo cannot order builds of sibling Meson targets (C objects, header generation
 
 ---
 
-## References
-
-- [meson-subproject](meson-subproject.md) - Related: Generic Meson subproject conventions (skeleton, banners, options, naming)
-- [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts that redirect `libnx` symbols
-- [rust-crate](rust-crate.md) - Related: `Cargo.toml` section ordering and feature naming rules
-- [rust-ffi](rust-ffi.md) - Related: `ffi` Cargo feature contract for the C-FFI surface
-- [rust-modules](rust-modules.md) - Foundation: Module layout inside `src/`
-- [../workspace](../workspace.md) - See also: Workspace crate categories and dependency direction
-
 ## Checklist
 
 Before committing a new or modified Rust-crate subproject, verify:
@@ -307,3 +298,12 @@ Before committing a new or modified Rust-crate subproject, verify:
 
 - [ ] If the crate ships a C-FFI surface, the checklist in [rust-ffi](rust-ffi.md) passes.
 - [ ] If the crate ships an `*_override.ld`, the checklist in [meson-linker-script](meson-linker-script.md) passes.
+
+## References
+
+- [meson-subproject](meson-subproject.md) - Related: Generic Meson subproject conventions (skeleton, banners, options, naming)
+- [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts that redirect `libnx` symbols
+- [rust-crates](rust-crates.md) - Related: `Cargo.toml` section ordering and feature naming rules
+- [rust-ffi](rust-ffi.md) - Related: `ffi` Cargo feature contract for the C-FFI surface
+- [rust-mods-files](rust-mods-files.md) - Foundation: Module layout inside `src/`
+- [../workspace](../workspace.md) - See also: Workspace crate categories and dependency direction

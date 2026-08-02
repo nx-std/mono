@@ -1,7 +1,7 @@
 ---
 name: "rust-no-std"
 description: "`no_std` crate anatomy for subproject crates: the `#![no_std]` marker, the lib.rs preamble, and the `extern crate <foo> as _;` pulls that wire in `#[panic_handler]` and `#[global_allocator]`. Load when creating a new subproject crate, editing the top of a `src/lib.rs`, or deciding whether to add `nx-panic-handler` / `nx-alloc` / `alloc` to a crate"
-type: arch
+type: "arch"
 scope: "global"
 ---
 
@@ -87,7 +87,7 @@ A minimal `sys/*` crate (e.g., `nx-cpu`) drops items 2, 3, and 4 and ends up wit
 `nx-panic-handler` pull, and module declarations. A service crate that needs heap types but is not a link boundary adds
 item 2 (`extern crate alloc;`) and skips item 3.
 
-Module organization inside `src/` follows [rust-modules](rust-modules.md); the FFI module
+Module organization inside `src/` follows [rust-mods-files](rust-mods-files.md); the FFI module
 follows [rust-ffi](rust-ffi.md).
 
 ---
@@ -292,13 +292,6 @@ When writing a new `src/lib.rs`, walk this list top-to-bottom:
 
 ---
 
-## References
-
-- [rust-ffi](rust-ffi.md) - Related: `ffi` Cargo feature for the FFI module declared in `lib.rs`
-- [rust-crate](rust-crate.md) - Related: `Cargo.toml` baseline for `nx-panic-handler` and `nx-alloc` dependencies
-- [meson-subproject-crate](meson-subproject-crate.md) - Related: Per-crate Meson wrapper; mirrors `nx-panic-handler` into the Meson dependency list
-- [rust-modules](rust-modules.md) - Foundation: Module layout within `src/`
-
 ## Checklist
 
 Before committing a new or modified `src/lib.rs`, verify:
@@ -313,3 +306,10 @@ Before committing a new or modified `src/lib.rs`, verify:
 - [ ] Linkage-attribute pulls use the `as _;` idiom with a trailing comment naming the attribute.
 - [ ] `extern crate alloc;` is omitted when the crate uses only `core`.
 - [ ] Aarch64-only crates carry a guarded `compile_error!` immediately after `#![no_std]`.
+
+## References
+
+- [rust-ffi](rust-ffi.md) - Related: `ffi` Cargo feature for the FFI module declared in `lib.rs`
+- [rust-crates](rust-crates.md) - Related: `Cargo.toml` baseline for `nx-panic-handler` and `nx-alloc` dependencies
+- [meson-subproject-crate](meson-subproject-crate.md) - Related: Per-crate Meson wrapper; mirrors `nx-panic-handler` into the Meson dependency list
+- [rust-mods-files](rust-mods-files.md) - Foundation: Module layout within `src/`

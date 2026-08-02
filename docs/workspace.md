@@ -210,7 +210,7 @@ The root `Cargo.toml` `members` array MUST be ordered alphabetically by `subproj
 
 ### Dependencies in `Cargo.toml`
 
-All `Cargo.toml` dependency sections (`[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`) MUST be ordered alphabetically ([code/rust-crate](code/rust-crate.md)).
+All `Cargo.toml` dependency sections (`[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`) MUST be ordered alphabetically ([code/rust-crates](code/rust-crates.md)).
 
 **Rationale**: Same as above. The Cargo/Meson mirror in each per-crate `meson.build` references these in the same order, making the relationship easy to audit.
 
@@ -224,7 +224,7 @@ Top-level `subproject(...)` calls in the root `meson.build` are grouped by purpo
 
 - [code/meson-subproject](code/meson-subproject.md) — Generic Meson subproject conventions
 - [code/meson-subproject-crate](code/meson-subproject-crate.md) — Rust-crate specialization of the Meson subproject layout
-- [code/rust-crate](code/rust-crate.md) — Crate manifest conventions
+- [code/rust-crates](code/rust-crates.md) — Crate manifest conventions
 - [code/rust-ffi](code/rust-ffi.md) — `ffi` Cargo feature contract for the FFI surface
 - [code/meson-linker-script](code/meson-linker-script.md) — `*_override.ld` linker scripts
 

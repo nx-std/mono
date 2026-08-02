@@ -1,79 +1,132 @@
 ---
 name: "principle-law-of-demeter"
-description: "Law of Demeter (Principle of Least Knowledge) for loose coupling. Load when reviewing method call chains, struct field access patterns, or coupling concerns"
+description: "Law of Demeter — a unit talks to its immediate collaborators, never through them to reach something further. Load when reviewing call chains, field access patterns, or coupling concerns"
 type: "principle"
 scope: "global"
 ---
 
 # Law of Demeter (Principle of Least Knowledge)
 
-**MANDATORY for ALL code in the workspace**
-
 ## Rule
 
-A method should only call methods on objects it directly knows about. Don't reach through chains of objects to access something deep inside—each unit of code should only talk to its immediate collaborators.
+A function or method may only talk to its immediate collaborators. Do not reach through chains of values to get
+at something buried deep in the graph. A method `m` of a type `T` may only call methods on `T` itself (`self`),
+on values passed as arguments to `m`, on values `m` created, and on values held in `T`'s own fields.
 
-A method `M` of an object `O` should only call methods on:
+If you write `a.b().c().do_something()` — or, with public fields, `a.b.c.do_something()` — you are violating
+the principle. Stop at `a.b()`: if you need something from `c`, ask `a` (or `b`) to hand you the value, or
+accept the value as a parameter.
 
-- `O` itself (methods on `self`)
-- Objects passed as arguments to `M`
-- Objects created by `M`
-- Objects held in instance variables of `O`
-
-If you find yourself chaining calls like `objectA.getB().getC().doSomething()`, you're violating this principle. Stop the chain at `getB()` or earlier—if you need data from a distant object, ask your direct collaborator to provide it instead of navigating through the object graph yourself.
-
-**Not violations**: Fluent APIs where each call returns the same logical object are not reaching through collaborators. Builder chains (`Request::builder().method(GET).uri("/foo").body(())`), iterator adapters (`.filter(..).map(..).collect()`), and `Result`/`Option` combinators (`.map_err(..).context(..)`) operate on the same type, not progressively deeper objects.
+**Not violations**: chains where every link is the same logical value. Builder chains
+(`CmifRequestBuilder::new(CMD_GET_MODEL).with_context(token).add_in_handle(h).build()`), iterator adapters
+(`descriptors.iter().filter(..).map(..).sum()`), `Result`/`Option` combinators
+(`.map_err(DispatchError::Layout)?`), and matching on an enum a direct collaborator returned
+(`let slot = session.acquire_object()?; slot.dispatch(..)`) are not reach-through — the enum is that
+collaborator's own return value.
 
 ## Examples
 
-1. **Direct collaborator access**
-Accessing nested data should go through the immediate collaborator, not chain through the object graph.
+1. **Ask the collaborator, don't navigate its internals**
+   A service client owns its session, the pointer-buffer sizing rule, and the "is this object still live"
+   decision.
 
 ```rust
-// Bad — reaches through the object graph
-let name = order.get_customer().get_address().get_city();
-
-// Good — ask the direct collaborator
-let name = order.shipping_city();
+// ❌ Bad — reaches through the client into its session and through the session into its raw
+// handle. This caller now depends on the client keeping exactly one session, on the session
+// exposing its kernel handle, and on the request being dispatchable without the client's
+// pointer-buffer accounting. Any of the three changing breaks it, and nothing in the type
+// system says this caller exists.
+fn read_display_mode(client: &DisplayClient) -> Result<DisplayMode, DispatchError> {
+    let handle = client.session.handle();
+    raw_dispatch_in_out(handle, CMD_GET_DISPLAY_MODE, ())
+}
 ```
 
-2. **Receive what you need as a parameter**
-Instead of navigating through intermediate objects to find configuration, accept the value directly.
+```rust
+// ✅ Good — one call to the immediate collaborator, which answers the question completely.
+// This caller knows two things: ask the client for the mode, or report why the object is gone.
+fn read_display_mode(client: &DisplayClient) -> Result<DisplayMode, DispatchError> {
+    match client.get_display_mode()? {
+        ModeReply::Active(mode) => Ok(mode),
+        ModeReply::Detached(reason) => Err(DispatchError::ObjectDetached(reason)),
+    }
+}
+```
+
+2. **Receive the value, not the object graph that contains it**
+   A page mapper needs a heap base and a page size. It should take exactly those two things.
 
 ```rust
-// Bad — chaining through intermediate objects
-fn process(registry: &Registry) {
-    let timeout = registry.get_config().get_network().get_timeout();
+// ❌ Bad — the mapper is handed the whole runtime environment and digs for what it needs.
+// It is coupled to the environment's shape three levels down, and it cannot be exercised
+// without a fully initialized runtime: loader block, address-space probe, service manager
+// session and all.
+struct PageMapper {
+    env: &'static RuntimeEnv,
 }
 
-// Good — receive what you need directly
-fn process(timeout: Duration) {
-    // use timeout
+impl PageMapper {
+    fn reserve(&self, count: usize) -> Option<NonNull<u8>> {
+        let base = self.env.loader.address_space.heap.base_addr; // three levels of reach-through
+        // ...
+    }
+}
+```
+
+```rust
+// ✅ Good — declare the two values the mapper actually uses.
+// The startup code that already holds the environment does the navigation once, at the seam.
+// A test constructs this with a scratch region and a literal page size.
+struct PageMapper {
+    heap_base: NonNull<u8>,
+    page_size: usize,
+}
+
+impl PageMapper {
+    fn reserve(&self, count: usize) -> Option<NonNull<u8>> { /* uses only its own two fields */ }
 }
 ```
 
 ## Why It Matters
 
-Violating this principle creates tight coupling between components that shouldn't know about each other. 
-When the internal structure of a deeply nested object changes, every caller that reached into it breaks. 
-Following it keeps modules loosely coupled and independently changeable.
+Reach-through chains turn a private implementation detail into a public contract by accident. When a client
+stops holding a bare session and starts holding a domain plus an object id, every caller that read
+`client.session.handle()` breaks — and nothing in the type system told you those callers existed. Keeping to
+immediate collaborators lets a crate restructure its internals as long as its methods keep their meaning.
+
+The second cost is testability: a type that navigates `env.loader.address_space.heap.base_addr` can only be
+exercised once a whole runtime is standing, so it ends up covered by an on-console integration run or not at
+all. A type that takes a base pointer and a page size is tested with a scratch region and three lines.
 
 ## Pragmatism Caveat
 
-In exceptional cases, a small violation may be justified if it genuinely simplifies the code without introducing meaningful coupling risk. 
-This should be vanishingly rare and **must** be accompanied by a comment explaining why the violation is acceptable and why the standard alternatives (wrapper method, passing the value directly) were not used. 
-An undocumented violation should be treated as incorrect.
-
+A short reach-through is occasionally the honest choice: navigating a plain data structure you own (a decoded
+wire header, a descriptor table you just validated) is reading data, not coupling. The rule targets navigation
+through _behavioral_ values that could hide their internals. When you deliberately reach through one, add a
+comment explaining why the alternatives (a delegating method on the direct collaborator, or passing the value
+in) were rejected. An undocumented violation is always wrong.
 
 ## Checklist
 
 Before committing code, verify:
 
-- [ ] Methods interact with immediate collaborators, not distant objects reached through navigation chains
-- [ ] Required data is provided via direct methods or explicit parameters rather than deep traversal
-- [ ] Any deliberate exception is small in scope and documented with rationale
-- [ ] Fluent/combinator chains on the same logical object are distinguished from true reach-through coupling
+- [ ] No expression navigates two or more levels into another type's fields to reach behavior
+- [ ] Functions accept the values they use (a handle, a page size, a buffer) rather than a container to dig
+      through
+- [ ] Cross-crate access goes through public functions and methods, never through another crate's internal
+      sessions, tables, or state
+- [ ] Fluent chains on one logical value (builders, iterators, `Result`/`Option` combinators, matched enums) are
+      not mistaken for violations
+- [ ] Any deliberate reach-through is local and carries a comment with its rationale
 
+## References
+
+- [principle-single-responsibility](principle-single-responsibility.md) - Related: A type that must be navigated
+  deeply usually owns too much
+- [principle-inversion-of-control](principle-inversion-of-control.md) - Related: Injecting the value you need is
+  the standard cure for reach-through
+- [principle-type-driven-design](principle-type-driven-design.md) - Related: Returning an enum lets a
+  collaborator answer a question completely instead of exposing its internals
 
 ## External References
 
