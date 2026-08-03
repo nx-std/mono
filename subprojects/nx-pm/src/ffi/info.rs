@@ -66,7 +66,9 @@ pub unsafe extern "C" fn __nx_pm__pminfo_get_program_id(program_id_out: *mut u64
         return GENERIC_ERROR;
     };
 
-    match svc.get_program_id(unsafe { ProcessId::new_unchecked(pid) }) {
+    // SAFETY: By this entry point's contract the C caller passes a pid it obtained from a
+    // `pm:*` call; nothing here can check that a pid is live.
+    match svc.get_program_id(ProcessId::from_raw_unchecked(pid)) {
         Ok(program_id) => {
             // SAFETY: caller guarantees `program_id_out` is writable.
             unsafe { *program_id_out = program_id.to_u64() };

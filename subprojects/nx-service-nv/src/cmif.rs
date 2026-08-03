@@ -49,8 +49,8 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError>
         return Err(OpenError::NvError(OpenNvError::from_raw(output.error)));
     }
 
-    // SAFETY: The fd was just returned by the NV driver via IPC.
-    Ok(unsafe { Fd::new_unchecked(output.fd) })
+    // SAFETY: The descriptor is the one the driver just returned for this open.
+    Ok(Fd::from_raw_unchecked(output.fd))
 }
 
 /// Performs an ioctl operation.

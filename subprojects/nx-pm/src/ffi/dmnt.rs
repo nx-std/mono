@@ -103,7 +103,8 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_start_process(pid: u64) -> u32 {
         return GENERIC_ERROR;
     };
 
-    let pid = unsafe { ProcessId::new_unchecked(pid) };
+    // SAFETY: The C caller supplies a pid it obtained from a `pm:*` call.
+    let pid = ProcessId::from_raw_unchecked(pid);
     let result = if hosversion_at_least(5, 0, 0) {
         svc.start_process(pid)
     } else {
@@ -127,7 +128,8 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_get_process_id(pid_out: *mut u64, progr
         return GENERIC_ERROR;
     };
 
-    let program_id = unsafe { ProgramId::new_unchecked(program_id) };
+    // SAFETY: The C caller supplies a program id sourced from NCM/NS or a `pm:*` call.
+    let program_id = ProgramId::from_raw_unchecked(program_id);
     let result = if hosversion_at_least(5, 0, 0) {
         svc.get_process_id(program_id)
     } else {
@@ -158,7 +160,8 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_hook_to_create_process(
         return GENERIC_ERROR;
     };
 
-    let program_id = unsafe { ProgramId::new_unchecked(program_id) };
+    // SAFETY: The C caller supplies a program id sourced from NCM/NS or a `pm:*` call.
+    let program_id = ProgramId::from_raw_unchecked(program_id);
     let result = if hosversion_at_least(5, 0, 0) {
         svc.hook_to_create_process(program_id)
     } else {
@@ -271,7 +274,8 @@ pub unsafe extern "C" fn __nx_pm__pmdmnt_get_program_id(program_id_out: *mut u64
         return GENERIC_ERROR;
     };
 
-    match svc.get_program_id(unsafe { ProcessId::new_unchecked(pid) }) {
+    // SAFETY: The C caller supplies a pid it obtained from a `pm:*` call.
+    match svc.get_program_id(ProcessId::from_raw_unchecked(pid)) {
         Ok(program_id) => {
             // SAFETY: caller guarantees `program_id_out` is writable.
             unsafe { *program_id_out = program_id.to_u64() };
