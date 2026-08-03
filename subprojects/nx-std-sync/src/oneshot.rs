@@ -97,7 +97,7 @@ impl<T> Drop for Receiver<T> {
 ///
 /// This error is returned when the receiving half of a channel is dropped.
 /// The error contains the value that was attempted to be sent.
-#[derive(PartialEq, Eq, Clone, Copy, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[error("channel closed")]
 pub struct SendError<T>(pub T);
 
