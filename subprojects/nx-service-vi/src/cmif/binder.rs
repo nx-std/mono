@@ -6,7 +6,7 @@ use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::{BufferMode, InputBuffer, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 use nx_svc::raw::Handle as RawHandle;
 
@@ -16,7 +16,7 @@ use crate::{proto::binder_cmds, types::BinderObjectId};
 ///
 /// Uses TransactParcelAuto (cmd 3) on 3.0.0+, TransactParcel (cmd 0) otherwise.
 pub fn transact_parcel(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     binder_id: BinderObjectId,
     code: u32,
     in_data: &[u8],
@@ -68,7 +68,7 @@ pub fn transact_parcel(
 /// * `addval` - Amount to add (+1 to increase, -1 to decrease)
 /// * `type_` - Reference type (0 for weak, 1 for strong)
 pub fn adjust_refcount(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     binder_id: BinderObjectId,
     addval: i32,
     type_: i32,
@@ -104,7 +104,7 @@ pub fn adjust_refcount(
 
 /// Gets a native handle from the binder.
 pub fn get_native_handle(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     binder_id: BinderObjectId,
     inval: u32,
 ) -> Result<RawHandle, GetNativeHandleError> {

@@ -319,8 +319,8 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 use core::mem::ManuallyDrop;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{Domain, DomainObject, Session};
-use nx_svc::{ipc::Handle as SessionHandle, process::Handle as ProcessHandle, sync::EventHandle};
+use nx_sf::service::{BorrowedSessionHandle, Domain, DomainObject, Session};
+use nx_svc::{process::Handle as ProcessHandle, sync::EventHandle};
 
 use crate::aruid::Aruid;
 
@@ -355,12 +355,7 @@ pub use self::{
 /// underlying session is closed exactly once by the owning root [`AppletService`].
 #[inline]
 fn alias_domain(parent: &Domain) -> ManuallyDrop<Domain> {
-    // SAFETY: We are creating an alias of an already-converted domain handle.
-    // The alias' [`Drop`] is suppressed via [`ManuallyDrop`]; the real owner
-    // (the root [`AppletService`]) closes the kernel handle.
-    ManuallyDrop::new(unsafe {
-        Domain::from_handle_unchecked(parent.handle(), parent.pointer_buffer_size())
-    })
+    parent.alias()
 }
 
 /// Defines a sub-interface wrapper that aliases the root domain's kernel handle
@@ -385,7 +380,7 @@ macro_rules! sub_interface_stub {
         impl $name {
             /// Returns the underlying session handle.
             #[inline]
-            pub fn session(&self) -> SessionHandle {
+            pub fn session(&self) -> BorrowedSessionHandle<'_> {
                 self.domain.handle()
             }
 
@@ -393,22 +388,6 @@ macro_rules! sub_interface_stub {
             #[inline]
             pub fn object_id(&self) -> u32 {
                 self.object_id
-            }
-
-            /// Borrowed view onto this wrapper's domain object.
-            ///
-            /// The per-object close is suppressed via [`ManuallyDrop`]; the
-            /// underlying server-side object is closed implicitly when the
-            /// owning root [`AppletService`] is dropped.
-            #[inline]
-            #[allow(dead_code)]
-            fn as_object(&self) -> ManuallyDrop<DomainObject<'_>> {
-                // SAFETY: `object_id` was returned by the server within this
-                // sub-interface's parent domain; the `ManuallyDrop` view is
-                // the only live `DomainObject` for this id at a time.
-                let object = unsafe { self.domain.open_object_raw(self.object_id) }
-                    .expect("sub-interface holds a non-zero domain object id");
-                ManuallyDrop::new(object)
             }
         }
     };
@@ -503,7 +482,7 @@ pub struct AppletService(Domain);
 impl AppletService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -563,7 +542,7 @@ pub struct AppletProxyService {
 impl AppletProxyService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.domain.handle()
     }
 
@@ -716,7 +695,7 @@ pub struct CommonStateGetter {
 impl CommonStateGetter {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.domain.handle()
     }
 
@@ -787,7 +766,7 @@ pub struct SelfController {
 impl SelfController {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.domain.handle()
     }
 
@@ -896,7 +875,7 @@ pub struct WindowController {
 impl WindowController {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.domain.handle()
     }
 
@@ -951,7 +930,7 @@ pub struct ApplicationFunctions {
 impl ApplicationFunctions {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.domain.handle()
     }
 
@@ -1026,7 +1005,7 @@ pub fn connect(
     // Build an owned session (the pointer-buffer-size query is internal) and
     // promote it to a domain. On failure the inner [`Session`] is dropped,
     // closing the kernel handle.
-    let session = Session::new(handle);
+    let session = Session::open(handle);
     let domain = session
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectError::ConvertToDomain(err))?;

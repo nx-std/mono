@@ -1,11 +1,11 @@
 //! CMIF protocol operations for the temperature control service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::proto;
 
 /// Enables fan control.
-pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControlError> {
+pub fn enable_fan_control(session: BorrowedSessionHandle<'_>) -> Result<(), EnableFanControlError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -20,7 +20,9 @@ pub fn enable_fan_control(session: SessionHandle) -> Result<(), EnableFanControl
 }
 
 /// Disables fan control.
-pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanControlError> {
+pub fn disable_fan_control(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DisableFanControlError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -35,7 +37,9 @@ pub fn disable_fan_control(session: SessionHandle) -> Result<(), DisableFanContr
 }
 
 /// Queries whether fan control is enabled.
-pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanControlEnabledError> {
+pub fn is_fan_control_enabled(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, IsFanControlEnabledError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -52,7 +56,7 @@ pub fn is_fan_control_enabled(session: SessionHandle) -> Result<bool, IsFanContr
 
 /// Gets the skin temperature in milli-degrees Celsius.
 pub fn get_skin_temperature_milli_c(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<i32, GetSkinTemperatureMilliCError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.

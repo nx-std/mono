@@ -1,6 +1,10 @@
 //! CMIF protocol operations for the overlay notification service.
 
-use nx_sf::{cmif, ipc::Handle, service::Session};
+use nx_sf::{
+    cmif,
+    ipc::Handle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+};
 
 use crate::{
     proto,
@@ -9,7 +13,11 @@ use crate::{
     },
 };
 
-fn dispatch_in<T>(session: Handle, cmd_id: u32, value: &T) -> Result<(), DispatchInError>
+fn dispatch_in<T>(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: &T,
+) -> Result<(), DispatchInError>
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
@@ -38,7 +46,7 @@ pub enum DispatchInError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out<T>(session: Handle, cmd_id: u32) -> Result<T, DispatchOutError>
+fn dispatch_out<T>(session: BorrowedSessionHandle<'_>, cmd_id: u32) -> Result<T, DispatchOutError>
 where
     T: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
@@ -66,7 +74,7 @@ pub enum DispatchOutError {
 }
 
 /// Opens a receiver sub-object.
-pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> {
+pub fn rcv_open_receiver(session: BorrowedSessionHandle<'_>) -> Result<Session, OpenReceiverError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -83,9 +91,14 @@ pub fn rcv_open_receiver(session: Handle) -> Result<Session, OpenReceiverError> 
 
     // SAFETY: the handle comes from a successful `OpenReceiver` response;
     // ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle = Handle::from_raw_unchecked(raw_handle);
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // Session below becomes its sole owner.
+        OwnedSessionHandle::from_handle_unchecked(handle),
+        0,
+    ))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -102,13 +115,16 @@ pub enum OpenReceiverError {
 }
 
 /// Adds a source to the receiver.
-pub fn receiver_add_source(session: Handle, name: &OvlnSourceName) -> Result<(), DispatchInError> {
+pub fn receiver_add_source(
+    session: BorrowedSessionHandle<'_>,
+    name: &OvlnSourceName,
+) -> Result<(), DispatchInError> {
     dispatch_in(session, proto::RECEIVER_ADD_SOURCE, name)
 }
 
 /// Removes a source from the receiver.
 pub fn receiver_remove_source(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     name: &OvlnSourceName,
 ) -> Result<(), DispatchInError> {
     dispatch_in(session, proto::RECEIVER_REMOVE_SOURCE, name)
@@ -116,7 +132,7 @@ pub fn receiver_remove_source(
 
 /// Gets the receive event handle (copy handle).
 pub fn receiver_get_receive_event_handle(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, GetReceiveEventHandleError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -150,18 +166,22 @@ pub enum GetReceiveEventHandleError {
 }
 
 /// Receives a message.
-pub fn receiver_receive(session: Handle) -> Result<OvlnRawMessage, DispatchOutError> {
+pub fn receiver_receive(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OvlnRawMessage, DispatchOutError> {
     dispatch_out::<OvlnRawMessage>(session, proto::RECEIVER_RECEIVE)
 }
 
 /// Receives a message with a system tick.
-pub fn receiver_receive_with_tick(session: Handle) -> Result<ReceiveWithTickOut, DispatchOutError> {
+pub fn receiver_receive_with_tick(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<ReceiveWithTickOut, DispatchOutError> {
     dispatch_out::<ReceiveWithTickOut>(session, proto::RECEIVER_RECEIVE_WITH_TICK)
 }
 
 /// Opens a sender sub-object.
 pub fn snd_open_sender(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     name: &OvlnSourceName,
     attribute: &OvlnQueueAttribute,
 ) -> Result<Session, OpenSenderError> {
@@ -195,9 +215,14 @@ pub fn snd_open_sender(
 
     // SAFETY: the handle comes from a successful `OpenSender` response;
     // ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle = Handle::from_raw_unchecked(raw_handle);
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // Session below becomes its sole owner.
+        OwnedSessionHandle::from_handle_unchecked(handle),
+        0,
+    ))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -215,7 +240,7 @@ pub enum OpenSenderError {
 
 /// Sends a message.
 pub fn sender_send(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     option: &OvlnSendOption,
     message: &OvlnRawMessage,
 ) -> Result<(), DispatchInError> {
@@ -235,6 +260,8 @@ pub fn sender_send(
 }
 
 /// Gets the count of unreceived messages.
-pub fn sender_get_unreceived_message_count(session: Handle) -> Result<u32, DispatchOutError> {
+pub fn sender_get_unreceived_message_count(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutError> {
     dispatch_out::<u32>(session, proto::SENDER_GET_UNRECEIVED_MESSAGE_COUNT)
 }

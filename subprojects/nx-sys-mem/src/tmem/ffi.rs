@@ -154,9 +154,12 @@ unsafe extern "C" fn __nx_sys_mem__tmem_map(t: *mut TransferMemory) -> u32 {
     }
 
     let src_option = NonNull::new(tm.src_addr);
+    // SAFETY: The C caller owns the `TransferMemory` struct and the handle inside it, both of
+    // which it keeps alive across this call; `map_addr` was checked null above, so the fields
+    // describe the unmapped state this reconstructs.
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm.handle),
+            Handle::from_raw_unchecked(tm.handle),
             tm.size,
             sys::Permissions::from_bits_retain(tm.perm),
             src_option,
@@ -195,9 +198,12 @@ unsafe extern "C" fn __nx_sys_mem__tmem_unmap(t: *mut TransferMemory) -> u32 {
     };
 
     let src_option = NonNull::new(tm.src_addr);
+    // SAFETY: The C caller owns the `TransferMemory` struct and the handle inside it, both of
+    // which it keeps alive across this call; `map_addr` was checked non-null above, so the
+    // fields describe the mapped state this reconstructs.
     let mapped = unsafe {
         sys::TransferMemory::<sys::Mapped>::from_parts(
-            Handle::from_raw(tm.handle),
+            Handle::from_raw_unchecked(tm.handle),
             tm.size,
             sys::Permissions::from_bits_retain(tm.perm),
             src_option,
@@ -270,9 +276,12 @@ unsafe extern "C" fn __nx_sys_mem__tmem_wait_for_permission(
     let tm = unsafe { t.as_ref() };
 
     let src_option = NonNull::new(tm.src_addr);
+    // SAFETY: The C caller owns the `TransferMemory` struct and the handle inside it, both of
+    // which it keeps alive across this call; waiting for a permission change is only defined
+    // on an unmapped object, which is the state this entry point is documented to take.
     let unmapped = unsafe {
         sys::TransferMemory::<sys::Unmapped>::from_parts(
-            Handle::from_raw(tm.handle),
+            Handle::from_raw_unchecked(tm.handle),
             tm.size,
             sys::Permissions::from_bits_retain(tm.perm),
             src_option,

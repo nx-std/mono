@@ -3,7 +3,7 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -14,7 +14,11 @@ use crate::{
     },
 };
 
-fn dispatch_in<T>(session: SessionHandle, cmd_id: u32, value: &T) -> Result<(), DispatchError>
+fn dispatch_in<T>(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: &T,
+) -> Result<(), DispatchError>
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
@@ -33,7 +37,11 @@ where
     Ok(())
 }
 
-fn dispatch_in_out<T, U>(session: SessionHandle, cmd_id: u32, value: &T) -> Result<U, DispatchError>
+fn dispatch_in_out<T, U>(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: &T,
+) -> Result<U, DispatchError>
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
     U: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
@@ -64,7 +72,7 @@ pub enum DispatchError {
 
 /// GetBusHandle (cmd 1).
 pub fn get_bus_handle(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     npad_id: u32,
     bus_type: u64,
     applet_resource_user_id: u64,
@@ -83,7 +91,7 @@ pub fn get_bus_handle(
 
 /// Initialize (cmd 3).
 pub fn initialize(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
     applet_resource_user_id: u64,
 ) -> Result<(), DispatchError> {
@@ -97,7 +105,7 @@ pub fn initialize(
 
 /// Finalize (cmd 4).
 pub fn finalize(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
     applet_resource_user_id: u64,
 ) -> Result<(), DispatchError> {
@@ -111,7 +119,7 @@ pub fn finalize(
 
 /// EnableExternalDevice (cmd 5).
 pub fn enable_external_device(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
     flag: bool,
     inval: u64,
@@ -130,7 +138,7 @@ pub fn enable_external_device(
 
 /// GetExternalDeviceId (cmd 6).
 pub fn get_external_device_id(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(session, proto::GET_EXTERNAL_DEVICE_ID, &handle)
@@ -138,7 +146,7 @@ pub fn get_external_device_id(
 
 /// SendCommandAsync (cmd 7).
 pub fn send_command_async(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
@@ -160,7 +168,7 @@ pub fn send_command_async(
 
 /// GetSendCommandAsyncResult (cmd 8).
 pub fn get_send_command_async_result(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
     buffer: &mut [u8],
 ) -> Result<u32, GetSendCommandAsyncResultError> {
@@ -192,7 +200,7 @@ pub enum GetSendCommandAsyncResultError {
 
 /// SetEventForSendCommandAsyncResult (cmd 9).
 pub fn set_event_for_send_command_async_result(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
 ) -> Result<u32, SetEventError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -225,7 +233,9 @@ pub enum SetEventError {
 }
 
 /// GetSharedMemoryHandle (cmd 10).
-pub fn get_shared_memory_handle(session: SessionHandle) -> Result<u32, GetSharedMemoryError> {
+pub fn get_shared_memory_handle(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, GetSharedMemoryError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -255,7 +265,7 @@ pub enum GetSharedMemoryError {
 
 /// EnableJoyPollingReceiveMode (cmd 11).
 pub fn enable_joy_polling_receive_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
     polling_mode: JoyPollingMode,
     command_buffer: &[u8],
@@ -296,7 +306,7 @@ pub enum EnableJoyPollingError {
 
 /// DisableJoyPollingReceiveMode (cmd 12).
 pub fn disable_joy_polling_receive_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(session, proto::DISABLE_JOY_POLLING_RECEIVE_MODE, &handle)
@@ -304,7 +314,7 @@ pub fn disable_joy_polling_receive_mode(
 
 /// SetStatusManagerType (cmd 14).
 pub fn set_status_manager_type(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     manager_type: u32,
 ) -> Result<(), DispatchError> {
     dispatch_in(session, proto::SET_STATUS_MANAGER_TYPE, &manager_type)

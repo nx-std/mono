@@ -114,7 +114,7 @@ pub fn connect_general_cmif(sm: &SmService) -> Result<SplGeneralService, Connect
         .get_service_handle_cmif(GENERAL_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(SplGeneralService(Session::from_handle(handle, 0)))
+    Ok(SplGeneralService(Session::new(handle, 0)))
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ pub fn connect_crypto_cmif(sm: &SmService) -> Result<SplCryptoService, ConnectCm
         .get_service_handle_cmif(CRYPTO_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(SplCryptoService(Session::from_handle(handle, 0)))
+    Ok(SplCryptoService(Session::new(handle, 0)))
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +455,7 @@ pub fn connect_ssl_cmif(sm: &SmService) -> Result<SplSslService, ConnectCmifErro
         .get_service_handle_cmif(SSL_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(SplSslService(Session::from_handle(handle, 0)))
+    Ok(SplSslService(Session::new(handle, 0)))
 }
 
 // ---------------------------------------------------------------------------
@@ -725,7 +725,7 @@ pub fn connect_es_cmif(sm: &SmService) -> Result<SplEsService, ConnectCmifError>
         .get_service_handle_cmif(ES_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(SplEsService(Session::from_handle(handle, 0)))
+    Ok(SplEsService(Session::new(handle, 0)))
 }
 
 // ---------------------------------------------------------------------------
@@ -958,7 +958,7 @@ pub fn connect_fs_cmif(sm: &SmService) -> Result<SplFsService, ConnectCmifError>
         .get_service_handle_cmif(FS_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(SplFsService(Session::from_handle(handle, 0)))
+    Ok(SplFsService(Session::new(handle, 0)))
 }
 
 // ---------------------------------------------------------------------------
@@ -1112,7 +1112,7 @@ pub fn connect_manu_cmif(sm: &SmService) -> Result<SplManuService, ConnectCmifEr
         .get_service_handle_cmif(MANU_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(SplManuService(Session::from_handle(handle, 0)))
+    Ok(SplManuService(Session::new(handle, 0)))
 }
 
 // ---------------------------------------------------------------------------

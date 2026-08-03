@@ -31,8 +31,10 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_caps::{AlbumEntry, AlbumFileId, ApplicationAlbumEntry, ScreenShotAttribute};
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -59,7 +61,7 @@ pub struct CapscService(Session);
 impl CapscService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -277,8 +279,10 @@ impl CapscService {
 
         // SAFETY: the kernel returned a valid move handle for the new control
         // session; ownership transfers to the new `Session`.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(CapscControlSession(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(CapscControlSession(Session::new(handle, 0)))
     }
 }
 
@@ -292,7 +296,7 @@ pub struct CapscControlSession(Session);
 impl CapscControlSession {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -530,7 +534,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<CapscService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(CapscService(service))
 }

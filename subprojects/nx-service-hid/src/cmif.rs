@@ -8,7 +8,8 @@ use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::InPointer,
-    ipc::Handle as SessionHandle,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
 };
 use nx_svc::mem::shmem::Handle as ShmemHandle;
 
@@ -18,9 +19,9 @@ use crate::proto::{applet_resource_cmds, cmds};
 ///
 /// This is IHidServer command 0.
 pub fn create_applet_resource(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
-) -> Result<SessionHandle, CreateAppletResourceError> {
+) -> Result<OwnedSessionHandle, CreateAppletResourceError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -43,14 +44,16 @@ pub fn create_applet_resource(
     };
 
     // SAFETY: the kernel returned a valid session handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Gets the shared memory handle from IAppletResource.
 ///
 /// This is IAppletResource command 0.
 pub fn get_shared_memory_handle(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<ShmemHandle, GetSharedMemoryHandleError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -68,7 +71,7 @@ pub fn get_shared_memory_handle(
     };
 
     // SAFETY: the kernel returned a valid shared memory handle in the response.
-    Ok(unsafe { ShmemHandle::from_raw(handle) })
+    Ok(ShmemHandle::from_raw_unchecked(handle))
 }
 
 /// Activates Npad (controller) input with revision support.
@@ -78,7 +81,7 @@ pub fn get_shared_memory_handle(
 ///
 /// For older firmware (<5.0.0), use command 103 without revision.
 pub fn activate_npad(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateNpadError> {
     // Use modern revision (0x5 for firmware 18.0.0+)
@@ -119,7 +122,7 @@ pub fn activate_npad(
 ///
 /// This is IHidServer command 100.
 pub fn set_supported_npad_style_set(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
     style_set: u32,
 ) -> Result<(), SetSupportedNpadStyleSetError> {
@@ -159,7 +162,7 @@ pub fn set_supported_npad_style_set(
 ///
 /// This is IHidServer command 102.
 pub fn set_supported_npad_id_type(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
     ids: &[u32],
 ) -> Result<(), SetSupportedNpadIdTypeError> {
@@ -192,7 +195,7 @@ pub fn set_supported_npad_id_type(
 ///
 /// This is IHidServer command 11.
 pub fn activate_touch_screen(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateTouchScreenError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
@@ -218,7 +221,7 @@ pub fn activate_touch_screen(
 ///
 /// This is IHidServer command 31.
 pub fn activate_keyboard(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateKeyboardError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
@@ -244,7 +247,7 @@ pub fn activate_keyboard(
 ///
 /// This is IHidServer command 21.
 pub fn activate_mouse(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateMouseError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
@@ -270,7 +273,7 @@ pub fn activate_mouse(
 ///
 /// This is IHidServer command 91.
 pub fn activate_gesture(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: Option<Aruid>,
 ) -> Result<(), ActivateGestureError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);

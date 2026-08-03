@@ -21,7 +21,7 @@ use core::{
     ptr,
 };
 
-use nx_svc::{ipc::Handle as SessionHandle, raw::Handle as RawHandle};
+use nx_svc::raw::Handle as RawHandle;
 use nx_sys_thread_tls::IpcBuffer;
 
 use super::{
@@ -38,6 +38,7 @@ use crate::{
         HipcRequest, HipcRequestBuilder, InOutBuffer, InPointer, InputBuffer, OutPointer,
         OutputBuffer, RecvListEntry, StaticDescriptor,
     },
+    service::handle::BorrowedSessionHandle,
 };
 
 /// Layout error for CMIF request serialization.
@@ -75,7 +76,11 @@ impl CmifRequest<'_> {
     /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
     /// when the kernel rejects the underlying `SendSyncRequest`.
     #[inline]
-    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+    pub fn send(
+        self,
+        buf: &mut IpcBuffer,
+        session: BorrowedSessionHandle<'_>,
+    ) -> Result<(), SendError> {
         self.send_inner(buf, session)
     }
 }
@@ -530,7 +535,11 @@ impl CmifControlRequest<'_> {
     /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
     /// when the kernel rejects the underlying `SendSyncRequest`.
     #[inline]
-    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+    pub fn send(
+        self,
+        buf: &mut IpcBuffer,
+        session: BorrowedSessionHandle<'_>,
+    ) -> Result<(), SendError> {
         self.send_inner(buf, session)
     }
 }
@@ -610,7 +619,11 @@ impl CmifCloseRequest {
     /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
     /// when the kernel rejects the underlying `SendSyncRequest`.
     #[inline]
-    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+    pub fn send(
+        self,
+        buf: &mut IpcBuffer,
+        session: BorrowedSessionHandle<'_>,
+    ) -> Result<(), SendError> {
         match self {
             Self::Session(hipc) => hipc.send_inner(buf, session),
             Self::DomainObject(hipc) => hipc.send_inner(buf, session),

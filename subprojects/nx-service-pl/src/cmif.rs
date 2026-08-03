@@ -3,14 +3,17 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 use zerocopy::IntoBytes as _;
 
 use crate::{proto, types::GetSharedFontOut};
 
 /// Requests loading of a shared font into shared memory.
-pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), RequestLoadError> {
+pub fn request_load(
+    session: BorrowedSessionHandle<'_>,
+    font_type: u32,
+) -> Result<(), RequestLoadError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -29,7 +32,10 @@ pub fn request_load(session: SessionHandle, font_type: u32) -> Result<(), Reques
 /// Gets the load state of a shared font.
 ///
 /// Returns the load state: 0 = not loaded, 1 = loaded.
-pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, GetLoadStateError> {
+pub fn get_load_state(
+    session: BorrowedSessionHandle<'_>,
+    font_type: u32,
+) -> Result<u32, GetLoadStateError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -48,7 +54,7 @@ pub fn get_load_state(session: SessionHandle, font_type: u32) -> Result<u32, Get
 }
 
 /// Gets the size of a shared font in bytes.
-pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeError> {
+pub fn get_size(session: BorrowedSessionHandle<'_>, font_type: u32) -> Result<u32, GetSizeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -68,7 +74,7 @@ pub fn get_size(session: SessionHandle, font_type: u32) -> Result<u32, GetSizeEr
 
 /// Gets the byte offset of a shared font within shared memory.
 pub fn get_shared_memory_address_offset(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     font_type: u32,
 ) -> Result<u32, GetSharedMemoryAddressOffsetError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -91,7 +97,7 @@ pub fn get_shared_memory_address_offset(
 
 /// Gets the shared memory native handle (copy handle).
 pub fn get_shared_memory_native_handle(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, GetSharedMemoryNativeHandleError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -122,7 +128,7 @@ pub fn get_shared_memory_native_handle(
 /// Returns [`GetSharedFontOut`] indicating whether fonts are loaded and how
 /// many entries were written.
 pub fn get_shared_font(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     language_code: u64,
     types: &mut [u32],
     offsets: &mut [u32],

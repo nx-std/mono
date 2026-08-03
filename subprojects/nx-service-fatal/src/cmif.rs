@@ -3,7 +3,7 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
 
 /// Throws a fatal error with the given policy (no CPU context).
 pub fn throw_fatal_with_policy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     result_code: u32,
     policy: FatalPolicy,
 ) -> Result<(), ThrowFatalError> {
@@ -41,7 +41,7 @@ pub fn throw_fatal_with_policy(
 
 /// Throws a fatal error with the given policy and CPU context.
 pub fn throw_fatal_with_context(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     result_code: u32,
     policy: FatalPolicy,
     ctx: &FatalCpuContext,

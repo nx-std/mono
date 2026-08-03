@@ -23,8 +23,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -43,7 +42,7 @@ pub struct AudaService(Session);
 impl AudaService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -123,7 +122,7 @@ pub struct AuddService(Session);
 impl AuddService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -157,7 +156,7 @@ pub fn connect_auda_cmif(sm: &SmService) -> Result<AudaService, ConnectAudaCmifE
         .get_service_handle_cmif(AUDA_SERVICE_NAME)
         .map_err(ConnectAudaCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AudaService(service))
 }
@@ -173,7 +172,7 @@ pub fn connect_audd_cmif(sm: &SmService) -> Result<AuddService, ConnectAuddCmifE
         .get_service_handle_cmif(AUDD_SERVICE_NAME)
         .map_err(ConnectAuddCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AuddService(service))
 }

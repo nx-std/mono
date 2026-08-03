@@ -19,9 +19,8 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     error::{ResultCode, ToResultCode},
-    service::Session,
+    service::{BorrowedSessionHandle, Session},
 };
-use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
 mod proto;
@@ -42,7 +41,7 @@ pub struct SetSysService(Session);
 impl SetSysService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -107,7 +106,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<SetSysService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(SetSysService(service))
 }
@@ -132,7 +131,7 @@ pub fn connect_tipc(sm: &SmService) -> Result<SetSysService, ConnectTipcError> {
         .get_service_handle_tipc(SERVICE_NAME)
         .map_err(ConnectTipcError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(SetSysService(service))
 }

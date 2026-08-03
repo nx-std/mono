@@ -4,8 +4,8 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif,
-    ipc::Handle,
-    service::{BufferAttr, Session},
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, BufferAttr, OwnedSessionHandle, Session},
 };
 
 use crate::{proto, types::I2cTransactionOption};
@@ -13,7 +13,10 @@ use crate::{proto, types::I2cTransactionOption};
 /// Opens an I2C session for the specified device.
 ///
 /// Returns a [`Session`] representing the opened session.
-pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSessionError> {
+pub fn open_session(
+    session: BorrowedSessionHandle<'_>,
+    device: u32,
+) -> Result<Session, OpenSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -34,9 +37,10 @@ pub fn open_session(session: Handle, device: u32) -> Result<Session, OpenSession
 
     // SAFETY: the kernel returned a valid move handle for the new device
     // session; ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle =
+        OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(raw_handle));
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(handle, 0))
 }
 
 /// Sends data to an I2C device with automatic buffer selection.

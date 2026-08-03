@@ -95,7 +95,7 @@ fn ensure_sm() -> Result<(), nx_service_sm::ConnectError> {
 /// buffer's `Service` must not call `serviceClose` on the cached pointer.
 fn write_shadow(session: &nx_sf::service::Session) {
     let service = Service {
-        session: session.handle(),
+        session: session.handle().to_handle(),
         own_handle: 0,
         object_id: 0,
         pointer_buffer_size: session.pointer_buffer_size(),

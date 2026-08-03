@@ -51,12 +51,15 @@ macro_rules! define_handle_type {
                 <Self as ::core::convert::TryFrom<$crate::raw::Handle>>::try_from(raw).ok()
             }
 
-            /// Converts a raw handle to a [`$name`].
+            /// Wraps a raw handle without checking that it names a live kernel object.
             ///
-            /// # Safety
-            ///
-            /// Caller must guarantee that the raw handle is valid.
-            pub const unsafe fn from_raw(raw: $crate::raw::Handle) -> Self {
+            /// The caller must ensure `raw` is a handle the kernel issued to this process and
+            /// has not closed. Nothing here can check that, since only the kernel knows which
+            /// handle numbers are live. A stale or fabricated handle is answered with
+            /// `InvalidHandle` by the SVC it reaches rather than faulting, which is why this
+            /// is a safe function; [`TryFrom`] is the checked constructor, and it rejects only
+            /// the reserved invalid value.
+            pub const fn from_raw_unchecked(raw: $crate::raw::Handle) -> Self {
                 Self(raw)
             }
 

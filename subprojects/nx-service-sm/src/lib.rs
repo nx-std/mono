@@ -51,10 +51,13 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 pub use nx_sf::ServiceName;
-use nx_sf::{error::ToResultCode, service::Session};
+use nx_sf::{
+    error::ToResultCode,
+    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+};
 use nx_svc::{
     error::{ResultCode, ToResultCode as _},
-    ipc::{self, Handle as SessionHandle},
+    ipc::{self},
 };
 
 mod cmif;
@@ -89,7 +92,7 @@ pub struct SmService(Session);
 impl SmService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -101,7 +104,7 @@ impl SmService {
     pub fn get_service_handle_cmif(
         &self,
         name: ServiceName,
-    ) -> Result<SessionHandle, GetServiceCmifError> {
+    ) -> Result<OwnedSessionHandle, GetServiceCmifError> {
         cmif::get_service_handle(self.0.handle(), name)
     }
 
@@ -112,7 +115,7 @@ impl SmService {
         name: ServiceName,
         is_light: bool,
         max_sessions: i32,
-    ) -> Result<SessionHandle, RegisterServiceCmifError> {
+    ) -> Result<OwnedSessionHandle, RegisterServiceCmifError> {
         cmif::register_service(self.0.handle(), name, is_light, max_sessions)
     }
 
@@ -145,7 +148,7 @@ impl SmService {
     pub fn get_service_handle_tipc(
         &self,
         name: ServiceName,
-    ) -> Result<SessionHandle, GetServiceTipcError> {
+    ) -> Result<OwnedSessionHandle, GetServiceTipcError> {
         tipc::get_service_handle(self.0.handle(), name)
     }
 
@@ -156,7 +159,7 @@ impl SmService {
         name: ServiceName,
         is_light: bool,
         max_sessions: i32,
-    ) -> Result<SessionHandle, RegisterServiceTipcError> {
+    ) -> Result<OwnedSessionHandle, RegisterServiceTipcError> {
         tipc::register_service(self.0.handle(), name, is_light, max_sessions)
     }
 
@@ -175,6 +178,15 @@ impl SmService {
     #[inline]
     pub fn detach_client_tipc(&self) -> Result<(), DetachClientTipcError> {
         tipc::detach_client(self.0.handle())
+    }
+
+    /// Registers the client using TIPC protocol.
+    ///
+    /// [`connect`] already registers over CMIF, which is the path that works on
+    /// every firmware; this is for a caller that has to re-register over TIPC.
+    #[inline]
+    pub fn register_client_tipc(&self) -> Result<(), RegisterClientTipcError> {
+        tipc::register_client(self.0.handle())
     }
 }
 
@@ -197,11 +209,16 @@ pub fn connect() -> Result<SmService, ConnectError> {
         }
     };
 
+    // SAFETY: The port connect above returned a freshly opened session that this process owns
+    // and nothing else closes, so this is where its single owner is established.
+    let handle = OwnedSessionHandle::from_handle_unchecked(handle);
+
     // Send RegisterClient (command 0) via CMIF with send_pid=true.
     // pointer_buffer_size is 0 because SM doesn't use pointer buffers.
-    cmif::register_client(handle).map_err(ConnectError::RegisterClient)?;
+    cmif::register_client(handle.as_borrowed()).map_err(ConnectError::RegisterClient)?;
 
-    Ok(SmService(Session::from_handle(handle, 0)))
+    // The handle adopted above moves into the `Session`, which owns it from here.
+    Ok(SmService(Session::new(handle, 0)))
 }
 
 /// Error returned by [`connect`].

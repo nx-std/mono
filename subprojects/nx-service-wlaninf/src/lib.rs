@@ -43,7 +43,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<WlaninfService, ConnectCmifError> 
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(WlaninfService(service))
 }

@@ -2,8 +2,10 @@
 //! sub-objects (LocalCommunicationService, IClientProcessMonitor,
 //! IMonitorService) from the creator session.
 
-use nx_sf::service::{DispatchError, Domain, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{DispatchError, Domain, OwnedSessionHandle, Session},
+};
 
 use crate::proto::{CMD_CREATE_CLIENT_PROCESS_MONITOR, CMD_CREATE_SERVICE};
 
@@ -35,7 +37,7 @@ pub(crate) fn create_service_domain(creator: &Domain) -> Result<u32, CreateServi
 /// Returns a move handle to the freshly-allocated IMonitorService session.
 pub(crate) fn create_service_session(
     creator: &Session,
-) -> Result<SessionHandle, CreateServiceError> {
+) -> Result<OwnedSessionHandle, CreateServiceError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -48,7 +50,9 @@ pub(crate) fn create_service_session(
         return Err(CreateServiceError::MissingObject);
     }
     // SAFETY: the kernel returned a valid session handle in the move-handle slot.
-    Ok(unsafe { SessionHandle::from_raw(result.move_handles[0]) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(result.move_handles[0]),
+    ))
 }
 
 /// Error returned by [`create_service_domain`] / [`create_service_session`].

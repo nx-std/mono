@@ -1,12 +1,14 @@
 //! CMIF protocol operations for the idle:sys service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::proto;
 
 /// Reports that the user is active, resetting the sleep counter.
 #[inline]
-pub fn report_user_is_active(session: SessionHandle) -> Result<(), ReportUserIsActiveError> {
+pub fn report_user_is_active(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), ReportUserIsActiveError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

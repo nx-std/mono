@@ -8,28 +8,38 @@
 
 use nx_svc::ipc::Handle as SessionHandle;
 
-use super::dispatch::Dispatch;
+use super::{dispatch::Dispatch, handle::BorrowedSessionHandle};
 
 /// Non-owning service view; drop does not close the handle.
 #[derive(Debug, Clone, Copy)]
 pub struct OverrideService {
-    handle: SessionHandle,
+    handle: BorrowedSessionHandle<'static>,
     pointer_buffer_size: u16,
 }
 
 impl OverrideService {
-    /// Wraps a handle managed by an external owner.
+    /// Wraps a handle managed by an external owner, without checking that the owner outlives
+    /// this view.
+    ///
+    /// The `'static` borrow this mints is an assertion, not a fact the compiler checked, which
+    /// is what the name admits. The caller must ensure the external owner keeps the session
+    /// open for as long as this view is used; nothing here closes it, and a session closed
+    /// underneath leaves the view naming a handle number the kernel may have reused, so
+    /// requests sent through it reach whatever now holds that number.
     #[inline]
-    pub const fn new(handle: SessionHandle, pointer_buffer_size: u16) -> Self {
+    pub const fn new_unchecked(handle: SessionHandle, pointer_buffer_size: u16) -> Self {
         Self {
-            handle,
+            // SAFETY: The external owner named in this constructor's precondition is what
+            // keeps the session alive; no borrow the compiler could check exists here,
+            // because the owner is on the C side of the boundary.
+            handle: BorrowedSessionHandle::from_handle_unchecked(handle),
             pointer_buffer_size,
         }
     }
 
     /// Returns the underlying session handle.
     #[inline]
-    pub fn handle(&self) -> SessionHandle {
+    pub fn handle(&self) -> BorrowedSessionHandle<'static> {
         self.handle
     }
 

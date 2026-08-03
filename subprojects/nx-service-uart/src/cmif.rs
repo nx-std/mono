@@ -5,7 +5,10 @@ use core::{mem::size_of, ptr};
 use nx_sf::{
     cmif,
     ipc::Handle,
-    service::{BufferAttr, DispatchError, OutHandleAttr, Session},
+    service::{
+        BorrowedSessionHandle, BufferAttr, DispatchError, OutHandleAttr, OwnedSessionHandle,
+        Session,
+    },
 };
 
 use crate::{
@@ -14,7 +17,7 @@ use crate::{
 };
 
 fn dispatch_in_u32_out_bool(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
@@ -43,7 +46,7 @@ pub enum DispatchInU32OutBoolError {
 }
 
 fn dispatch_in_two_u32s_out_bool(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     val0: u32,
     val1: u32,
@@ -81,7 +84,10 @@ pub enum DispatchInTwoU32sOutBoolError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchOutU64Error> {
+fn dispatch_out_u64(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u64, DispatchOutU64Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -104,18 +110,24 @@ pub enum DispatchOutU64Error {
 }
 
 /// Checks if a production port exists (pre-17.0.0).
-pub fn has_port(session: Handle, port: u32) -> Result<bool, DispatchInU32OutBoolError> {
+pub fn has_port(
+    session: BorrowedSessionHandle<'_>,
+    port: u32,
+) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::HAS_PORT, port)
 }
 
 /// Checks if a dev port exists (pre-17.0.0).
-pub fn has_port_for_dev(session: Handle, port: u32) -> Result<bool, DispatchInU32OutBoolError> {
+pub fn has_port_for_dev(
+    session: BorrowedSessionHandle<'_>,
+    port: u32,
+) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::HAS_PORT_FOR_DEV, port)
 }
 
 /// Checks if a baud rate is supported for a production port (pre-17.0.0).
 pub fn is_supported_baud_rate(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     baud_rate: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -124,7 +136,7 @@ pub fn is_supported_baud_rate(
 
 /// Checks if a baud rate is supported for a dev port (pre-17.0.0).
 pub fn is_supported_baud_rate_for_dev(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     baud_rate: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -138,7 +150,7 @@ pub fn is_supported_baud_rate_for_dev(
 
 /// Checks if a flow control mode is supported for a production port (pre-17.0.0).
 pub fn is_supported_flow_control_mode(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     mode: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -147,7 +159,7 @@ pub fn is_supported_flow_control_mode(
 
 /// Checks if a flow control mode is supported for a dev port (pre-17.0.0).
 pub fn is_supported_flow_control_mode_for_dev(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     mode: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -160,7 +172,9 @@ pub fn is_supported_flow_control_mode_for_dev(
 }
 
 /// Creates a new port session (returns IPortSession as a move handle).
-pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSessionError> {
+pub fn create_port_session(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<Session, CreatePortSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -177,14 +191,19 @@ pub fn create_port_session(session: Handle) -> Result<Session, CreatePortSession
 
     // SAFETY: the kernel returned a valid move handle for the new port
     // session; ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle = Handle::from_raw_unchecked(raw_handle);
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // Session below becomes its sole owner.
+        OwnedSessionHandle::from_handle_unchecked(handle),
+        0,
+    ))
 }
 
 /// Checks if a port event type is supported for a production port (pre-17.0.0).
 pub fn is_supported_port_event(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     event_type: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -193,7 +212,7 @@ pub fn is_supported_port_event(
 
 /// Checks if a port event type is supported for a dev port (pre-17.0.0).
 pub fn is_supported_port_event_for_dev(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     event_type: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -207,7 +226,7 @@ pub fn is_supported_port_event_for_dev(
 
 /// Checks if a device variation is supported for a production port ([7.0.0-16.1.0]).
 pub fn is_supported_device_variation(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     device_variation: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -221,7 +240,7 @@ pub fn is_supported_device_variation(
 
 /// Checks if a device variation is supported for a dev port ([7.0.0-16.1.0]).
 pub fn is_supported_device_variation_for_dev(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port: u32,
     device_variation: u32,
 ) -> Result<bool, DispatchInTwoU32sOutBoolError> {
@@ -526,7 +545,9 @@ pub fn port_open_for_dev_v7(
 }
 
 /// Gets the number of bytes available for writing.
-pub fn port_get_writable_length(session: Handle) -> Result<u64, DispatchOutU64Error> {
+pub fn port_get_writable_length(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u64, DispatchOutU64Error> {
     dispatch_out_u64(session, proto::PORT_GET_WRITABLE_LENGTH)
 }
 
@@ -546,7 +567,9 @@ pub fn port_send(service: &Session, data: &[u8]) -> Result<u64, PortSendError> {
 }
 
 /// Gets the number of bytes available for reading.
-pub fn port_get_readable_length(session: Handle) -> Result<u64, DispatchOutU64Error> {
+pub fn port_get_readable_length(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u64, DispatchOutU64Error> {
     dispatch_out_u64(session, proto::PORT_GET_READABLE_LENGTH)
 }
 
@@ -608,7 +631,7 @@ pub fn port_bind_port_event(
 
 /// Unbinds a port event.
 pub fn port_unbind_port_event(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     port_event_type: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::PORT_UNBIND_PORT_EVENT, port_event_type)

@@ -228,7 +228,7 @@ pub fn connect_shell_cmif(sm: &SmService) -> Result<LdrShellService, ConnectCmif
         .get_service_handle_cmif(proto::SHELL_SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(LdrShellService(service))
 }
@@ -239,7 +239,7 @@ pub fn connect_dmnt_cmif(sm: &SmService) -> Result<LdrDmntService, ConnectCmifEr
         .get_service_handle_cmif(proto::DMNT_SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(LdrDmntService(service))
 }
@@ -250,7 +250,7 @@ pub fn connect_pm_cmif(sm: &SmService) -> Result<LdrPmService, ConnectCmifError>
         .get_service_handle_cmif(proto::PM_SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(LdrPmService(service))
 }

@@ -32,8 +32,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -68,7 +70,7 @@ unsafe impl Sync for NcmService {}
 impl NcmService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -112,11 +114,12 @@ impl NcmService {
         &self,
         storage_id: NcmStorageId,
     ) -> Result<NcmContentStorage, OpenSubObjectError> {
-        let handle = cmif::root::open_content_storage(&self.0, storage_id)?;
-        Ok(NcmContentStorage(Session::from_handle(
-            unsafe { SessionHandle::from_raw(handle) },
-            0,
-        )))
+        let raw = cmif::root::open_content_storage(&self.0, storage_id)?;
+        // SAFETY: The server returned a freshly opened content-storage session in this reply,
+        // so the `Session` below is its sole owner.
+        let handle =
+            OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(raw));
+        Ok(NcmContentStorage(Session::new(handle, 0)))
     }
 
     /// Opens a content meta database sub-object (cmd 5).
@@ -125,11 +128,12 @@ impl NcmService {
         &self,
         storage_id: NcmStorageId,
     ) -> Result<NcmContentMetaDatabase, OpenSubObjectError> {
-        let handle = cmif::root::open_content_meta_database(&self.0, storage_id)?;
-        Ok(NcmContentMetaDatabase(Session::from_handle(
-            unsafe { SessionHandle::from_raw(handle) },
-            0,
-        )))
+        let raw = cmif::root::open_content_meta_database(&self.0, storage_id)?;
+        // SAFETY: The server returned a freshly opened meta-database session in this reply,
+        // so the `Session` below is its sole owner.
+        let handle =
+            OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(raw));
+        Ok(NcmContentMetaDatabase(Session::new(handle, 0)))
     }
 
     /// Closes content storage forcibly (cmd 6, pre-2.0.0).
@@ -794,7 +798,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<NcmService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    Ok(NcmService(Session::from_handle(handle, 0)))
+    Ok(NcmService(Session::new(handle, 0)))
 }
 
 /// Errors returned by [`connect_cmif`].

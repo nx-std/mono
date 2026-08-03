@@ -6,8 +6,8 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     hipc::{BufferMode, InputBuffer},
-    ipc::Handle,
-    service::Session,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
     tipc,
 };
 
@@ -18,7 +18,11 @@ use crate::{
     },
 };
 
-fn dispatch_in_u64(session: Handle, cmd_id: u32, value: u64) -> Result<(), DispatchError> {
+fn dispatch_in_u64(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: u64,
+) -> Result<(), DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -37,7 +41,11 @@ fn dispatch_in_u64(session: Handle, cmd_id: u32, value: u64) -> Result<(), Dispa
     Ok(())
 }
 
-fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), DispatchError> {
+fn dispatch_in_bool(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: bool,
+) -> Result<(), DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -56,7 +64,7 @@ fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), Dis
     Ok(())
 }
 
-fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchError> {
+fn dispatch_out_u64(session: BorrowedSessionHandle<'_>, cmd_id: u32) -> Result<u64, DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -73,7 +81,10 @@ fn dispatch_out_u64(session: Handle, cmd_id: u32) -> Result<u64, DispatchError> 
     Ok(value)
 }
 
-fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchError> {
+fn dispatch_out_bool(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<bool, DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -98,7 +109,7 @@ pub enum DispatchError {
 
 /// Launches a program (cmd 0, TIPC).
 pub fn launch_program(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     loc: &NcmProgramLocation,
     pm_launch_flags: u32,
     pgl_launch_flags: PglLaunchFlag,
@@ -131,13 +142,16 @@ pub fn launch_program(
 }
 
 /// Terminates a process (cmd 1).
-pub fn terminate_process(session: Handle, pid: u64) -> Result<(), DispatchError> {
+pub fn terminate_process(
+    session: BorrowedSessionHandle<'_>,
+    pid: u64,
+) -> Result<(), DispatchError> {
     dispatch_in_u64(session, proto::TERMINATE_PROCESS, pid)
 }
 
 /// Launches a program from a host content path (cmd 2, TIPC).
 pub fn launch_program_from_host(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     content_path: &[u8],
     pm_launch_flags: u32,
 ) -> Result<u64, DispatchError> {
@@ -164,7 +178,7 @@ pub fn launch_program_from_host(
 
 /// Gets host content meta info (cmd 4, TIPC).
 pub fn get_host_content_meta_info(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     content_path: &[u8],
 ) -> Result<ContentMetaInfo, DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -186,17 +200,25 @@ pub fn get_host_content_meta_info(
 }
 
 /// Gets the application process ID (cmd 5).
-pub fn get_application_process_id(session: Handle) -> Result<u64, DispatchError> {
+pub fn get_application_process_id(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u64, DispatchError> {
     dispatch_out_u64(session, proto::GET_APPLICATION_PROCESS_ID)
 }
 
 /// Boosts system memory resource limit (cmd 6).
-pub fn boost_system_memory_resource_limit(session: Handle, size: u64) -> Result<(), DispatchError> {
+pub fn boost_system_memory_resource_limit(
+    session: BorrowedSessionHandle<'_>,
+    size: u64,
+) -> Result<(), DispatchError> {
     dispatch_in_u64(session, proto::BOOST_SYSTEM_MEMORY_RESOURCE_LIMIT, size)
 }
 
 /// Checks whether a process is tracked (cmd 7, TIPC).
-pub fn is_process_tracked(session: Handle, pid: u64) -> Result<bool, DispatchError> {
+pub fn is_process_tracked(
+    session: BorrowedSessionHandle<'_>,
+    pid: u64,
+) -> Result<bool, DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -216,18 +238,23 @@ pub fn is_process_tracked(session: Handle, pid: u64) -> Result<bool, DispatchErr
 }
 
 /// Enables/disables application crash reports (cmd 8).
-pub fn enable_application_crash_report(session: Handle, enable: bool) -> Result<(), DispatchError> {
+pub fn enable_application_crash_report(
+    session: BorrowedSessionHandle<'_>,
+    enable: bool,
+) -> Result<(), DispatchError> {
     dispatch_in_bool(session, proto::ENABLE_APPLICATION_CRASH_REPORT, enable)
 }
 
 /// Checks whether application crash reports are enabled (cmd 9).
-pub fn is_application_crash_report_enabled(session: Handle) -> Result<bool, DispatchError> {
+pub fn is_application_crash_report_enabled(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchError> {
     dispatch_out_bool(session, proto::IS_APPLICATION_CRASH_REPORT_ENABLED)
 }
 
 /// Enables/disables all-thread dump on crash (cmd 10).
 pub fn enable_application_all_thread_dump_on_crash(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     enable: bool,
 ) -> Result<(), DispatchError> {
     dispatch_in_bool(
@@ -238,7 +265,9 @@ pub fn enable_application_all_thread_dump_on_crash(
 }
 
 /// Gets an event observer sub-object (cmd 20, TIPC).
-pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverError> {
+pub fn get_event_observer(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<Session, GetEventObserverError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -258,9 +287,10 @@ pub fn get_event_observer(session: Handle) -> Result<Session, GetEventObserverEr
 
     // SAFETY: the kernel returned a valid move handle for the new observer
     // session; ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle =
+        OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(raw_handle));
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(handle, 0))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -274,7 +304,9 @@ pub enum GetEventObserverError {
 }
 
 /// Gets the process event handle from the observer (cmd 0, copy handle).
-pub fn observer_get_process_event(session: Handle) -> Result<u32, GetProcessEventError> {
+pub fn observer_get_process_event(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, GetProcessEventError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -306,7 +338,9 @@ pub enum GetProcessEventError {
 }
 
 /// Gets the process event info from the observer (cmd 1).
-pub fn observer_get_process_event_info(session: Handle) -> Result<ProcessEventInfo, DispatchError> {
+pub fn observer_get_process_event_info(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<ProcessEventInfo, DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

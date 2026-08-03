@@ -743,7 +743,7 @@ pub fn connect_nfp_cmif(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectNfpCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
     let domain = session
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectNfpCmifError::ConvertToDomain(err))?;
@@ -803,7 +803,7 @@ pub fn connect_nfc_cmif(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectNfcCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
     let domain = session
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectNfcCmifError::ConvertToDomain(err))?;
@@ -858,7 +858,7 @@ pub fn connect_mifare_cmif(
         .get_service_handle_cmif(proto::NFC_MF_SERVICE_NAME)
         .map_err(ConnectMifareCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
     let domain = session
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectMifareCmifError::ConvertToDomain(err))?;

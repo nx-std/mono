@@ -9,7 +9,7 @@ use core::{mem::size_of, ptr};
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::proto;
@@ -21,7 +21,7 @@ use crate::proto;
 /// buffers.
 #[inline]
 pub fn register_process(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     acid_sac: &[u8],
     aci0_sac: &[u8],
@@ -59,7 +59,10 @@ pub enum RegisterProcessError {
 
 /// Unregisters a process from the Service Manager using CMIF protocol.
 #[inline]
-pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), UnregisterProcessError> {
+pub fn unregister_process(
+    session: BorrowedSessionHandle<'_>,
+    pid: u64,
+) -> Result<(), UnregisterProcessError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

@@ -22,10 +22,7 @@
 //! [`OverrideService::dispatch`]: super::OverrideService::dispatch
 //! [`out_objects`]: DomainDispatch::out_objects
 
-use nx_svc::{
-    error::{ResultCode, ToResultCode as _},
-    ipc::Handle as SessionHandle,
-};
+use nx_svc::error::{ResultCode, ToResultCode as _};
 use nx_sys_thread_tls::IpcBuffer;
 
 use super::domain::{Domain, DomainObject};
@@ -33,6 +30,7 @@ use crate::{
     cmif::{self, ObjectId},
     error::ToResultCode,
     hipc::{self, InOutBuffer, InPointer, InputBuffer, OutPointer, OutputBuffer},
+    service::handle::BorrowedSessionHandle,
 };
 
 /// Maximum number of buffers in a single dispatch.
@@ -98,7 +96,7 @@ pub enum OutHandleAttr {
 /// Builder for dispatching a single CMIF request.
 #[derive(Debug)]
 pub struct Dispatch<'a> {
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'a>,
     pointer_buffer_size: u16,
     object_id: Option<ObjectId>,
     request_id: u32,
@@ -120,7 +118,7 @@ impl<'a> Dispatch<'a> {
     /// Creates a new dispatch builder. Used by the typed wrappers.
     #[inline]
     pub(crate) fn new(
-        session: SessionHandle,
+        session: BorrowedSessionHandle<'a>,
         pointer_buffer_size: u16,
         object_id: Option<ObjectId>,
         request_id: u32,
@@ -467,7 +465,7 @@ impl<'d> DomainDispatch<'d> {
     #[inline]
     pub(crate) fn new(
         domain: &'d Domain,
-        session: SessionHandle,
+        session: BorrowedSessionHandle<'d>,
         pointer_buffer_size: u16,
         object_id: Option<ObjectId>,
         request_id: u32,

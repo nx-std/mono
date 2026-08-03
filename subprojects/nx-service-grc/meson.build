@@ -18,9 +18,6 @@ nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
 nx_sf_proj = subproject('nx-sf')
 nx_sf_dep = nx_sf_proj.get_variable('nx_sf_dep')
 
-nx_svc_proj = subproject('nx-svc')
-nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
-
 nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
 nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
 
@@ -29,7 +26,6 @@ deps = [
     nx_service_caps_dep,
     nx_service_sm_dep,
     nx_sf_dep,
-    nx_svc_dep,
     nx_sys_thread_tls_dep,
 ]
 

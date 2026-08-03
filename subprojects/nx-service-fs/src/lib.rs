@@ -1393,7 +1393,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<FsService, ConnectCmifError> {
         .get_service_handle_cmif(proto::SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
     let pointer_buffer_size = session.pointer_buffer_size();
 
     let creator = session
@@ -1410,8 +1410,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<FsService, ConnectCmifError> {
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
         // SAFETY: Cloning a domain session yields another kernel handle addressing the same
         // domain object table on the server side.
-        let cloned_domain =
-            unsafe { Domain::from_handle_unchecked(cloned_handle, pointer_buffer_size) };
+        let cloned_domain = Domain::new_unchecked(cloned_handle, pointer_buffer_size);
         sessions.push(cloned_domain);
     }
 

@@ -62,8 +62,9 @@ extern crate nx_panic_handler as _;
 use alloc::{boxed::Box, vec::Vec};
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, Session, clone_current_object};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{
+    ConvertToDomainError, Domain, DomainObject, OwnedSessionHandle, Session, clone_current_object,
+};
 
 mod cmif;
 mod dispatch;
@@ -248,7 +249,7 @@ impl LdnService {
 
     /// `GetStateChangeEvent` (cmd 100). Returns a kernel handle to a
     /// caller-owned autoclear event copy.
-    pub fn get_state_change_event(&self) -> Result<SessionHandle, GetStateChangeEventError> {
+    pub fn get_state_change_event(&self) -> Result<OwnedSessionHandle, GetStateChangeEventError> {
         self.dispatch_lcs(lcs::get_state_change_event)
     }
 
@@ -549,7 +550,7 @@ pub fn connect_cmif(sm: &SmService, kind: LdnServiceType) -> Result<LdnService, 
         .map_err(ConnectCmifError::GetService)?;
 
     // 2. Wrap as a Session (queries pointer-buffer size internally).
-    let creator_session = Session::new(creator_handle);
+    let creator_session = Session::open(creator_handle);
     let pointer_buffer_size = creator_session.pointer_buffer_size();
 
     // 3. Convert to domain. On failure the Session is returned alongside
@@ -568,8 +569,7 @@ pub fn connect_cmif(sm: &SmService, kind: LdnServiceType) -> Result<LdnService, 
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
         // SAFETY: Cloning a domain session yields another kernel handle addressing the same
         // domain object table on the server side.
-        let cloned_domain =
-            unsafe { Domain::from_handle_unchecked(cloned_handle, pointer_buffer_size) };
+        let cloned_domain = Domain::new_unchecked(cloned_handle, pointer_buffer_size);
         sessions.push(cloned_domain);
     }
 
@@ -708,7 +708,7 @@ pub fn connect_monitor_cmif(sm: &SmService) -> Result<LdnMonitorService, Connect
         .get_service_handle_cmif(SERVICE_NAME_MONITOR)
         .map_err(ConnectMonitorCmifError::GetService)?;
 
-    let creator = Session::new(creator_handle);
+    let creator = Session::open(creator_handle);
 
     // 2. CreateMonitorService (cmd 0 on the non-domain creator) returns the
     //    new IMonitorService session as a move handle.
@@ -719,7 +719,7 @@ pub fn connect_monitor_cmif(sm: &SmService) -> Result<LdnMonitorService, Connect
     drop(creator);
 
     // 4. Wrap the new session, querying pointer-buffer-size on it.
-    let monitor = Session::new(monitor_handle);
+    let monitor = Session::open(monitor_handle);
 
     Ok(LdnMonitorService { monitor })
 }

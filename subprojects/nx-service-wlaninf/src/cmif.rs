@@ -3,13 +3,13 @@
 use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, WlanInfState};
 
 /// Reads the current [`WlanInfState`] (cmd 10).
-pub fn get_state(session: SessionHandle) -> Result<WlanInfState, GetStateError> {
+pub fn get_state(session: BorrowedSessionHandle<'_>) -> Result<WlanInfState, GetStateError> {
     let raw = dispatch_no_in_u32(session, CMD_GET_STATE).map_err(GetStateError::Dispatch)?;
     WlanInfState::from_raw(raw).ok_or(GetStateError::InvalidState(raw))
 }
@@ -37,7 +37,7 @@ impl ToResultCode for GetStateError {
 }
 
 /// Reads the current [`Rssi`] (cmd 12).
-pub fn get_rssi(session: SessionHandle) -> Result<Rssi, GetRssiError> {
+pub fn get_rssi(session: BorrowedSessionHandle<'_>) -> Result<Rssi, GetRssiError> {
     let raw = dispatch_no_in_u32(session, CMD_GET_RSSI).map_err(GetRssiError)?;
     // libnx reinterprets the same 4-byte payload through an `s32*` cast; the
     // service does not zero/extend, so a bitwise reinterpret preserves the
@@ -58,7 +58,10 @@ impl ToResultCode for GetRssiError {
 
 /// Sends a CMIF request with no input payload and reads a single `u32` from
 /// the response data area.
-fn dispatch_no_in_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchError> {
+fn dispatch_no_in_u32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

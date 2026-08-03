@@ -14,6 +14,7 @@ use nx_svc::{
     ipc::{self, Handle as SessionHandle},
 };
 
+use super::handle::{BorrowedSessionHandle, OwnedSessionHandle};
 use crate::{
     cmif::{self, CmifCloseRequest, CmifControlRequestBuilder, ObjectId},
     error::{GENERIC_ERROR, ToResultCode},
@@ -32,7 +33,7 @@ const CTRL_CLONE_OBJECT_EX: u32 = 4;
 
 /// Queries the server's pointer-buffer size via control request 3.
 pub fn query_pointer_buffer_size(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u16, QueryPointerBufferSizeError> {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -69,7 +70,9 @@ impl ToResultCode for QueryPointerBufferSizeError {
 }
 
 /// Clones the current session via control request 2.
-pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, CloneObjectError> {
+pub fn clone_current_object(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, CloneObjectError> {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -85,8 +88,11 @@ pub fn clone_current_object(session: SessionHandle) -> Result<SessionHandle, Clo
         .first()
         .ok_or(CloneObjectError::MissingHandle)?;
 
-    // SAFETY: The kernel returned the handle as a move handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(raw) })
+    // SAFETY: The server answered with a freshly created session that this process now owns
+    // and nothing else will close; adopting it here is the one place that ownership begins.
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        SessionHandle::from_raw_unchecked(raw),
+    ))
 }
 
 /// Error returned by [`clone_current_object`].
@@ -117,9 +123,9 @@ impl ToResultCode for CloneObjectError {
 
 /// Clones the current session with a session manager tag via control request 4.
 pub fn clone_current_object_ex(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     tag: u32,
-) -> Result<SessionHandle, CloneObjectExError> {
+) -> Result<OwnedSessionHandle, CloneObjectExError> {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -137,8 +143,11 @@ pub fn clone_current_object_ex(
         .first()
         .ok_or(CloneObjectExError::MissingHandle)?;
 
-    // SAFETY: The kernel returned the handle as a move handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(raw) })
+    // SAFETY: The server answered with a freshly created session that this process now owns
+    // and nothing else will close; adopting it here is the one place that ownership begins.
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        SessionHandle::from_raw_unchecked(raw),
+    ))
 }
 
 /// Error returned by [`clone_current_object_ex`].
@@ -169,7 +178,7 @@ impl ToResultCode for CloneObjectExError {
 
 /// Converts the current session to a domain via control request 0.
 pub fn convert_current_object_to_domain(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<ObjectId, ConvertToDomainError> {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -207,9 +216,9 @@ impl ToResultCode for ConvertToDomainError {
 
 /// Copies a domain object to a new standalone session via control request 1.
 pub fn copy_from_current_domain(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     object_id: ObjectId,
-) -> Result<SessionHandle, CopyFromDomainError> {
+) -> Result<OwnedSessionHandle, CopyFromDomainError> {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -227,8 +236,11 @@ pub fn copy_from_current_domain(
         .first()
         .ok_or(CopyFromDomainError::MissingHandle)?;
 
-    // SAFETY: The kernel returned the handle as a move handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(raw) })
+    // SAFETY: The server answered with a freshly created session that this process now owns
+    // and nothing else will close; adopting it here is the one place that ownership begins.
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        SessionHandle::from_raw_unchecked(raw),
+    ))
 }
 
 /// Error returned by [`copy_from_current_domain`].
@@ -261,12 +273,12 @@ impl ToResultCode for CopyFromDomainError {
 ///
 /// Errors from either step are deliberately swallowed: a peer that has gone
 /// away must not block the local side from releasing its kernel handle.
-pub(crate) fn close_session(handle: SessionHandle) {
+pub(crate) fn close_session(handle: BorrowedSessionHandle<'_>) {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let _ = CmifCloseRequest::session().send(&mut buf, handle);
-    let _ = ipc::close_handle(handle);
+    let _ = ipc::close_handle(handle.to_handle());
 }
 
 /// Sends a CMIF domain-object close request on the parent session.
@@ -274,7 +286,7 @@ pub(crate) fn close_session(handle: SessionHandle) {
 /// Does not close the session handle - only the named object inside the
 /// domain. Errors are deliberately swallowed for the same reason as
 /// [`close_session`].
-pub(crate) fn close_object(session: SessionHandle, object_id: ObjectId) {
+pub(crate) fn close_object(session: BorrowedSessionHandle<'_>, object_id: ObjectId) {
     // SAFETY: IPC operations are serialized on this thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 

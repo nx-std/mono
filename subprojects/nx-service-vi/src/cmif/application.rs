@@ -6,8 +6,8 @@ use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
-    service::Session,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
 };
 use nx_svc::raw::Handle as RawHandle;
 
@@ -17,23 +17,29 @@ use crate::{
 };
 
 /// Gets IHOSBinderDriverRelay session.
-pub fn get_relay_service(session: SessionHandle) -> Result<Session, GetSubServiceError> {
+pub fn get_relay_service(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(session, application_cmds::GET_RELAY_SERVICE)
 }
 
 /// Gets ISystemDisplayService session.
-pub fn get_system_display_service(session: SessionHandle) -> Result<Session, GetSubServiceError> {
+pub fn get_system_display_service(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(session, application_cmds::GET_SYSTEM_DISPLAY_SERVICE)
 }
 
 /// Gets IManagerDisplayService session.
-pub fn get_manager_display_service(session: SessionHandle) -> Result<Session, GetSubServiceError> {
+pub fn get_manager_display_service(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(session, application_cmds::GET_MANAGER_DISPLAY_SERVICE)
 }
 
 /// Gets IHOSBinderDriverIndirect session (2.0.0+).
 pub fn get_indirect_display_transaction_service(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<Session, GetSubServiceError> {
     get_sub_service_no_params(
         session,
@@ -43,7 +49,7 @@ pub fn get_indirect_display_transaction_service(
 
 /// Helper to get a sub-service with no input parameters.
 fn get_sub_service_no_params(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<Session, GetSubServiceError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -61,18 +67,19 @@ fn get_sub_service_no_params(
     };
 
     // SAFETY: handle is a valid session handle from the kernel
-    let session_handle = unsafe { SessionHandle::from_raw(handle) };
+    let session_handle =
+        OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(handle));
 
     // Sub-services here are non-domain handles obtained via move-handle.
     // Skip the pointer-buffer-size query (libnx doesn't issue it on these
     // sub-services either); callers that need pointer-buffer dispatch can
     // upgrade the value later.
-    Ok(Session::from_handle(session_handle, 0))
+    Ok(Session::new(session_handle, 0))
 }
 
 /// Opens a display by name.
 pub fn open_display(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     name: &DisplayName,
 ) -> Result<DisplayId, OpenDisplayError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -95,7 +102,7 @@ pub fn open_display(
 
 /// Closes a display.
 pub fn close_display(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<(), CloseDisplayError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -125,7 +132,7 @@ pub struct DisplayResolution {
 
 /// Gets display resolution.
 pub fn get_display_resolution(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<DisplayResolution, GetDisplayResolutionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -169,7 +176,7 @@ pub struct OpenLayerOutput {
 
 /// Opens a layer.
 pub fn open_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_name: &DisplayName,
     layer_id: LayerId,
     aruid: u64,
@@ -215,7 +222,10 @@ pub fn open_layer(
 }
 
 /// Closes a layer.
-pub fn close_layer(session: SessionHandle, layer_id: LayerId) -> Result<(), CloseLayerError> {
+pub fn close_layer(
+    session: BorrowedSessionHandle<'_>,
+    layer_id: LayerId,
+) -> Result<(), CloseLayerError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -245,7 +255,7 @@ pub struct CreateStrayLayerOutput {
 
 /// Creates a stray layer on IApplicationDisplayService (cmd 2030).
 pub fn create_stray_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_flags: u32,
     display_id: DisplayId,
 ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
@@ -269,7 +279,7 @@ pub fn create_stray_layer(
 /// varies is the (session, cmd_id) pair. The runtime layer chooses which
 /// pair to pass in based on hosversion.
 pub(crate) fn create_stray_layer_dispatch(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     layer_flags: u32,
     display_id: DisplayId,
@@ -320,7 +330,7 @@ pub(crate) fn create_stray_layer_dispatch(
 
 /// Destroys a stray layer.
 pub fn destroy_stray_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
 ) -> Result<(), DestroyStrayLayerError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -341,7 +351,7 @@ pub fn destroy_stray_layer(
 
 /// Sets layer scaling mode.
 pub fn set_layer_scaling_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     scaling_mode: ViScalingMode,
     layer_id: LayerId,
 ) -> Result<(), SetLayerScalingModeError> {
@@ -386,7 +396,7 @@ pub struct IndirectLayerImageInfo {
 /// Gets indirect layer image map.
 #[allow(clippy::too_many_arguments)]
 pub fn get_indirect_layer_image_map(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     width: i64,
     height: i64,
     indirect_layer_consumer_handle: u64,
@@ -449,7 +459,7 @@ pub struct IndirectLayerMemoryInfo {
 
 /// Gets indirect layer image required memory info.
 pub fn get_indirect_layer_image_required_memory_info(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     width: i64,
     height: i64,
 ) -> Result<IndirectLayerMemoryInfo, GetIndirectLayerImageRequiredMemoryInfoError> {
@@ -492,7 +502,7 @@ pub fn get_indirect_layer_image_required_memory_info(
 
 /// Gets display vsync event.
 pub fn get_display_vsync_event(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<RawHandle, GetDisplayVsyncEventError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

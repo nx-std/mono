@@ -15,7 +15,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::service::{BorrowedSessionHandle, OwnedSessionHandle, Session};
 use nx_svc::ipc::Handle;
 
 mod cmif;
@@ -39,7 +39,7 @@ pub struct BtmuService(Session);
 impl BtmuService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -455,15 +455,18 @@ pub fn connect_cmif(sm: &SmService) -> Result<BtmuService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    let root = Session::from_handle(handle, 0);
+    let root = Session::new(handle, 0);
 
     let core_raw = cmif::get_core(&root).map_err(ConnectCmifError::GetCore)?;
 
     // SAFETY: the kernel returned a valid move handle for the new IBtmUserCore
     // sub-object; ownership transfers to the new `Session`.
-    let core_handle = unsafe { Handle::from_raw(core_raw) };
+    let core_handle = Handle::from_raw_unchecked(core_raw);
 
-    Ok(BtmuService(Session::from_handle(core_handle, 0)))
+    Ok(BtmuService(Session::new(
+        OwnedSessionHandle::from_handle_unchecked(core_handle),
+        0,
+    )))
 }
 
 /// Error returned by [`connect_cmif`].

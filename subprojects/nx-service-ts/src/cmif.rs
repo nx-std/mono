@@ -1,6 +1,10 @@
 //! CMIF protocol operations for the temperature measurement service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
+};
 
 use crate::proto;
 
@@ -8,7 +12,7 @@ use crate::proto;
 ///
 /// Returns `(min_temperature, max_temperature)` in Celsius.
 pub fn get_temperature_range(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     location: u8,
 ) -> Result<(i32, i32), GetTemperatureRangeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -30,7 +34,10 @@ pub fn get_temperature_range(
 }
 
 /// Gets the temperature for a location, in Celsius.
-pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetTemperatureError> {
+pub fn get_temperature(
+    session: BorrowedSessionHandle<'_>,
+    location: u8,
+) -> Result<i32, GetTemperatureError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -48,7 +55,7 @@ pub fn get_temperature(session: SessionHandle, location: u8) -> Result<i32, GetT
 
 /// Gets the temperature for a location, in millicelsius.
 pub fn get_temperature_milli_c(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     location: u8,
 ) -> Result<i32, GetTemperatureMilliCError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -71,9 +78,9 @@ pub fn get_temperature_milli_c(
 ///
 /// Returns a session handle for the opened device.
 pub fn open_session(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_code: u32,
-) -> Result<SessionHandle, OpenSessionError> {
+) -> Result<OwnedSessionHandle, OpenSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -91,11 +98,15 @@ pub fn open_session(
     };
 
     // SAFETY: handle is from a valid IPC response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Gets the temperature from a session, as a float in Celsius.
-pub fn session_get_temperature(session: SessionHandle) -> Result<f32, SessionGetTemperatureError> {
+pub fn session_get_temperature(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<f32, SessionGetTemperatureError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

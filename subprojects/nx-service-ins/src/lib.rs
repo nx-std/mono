@@ -21,8 +21,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -41,7 +40,7 @@ pub struct InsrService(Session);
 impl InsrService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -78,7 +77,7 @@ pub struct InssService(Session);
 impl InssService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -104,7 +103,7 @@ pub fn connect_insr_cmif(sm: &SmService) -> Result<InsrService, ConnectInsrCmifE
         .get_service_handle_cmif(INSR_SERVICE_NAME)
         .map_err(ConnectInsrCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(InsrService(service))
 }
@@ -120,7 +119,7 @@ pub fn connect_inss_cmif(sm: &SmService) -> Result<InssService, ConnectInssCmifE
         .get_service_handle_cmif(INSS_SERVICE_NAME)
         .map_err(ConnectInssCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(InssService(service))
 }

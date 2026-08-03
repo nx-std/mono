@@ -83,7 +83,8 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_get_service_original(
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
-    unsafe { *handle_out = handle.to_raw() };
+    // Ownership passes to the C caller, which closes the handle itself.
+    unsafe { *handle_out = handle.into_handle().to_raw() };
     0
 }
 
@@ -110,7 +111,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_add_override_handle(
     handle: u32,
 ) {
     // SAFETY: Caller guarantees handle is valid.
-    let handle = unsafe { nx_svc::ipc::Handle::from_raw(handle) };
+    let handle = nx_svc::ipc::Handle::from_raw_unchecked(handle);
     // Ignore error (matches libnx behavior)
     let _ = sm::add_override(name, handle);
 }
@@ -139,7 +140,8 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service(
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
-    unsafe { *handle_out = handle.to_raw() };
+    // Ownership passes to the C caller, which closes the handle itself.
+    unsafe { *handle_out = handle.into_handle().to_raw() };
     0
 }
 
@@ -167,7 +169,8 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service_cmif(
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
-    unsafe { *handle_out = handle.to_raw() };
+    // Ownership passes to the C caller, which closes the handle itself.
+    unsafe { *handle_out = handle.into_handle().to_raw() };
     0
 }
 
@@ -195,7 +198,8 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_register_service_tipc(
     };
 
     // SAFETY: Caller guarantees handle_out points to valid memory.
-    unsafe { *handle_out = handle.to_raw() };
+    // Ownership passes to the C caller, which closes the handle itself.
+    unsafe { *handle_out = handle.into_handle().to_raw() };
     0
 }
 
@@ -295,7 +299,7 @@ fn set_sm_ffi_session() {
         // SAFETY: Called only during initialization, single-threaded access.
         unsafe {
             let service = Service {
-                session: sm.session(),
+                session: sm.session().to_handle(),
                 own_handle: 0,
                 object_id: 0,
                 pointer_buffer_size: 0,

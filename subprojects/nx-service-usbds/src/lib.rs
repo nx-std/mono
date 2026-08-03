@@ -31,8 +31,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -55,7 +57,7 @@ pub struct UsbDsService(Session);
 impl UsbDsService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -90,8 +92,10 @@ impl UsbDsService {
             cmif::get_ds_interface_legacy(&self.0, descriptor, interface_name)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok((UsbDsInterface(Session::from_handle(handle, 0)), intf_num))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok((UsbDsInterface(Session::new(handle, 0)), intf_num))
     }
 
     /// GetStateChangeEvent (pre-11.0.0, cmd 3). Returns copy-handle.
@@ -126,8 +130,10 @@ impl UsbDsService {
             cmif::register_interface(&self.0, proto::GET_DS_INTERFACE_LEGACY, intf_num)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(UsbDsInterface(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(UsbDsInterface(Session::new(handle, 0)))
     }
 
     /// ClearDeviceData (5.0.0–10.x, cmd 5).
@@ -215,8 +221,10 @@ impl UsbDsService {
         let raw_handle = cmif::register_interface(&self.0, proto::REGISTER_INTERFACE, intf_num)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(UsbDsInterface(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(UsbDsInterface(Session::new(handle, 0)))
     }
 
     /// GetStateChangeEvent (11.0.0+, cmd 2). Returns copy-handle.
@@ -302,7 +310,7 @@ pub struct UsbDsInterface(Session);
 impl UsbDsInterface {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -451,8 +459,10 @@ impl UsbDsInterface {
         let raw_handle = cmif::intf_get_ds_endpoint(&self.0, descriptor)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(UsbDsEndpoint(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(UsbDsEndpoint(Session::new(handle, 0)))
     }
 
     /// RegisterEndpoint (5.0.0+, cmd 0). Takes endpoint address.
@@ -463,8 +473,10 @@ impl UsbDsInterface {
         let raw_handle = cmif::intf_register_endpoint(&self.0, endpoint_address)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(UsbDsEndpoint(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(UsbDsEndpoint(Session::new(handle, 0)))
     }
 
     /// AppendConfigurationData (pre-11.0.0, cmd 12).
@@ -501,7 +513,7 @@ pub struct UsbDsEndpoint(Session);
 impl UsbDsEndpoint {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -555,7 +567,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<UsbDsService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(UsbDsService(service))
 }

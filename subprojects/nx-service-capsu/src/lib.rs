@@ -43,8 +43,10 @@ use nx_service_caps::{
     LoadAlbumScreenShotImageOutputForApplication, ScreenShotDecodeOption,
 };
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -70,7 +72,7 @@ pub struct CapsuService(Session);
 impl CapsuService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -313,8 +315,10 @@ impl CapsuService {
 
         // SAFETY: the kernel returned a valid move handle for the new accessor
         // session; ownership transfers to the new `Session`.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(CapsuAccessor(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(CapsuAccessor(Session::new(handle, 0)))
     }
 }
 
@@ -328,7 +332,7 @@ pub struct CapsuAccessor(Session);
 impl CapsuAccessor {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -393,7 +397,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<CapsuService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(CapsuService(service))
 }

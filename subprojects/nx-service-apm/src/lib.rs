@@ -16,9 +16,8 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     error::{ResultCode, ToResultCode},
-    service::Session,
+    service::{BorrowedSessionHandle, Session},
 };
-use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
 mod proto;
@@ -40,7 +39,7 @@ pub struct ApmService(Session);
 impl ApmService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -51,7 +50,7 @@ impl ApmService {
     #[inline]
     pub fn open_session(&self) -> Result<ApmSession, OpenSessionError> {
         let session_handle = cmif::open_session(self.0.handle())?;
-        Ok(ApmSession(Session::from_handle(session_handle, 0)))
+        Ok(ApmSession(Session::new(session_handle, 0)))
     }
 
     /// Gets the current performance mode.
@@ -72,7 +71,7 @@ pub struct ApmSession(Session);
 impl ApmSession {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -124,7 +123,7 @@ pub fn connect(sm: &SmService) -> Result<ApmService, ConnectError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectError::GetService)?;
 
-    Ok(ApmService(Session::from_handle(handle, 0)))
+    Ok(ApmService(Session::new(handle, 0)))
 }
 
 /// Error returned by [`connect`].

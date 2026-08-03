@@ -37,8 +37,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -64,7 +66,7 @@ pub struct AudoutService(Session);
 impl AudoutService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -116,8 +118,10 @@ impl AudoutService {
 
         // SAFETY: the kernel returned a valid move handle for the
         // IAudioOut session; ownership transfers to the new `Session`.
-        let session = unsafe { SessionHandle::from_raw(raw_handle) };
-        let service = Session::from_handle(session, 0);
+        let session = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        let service = Session::new(session, 0);
 
         Ok((AudoutAudioOut(service), out))
     }
@@ -146,8 +150,10 @@ impl AudoutService {
 
         // SAFETY: the kernel returned a valid move handle for the
         // IAudioOut session; ownership transfers to the new `Session`.
-        let session = unsafe { SessionHandle::from_raw(raw_handle) };
-        let service = Session::from_handle(session, 0);
+        let session = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        let service = Session::new(session, 0);
 
         Ok((AudoutAudioOut(service), out))
     }
@@ -163,7 +169,7 @@ pub struct AudoutAudioOut(Session);
 impl AudoutAudioOut {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -305,7 +311,7 @@ pub struct AudoutaService(Session);
 impl AudoutaService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -373,7 +379,7 @@ pub struct AudoutdService(Session);
 impl AudoutdService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -407,7 +413,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<AudoutService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AudoutService(service))
 }
@@ -425,7 +431,7 @@ pub fn connect_audouta_cmif(sm: &SmService) -> Result<AudoutaService, ConnectAud
         .get_service_handle_cmif(AUDOUTA_SERVICE_NAME)
         .map_err(ConnectAudoutaCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AudoutaService(service))
 }
@@ -443,7 +449,7 @@ pub fn connect_audoutd_cmif(sm: &SmService) -> Result<AudoutdService, ConnectAud
         .get_service_handle_cmif(AUDOUTD_SERVICE_NAME)
         .map_err(ConnectAudoutdCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AudoutdService(service))
 }

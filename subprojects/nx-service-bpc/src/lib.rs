@@ -25,8 +25,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -45,7 +44,7 @@ pub struct BpcService(Session);
 impl BpcService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -90,7 +89,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<BpcService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    Ok(BpcService(Session::from_handle(handle, 0)))
+    Ok(BpcService(Session::new(handle, 0)))
 }
 
 /// Connects to the `bpc:c` (Board Power Control) service using CMIF.
@@ -102,7 +101,7 @@ pub fn connect_cmif_legacy(sm: &SmService) -> Result<BpcService, ConnectCmifErro
         .get_service_handle_cmif(SERVICE_NAME_LEGACY)
         .map_err(ConnectCmifError)?;
 
-    Ok(BpcService(Session::from_handle(handle, 0)))
+    Ok(BpcService(Session::new(handle, 0)))
 }
 
 /// Error returned by [`connect_cmif`] and [`connect_cmif_legacy`].

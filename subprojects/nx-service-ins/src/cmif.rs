@@ -1,11 +1,11 @@
 //! CMIF protocol operations for the INS services.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::proto;
 
 /// Gets the last system tick an event was signaled at.
-pub fn get_last_tick(session: SessionHandle, id: u32) -> Result<u64, GetLastTickError> {
+pub fn get_last_tick(session: BorrowedSessionHandle<'_>, id: u32) -> Result<u64, GetLastTickError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -34,7 +34,7 @@ struct EventInput {
 
 /// Gets a readable event handle for the given request ID.
 pub fn get_readable_event(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     id: u32,
 ) -> Result<nx_svc::sync::EventHandle, GetReadableEventError> {
     let input = EventInput {
@@ -62,11 +62,14 @@ pub fn get_readable_event(
         .ok_or(GetReadableEventError::MissingHandle)?;
 
     // SAFETY: handle is from a valid IPC response.
-    Ok(unsafe { nx_svc::sync::EventHandle::from_raw(handle) })
+    Ok(nx_svc::sync::EventHandle::from_raw_unchecked(handle))
 }
 
 /// Gets a writable event handle for the given send ID.
-pub fn get_writable_event(session: SessionHandle, id: u32) -> Result<u32, GetWritableEventError> {
+pub fn get_writable_event(
+    session: BorrowedSessionHandle<'_>,
+    id: u32,
+) -> Result<u32, GetWritableEventError> {
     let input = EventInput {
         id,
         _pad: 0,

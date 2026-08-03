@@ -3,7 +3,7 @@
 use nx_sf::{
     cmif,
     hipc::{InPointer, OutPointer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 };
 
 fn dispatch_in_with_pid<T>(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: &T,
 ) -> Result<(), DispatchError>
@@ -40,7 +40,7 @@ where
 }
 
 fn dispatch_in_with_pid_and_pointer<T>(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: &T,
     buffer: &[u8],
@@ -76,7 +76,7 @@ pub enum DispatchError {
 
 /// LeClientReadCharacteristic (cmd 0).
 pub fn le_client_read_characteristic(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     connection_handle: u32,
     is_primary: bool,
     serv_id: &BtdrvGattId,
@@ -100,7 +100,7 @@ pub fn le_client_read_characteristic(
 /// LeClientReadDescriptor (cmd 1).
 #[allow(clippy::too_many_arguments)]
 pub fn le_client_read_descriptor(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     connection_handle: u32,
     is_primary: bool,
     serv_id: &BtdrvGattId,
@@ -126,7 +126,7 @@ pub fn le_client_read_descriptor(
 /// LeClientWriteCharacteristic (cmd 2).
 #[allow(clippy::too_many_arguments)]
 pub fn le_client_write_characteristic(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     connection_handle: u32,
     is_primary: bool,
     serv_id: &BtdrvGattId,
@@ -158,7 +158,7 @@ pub fn le_client_write_characteristic(
 /// LeClientWriteDescriptor (cmd 3).
 #[allow(clippy::too_many_arguments)]
 pub fn le_client_write_descriptor(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     connection_handle: u32,
     is_primary: bool,
     serv_id: &BtdrvGattId,
@@ -184,7 +184,7 @@ pub fn le_client_write_descriptor(
 
 /// LeClientRegisterNotification (cmd 4).
 pub fn le_client_register_notification(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     connection_handle: u32,
     is_primary: bool,
     serv_id: &BtdrvGattId,
@@ -205,7 +205,7 @@ pub fn le_client_register_notification(
 
 /// LeClientDeregisterNotification (cmd 5).
 pub fn le_client_deregister_notification(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     connection_handle: u32,
     is_primary: bool,
     serv_id: &BtdrvGattId,
@@ -226,7 +226,7 @@ pub fn le_client_deregister_notification(
 
 /// SetLeResponse (cmd 6).
 pub fn set_le_response(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     server_if: u8,
     serv_uuid: &BtdrvGattAttributeUuid,
     char_uuid: &BtdrvGattAttributeUuid,
@@ -248,7 +248,7 @@ pub fn set_le_response(
 /// LeSendIndication (cmd 7).
 #[allow(clippy::too_many_arguments)]
 pub fn le_send_indication(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     server_if: u8,
     serv_uuid: &BtdrvGattAttributeUuid,
     char_uuid: &BtdrvGattAttributeUuid,
@@ -271,7 +271,7 @@ pub fn le_send_indication(
 
 /// GetLeEventInfo (cmd 8).
 pub fn get_le_event_info(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     buffer: &mut [u8],
     applet_resource_user_id: u64,
 ) -> Result<BtdrvBleEventType, GetLeEventInfoError> {
@@ -323,7 +323,7 @@ pub enum GetLeEventInfoError {
 
 /// RegisterBleEvent (cmd 9).
 pub fn register_ble_event(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     applet_resource_user_id: u64,
 ) -> Result<u32, RegisterBleEventError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

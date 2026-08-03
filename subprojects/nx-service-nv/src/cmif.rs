@@ -8,7 +8,7 @@ use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 use nx_svc::{
     mem::tmem::Handle as TmemHandle, process::Handle as ProcessHandle, raw::Handle as RawHandle,
@@ -23,7 +23,7 @@ use crate::{
 /// Opens a device by path.
 ///
 /// This is INvDrvServices command 0.
-pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError> {
+pub fn open(session: BorrowedSessionHandle<'_>, device_path: &[u8]) -> Result<Fd, OpenError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -57,7 +57,7 @@ pub fn open(session: SessionHandle, device_path: &[u8]) -> Result<Fd, OpenError>
 ///
 /// This is INvDrvServices command 1.
 pub fn ioctl(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: Fd,
     request: u32,
     in_size: usize,
@@ -128,7 +128,7 @@ pub fn ioctl(
 /// This is INvDrvServices command 11 (3.0.0+).
 #[allow(clippy::too_many_arguments)]
 pub fn ioctl2(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: Fd,
     request: u32,
     in_size: usize,
@@ -206,7 +206,7 @@ pub fn ioctl2(
 /// This is INvDrvServices command 12 (3.0.0+).
 #[allow(clippy::too_many_arguments)]
 pub fn ioctl3(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: Fd,
     request: u32,
     in_size: usize,
@@ -282,7 +282,7 @@ pub fn ioctl3(
 /// Closes a device file descriptor.
 ///
 /// This is INvDrvServices command 2.
-pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
+pub fn close(session: BorrowedSessionHandle<'_>, fd: Fd) -> Result<(), CloseError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -308,7 +308,7 @@ pub fn close(session: SessionHandle, fd: Fd) -> Result<(), CloseError> {
 ///
 /// This is INvDrvServices command 3.
 pub fn initialize(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     process_handle: ProcessHandle,
     tmem_handle: TmemHandle,
     tmem_size: u32,
@@ -334,7 +334,7 @@ pub fn initialize(
 ///
 /// This is INvDrvServices command 4.
 pub fn query_event(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: Fd,
     event_id: u32,
 ) -> Result<RawHandle, QueryEventError> {
@@ -379,7 +379,10 @@ pub fn query_event(
 /// Sets the client PID (ARUID).
 ///
 /// This is INvDrvServices command 8.
-pub fn set_client_pid(session: SessionHandle, aruid: Aruid) -> Result<(), SetClientPidError> {
+pub fn set_client_pid(
+    session: BorrowedSessionHandle<'_>,
+    aruid: Aruid,
+) -> Result<(), SetClientPidError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

@@ -29,8 +29,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BufferAttr, DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, BufferAttr, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -58,7 +60,7 @@ pub struct UsbHsService(Session);
 impl UsbHsService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -180,8 +182,10 @@ impl UsbHsService {
         )?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(UsbHsClientIf(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(UsbHsClientIf(Session::new(handle, 0)))
     }
 }
 
@@ -278,8 +282,10 @@ impl UsbHsService {
         let raw_handle = cmif::acquire_usb_if_legacy(&self.0, interface_id, &raw mut *info_out)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok(UsbHsClientIf(Session::from_handle(handle, 0)))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok(UsbHsClientIf(Session::new(handle, 0)))
     }
 }
 
@@ -297,7 +303,7 @@ pub struct UsbHsClientIf(Session);
 impl UsbHsClientIf {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -434,8 +440,10 @@ impl UsbHsClientIf {
         )?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok((UsbHsClientEp(Session::from_handle(handle, 0)), desc))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok((UsbHsClientEp(Session::new(handle, 0)), desc))
     }
 }
 
@@ -512,8 +520,10 @@ impl UsbHsClientIf {
         )?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
-        let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-        Ok((UsbHsClientEp(Session::from_handle(handle, 0)), desc))
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        Ok((UsbHsClientEp(Session::new(handle, 0)), desc))
     }
 }
 
@@ -531,7 +541,7 @@ pub struct UsbHsClientEp(Session);
 impl UsbHsClientEp {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -730,7 +740,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<UsbHsService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(UsbHsService(service))
 }

@@ -16,11 +16,10 @@ use nx_service_applet::{AppletType, aruid::Aruid};
 use nx_service_sm::SmService;
 use nx_sf::{
     error::{ResultCode, ToResultCode},
-    service::Session,
+    service::{BorrowedSessionHandle, Session},
 };
 use nx_svc::{
     error::ToResultCode as _,
-    ipc::Handle as SessionHandle,
     mem::tmem::{Handle as TmemHandle, MemoryPermission},
     process::Handle as ProcessHandle,
     raw::Handle as RawHandle,
@@ -85,13 +84,13 @@ unsafe impl Sync for NvService {}
 impl NvService {
     /// Returns the main service session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.main_session.handle()
     }
 
     /// Returns the clone service session handle.
     #[inline]
-    pub fn clone_session(&self) -> SessionHandle {
+    pub fn clone_session(&self) -> BorrowedSessionHandle<'_> {
         self.clone_session.handle()
     }
 
@@ -100,7 +99,7 @@ impl NvService {
     /// Certain high-frequency ioctls are routed to the clone session to
     /// avoid contention on the main session.
     #[inline]
-    fn session_for_request(&self, request: u32) -> SessionHandle {
+    fn session_for_request(&self, request: u32) -> BorrowedSessionHandle<'_> {
         let masked = request & proto::IOCTL_MASK;
 
         // Check masked ioctls
@@ -300,7 +299,7 @@ pub fn connect(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectError::GetService)?;
 
-    let main_session = Session::from_handle(handle, 0);
+    let main_session = Session::new(handle, 0);
 
     // Create transfer memory
     let transfer_mem = unsafe { tmem::create(config.transfer_mem_size, MemoryPermission::NONE) }
@@ -312,7 +311,7 @@ pub fn connect(
     if let Err(e) = cmif::initialize(
         main_session.handle(),
         ProcessHandle::current_process(),
-        unsafe { TmemHandle::from_raw(transfer_mem.handle().to_raw()) },
+        TmemHandle::from_raw_unchecked(transfer_mem.handle().to_raw()),
         config.transfer_mem_size as u32,
     ) {
         // Clean up on failure: free the tmem we just created; the main session

@@ -38,7 +38,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session};
 use nx_svc::ipc::Handle;
 
 mod cmif;
@@ -85,7 +85,7 @@ pub struct NsGetterService(Session);
 
 impl NsGetterService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -93,80 +93,99 @@ impl NsGetterService {
         &self,
     ) -> Result<NsAppManagerService, GetInterfaceError> {
         let raw = cmif::getter::get_application_manager_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsAppManagerService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsAppManagerService(Session::new(handle, 0)))
     }
 
     pub fn get_content_management_interface(
         &self,
     ) -> Result<NsContentManagementService, GetInterfaceError> {
         let raw = cmif::getter::get_content_management_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsContentManagementService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsContentManagementService(Session::new(handle, 0)))
     }
 
     pub fn get_download_task_interface(&self) -> Result<NsDownloadTaskService, GetInterfaceError> {
         let raw = cmif::getter::get_download_task_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsDownloadTaskService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsDownloadTaskService(Session::new(handle, 0)))
     }
 
     pub fn get_factory_reset_interface(&self) -> Result<NsFactoryResetService, GetInterfaceError> {
         let raw = cmif::getter::get_factory_reset_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsFactoryResetService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsFactoryResetService(Session::new(handle, 0)))
     }
 
     pub fn get_ecommerce_interface(&self) -> Result<NsECommerceService, GetInterfaceError> {
         let raw = cmif::getter::get_ecommerce_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsECommerceService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsECommerceService(Session::new(handle, 0)))
     }
 
     pub fn get_readonly_application_control_data_interface(
         &self,
     ) -> Result<NsReadOnlyControlDataService, GetInterfaceError> {
         let raw = cmif::getter::get_readonly_application_control_data_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsReadOnlyControlDataService(Session::from_handle(
-            handle, 0,
-        )))
+        // SAFETY: The server returned a freshly opened session in this reply.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsReadOnlyControlDataService(Session::new(handle, 0)))
     }
 
     pub fn get_readonly_application_record_interface(
         &self,
     ) -> Result<NsReadOnlyRecordService, GetInterfaceError> {
         let raw = cmif::getter::get_readonly_application_record_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsReadOnlyRecordService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsReadOnlyRecordService(Session::new(handle, 0)))
     }
 
     pub fn get_dynamic_rights_interface(
         &self,
     ) -> Result<NsDynamicRightsService, GetInterfaceError> {
         let raw = cmif::getter::get_dynamic_rights_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsDynamicRightsService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsDynamicRightsService(Session::new(handle, 0)))
     }
 
     pub fn get_application_version_interface(
         &self,
     ) -> Result<NsApplicationVersionService, GetInterfaceError> {
         let raw = cmif::getter::get_application_version_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsApplicationVersionService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsApplicationVersionService(Session::new(handle, 0)))
     }
 
     pub fn get_account_proxy_interface(&self) -> Result<NsAccountProxyService, GetInterfaceError> {
         let raw = cmif::getter::get_account_proxy_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsAccountProxyService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsAccountProxyService(Session::new(handle, 0)))
     }
 
     pub fn get_document_interface(&self) -> Result<NsDocumentService, GetInterfaceError> {
         let raw = cmif::getter::get_document_interface(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsDocumentService(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsDocumentService(Session::new(handle, 0)))
     }
 }
 
@@ -180,7 +199,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<NsGetterService, ConnectCmifError>
     let handle = sm
         .get_service_handle_cmif(NS_AM2_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
-    Ok(NsGetterService(Session::from_handle(handle, 0)))
+    Ok(NsGetterService(Session::new(handle, 0)))
 }
 
 /// Connects to the NS getter interface using a specified service name.
@@ -194,7 +213,7 @@ pub fn connect_cmif_fallback(
     let handle = sm
         .get_service_handle_cmif(service_name)
         .map_err(ConnectCmifError::GetService)?;
-    Ok(NsGetterService(Session::from_handle(handle, 0)))
+    Ok(NsGetterService(Session::new(handle, 0)))
 }
 
 /// Connects to the NS legacy service (`ns:am`, pre-3.0.0).
@@ -205,7 +224,7 @@ pub fn connect_cmif_legacy(sm: &SmService) -> Result<NsAppManagerService, Connec
     let handle = sm
         .get_service_handle_cmif(NS_AM_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
-    Ok(NsAppManagerService(Session::from_handle(handle, 0)))
+    Ok(NsAppManagerService(Session::new(handle, 0)))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -230,7 +249,7 @@ pub struct NsAppManagerService(Session);
 
 impl NsAppManagerService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1122,8 +1141,10 @@ impl NsAppManagerService {
 impl NsAppManagerService {
     pub fn get_request_server_stopper(&self) -> Result<NsRequestServerStopper, GetSubObjectError> {
         let raw = cmif::app_manager::get_request_server_stopper(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsRequestServerStopper(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsRequestServerStopper(Session::new(handle, 0)))
     }
 
     pub fn delete_user_save_data_all(
@@ -1131,8 +1152,10 @@ impl NsAppManagerService {
         uid: AccountUid,
     ) -> Result<NsProgressMonitor, GetSubObjectError> {
         let raw = cmif::app_manager::delete_user_save_data_all(&self.0, uid)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsProgressMonitor(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsProgressMonitor(Session::new(handle, 0)))
     }
 }
 
@@ -1146,7 +1169,7 @@ pub struct NsContentManagementService(Session);
 
 impl NsContentManagementService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1211,7 +1234,7 @@ pub struct NsDownloadTaskService(Session);
 
 impl NsDownloadTaskService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1267,7 +1290,7 @@ pub struct NsFactoryResetService(Session);
 
 impl NsFactoryResetService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1305,7 +1328,7 @@ pub struct NsECommerceService(Session);
 
 impl NsECommerceService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1331,7 +1354,7 @@ pub struct NsReadOnlyControlDataService(Session);
 
 impl NsReadOnlyControlDataService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1404,7 +1427,7 @@ pub struct NsReadOnlyRecordService(Session);
 
 impl NsReadOnlyRecordService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1415,7 +1438,7 @@ pub struct NsDynamicRightsService(Session);
 
 impl NsDynamicRightsService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1426,7 +1449,7 @@ pub struct NsApplicationVersionService(Session);
 
 impl NsApplicationVersionService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1437,7 +1460,7 @@ pub struct NsAccountProxyService(Session);
 
 impl NsAccountProxyService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1448,7 +1471,7 @@ pub struct NsDocumentService(Session);
 
 impl NsDocumentService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1463,7 +1486,7 @@ pub struct NsRequestServerStopper(Session);
 
 impl NsRequestServerStopper {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -1474,7 +1497,7 @@ pub struct NsProgressMonitor(Session);
 
 impl NsProgressMonitor {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1504,13 +1527,21 @@ impl NsProgressMonitor {
 pub struct NsProgressAsyncResult(Session);
 
 impl NsProgressAsyncResult {
-    pub fn from_session_handle(raw: u32) -> Self {
-        let handle = unsafe { Handle::from_raw(raw) };
-        Self(Session::from_handle(handle, 0))
+    /// Adopts a pre-obtained IProgressAsyncResult session handle.
+    ///
+    /// The caller must ensure `raw` names a live IProgressAsyncResult session this process
+    /// owns and that nothing else will close, since the returned value closes it on drop.
+    /// A second owner closes a handle number the kernel may have reused, which tears down an
+    /// unrelated session rather than faulting.
+    pub fn from_raw_unchecked(raw: u32) -> Self {
+        // SAFETY: Delegated to this constructor's precondition, which is where the caller
+        // vouches for a handle ns handed it back on an async command.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Self(Session::new(handle, 0))
     }
 
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1550,7 +1581,7 @@ pub struct NsvmService(Session);
 
 impl NsvmService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1569,7 +1600,7 @@ pub fn connect_nsvm_cmif(sm: &SmService) -> Result<NsvmService, ConnectCmifError
     let handle = sm
         .get_service_handle_cmif(NSVM_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
-    Ok(NsvmService(Session::from_handle(handle, 0)))
+    Ok(NsvmService(Session::new(handle, 0)))
 }
 
 // ===========================================================================
@@ -1582,7 +1613,7 @@ pub struct NsdevService(Session);
 
 impl NsdevService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1707,7 +1738,7 @@ pub fn connect_nsdev_cmif(sm: &SmService) -> Result<NsdevService, ConnectCmifErr
     let handle = sm
         .get_service_handle_cmif(NSDEV_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
-    Ok(NsdevService(Session::from_handle(handle, 0)))
+    Ok(NsdevService(Session::new(handle, 0)))
 }
 
 // ===========================================================================
@@ -1720,7 +1751,7 @@ pub struct NssuService(Session);
 
 impl NssuService {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -1733,8 +1764,10 @@ impl NssuService {
         &self,
     ) -> Result<NsSystemUpdateControl, OpenSystemUpdateControlError> {
         let raw = cmif::nssu::open_system_update_control(&self.0)?;
-        let handle = unsafe { Handle::from_raw(raw) };
-        Ok(NsSystemUpdateControl(Session::from_handle(handle, 0)))
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(Handle::from_raw_unchecked(raw));
+        Ok(NsSystemUpdateControl(Session::new(handle, 0)))
     }
 
     #[inline]
@@ -1809,7 +1842,7 @@ pub fn connect_nssu_cmif(sm: &SmService) -> Result<NssuService, ConnectCmifError
     let handle = sm
         .get_service_handle_cmif(NSSU_SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
-    Ok(NssuService(Session::from_handle(handle, 0)))
+    Ok(NssuService(Session::new(handle, 0)))
 }
 
 // ===========================================================================
@@ -1822,7 +1855,7 @@ pub struct NsSystemUpdateControl(Session);
 
 impl NsSystemUpdateControl {
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 

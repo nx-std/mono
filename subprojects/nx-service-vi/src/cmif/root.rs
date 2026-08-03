@@ -7,8 +7,8 @@ use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
     hipc::InputBuffer,
-    ipc::Handle as SessionHandle,
-    service::Session,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
 };
 
 use crate::proto::root_cmds;
@@ -18,7 +18,7 @@ use crate::proto::root_cmds;
 /// The command ID equals the service type value (0=Application, 1=System, 2=Manager).
 /// The input parameter is 1 for System/Manager (uses proxy name exchange), 0 for Application.
 pub fn get_display_service(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     service_type: crate::types::ViServiceType,
 ) -> Result<Session, GetDisplayServiceError> {
     // Command ID equals service type value
@@ -50,17 +50,18 @@ pub fn get_display_service(
     };
 
     // SAFETY: handle is a valid session handle from the kernel
-    let session_handle = unsafe { SessionHandle::from_raw(handle) };
+    let session_handle =
+        OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(handle));
 
     // IApplicationDisplayService is returned via move-handle; libnx does
     // not query its pointer-buffer-size, so skip the kernel round-trip.
-    Ok(Session::from_handle(session_handle, 0))
+    Ok(Session::new(session_handle, 0))
 }
 
 /// Prepares the fatal display.
 ///
 /// Available on 16.0.0+ with Manager service type.
-pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
+pub fn prepare_fatal(session: BorrowedSessionHandle<'_>) -> Result<(), PrepareFatalError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -77,7 +78,7 @@ pub fn prepare_fatal(session: SessionHandle) -> Result<(), PrepareFatalError> {
 /// Shows the fatal display.
 ///
 /// Available on 16.0.0+ with Manager service type.
-pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
+pub fn show_fatal(session: BorrowedSessionHandle<'_>) -> Result<(), ShowFatalError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -95,7 +96,7 @@ pub fn show_fatal(session: SessionHandle) -> Result<(), ShowFatalError> {
 ///
 /// Available on 16.0.0+ with Manager service type.
 pub fn draw_fatal_rectangle(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     x: i32,
     y: i32,
     end_x: i32,
@@ -144,7 +145,7 @@ pub fn draw_fatal_rectangle(
 /// Available on 16.0.0+ with Manager service type.
 #[allow(clippy::too_many_arguments)]
 pub fn draw_fatal_text32(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     x: i32,
     y: i32,
     utf32_codepoints: &[u32],

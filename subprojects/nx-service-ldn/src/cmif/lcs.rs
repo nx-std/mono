@@ -8,8 +8,10 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject, OutHandleAttr};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BufferAttr, DispatchError, DomainObject, OutHandleAttr, OwnedSessionHandle},
+};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_no_io, dispatch_out},
@@ -277,7 +279,7 @@ pub(crate) fn get_network_config(
 /// of the autoclear event; caller owns the handle and must close it.
 pub(crate) fn get_state_change_event(
     object: &DomainObject<'_>,
-) -> Result<SessionHandle, GetStateChangeEventError> {
+) -> Result<OwnedSessionHandle, GetStateChangeEventError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -291,7 +293,9 @@ pub(crate) fn get_state_change_event(
         return Err(GetStateChangeEventError::MissingHandle);
     }
     // SAFETY: the kernel returned a valid handle in the copy-handle slot.
-    Ok(unsafe { SessionHandle::from_raw(result.copy_handles[0]) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(result.copy_handles[0]),
+    ))
 }
 
 #[derive(Debug, thiserror::Error)]

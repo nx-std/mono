@@ -22,9 +22,8 @@ use nx_service_applet::aruid::Aruid;
 use nx_service_sm::SmService;
 use nx_sf::{
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    service::Session,
+    service::{BorrowedSessionHandle, Session},
 };
-use nx_svc::ipc::Handle as SessionHandle;
 use nx_sys_mem::{
     error::ToResultCode as _,
     shmem::{self as sys_shmem, Mapped, Permissions},
@@ -69,13 +68,13 @@ unsafe impl Sync for HidService {}
 impl HidService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.service.handle()
     }
 
     /// Returns the IAppletResource session handle.
     #[inline]
-    pub fn applet_resource_session(&self) -> SessionHandle {
+    pub fn applet_resource_session(&self) -> BorrowedSessionHandle<'_> {
         self.applet_resource.handle()
     }
 
@@ -150,13 +149,13 @@ pub fn connect(sm: &SmService, aruid: Option<Aruid>) -> Result<HidService, Conne
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectError::GetService)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     // Create IAppletResource sub-interface
     let applet_resource_handle = cmif::create_applet_resource(service.handle(), aruid)
         .map_err(ConnectError::CreateAppletResource)?;
 
-    let applet_resource = Session::from_handle(applet_resource_handle, 0);
+    let applet_resource = Session::new(applet_resource_handle, 0);
 
     // Get shared memory handle from IAppletResource
     let shmem_handle = cmif::get_shared_memory_handle(applet_resource.handle())

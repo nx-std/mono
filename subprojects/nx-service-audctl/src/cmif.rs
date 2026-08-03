@@ -1,13 +1,16 @@
 //! CMIF protocol operations for the audio control service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::{
     proto,
     types::{SetDefaultTargetIn, SetTargetMuteIn, SetTargetVolumeIn, TargetModeIn},
 };
 
-fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoIoError> {
+fn dispatch_no_io(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<(), DispatchNoIoError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -31,7 +34,7 @@ pub enum DispatchNoIoError {
 }
 
 fn dispatch_in_u32(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: u32,
 ) -> Result<(), DispatchInU32Error> {
@@ -60,7 +63,7 @@ pub enum DispatchInU32Error {
 }
 
 fn dispatch_in_bool(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: bool,
 ) -> Result<(), DispatchInBoolError> {
@@ -90,7 +93,7 @@ pub enum DispatchInBoolError {
 }
 
 fn dispatch_in_f32(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: f32,
 ) -> Result<(), DispatchInF32Error> {
@@ -119,7 +122,7 @@ pub enum DispatchInF32Error {
 }
 
 fn dispatch_in_struct<T>(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: &T,
 ) -> Result<(), DispatchInStructError>
@@ -150,7 +153,10 @@ pub enum DispatchInStructError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_i32(session: SessionHandle, cmd_id: u32) -> Result<i32, DispatchOutI32Error> {
+fn dispatch_out_i32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<i32, DispatchOutI32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -175,7 +181,10 @@ pub enum DispatchOutI32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchOutU32Error> {
+fn dispatch_out_u32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchOutU32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -200,7 +209,10 @@ pub enum DispatchOutU32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_f32(session: SessionHandle, cmd_id: u32) -> Result<f32, DispatchOutF32Error> {
+fn dispatch_out_f32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<f32, DispatchOutF32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -226,7 +238,7 @@ pub enum DispatchOutF32Error {
 }
 
 fn dispatch_in_u32_out_i32(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     input: u32,
 ) -> Result<i32, DispatchInU32OutI32Error> {
@@ -258,7 +270,7 @@ pub enum DispatchInU32OutI32Error {
 }
 
 fn dispatch_in_u32_out_u32(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     input: u32,
 ) -> Result<u32, DispatchInU32OutU32Error> {
@@ -290,7 +302,7 @@ pub enum DispatchInU32OutU32Error {
 }
 
 fn dispatch_in_u32_out_bool(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     input: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
@@ -321,7 +333,10 @@ pub enum DispatchInU32OutBoolError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_event(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchEventError> {
+fn dispatch_event(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchEventError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -351,14 +366,14 @@ pub enum DispatchEventError {
 }
 
 pub fn get_target_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
 ) -> Result<i32, DispatchInU32OutI32Error> {
     dispatch_in_u32_out_i32(session, proto::GET_TARGET_VOLUME, target)
 }
 
 pub fn set_target_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
     volume: i32,
 ) -> Result<(), DispatchInStructError> {
@@ -369,23 +384,27 @@ pub fn set_target_volume(
     )
 }
 
-pub fn get_target_volume_min(session: SessionHandle) -> Result<i32, DispatchOutI32Error> {
+pub fn get_target_volume_min(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<i32, DispatchOutI32Error> {
     dispatch_out_i32(session, proto::GET_TARGET_VOLUME_MIN)
 }
 
-pub fn get_target_volume_max(session: SessionHandle) -> Result<i32, DispatchOutI32Error> {
+pub fn get_target_volume_max(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<i32, DispatchOutI32Error> {
     dispatch_out_i32(session, proto::GET_TARGET_VOLUME_MAX)
 }
 
 pub fn is_target_mute(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::IS_TARGET_MUTE, target)
 }
 
 pub fn set_target_mute(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
     mute: bool,
 ) -> Result<(), DispatchInStructError> {
@@ -400,14 +419,14 @@ pub fn set_target_mute(
 }
 
 pub fn is_target_connected(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::IS_TARGET_CONNECTED, target)
 }
 
 pub fn set_default_target(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
     fade_in_ns: u64,
     fade_out_ns: u64,
@@ -424,19 +443,19 @@ pub fn set_default_target(
     )
 }
 
-pub fn get_default_target(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_default_target(session: BorrowedSessionHandle<'_>) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_DEFAULT_TARGET)
 }
 
 pub fn get_audio_output_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
 ) -> Result<u32, DispatchInU32OutU32Error> {
     dispatch_in_u32_out_u32(session, proto::GET_AUDIO_OUTPUT_MODE, target)
 }
 
 pub fn set_audio_output_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
     mode: u32,
 ) -> Result<(), DispatchInStructError> {
@@ -448,25 +467,27 @@ pub fn set_audio_output_mode(
 }
 
 pub fn set_force_mute_policy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     policy: u32,
 ) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::SET_FORCE_MUTE_POLICY, policy)
 }
 
-pub fn get_force_mute_policy(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_force_mute_policy(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_FORCE_MUTE_POLICY)
 }
 
 pub fn get_output_mode_setting(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
 ) -> Result<u32, DispatchInU32OutU32Error> {
     dispatch_in_u32_out_u32(session, proto::GET_OUTPUT_MODE_SETTING, target)
 }
 
 pub fn set_output_mode_setting(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     target: u32,
     mode: u32,
 ) -> Result<(), DispatchInStructError> {
@@ -477,30 +498,35 @@ pub fn set_output_mode_setting(
     )
 }
 
-pub fn set_output_target(session: SessionHandle, target: u32) -> Result<(), DispatchInU32Error> {
+pub fn set_output_target(
+    session: BorrowedSessionHandle<'_>,
+    target: u32,
+) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::SET_OUTPUT_TARGET, target)
 }
 
 pub fn set_input_target_force_enabled(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     enable: bool,
 ) -> Result<(), DispatchInBoolError> {
     dispatch_in_bool(session, proto::SET_INPUT_TARGET_FORCE_ENABLED, enable)
 }
 
 pub fn set_headphone_output_level_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     mode: u32,
 ) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::SET_HEADPHONE_OUTPUT_LEVEL_MODE, mode)
 }
 
-pub fn get_headphone_output_level_mode(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_headphone_output_level_mode(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_HEADPHONE_OUTPUT_LEVEL_MODE)
 }
 
 pub fn acquire_audio_volume_update_event_for_play_report(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, DispatchEventError> {
     dispatch_event(
         session,
@@ -509,7 +535,7 @@ pub fn acquire_audio_volume_update_event_for_play_report(
 }
 
 pub fn acquire_audio_output_device_update_event_for_play_report(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, DispatchEventError> {
     dispatch_event(
         session,
@@ -518,13 +544,13 @@ pub fn acquire_audio_output_device_update_event_for_play_report(
 }
 
 pub fn get_audio_output_target_for_play_report(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_AUDIO_OUTPUT_TARGET_FOR_PLAY_REPORT)
 }
 
 pub fn notify_headphone_volume_warning_displayed_event(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(
         session,
@@ -533,16 +559,20 @@ pub fn notify_headphone_volume_warning_displayed_event(
 }
 
 pub fn set_system_output_master_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     volume: f32,
 ) -> Result<(), DispatchInF32Error> {
     dispatch_in_f32(session, proto::SET_SYSTEM_OUTPUT_MASTER_VOLUME, volume)
 }
 
-pub fn get_system_output_master_volume(session: SessionHandle) -> Result<f32, DispatchOutF32Error> {
+pub fn get_system_output_master_volume(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<f32, DispatchOutF32Error> {
     dispatch_out_f32(session, proto::GET_SYSTEM_OUTPUT_MASTER_VOLUME)
 }
 
-pub fn get_active_output_target(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_active_output_target(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_ACTIVE_OUTPUT_TARGET)
 }

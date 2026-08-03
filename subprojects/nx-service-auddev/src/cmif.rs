@@ -3,7 +3,8 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
 };
 
 use crate::{proto, types::AudioDeviceName};
@@ -12,9 +13,9 @@ use crate::{proto, types::AudioDeviceName};
 ///
 /// Returns the move handle for the new IAudioDevice session.
 pub fn get_audio_device_service(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     aruid: u64,
-) -> Result<SessionHandle, GetAudioDeviceServiceError> {
+) -> Result<OwnedSessionHandle, GetAudioDeviceServiceError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -33,7 +34,9 @@ pub fn get_audio_device_service(
     };
 
     // SAFETY: handle is from a valid IPC response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Error returned by [`get_audio_device_service`].
@@ -51,7 +54,7 @@ pub enum GetAudioDeviceServiceError {
 ///
 /// Returns the number of names written to `names`.
 pub fn list_audio_device_name(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     names: &mut [AudioDeviceName],
 ) -> Result<i32, ListAudioDeviceNameError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -84,7 +87,7 @@ pub fn list_audio_device_name(
 ///
 /// Returns the number of names written to `names`.
 pub fn list_audio_device_name_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     names: &mut [AudioDeviceName],
 ) -> Result<i32, ListAudioDeviceNameError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -124,7 +127,7 @@ pub enum ListAudioDeviceNameError {
 
 /// Sets the output volume for a named audio device (3.0.0+, auto-select buffers).
 pub fn set_audio_device_output_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_name: &AudioDeviceName,
     volume: f32,
 ) -> Result<(), SetAudioDeviceOutputVolumeError> {
@@ -146,7 +149,7 @@ pub fn set_audio_device_output_volume(
 
 /// Sets the output volume for a named audio device (pre-3.0.0, mapped buffers).
 pub fn set_audio_device_output_volume_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_name: &AudioDeviceName,
     volume: f32,
 ) -> Result<(), SetAudioDeviceOutputVolumeError> {
@@ -177,7 +180,7 @@ pub enum SetAudioDeviceOutputVolumeError {
 
 /// Gets the output volume for a named audio device (3.0.0+, auto-select buffers).
 pub fn get_audio_device_output_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_name: &AudioDeviceName,
 ) -> Result<f32, GetAudioDeviceOutputVolumeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -200,7 +203,7 @@ pub fn get_audio_device_output_volume(
 
 /// Gets the output volume for a named audio device (pre-3.0.0, mapped buffers).
 pub fn get_audio_device_output_volume_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_name: &AudioDeviceName,
 ) -> Result<f32, GetAudioDeviceOutputVolumeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -232,7 +235,7 @@ pub enum GetAudioDeviceOutputVolumeError {
 
 /// Gets the active audio device name (3.0.0+, auto-select buffers).
 pub fn get_active_audio_device_name(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_name: &mut AudioDeviceName,
 ) -> Result<(), GetActiveAudioDeviceNameError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -252,7 +255,7 @@ pub fn get_active_audio_device_name(
 
 /// Gets the active audio device name (pre-3.0.0, mapped buffers).
 pub fn get_active_audio_device_name_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_name: &mut AudioDeviceName,
 ) -> Result<(), GetActiveAudioDeviceNameError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

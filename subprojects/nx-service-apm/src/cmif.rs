@@ -6,7 +6,8 @@
 use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    ipc::Handle as SessionHandle,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
 };
 
 use crate::proto::{
@@ -17,7 +18,9 @@ use crate::proto::{
 /// Opens an APM session for performance configuration.
 ///
 /// This is IManager command 0.
-pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSessionError> {
+pub fn open_session(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, OpenSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -33,14 +36,16 @@ pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSession
     };
 
     // SAFETY: the kernel returned a valid session handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Gets the current performance mode.
 ///
 /// This is IManager command 1.
 pub fn get_performance_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<PerformanceMode, GetPerformanceModeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -61,7 +66,7 @@ pub fn get_performance_mode(
 ///
 /// This is ISession command 0.
 pub fn set_performance_configuration(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     mode: PerformanceMode,
     config: u32,
 ) -> Result<(), SetPerformanceConfigurationError> {
@@ -93,7 +98,7 @@ pub fn set_performance_configuration(
 ///
 /// This is ISession command 1.
 pub fn get_performance_configuration(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     mode: PerformanceMode,
 ) -> Result<u32, GetPerformanceConfigurationError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

@@ -22,7 +22,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -43,7 +43,7 @@ pub struct I2cService(Session);
 impl I2cService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -70,7 +70,7 @@ pub struct I2cSession(Session);
 impl I2cSession {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -119,7 +119,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<I2cService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(I2cService(service))
 }

@@ -336,7 +336,7 @@ pub fn connect_cmif(
         .map_err(ConnectCmifError::GetService)?;
 
     // 2. Build an owned session (pointer-buffer-size query is internal).
-    let session = Session::new(handle);
+    let session = Session::open(handle);
 
     // 3. Convert to a domain. On failure, drop the session.
     let creator = session

@@ -36,8 +36,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -59,7 +58,7 @@ pub struct AuddevService(Session);
 impl AuddevService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -162,7 +161,7 @@ pub fn connect_cmif(sm: &SmService, aruid: u64) -> Result<AuddevService, Connect
 
     // Wrap the manager handle so it auto-closes on `Drop` regardless of the
     // success/error path — only the IAudioDevice sub-session is kept.
-    let mgr = Session::from_handle(mgr_handle, 0);
+    let mgr = Session::new(mgr_handle, 0);
 
     let device_handle = cmif::get_audio_device_service(mgr.handle(), aruid)
         .map_err(ConnectCmifError::OpenDevice)?;
@@ -170,7 +169,7 @@ pub fn connect_cmif(sm: &SmService, aruid: u64) -> Result<AuddevService, Connect
     // Drop the manager session — only the IAudioDevice handle is needed.
     drop(mgr);
 
-    Ok(AuddevService(Session::from_handle(device_handle, 0)))
+    Ok(AuddevService(Session::new(device_handle, 0)))
 }
 
 /// Error returned by [`connect_cmif`].

@@ -26,8 +26,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod dispatch;
@@ -54,7 +53,7 @@ pub struct HiddbgService(Session);
 impl HiddbgService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -485,7 +484,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<HiddbgService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    let session = Session::from_handle(handle, 0);
+    let session = Session::new(handle, 0);
 
     Ok(HiddbgService(session))
 }

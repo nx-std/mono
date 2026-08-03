@@ -29,8 +29,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -63,7 +65,7 @@ pub struct AudrenService(Session);
 impl AudrenService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -99,8 +101,10 @@ impl AudrenService {
 
         // SAFETY: the kernel returned a valid move handle for the
         // IAudioRenderer session; ownership transfers to the new `Session`.
-        let session = unsafe { SessionHandle::from_raw(raw_handle) };
-        let service = Session::from_handle(session, 0);
+        let session = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        let service = Session::new(session, 0);
 
         Ok(AudrenRenderer(service))
     }
@@ -129,7 +133,7 @@ pub struct AudrenRenderer(Session);
 impl AudrenRenderer {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -210,7 +214,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<AudrenService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AudrenService(service))
 }

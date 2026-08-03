@@ -180,7 +180,7 @@ pub fn connect_shell_cmif(sm: &SmService) -> Result<PmShellService, ConnectShell
         .get_service_handle_cmif(proto::SERVICE_NAME)
         .map_err(ConnectShellCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PmShellService(service))
 }

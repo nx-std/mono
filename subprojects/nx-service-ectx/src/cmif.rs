@@ -3,7 +3,7 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::proto;
@@ -21,7 +21,7 @@ pub struct PullContextOutput {
 
 /// Pulls error context associated with a descriptor and result code.
 pub fn pull_context(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     dst: &mut [u8],
     descriptor: u32,
     result: u32,
