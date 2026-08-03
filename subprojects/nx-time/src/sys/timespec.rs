@@ -33,38 +33,22 @@ pub(crate) struct Timespec {
 }
 
 impl Timespec {
-    /// Create a new `Timespec`.
+    /// Create a new `Timespec` without checking the nanoseconds field.
     ///
-    /// # Panics
-    ///
-    /// This function panics if the `tv_nsec` value is not within the valid range,
-    /// i.e. if it is out of the `[0, 999_999_999]` range.
-    #[allow(dead_code)]
-    pub fn new(tv_sec: i64, tv_nsec: i64) -> Timespec {
-        // Check if nanoseconds are within valid range
-        let tv_nsec = match tv_nsec.try_into() {
-            Ok(val) => val,
-            Err(_) => panic!("invalid timestamp"),
-        };
-        Self { tv_sec, tv_nsec }
-    }
-
-    /// Create a new `Timespec`.
-    ///
-    /// # Safety
-    ///
-    /// This function is unsafe because it does not check if the nanoseconds
-    /// value is within the valid range.
-    pub(crate) const unsafe fn new_unchecked(tv_sec: i64, tv_nsec: i64) -> Timespec {
+    /// The caller must ensure `tv_nsec` is in `0..=999_999_999`; see
+    /// [`Nanoseconds::new_unchecked`] for what an out-of-range value costs.
+    pub(crate) const fn new_unchecked(tv_sec: i64, tv_nsec: i64) -> Timespec {
         Timespec {
             tv_sec,
-            tv_nsec: unsafe { Nanoseconds::new_unchecked(tv_nsec as u32) },
+            // SAFETY: Delegated to this function's own precondition.
+            tv_nsec: Nanoseconds::new_unchecked(tv_nsec as u32),
         }
     }
 
     /// Create a new `Timespec` with 0 seconds and 0 nanoseconds.
     pub const fn zero() -> Timespec {
-        unsafe { Self::new_unchecked(0, 0) }
+        // SAFETY: 0 is within the valid nanoseconds range.
+        Self::new_unchecked(0, 0)
     }
 
     /// Get the current time for the specified clock.
@@ -138,7 +122,8 @@ impl Timespec {
             nsec -= NSEC_PER_SEC as u32;
             secs = secs.checked_add(1)?;
         }
-        Some(unsafe { Timespec::new_unchecked(secs, nsec.into()) })
+        // SAFETY: The branch above normalises `nsec` into `0..NSEC_PER_SEC`.
+        Some(Timespec::new_unchecked(secs, nsec.into()))
     }
 
     pub fn checked_sub_duration(&self, other: &Duration) -> Option<Timespec> {
@@ -150,7 +135,8 @@ impl Timespec {
             nsec += NSEC_PER_SEC as i32;
             secs = secs.checked_sub(1)?;
         }
-        Some(unsafe { Timespec::new_unchecked(secs, nsec.into()) })
+        // SAFETY: The branch above normalises `nsec` into `0..NSEC_PER_SEC`.
+        Some(Timespec::new_unchecked(secs, nsec.into()))
     }
 }
 
@@ -166,6 +152,7 @@ impl Timespec {
 ///
 /// The monotonic clock ([`ClockId::Monotonic`]) provides a steady time source that is
 /// guaranteed to be strictly increasing and unaffected by system time changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ClockId {
     /// System-wide realtime clock.
@@ -174,3 +161,26 @@ pub enum ClockId {
     /// starting point.
     Monotonic = 1,
 }
+
+impl TryFrom<i32> for ClockId {
+    type Error = UnknownClockIdError;
+
+    /// Decodes the `clockid_t` a C caller passed across the FFI boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnknownClockIdError`] if the value names no clock this platform
+    /// implements.
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Realtime),
+            1 => Ok(Self::Monotonic),
+            unknown => Err(UnknownClockIdError(unknown)),
+        }
+    }
+}
+
+/// An error indicating that a `clockid_t` names no clock this platform implements.
+#[derive(Debug, thiserror::Error)]
+#[error("Unknown clock id {0}")]
+pub struct UnknownClockIdError(pub i32);

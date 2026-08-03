@@ -6,6 +6,8 @@
 
 mod libsysbase;
 
+use nx_cpu::counter::Ticks;
+
 use crate::sys::clock;
 
 //<editor-fold desc="switch/arm/counter.h">
@@ -22,7 +24,7 @@ use crate::sys::clock;
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time__arm_get_system_tick() -> u64 {
-    clock::aarch64::get_system_tick()
+    clock::aarch64::get_system_tick().to_raw()
 }
 
 /// Gets the system counter-timer frequency.
@@ -37,7 +39,7 @@ pub unsafe extern "C" fn __nx_time__arm_get_system_tick() -> u64 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time__arm_get_system_tick_freq() -> u64 {
-    clock::aarch64::get_system_tick_freq()
+    clock::aarch64::get_system_tick_freq().to_raw()
 }
 
 /// Converts time from nanoseconds to CPU ticks.
@@ -50,7 +52,7 @@ pub unsafe extern "C" fn __nx_time__arm_get_system_tick_freq() -> u64 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time__arm_ns_to_ticks(ns: u64) -> u64 {
-    clock::aarch64::ns_to_cpu_ticks(ns)
+    clock::aarch64::ns_to_cpu_ticks(ns).to_raw()
 }
 
 /// Converts from CPU ticks to nanoseconds.
@@ -62,7 +64,9 @@ pub unsafe extern "C" fn __nx_time__arm_ns_to_ticks(ns: u64) -> u64 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_time__arm_ticks_to_ns(tick: u64) -> u64 {
-    clock::aarch64::cpu_ticks_to_ns(tick)
+    // SAFETY: The C caller's contract for `armTicksToNs` is that this argument is a
+    // counter-timer reading; nothing at this boundary can check that.
+    clock::aarch64::cpu_ticks_to_ns(Ticks::new_unchecked(tick))
 }
 
 //</editor-fold>
