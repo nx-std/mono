@@ -19,3 +19,4 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rand = { version = "0.1.0", path = "../nx-rand" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
+thiserror = { version = "2.0", default-features = false }

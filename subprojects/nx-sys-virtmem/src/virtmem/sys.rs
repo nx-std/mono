@@ -116,7 +116,9 @@ impl VirtmemManager {
         }
 
         // Parse the raw FFI arguments into a page-aligned value handle.
-        let range = Reservation::new(mem as usize, size)?;
+        // The reason the range was rejected has no channel back to the C caller, which sees
+        // only a null return, so it is dropped here rather than at the boundary.
+        let range = Reservation::create(mem as usize, size).ok()?;
 
         let state = self.0.get_or_insert_with(init_state);
 
@@ -288,9 +290,10 @@ impl VirtmemState {
 
         // The expanded range is non-empty and page-aligned, so construction
         // succeeds; a degenerate range would simply reserve nothing.
-        match Reservation::new(query_start, query_end - query_start) {
-            Some(range) => self.reservations.is_reserved(range),
-            None => false,
+        match Reservation::create(query_start, query_end - query_start) {
+            Ok(range) => self.reservations.is_reserved(range),
+            // A degenerate expanded range covers no page, so nothing can be reserved in it.
+            Err(_) => false,
         }
     }
 }

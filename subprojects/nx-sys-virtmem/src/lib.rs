@@ -112,5 +112,4 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 #[cfg(test)]
 extern crate alloc;
 
-pub mod alignment;
 pub mod virtmem;
