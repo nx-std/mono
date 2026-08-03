@@ -428,9 +428,9 @@ pub unsafe extern "C" fn __nx_sys_thread__thread_tls_alloc(destructor: Option<De
 pub extern "C" fn __nx_sys_thread__thread_tls_get(slot_id: i32) -> *mut c_void {
     // Validate the raw slot id once at the edge; an out-of-range id reads back
     // as a null value, matching libnx `threadTlsGet`.
-    match tsd::TsdKey::from_raw(slot_id as u32) {
-        Some(key) => tsd::get(key),
-        None => null_mut(),
+    match tsd::TsdKey::try_from(slot_id as u32) {
+        Ok(key) => tsd::get(key),
+        Err(_) => null_mut(),
     }
 }
 
@@ -439,7 +439,7 @@ pub extern "C" fn __nx_sys_thread__thread_tls_get(slot_id: i32) -> *mut c_void {
 pub extern "C" fn __nx_sys_thread__thread_tls_set(slot_id: i32, value: *mut c_void) {
     // `threadTlsSet` returns `void`; an out-of-range slot id is silently
     // ignored, matching libnx.
-    if let Some(key) = tsd::TsdKey::from_raw(slot_id as u32) {
+    if let Ok(key) = tsd::TsdKey::try_from(slot_id as u32) {
         tsd::set(key, value);
     }
 }
@@ -449,7 +449,7 @@ pub extern "C" fn __nx_sys_thread__thread_tls_set(slot_id: i32, value: *mut c_vo
 pub extern "C" fn __nx_sys_thread__thread_tls_free(slot_id: i32) {
     // `threadTlsFree` returns `void`; an invalid or unallocated slot id is
     // silently ignored, matching libnx.
-    if let Some(key) = tsd::TsdKey::from_raw(slot_id as u32) {
+    if let Ok(key) = tsd::TsdKey::try_from(slot_id as u32) {
         let _ = tsd::free(key);
     }
 }

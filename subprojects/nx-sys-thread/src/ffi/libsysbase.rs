@@ -342,12 +342,13 @@ pub unsafe extern "C" fn __nx_sys_thread__syscall_tls_create(
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_sys_thread__syscall_tls_set(key: u32, value: *const c_void) -> c_int {
     // Validate the raw `u32` key once at the edge into a `TsdKey`.
-    match tsd::TsdKey::from_raw(key) {
-        Some(tsd_key) => {
+    match tsd::TsdKey::try_from(key) {
+        Ok(tsd_key) => {
             tsd::set(tsd_key, value.cast_mut());
             0
         }
-        None => EINVAL,
+        // `errno` is the only channel back to the C caller, so the rejected id is dropped.
+        Err(_) => EINVAL,
     }
 }
 
@@ -355,21 +356,21 @@ pub extern "C" fn __nx_sys_thread__syscall_tls_set(key: u32, value: *const c_voi
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_sys_thread__syscall_tls_get(key: u32) -> *mut c_void {
     // An out-of-range key resolves to a null value, matching newlib.
-    match tsd::TsdKey::from_raw(key) {
-        Some(tsd_key) => tsd::get(tsd_key),
-        None => null_mut(),
+    match tsd::TsdKey::try_from(key) {
+        Ok(tsd_key) => tsd::get(tsd_key),
+        Err(_) => null_mut(),
     }
 }
 
 /// Deletes a pthread TLS key (`__syscall_tls_delete`).
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_sys_thread__syscall_tls_delete(key: u32) -> c_int {
-    match tsd::TsdKey::from_raw(key) {
-        Some(tsd_key) => match tsd::free(tsd_key) {
+    match tsd::TsdKey::try_from(key) {
+        Ok(tsd_key) => match tsd::free(tsd_key) {
             Ok(()) => 0,
             Err(tsd::TsdFreeError::UnallocatedSlot) => EINVAL,
         },
-        None => EINVAL,
+        Err(_) => EINVAL,
     }
 }
 

@@ -70,24 +70,13 @@ pub type Destructor = unsafe extern "C" fn(*mut c_void);
 ///
 /// Wraps the slot index of a key, guaranteed to be below [`NUM_TSD_KEYS`]. The
 /// C ABI adapters carry a raw `s32`/`u32` slot id;
-/// [`from_raw`](TsdKey::from_raw) is the single validation point that turns one
-/// into a `TsdKey` at the FFI edge, so the core ([`get`], [`set`], [`free`])
-/// never re-checks the range — the type itself carries that invariant.
+/// [`TryFrom<u32>`] is the single validation point that turns one into a
+/// `TsdKey` at the FFI edge, so the core ([`get`], [`set`], [`free`]) never
+/// re-checks the range — the type itself carries that invariant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TsdKey(u32);
 
 impl TsdKey {
-    /// Validates a raw slot id from a C caller, returning the key when it
-    /// names an in-range slot.
-    ///
-    /// The libnx ABI passes the id as a signed `s32`; a negative value
-    /// reinterpreted as `u32` lands far above [`NUM_TSD_KEYS`] and is rejected
-    /// here, so this single `u32` entry point validates both the libnx
-    /// (`s32`) and newlib (`u32`) raw forms.
-    pub fn from_raw(raw: u32) -> Option<Self> {
-        ((raw as usize) < NUM_TSD_KEYS).then_some(Self(raw))
-    }
-
     /// Returns the raw slot id for the C ABI.
     pub const fn to_raw(self) -> u32 {
         self.0
@@ -103,6 +92,31 @@ impl TsdKey {
         self.0 as usize
     }
 }
+
+impl TryFrom<u32> for TsdKey {
+    type Error = UnknownTsdKeyError;
+
+    /// Validates a raw slot id from a C caller.
+    ///
+    /// The libnx ABI passes the id as a signed `s32`; a negative value reinterpreted as `u32`
+    /// lands far above [`NUM_TSD_KEYS`] and is rejected here, so this single `u32` entry point
+    /// validates both the libnx (`s32`) and newlib (`u32`) raw forms.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnknownTsdKeyError`] if the id names no slot.
+    fn try_from(raw: u32) -> Result<Self, Self::Error> {
+        if (raw as usize) >= NUM_TSD_KEYS {
+            return Err(UnknownTsdKeyError(raw));
+        }
+        Ok(Self(raw))
+    }
+}
+
+/// An error indicating that a raw slot id names no TSD key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("The slot id {0} names no TSD key")]
+pub struct UnknownTsdKeyError(u32);
 
 /// Per-thread runtime TSD state.
 ///
