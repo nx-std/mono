@@ -1,6 +1,6 @@
 ---
 name: "rust-fn-unchecked"
-description: "Unchecked constructors that skip FromStr/TryFrom: when the bypass stays a safe fn, when it is unsafe with # Safety and a // SAFETY: call site. Load when adding or reviewing a *_unchecked call"
+description: "Unchecked constructors that skip FromStr/TryFrom: when the bypass stays a safe fn, when it is unsafe with # Safety, and the // SAFETY: note every call site carries. Load when adding or reviewing a *_unchecked call"
 type: "core"
 scope: "global"
 ---
@@ -133,19 +133,20 @@ restatement of the function's own docs are all failures — they record that som
 they concluded. Without the note, a later change to the invariant has no searchable list of sites to
 re-examine, and the invalid value enters the domain from the one path nobody audits.
 
-The marker follows the split. A call to an `unsafe` unchecked constructor sits in an `unsafe` block under a
-`// SAFETY:` comment. A call to a safe one gets a plain `//` comment justifying the bypass
-([rust-docs-comments](rust-docs-comments.md#2-comments-justify-decisions)) and **never** a `// SAFETY:` marker:
-that marker is the searchable index of the workspace's soundness obligations, and diluting it with
-non-UB preconditions is what makes an audit of it useless.
+**The note carries a `// SAFETY:` marker, whether the constructor is `unsafe` or not.** A call to an `unsafe`
+one additionally sits in an `unsafe` block. The marker is the workspace's searchable index of *asserted
+obligations*, and every `_unchecked` call is one: the two kinds differ in what misuse costs
+([§1](#1-validation-lives-in-fromstr-and-tryfrom)), not in whether someone vouched for a value the type could
+not check itself. Indexing only the UB half would leave the safe half — the larger half — with no way to
+enumerate the sites a changed invariant invalidates.
 
 ```rust
-// ✅ Good — each note names the fact that makes the bypass correct, and the markers stay
-// distinct, so grepping `SAFETY:` still returns only the sites where misuse is UB.
+// ✅ Good — both notes name the fact that makes the bypass correct and both are greppable,
+// so a later change to either invariant has a list of sites to re-examine.
 impl SmClient {
     pub fn connect(&self, name: &ServiceName) -> Result<Session, ConnectError> {
-        // The bytes come out of an already-validated `ServiceName`, so re-checking them
-        // would re-derive a proof this value carries by construction.
+        // SAFETY: The bytes come out of an already-validated `ServiceName`, so re-checking
+        // them would re-derive a proof this value carries by construction.
         let request = ConnectRequest::new(ServiceName::from_bytes_unchecked(name.as_bytes()));
 
         let raw = self.dispatch(request)?.into_raw_handle();
@@ -155,6 +156,9 @@ impl SmClient {
     }
 }
 ```
+
+To recover the UB-only view the marker alone no longer gives, grep for `unsafe {` alongside it: a soundness
+obligation is exactly a `// SAFETY:` that introduces an `unsafe` block.
 
 **Test code is the one exception.** A call in a `#[cfg(test)]` module needs no justification comment: the value
 is a literal in the same expression, visible to anyone reading the assertion, and the comment would bury the
@@ -199,10 +203,9 @@ Before committing code, verify:
 - [ ] An `unsafe` unchecked constructor carries a `# Safety` section; a safe one states its precondition in
       prose and carries no `# Safety` section
 - [ ] The constructor's visibility is as narrow as its callers allow
-- [ ] Every call site outside `#[cfg(test)]` carries a note immediately above it naming why the invariant
-      already holds: `// SAFETY:` for the `unsafe` case, a plain `//` comment for the safe one
-- [ ] No `// SAFETY:` comment sits above a safe unchecked call, and none merely restates the function's docs or
-      asserts that the value is valid
+- [ ] Every call site outside `#[cfg(test)]` carries a `// SAFETY:` note immediately above it naming why the
+      invariant already holds, and a call to an `unsafe` constructor is additionally inside an `unsafe` block
+- [ ] No `// SAFETY:` note merely restates the function's docs or asserts that the value is valid
 - [ ] No value from an FFI caller, an untrusted asset header, or a shared buffer is wrapped rather than parsed
 - [ ] The module documents which invariants the type maintains and where validation actually occurs
 
@@ -218,5 +221,5 @@ Before committing code, verify:
   one is `create` rather than `TryFrom`
 - [rust-docs-rustdoc](rust-docs-rustdoc.md) - Related: The rustdoc sections a `# Safety` block sits among, and
   module-level invariant docs
-- [rust-docs-comments](rust-docs-comments.md) - Related: The voice of the plain `//` comment that justifies a
-  safe unchecked call
+- [rust-docs-comments](rust-docs-comments.md) - Related: The voice a `// SAFETY:` note is written in, and the
+  bar it has to clear to count as a justification

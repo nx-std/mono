@@ -48,6 +48,8 @@ const_assert_eq!(NSEC_PER_RATIO, 625);
 ///
 /// One tick is not a whole number of nanoseconds, so this is the floor. It is reported to
 /// `clock_getres`, which has no way to express a fractional resolution.
+// SAFETY: One is a tick count by definition; this asks what a single tick is worth in
+// nanoseconds.
 #[cfg(feature = "ffi")]
 pub const NSEC_PER_TICK: u64 = cpu_ticks_to_ns(Ticks::from_u64_unchecked(1));
 

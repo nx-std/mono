@@ -290,8 +290,8 @@ impl MutexTag {
     ///
     /// Returns the mutex owner's tag with the _waiters bitflag_ cleared.
     fn owner(&self) -> ThreadTag {
-        // The waiters bit is stored inside the handle word, so it is masked off before the
-        // remainder is read back as the handle the kernel assigned.
+        // SAFETY: The waiters bit is stored inside the handle word, so it is masked off
+        // before the remainder is read back as the handle the kernel assigned.
         ThreadTag::from_raw_unchecked(self.0 & !HANDLE_WAIT_MASK)
     }
 
