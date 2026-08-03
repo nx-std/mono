@@ -64,11 +64,13 @@ impl NxAllocator {
 unsafe impl GlobalAlloc for NxAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut alloc = self.0.lock();
-        unsafe { alloc.malloc(layout.size(), layout.align()) }
+        alloc.malloc(layout)
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let mut alloc = self.0.lock();
-        unsafe { alloc.free(ptr, layout.size(), layout.align()) }
+        // SAFETY: `GlobalAlloc::dealloc`'s contract is that `ptr` came from this allocator
+        // under this exact `layout`.
+        unsafe { alloc.free(ptr, layout) }
     }
 }
