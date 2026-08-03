@@ -9,7 +9,7 @@
 
 pub use super::raw::{CUR_PROCESS_HANDLE, Handle, INVALID_HANDLE};
 use super::{
-    error::{_sealed, KernelError, Module, ResultCode, ToResultCode},
+    error::{_sealed, KernelError, ResultCode, ToResultCode},
     raw,
     result::{Error, Result, raw::Result as RawResult},
 };
@@ -153,28 +153,15 @@ pub fn get_info(info_type: InfoType, handle: Handle) -> Result<u64, GetInfoError
     let mut out = 0u64;
 
     let rc = unsafe { raw::get_info(&mut out, id0, handle, id1) };
-    RawResult::from_raw(rc).map(out, |rc| {
-        let desc = rc.description();
-
-        // Map kernel error codes to the appropriate error enum variant
-        if desc == KernelError::InvalidHandle {
-            GetInfoError::InvalidHandle
-        } else if desc == KernelError::InvalidAddress {
-            GetInfoError::InvalidAddress
-        } else if desc == KernelError::InvalidEnumValue {
-            // Check if it's an info type or ID error based on the error code
-            if rc.module() == Module::Kernel {
-                if desc == KernelError::InvalidEnumValue {
-                    GetInfoError::InvalidInfoType
-                } else {
-                    GetInfoError::InvalidInfoId
-                }
-            } else {
-                GetInfoError::Unknown(Error::from(rc))
-            }
-        } else {
-            GetInfoError::Unknown(Error::from(rc))
-        }
+    RawResult::from_raw(rc).map(out, |rc| match KernelError::try_from(rc.description()) {
+        Ok(KernelError::InvalidHandle) => GetInfoError::InvalidHandle,
+        Ok(KernelError::InvalidAddress) => GetInfoError::InvalidAddress,
+        // The kernel rejects an unknown `id0` and an unknown `id1` with the same
+        // description, so the info type is the most this can name.
+        Ok(KernelError::InvalidEnumValue) => GetInfoError::InvalidInfoType,
+        // A kernel code this call does not model, or one a later firmware added,
+        // is forwarded whole rather than folded into a variant that misnames it.
+        Ok(_) | Err(_) => GetInfoError::Unknown(Error::from(rc)),
     })
 }
 
@@ -305,9 +292,6 @@ pub enum GetInfoError {
     /// The info type is invalid.
     #[error("Invalid info type")]
     InvalidInfoType,
-    /// The info ID is invalid.
-    #[error("Invalid info ID")]
-    InvalidInfoId,
     /// An unknown error occurred.
     ///
     /// This variant is used when the error code is not recognized.
@@ -323,7 +307,6 @@ impl ToResultCode for GetInfoError {
             GetInfoError::InvalidMemState => KernelError::InvalidAddress.to_rc(),
             GetInfoError::InvalidAddress => KernelError::InvalidAddress.to_rc(),
             GetInfoError::InvalidInfoType => KernelError::InvalidEnumValue.to_rc(),
-            GetInfoError::InvalidInfoId => KernelError::InvalidEnumValue.to_rc(),
             GetInfoError::Unknown(err) => err.to_raw(),
         }
     }

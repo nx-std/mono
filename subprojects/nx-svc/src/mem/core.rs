@@ -8,8 +8,34 @@ use crate::{
     result::{Error, raw::Result as RawResult},
 };
 
-/// Page information
-pub type PageInfo = u32;
+/// The page-information word [`query_memory`] reports alongside a [`MemoryInfo`].
+///
+/// The kernel packs its own flags into this word. It is wrapped rather than
+/// carried as a bare `u32` so it cannot be interchanged with the addresses,
+/// sizes and reference counts that surround it at every call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct PageInfo(u32);
+
+impl PageInfo {
+    /// Wraps a raw page-information word without checking it.
+    ///
+    /// The caller must ensure `raw` is a word the kernel wrote into the page-info
+    /// out-param of a `svcQueryMemory`-family call, rather than an unrelated
+    /// integer. This constructor performs no validation; the flags are the
+    /// kernel's own encoding, so a word from anywhere else decodes into
+    /// meaningless attributes rather than being rejected.
+    #[inline]
+    pub const fn new_unchecked(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the raw page-information word.
+    #[inline]
+    pub const fn to_raw(self) -> u32 {
+        self.0
+    }
+}
 
 /// Sets the process heap to a given size.
 ///
@@ -146,12 +172,22 @@ pub fn query_memory(addr: usize) -> Result<(MemoryInfo, PageInfo), QueryMemoryEr
     let mut page_info = Default::default();
 
     let rc = unsafe { raw::query_memory(&mut mem_info, &mut page_info, addr) };
-    RawResult::from_raw(rc).map((mem_info.into(), page_info), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::InvalidHandle == desc => QueryMemoryError::InvalidHandle,
         desc if KError::InvalidAddress == desc => QueryMemoryError::InvalidAddress,
         desc if KError::InvalidCurrentMemory == desc => QueryMemoryError::InvalidCurrentMemory,
         _ => QueryMemoryError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Decoded only after the result code says the kernel filled the record; on
+    // the failure path `mem_info` still holds its zeroed default.
+    let mem_info = mem_info
+        .try_into()
+        .map_err(QueryMemoryError::DecodeMemoryInfo)?;
+
+    // SAFETY: The word came from this call's own page-info out-param, which the
+    // kernel filled before reporting the success checked above.
+    Ok((mem_info, PageInfo::new_unchecked(page_info)))
 }
 
 /// Error type for query_memory operations.
@@ -182,6 +218,14 @@ pub enum QueryMemoryError {
     #[error("Invalid memory state")]
     InvalidCurrentMemory,
 
+    /// The kernel succeeded but reported a record this build cannot decode.
+    ///
+    /// The queried range is untouched: the failure is in reading the kernel's
+    /// answer, not in the query, so retrying gains nothing until the unknown
+    /// memory type is added to [`raw::MemoryType`].
+    #[error("Failed to decode the memory record returned by the kernel")]
+    DecodeMemoryInfo(#[source] DecodeMemoryInfoError),
+
     /// An unknown error occurred
     #[error("Unknown error: {0}")]
     Unknown(Error),
@@ -193,6 +237,7 @@ impl ToResultCode for QueryMemoryError {
             Self::InvalidHandle => KError::InvalidHandle.to_rc(),
             Self::InvalidAddress => KError::InvalidAddress.to_rc(),
             Self::InvalidCurrentMemory => KError::InvalidCurrentMemory.to_rc(),
+            Self::DecodeMemoryInfo(_) => KError::InvalidEnumValue.to_rc(),
             Self::Unknown(err) => err.to_raw(),
         }
     }
@@ -381,10 +426,12 @@ pub struct MemoryInfo {
     pub device_refcount: u32,
 }
 
-impl From<raw::MemoryInfo> for MemoryInfo {
-    fn from(value: raw::MemoryInfo) -> Self {
-        let (mem_state, mem_type) = parse_mem_type(value.typ);
-        Self {
+impl TryFrom<raw::MemoryInfo> for MemoryInfo {
+    type Error = DecodeMemoryInfoError;
+
+    fn try_from(value: raw::MemoryInfo) -> Result<Self, Self::Error> {
+        let (mem_state, mem_type) = parse_mem_type(value.typ).map_err(DecodeMemoryInfoError)?;
+        Ok(Self {
             addr: value.addr,
             size: value.size,
             typ: mem_type,
@@ -393,19 +440,29 @@ impl From<raw::MemoryInfo> for MemoryInfo {
             perm: MemoryPermission::from_bits_truncate(value.perm),
             ipc_refcount: value.ipc_refcount,
             device_refcount: value.device_refcount,
-        }
+        })
     }
 }
 
+/// Errors returned when decoding a [`raw::MemoryInfo`] into a [`MemoryInfo`].
+///
+/// The kernel reported a memory type this build does not know. Detected before
+/// any field of the record is handed to the caller, so no value decoded from an
+/// unknown layout escapes this conversion.
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to decode the memory type reported by the kernel")]
+pub struct DecodeMemoryInfoError(#[source] pub raw::UnknownMemoryTypeError);
+
 /// Parses the memory type and state from a raw value
-fn parse_mem_type(value: u32) -> (MemoryState, MemoryType) {
+fn parse_mem_type(value: u32) -> Result<(MemoryState, MemoryType), raw::UnknownMemoryTypeError> {
     let mem_state_bits = value & !raw::MEMORY_TYPE_MASK;
+    // `MEMORY_TYPE_MASK` is `0xFF`, so the masked value always fits in a `u8`.
     let mem_type_bits = (value & raw::MEMORY_TYPE_MASK) as u8;
 
     let mem_state = MemoryState(raw::MemoryState::from_bits_truncate(mem_state_bits));
-    let mem_type = unsafe { core::mem::transmute::<u8, raw::MemoryType>(mem_type_bits) }.into();
+    let mem_type = raw::MemoryType::try_from(mem_type_bits)?.into();
 
-    (mem_state, mem_type)
+    Ok((mem_state, mem_type))
 }
 
 /// Memory state flags that control memory region behavior

@@ -40,7 +40,7 @@ pub fn connect_to_named_port(name: &CStr) -> Result<Handle, ConnectError> {
     // and `handle` is a valid mutable pointer to receive the output handle.
     let rc = unsafe { raw::connect_to_named_port(&mut handle, name.as_ptr()) };
 
-    RawResult::from_raw(rc).map(Handle(handle), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::OutOfRange == desc => ConnectError::OutOfRange,
         desc if KError::NotFound == desc => ConnectError::NotFound,
         desc if KError::OutOfHandles == desc => ConnectError::OutOfHandles,
@@ -48,7 +48,11 @@ pub fn connect_to_named_port(name: &CStr) -> Result<Handle, ConnectError> {
         desc if KError::OutOfSessions == desc => ConnectError::OutOfSessions,
         desc if KError::LimitReached == desc => ConnectError::LimitReached,
         _ => ConnectError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    Handle::try_from(handle).map_err(ConnectError::NoSessionHandle)
 }
 
 /// Error returned by [`connect_to_named_port`].
@@ -72,6 +76,12 @@ pub enum ConnectError {
     /// Process session resource limit exceeded.
     #[error("Limit reached")]
     LimitReached,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Indicates a mismatch with the SVC ABI rather than anything the caller
+    /// passed, and no session this process owns was opened.
+    #[error("The kernel reported success without returning a session handle")]
+    NoSessionHandle(#[source] crate::handle::InvalidHandleError),
     /// Unexpected kernel error.
     #[error("Unknown error: {0}")]
     Unknown(Error),
@@ -80,6 +90,7 @@ pub enum ConnectError {
 impl ToResultCode for ConnectError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NoSessionHandle(_) => KError::InvalidHandle.to_rc(),
             Self::OutOfRange => KError::OutOfRange.to_rc(),
             Self::NotFound => KError::NotFound.to_rc(),
             Self::OutOfHandles => KError::OutOfHandles.to_rc(),
@@ -100,14 +111,18 @@ pub fn connect_to_port(port: Handle) -> Result<Handle, ConnectToPortError> {
     // The kernel validates the port handle and returns an error if invalid.
     let rc = unsafe { raw::connect_to_port(&mut session, port.to_raw()) };
 
-    RawResult::from_raw(rc).map(Handle(session), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::OutOfSessions == desc => ConnectToPortError::OutOfSessions,
         desc if KError::OutOfResource == desc => ConnectToPortError::OutOfResource,
         desc if KError::OutOfHandles == desc => ConnectToPortError::OutOfHandles,
         desc if KError::InvalidHandle == desc => ConnectToPortError::InvalidHandle,
         desc if KError::LimitReached == desc => ConnectToPortError::LimitReached,
         _ => ConnectToPortError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    Handle::try_from(session).map_err(ConnectToPortError::NoSessionHandle)
 }
 
 /// Error returned by [`connect_to_port`].
@@ -128,6 +143,13 @@ pub enum ConnectToPortError {
     /// Process session resource limit exceeded.
     #[error("Limit reached")]
     LimitReached,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Distinct from [`InvalidHandle`](Self::InvalidHandle), which reports the
+    /// kernel rejecting the *port* handle passed in; this names the session
+    /// handle the kernel failed to return.
+    #[error("The kernel reported success without returning a session handle")]
+    NoSessionHandle(#[source] crate::handle::InvalidHandleError),
     /// Unexpected kernel error.
     #[error("Unknown error: {0}")]
     Unknown(Error),
@@ -136,6 +158,7 @@ pub enum ConnectToPortError {
 impl ToResultCode for ConnectToPortError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NoSessionHandle(_) => KError::InvalidHandle.to_rc(),
             Self::OutOfSessions => KError::OutOfSessions.to_rc(),
             Self::OutOfResource => KError::OutOfResource.to_rc(),
             Self::OutOfHandles => KError::OutOfHandles.to_rc(),
@@ -385,7 +408,7 @@ pub fn send_async_request_with_user_buffer(
         )
     };
 
-    RawResult::from_raw(rc).map(EventHandle(event_handle), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::TerminationRequested == desc => {
             SendAsyncWithBufferError::TerminationRequested
         }
@@ -404,7 +427,11 @@ pub fn send_async_request_with_user_buffer(
         desc if KError::ReceiveListBroken == desc => SendAsyncWithBufferError::ReceiveListBroken,
         desc if KError::MessageTooLarge == desc => SendAsyncWithBufferError::MessageTooLarge,
         _ => SendAsyncWithBufferError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    EventHandle::try_from(event_handle).map_err(SendAsyncWithBufferError::NoEventHandle)
 }
 
 /// Error returned by [`send_async_request_with_user_buffer`].
@@ -449,6 +476,14 @@ pub enum SendAsyncWithBufferError {
     /// Message exceeds maximum allowed size.
     #[error("Message too large")]
     MessageTooLarge,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Distinct from [`InvalidHandle`](Self::InvalidHandle), which reports the
+    /// kernel rejecting the *session* handle passed in; this names the
+    /// completion event the kernel failed to return, so nothing is left to wait
+    /// on for a request that may still be in flight.
+    #[error("The kernel reported success without returning a completion event handle")]
+    NoEventHandle(#[source] crate::handle::InvalidHandleError),
     /// Unexpected kernel error.
     #[error("Unknown error: {0}")]
     Unknown(Error),
@@ -457,6 +492,7 @@ pub enum SendAsyncWithBufferError {
 impl ToResultCode for SendAsyncWithBufferError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NoEventHandle(_) => KError::InvalidHandle.to_rc(),
             Self::TerminationRequested => KError::TerminationRequested.to_rc(),
             Self::InvalidSize => KError::InvalidSize.to_rc(),
             Self::InvalidAddress => KError::InvalidAddress.to_rc(),

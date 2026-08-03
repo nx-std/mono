@@ -66,7 +66,7 @@ pub unsafe fn create(
     let mut handle = raw::INVALID_HANDLE;
     let rc = unsafe { raw::create_thread(&mut handle, entry, arg, stack_top, prio, cpuid) };
 
-    RawResult::from_raw(rc).map(Handle(handle), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::OutOfMemory == desc => CreateThreadError::OutOfMemory,
         desc if KError::OutOfResource == desc => CreateThreadError::OutOfResource,
         desc if KError::LimitReached == desc => CreateThreadError::LimitReached,
@@ -74,7 +74,11 @@ pub unsafe fn create(
         desc if KError::InvalidPriority == desc => CreateThreadError::InvalidPriority,
         desc if KError::InvalidCoreId == desc => CreateThreadError::InvalidCoreId,
         _ => CreateThreadError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    Handle::try_from(handle).map_err(CreateThreadError::NoThreadHandle)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -101,6 +105,13 @@ pub enum CreateThreadError {
     /// `KernelError::InvalidCoreId` (raw code `0x271`).
     #[error("Invalid core id")]
     InvalidCoreId,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Indicates a mismatch with the SVC ABI rather than anything the caller
+    /// passed, and no thread this process owns was created.
+    #[error("The kernel reported success without returning a thread handle")]
+    NoThreadHandle(#[source] crate::handle::InvalidHandleError),
+
     /// Any unforeseen kernel error. Contains the original [`Error`] so callers
     /// can inspect the raw result (`Error::to_raw`).
     #[error("Unknown error: {0}")]
@@ -110,6 +121,7 @@ pub enum CreateThreadError {
 impl ToResultCode for CreateThreadError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NoThreadHandle(_) => KError::InvalidHandle.to_rc(),
             Self::OutOfMemory => KError::OutOfMemory.to_rc(),
             Self::OutOfResource => KError::OutOfResource.to_rc(),
             Self::LimitReached => KError::LimitReached.to_rc(),
@@ -596,10 +608,13 @@ pub struct RawCoreAffinity {
 impl RawCoreAffinity {
     /// Creates a new [`RawCoreAffinity`] with the specified raw values without validation.
     ///
-    /// # Safety
+    /// The caller must ensure `core_id` names a core the process is permitted to
+    /// run on (or one of the sentinels [`CoreAffinity`] models) and that
+    /// `affinity_mask` is non-empty. This constructor performs no validation;
+    /// values the kernel rejects surface as `InvalidCoreId` from the SVC that
+    /// consumes them, not from here.
     ///
-    /// This function does not validate the input values. Invalid values may cause
-    /// kernel errors when passed to the SVC. Use with caution.
+    /// Prefer [`CoreAffinity`], which cannot represent an invalid combination.
     pub const fn new_unchecked(core_id: i32, affinity_mask: u32) -> Self {
         Self {
             core_id,
