@@ -91,6 +91,7 @@ dependencies = [
  "nx-svc",
  "rand",
  "rand_chacha",
+ "thiserror",
 ]
 
 [[package]]

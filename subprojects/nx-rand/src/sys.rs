@@ -26,7 +26,10 @@
 
 // See: https://doc.rust-lang.org/nightly/edition-guide/rust-2024/static-mut-references.html#safe-references
 // TODO: Review the safety of having a global mutable reference to a static variable
-#![allow(static_mut_refs)]
+#![expect(
+    static_mut_refs,
+    reason = "the global RNG is a `static mut` reached through `assume_init_mut`; replacing it is tracked by the TODO above"
+)]
 
 use core::{
     mem::MaybeUninit,
@@ -48,10 +51,6 @@ static RNG_STATE: AtomicRngState = AtomicRngState::new();
 ///
 /// This function is thread-safe and uses the ChaCha20 algorithm for generating
 /// random numbers. The entropy is sourced from the kernel's TRNG.
-///
-/// # Arguments
-///
-/// * `slice` - The buffer to fill with random data
 pub fn fill_bytes(slice: &mut [u8]) {
     get_rng().fill_bytes(slice);
 }
@@ -115,20 +114,20 @@ fn get_rng() -> &'static mut ChaCha20Rng {
 ///
 /// This function will panic if it fails to obtain entropy from the system TRNG.
 fn init_rng() {
-    let mut seed = [0u64; 4];
-    for (i, item) in seed.iter_mut().enumerate() {
+    let mut seed = [0u8; 32];
+    for (index, chunk) in seed.chunks_exact_mut(size_of::<u64>()).enumerate() {
         // Get process TRNG seeds from kernel using the new helper
-        match nx_svc::misc::get_random_entropy(i as u64) {
-            Ok(val) => *item = val,
+        // `chunks_exact_mut` yields four chunks, so `index` is at most 3.
+        match nx_svc::misc::get_random_entropy(index as u64) {
+            // Native-endian, matching the in-memory layout the seed previously
+            // took on by being reinterpreted from `[u64; 4]`.
+            Ok(entropy) => chunk.copy_from_slice(&entropy.to_ne_bytes()),
             Err(err) => panic!("Failed to get random entropy: {}", err),
         }
     }
 
     unsafe {
-        RNG.write(ChaCha20Rng::from_seed(core::mem::transmute::<
-            [u64; 4],
-            [u8; 32],
-        >(seed)));
+        RNG.write(ChaCha20Rng::from_seed(seed));
     }
 }
 
@@ -144,6 +143,29 @@ enum RngState {
     Initialized = 2,
 }
 
+impl TryFrom<u8> for RngState {
+    type Error = UnknownRngStateError;
+
+    /// Decodes the byte held in the atomic cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnknownRngStateError`] if the byte is not a state discriminant.
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Uninitialized),
+            1 => Ok(Self::Initializing),
+            2 => Ok(Self::Initialized),
+            unknown => Err(UnknownRngStateError(unknown)),
+        }
+    }
+}
+
+/// An error indicating that a byte names no RNG initialization state.
+#[derive(Debug, thiserror::Error)]
+#[error("Unknown RNG state {0}")]
+struct UnknownRngStateError(u8);
+
 /// A thread-safe wrapper around [`RngState`]
 #[derive(Debug)]
 struct AtomicRngState(AtomicU8);
@@ -156,12 +178,13 @@ impl AtomicRngState {
 
     /// Loads the current state with acquire ordering
     fn load_acquire(&self) -> RngState {
-        match self.0.load(Ordering::Acquire) {
-            0 => RngState::Uninitialized,
-            1 => RngState::Initializing,
-            2 => RngState::Initialized,
-            _ => unreachable!(),
-        }
+        let raw = self.0.load(Ordering::Acquire);
+        // The cell is private and every write to it stores an `RngState` discriminant,
+        // so the decode cannot fail. Falling back to `Uninitialized` keeps this total
+        // instead of panicking on an unreachable branch, and is the safe choice if it
+        // ever were reached: a thread that read it would fail its claim and retry,
+        // rather than reach an RNG that has not been written.
+        RngState::try_from(raw).unwrap_or(RngState::Uninitialized)
     }
 
     /// Tries to claim initialization of the RNG.
@@ -169,11 +192,11 @@ impl AtomicRngState {
     /// This function atomically attempts to transition the RNG state from
     /// [`RngState::Uninitialized`] to [`RngState::Initializing`].
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// * `Ok(())` if the transition was successful
-    /// * `Err(())` if another thread has already claimed initialization
-    fn try_claim_initialization(&self) -> Result<(), ()> {
+    /// Returns [`InitializationClaimedError`] if another thread holds the claim, or
+    /// if initialization has already finished.
+    fn try_claim_initialization(&self) -> Result<(), InitializationClaimedError> {
         self.0
             .compare_exchange(
                 RngState::Uninitialized as u8,
@@ -181,7 +204,11 @@ impl AtomicRngState {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             )
-            .map_or_else(|_| Err(()), |_| Ok(()))
+            .map(|_| ())
+            // The state observed by the failed exchange is dropped: the caller re-reads
+            // it at the top of its loop, and acting on a value already stale by then is
+            // what the loop exists to avoid.
+            .map_err(|_| InitializationClaimedError)
     }
 
     /// Marks the RNG as initialized with release ordering
@@ -189,3 +216,8 @@ impl AtomicRngState {
         self.0.store(RngState::Initialized as u8, Ordering::Release);
     }
 }
+
+/// An error indicating that another thread already claimed RNG initialization.
+#[derive(Debug, thiserror::Error)]
+#[error("RNG initialization is already claimed")]
+struct InitializationClaimedError;
