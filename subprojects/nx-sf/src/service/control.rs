@@ -181,7 +181,7 @@ pub fn convert_current_object_to_domain(
 
     let resp = cmif::parse_response::<&u32>(&buf).map_err(ConvertToDomainError::ParseResponse)?;
 
-    // The server answers a successful ConvertToDomain with a non-zero object id.
+    // SAFETY: The server answers a successful ConvertToDomain with a non-zero object id.
     Ok(ObjectId::from_raw_unchecked(*resp.payload))
 }
 
