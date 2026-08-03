@@ -23,7 +23,7 @@ pub unsafe extern "C" fn __nx_alloc__malloc(size: usize) -> *mut c_void {
     let alloc_ptr = {
         let mut alloc = global_allocator::lock();
 
-        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let raw_alloc_ptr = alloc.malloc(layout.to_alloc_layout());
         let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
             return ptr::null_mut();
         };
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn __nx_alloc__aligned_alloc(align: usize, size: usize) ->
     let alloc_ptr = {
         let mut alloc = global_allocator::lock();
 
-        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let raw_alloc_ptr = alloc.malloc(layout.to_alloc_layout());
         let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
             return ptr::null_mut();
         };
@@ -84,9 +84,16 @@ pub unsafe extern "C" fn __nx_alloc__free(ptr: *mut c_void) {
     };
 
     let allocation = unsafe { Allocation::from_data_ptr(alloc_ptr) };
+    let Some(layout) = allocation.layout() else {
+        // The metadata header no longer describes a valid layout, so it was overwritten.
+        // Leaking the block is the only remaining option: returning it to the heap under a
+        // bogus layout would corrupt the free list for every later allocation.
+        return;
+    };
 
     let mut alloc = global_allocator::lock();
-    unsafe { alloc.free(allocation.as_ptr(), allocation.size(), allocation.align()) }
+    // SAFETY: `layout` was rebuilt from the header this allocator wrote for this block.
+    unsafe { alloc.free(allocation.as_ptr(), layout) }
 }
 
 /// Allocates a zero-initialized block of `nmemb * size` bytes.
@@ -115,7 +122,7 @@ pub unsafe extern "C" fn __nx_alloc__calloc(nmemb: usize, size: usize) -> *mut c
         let mut alloc = global_allocator::lock();
 
         // Allocate new block
-        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let raw_alloc_ptr = alloc.malloc(layout.to_alloc_layout());
         let Some(alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
             return ptr::null_mut();
         };
@@ -158,10 +165,14 @@ pub unsafe extern "C" fn __nx_alloc__realloc(ptr: *mut c_void, new_size: usize) 
         return ptr::null_mut();
     };
     let allocation = unsafe { Allocation::from_data_ptr(alloc_ptr) };
+    let Some(old_layout) = allocation.layout() else {
+        // See `__nx_alloc__free`: an unreadable header leaves nothing safe to do with the
+        // block, and there is no old size to copy forward either.
+        return ptr::null_mut();
+    };
     let old_size = allocation.size();
-    let align = allocation.align();
 
-    let Ok(layout) = Layout::from_size_align(new_size, align) else {
+    let Ok(layout) = Layout::from_size_align(new_size, old_layout.align()) else {
         return ptr::null_mut();
     };
 
@@ -170,7 +181,7 @@ pub unsafe extern "C" fn __nx_alloc__realloc(ptr: *mut c_void, new_size: usize) 
         let mut alloc = global_allocator::lock();
 
         // Allocate new block
-        let raw_alloc_ptr = unsafe { alloc.malloc(layout.size(), layout.align()) };
+        let raw_alloc_ptr = alloc.malloc(layout.to_alloc_layout());
         let Some(new_alloc_ptr) = ptr::NonNull::new(raw_alloc_ptr) else {
             return ptr::null_mut();
         };
@@ -182,7 +193,8 @@ pub unsafe extern "C" fn __nx_alloc__realloc(ptr: *mut c_void, new_size: usize) 
         unsafe { ptr::copy_nonoverlapping(allocation.as_ptr(), new_alloc_ptr.as_ptr(), copy_size) };
 
         // Free old allocation
-        unsafe { alloc.free(allocation.as_ptr(), old_size, align) };
+        // SAFETY: `old_layout` was rebuilt from the header this allocator wrote for it.
+        unsafe { alloc.free(allocation.as_ptr(), old_layout) };
 
         new_alloc_ptr
     };
@@ -271,8 +283,8 @@ mod meta {
                 ptr::write(
                     &mut alloc.as_mut().meta,
                     MetaRepr {
-                        size: layout.size,
-                        align: layout.align,
+                        size: layout.alloc_layout.size(),
+                        align: layout.alloc_layout.align(),
                         offset: layout.offset,
                     },
                 )
@@ -304,10 +316,15 @@ mod meta {
             this.meta.size
         }
 
-        /// Get the allocation alignment from the metadata.
-        pub fn align(&self) -> usize {
+        /// Rebuild the layout this block was allocated with, from its metadata header.
+        ///
+        /// Returns `None` if the header does not describe a valid layout, which means it was
+        /// overwritten: the values were written from a valid layout at allocation time. The
+        /// caller leaks the block rather than handing the heap a size and alignment that no
+        /// longer describe it.
+        pub fn layout(&self) -> Option<AllocLayout> {
             let this = unsafe { self.0.as_ref() };
-            this.meta.align
+            AllocLayout::from_size_align(this.meta.size, this.meta.align).ok()
         }
 
         /// Get a raw pointer to the allocated memory.
@@ -331,8 +348,7 @@ mod meta {
 
     /// Allocation layout metadata
     pub struct Layout {
-        size: usize,
-        align: usize,
+        alloc_layout: AllocLayout,
         offset: usize,
     }
 
@@ -350,31 +366,30 @@ mod meta {
         /// The final size of the allocation will be `size` + padding + size of the layout metadata.
         /// The alignment will be the given alignment.
         pub fn from_size_align(size: usize, align: usize) -> Result<Self, LayoutError> {
-            // Reject zero, non-power-of-two, or otherwise invalid alignments.
-            if align == 0 || !align.is_power_of_two() {
-                return Err(LayoutError);
-            }
-
-            // We need to store the metadata, plus a usize for the offset, before the user's data.
-            let meta_size = mem::size_of::<MetaRepr>() + mem::size_of::<usize>();
-            let data_align = align;
-
-            let data_layout = AllocLayout::from_size_align(size, data_align)
+            // `AllocLayout` is the only alignment validator here: it rejects a zero or
+            // non-power-of-two alignment, and a size that overflows once padded. Repeating
+            // those checks would be a second copy to keep in step, and the rounding below
+            // relies on the alignment already being a power of two.
+            let data_layout = AllocLayout::from_size_align(size, align)
                 .map_err(|_| LayoutError)?
                 .pad_to_align();
 
+            // We need to store the metadata, plus a usize for the offset, before the user's data.
+            let meta_size = mem::size_of::<MetaRepr>() + mem::size_of::<usize>();
+
             // The offset to the user data must be a multiple of the alignment,
             // and large enough to hold the metadata.
-            let offset = (meta_size + data_align - 1) & !(data_align - 1);
+            let offset = (meta_size + align - 1) & !(align - 1);
 
             let total_size = offset.checked_add(data_layout.size()).ok_or(LayoutError)?;
 
-            // The allocation must be aligned to the user's requested alignment.
-            let alloc_align = data_align;
+            // The block handed to the heap covers the metadata and the user's data, and
+            // carries the user's alignment.
+            let alloc_layout =
+                AllocLayout::from_size_align(total_size, align).map_err(|_| LayoutError)?;
 
             Ok(Self {
-                size: total_size,
-                align: alloc_align,
+                alloc_layout,
                 offset,
             })
         }
@@ -383,12 +398,12 @@ mod meta {
         ///
         /// The returned size includes the size of the layout metadata: `size + size_of(metadata)`.
         pub fn size(&self) -> usize {
-            self.size
+            self.alloc_layout.size()
         }
 
-        /// Get the alignment of the layout.
-        pub fn align(&self) -> usize {
-            self.align
+        /// Get the layout of the whole block, metadata included, as the heap takes it.
+        pub fn to_alloc_layout(&self) -> AllocLayout {
+            self.alloc_layout
         }
     }
 
