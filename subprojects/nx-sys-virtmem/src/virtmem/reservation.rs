@@ -50,7 +50,7 @@ pub const MANAGED_PAGES: usize = MANAGED_SPAN >> PAGE_SHIFT;
 
 /// A page-aligned virtual-address reservation.
 ///
-/// Constructed only through [`Reservation::new`], which rejects unaligned or
+/// Constructed only through [`Reservation::create`], which rejects unaligned or
 /// empty ranges, so every value is a non-empty, page-aligned `[start, end)`
 /// span. This is a self-describing value handle: it carries the exact extent,
 /// which the bitmap alone cannot recover (abutting reservations would
@@ -62,16 +62,31 @@ pub struct Reservation {
 }
 
 impl Reservation {
-    /// Creates a reservation, returning `None` unless `start` and `size` are
-    /// both page-aligned, `size` is non-zero, and `start + size` does not
-    /// overflow.
-    pub fn new(start: usize, size: usize) -> Option<Self> {
-        if size == 0 || (start & PAGE_MASK) != 0 || (size & PAGE_MASK) != 0 {
-            return None;
+    /// Creates a reservation from a start address and a byte length.
+    ///
+    /// This is `create` rather than `TryFrom` because there is no single source value to
+    /// convert from: a reservation is built from two of its own inputs, an address and a
+    /// length, which is the case `rust-fn` reserves `create` for.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`ReservationError`] naming which requirement the range failed, rather
+    /// than only that it failed: a caller rejecting an FFI argument reports the reason.
+    pub fn create(start: usize, size: usize) -> Result<Self, ReservationError> {
+        if size == 0 {
+            return Err(ReservationError::Empty);
+        }
+        if (start & PAGE_MASK) != 0 {
+            return Err(ReservationError::UnalignedStart);
+        }
+        if (size & PAGE_MASK) != 0 {
+            return Err(ReservationError::UnalignedSize);
         }
         // Reject ranges whose end would wrap the address space.
-        start.checked_add(size)?;
-        Some(Self { start, size })
+        start
+            .checked_add(size)
+            .ok_or(ReservationError::EndOverflow)?;
+        Ok(Self { start, size })
     }
 
     /// Inclusive start address of the reserved range.
@@ -88,6 +103,23 @@ impl Reservation {
     pub const fn end(&self) -> usize {
         self.start + self.size
     }
+}
+
+/// An error naming why a range cannot become a [`Reservation`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ReservationError {
+    /// The range covers no pages.
+    #[error("A reservation must cover at least one page")]
+    Empty,
+    /// The start address is not on a page boundary.
+    #[error("The start address is not page-aligned")]
+    UnalignedStart,
+    /// The size is not a whole number of pages.
+    #[error("The size is not a whole number of pages")]
+    UnalignedSize,
+    /// The range's end would wrap past the top of the address space.
+    #[error("The range end overflows the address space")]
+    EndOverflow,
 }
 
 /// Stable interface for reservation bookkeeping.
@@ -613,7 +645,7 @@ mod tests {
 
     /// Builds a reservation spanning `[BASE + start_page, +page_count)` pages.
     fn rsv(start_page: usize, page_count: usize) -> Reservation {
-        Reservation::new(BASE + start_page * PAGE_SIZE, page_count * PAGE_SIZE)
+        Reservation::create(BASE + start_page * PAGE_SIZE, page_count * PAGE_SIZE)
             .expect("test fixture should be page-aligned and non-empty")
     }
 
@@ -624,13 +656,10 @@ mod tests {
         let size = 4 * PAGE_SIZE;
 
         //* When
-        let result = Reservation::new(start, size);
+        let result = Reservation::create(start, size);
 
         //* Then
-        assert!(
-            result.is_some(),
-            "aligned, non-empty range should construct"
-        );
+        assert!(result.is_ok(), "aligned, non-empty range should construct");
         let reservation = result.expect("should return reservation");
         assert_eq!(reservation.start(), start, "start should round-trip");
         assert_eq!(
@@ -641,36 +670,36 @@ mod tests {
     }
 
     #[test]
-    fn new_with_unaligned_start_returns_none() {
+    fn create_with_unaligned_start_returns_error() {
         //* Given
         let unaligned_start = BASE + 1;
 
         //* When
-        let result = Reservation::new(unaligned_start, PAGE_SIZE);
+        let result = Reservation::create(unaligned_start, PAGE_SIZE);
 
         //* Then
-        assert!(result.is_none(), "unaligned start should be rejected");
+        assert_eq!(result, Err(ReservationError::UnalignedStart));
     }
 
     #[test]
-    fn new_with_unaligned_size_returns_none() {
+    fn create_with_unaligned_size_returns_error() {
         //* Given
         let unaligned_size = PAGE_SIZE + 1;
 
         //* When
-        let result = Reservation::new(BASE, unaligned_size);
+        let result = Reservation::create(BASE, unaligned_size);
 
         //* Then
-        assert!(result.is_none(), "unaligned size should be rejected");
+        assert_eq!(result, Err(ReservationError::UnalignedSize));
     }
 
     #[test]
-    fn new_with_zero_size_returns_none() {
+    fn create_with_zero_size_returns_error() {
         //* When
-        let result = Reservation::new(BASE, 0);
+        let result = Reservation::create(BASE, 0);
 
         //* Then
-        assert!(result.is_none(), "zero-size reservation should be rejected");
+        assert_eq!(result, Err(ReservationError::Empty));
     }
 
     #[test]
@@ -808,8 +837,8 @@ mod tests {
         //* Given
         let map = fresh_map(64);
         // A reservation entirely above the managed span.
-        let beyond =
-            Reservation::new(BASE + 4096 * PAGE_SIZE, PAGE_SIZE).expect("fixture should construct");
+        let beyond = Reservation::create(BASE + 4096 * PAGE_SIZE, PAGE_SIZE)
+            .expect("fixture should construct");
 
         //* When
         let reserved = map.is_reserved(beyond);
@@ -822,8 +851,8 @@ mod tests {
     fn reserve_with_out_of_span_range_is_noop() {
         //* Given
         let mut map = fresh_map(64);
-        let beyond =
-            Reservation::new(BASE + 4096 * PAGE_SIZE, PAGE_SIZE).expect("fixture should construct");
+        let beyond = Reservation::create(BASE + 4096 * PAGE_SIZE, PAGE_SIZE)
+            .expect("fixture should construct");
 
         //* When
         map.reserve(beyond);
@@ -1026,7 +1055,7 @@ mod tests {
         fn reserve_with_out_of_span_range_is_noop() {
             //* Given
             let mut map = fresh_radix(64);
-            let beyond = Reservation::new(BASE + 4096 * PAGE_SIZE, PAGE_SIZE)
+            let beyond = Reservation::create(BASE + 4096 * PAGE_SIZE, PAGE_SIZE)
                 .expect("fixture should construct");
 
             //* When
