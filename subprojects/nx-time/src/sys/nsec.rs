@@ -27,10 +27,12 @@ pub const NSEC_MAX: i64 = NSEC_PER_SEC - 1;
 ///
 /// The type is `#[repr(transparent)]` meaning it has the same ABI layout as its inner `u32`.
 ///
-/// # Safety
-///
-/// Creating invalid values (outside the valid range) is unsafe and results in undefined behavior.
-/// Use the safe constructor [`try_from`](Nanoseconds::try_from) to create values safely.
+/// The range is an invariant this type upholds, not one the language enforces. Upstream
+/// carries a `rustc_layout_scalar_valid_range_end` attribute that turns an out-of-range
+/// value into a niche, and therefore into undefined behaviour; that attribute is
+/// perma-unstable and was not carried over, so every `u32` is a well-formed
+/// `Nanoseconds` as far as the compiler is concerned. An out-of-range value produces
+/// wrong arithmetic downstream rather than unsoundness.
 #[derive(Clone, Copy, Eq)]
 #[repr(transparent)]
 pub struct Nanoseconds(u32);
@@ -40,25 +42,26 @@ const_assert_eq!(size_of::<Nanoseconds>(), size_of::<u32>());
 
 impl Nanoseconds {
     /// The zero value for this type.
-    // SAFETY: 0 is within the valid range
-    pub const ZERO: Self = unsafe { Nanoseconds::new_unchecked(0) };
+    // SAFETY: 0 is within the valid range.
+    pub const ZERO: Self = Nanoseconds::new_unchecked(0);
 
     /// Constructs an instance of this type from the underlying integer
     /// primitive without checking if the value is within the valid range.
     ///
-    /// # Safety
-    ///
-    /// Immediate language UB if the value is not within the valid range,
-    /// i.e., if it is out of the range `0..=999_999_999`.
+    /// The caller must ensure `val` is in `0..=999_999_999`. A value outside that
+    /// range is not undefined behaviour, but it breaks the invariant every consumer
+    /// relies on: sub-second arithmetic silently carries past a second, and
+    /// [`Timespec`](crate::sys::timespec::Timespec) renders a nonsensical time.
+    /// Prefer [`try_from`](Nanoseconds::try_from), which checks.
     #[inline]
-    pub const unsafe fn new_unchecked(val: u32) -> Self {
+    pub const fn new_unchecked(val: u32) -> Self {
         Nanoseconds(val)
     }
 
     /// Constructs an instance of this type from the underlying integer
     #[inline]
     pub const fn as_inner(self) -> u32 {
-        unsafe { core::mem::transmute(self) }
+        self.0
     }
 }
 
@@ -78,7 +81,9 @@ impl TryFrom<i64> for Nanoseconds {
     #[inline]
     fn try_from(val: i64) -> Result<Self, Self::Error> {
         if (NSEC_MIN..=NSEC_MAX).contains(&val) {
-            Ok(unsafe { Nanoseconds::new_unchecked(val as u32) })
+            // SAFETY: The range check above proves `val` is in `0..=999_999_999`,
+            // so the cast to `u32` is lossless.
+            Ok(Nanoseconds::new_unchecked(val as u32))
         } else {
             Err(OutOfRangeError(val))
         }
@@ -94,7 +99,8 @@ impl TryFrom<u32> for Nanoseconds {
     #[inline]
     fn try_from(val: u32) -> Result<Self, Self::Error> {
         if val <= NSEC_MAX as u32 {
-            Ok(unsafe { Nanoseconds::new_unchecked(val) })
+            // SAFETY: The bound check above proves `val` is in `0..=999_999_999`.
+            Ok(Nanoseconds::new_unchecked(val))
         } else {
             Err(OutOfRangeError(val))
         }

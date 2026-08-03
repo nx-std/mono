@@ -5,7 +5,7 @@
 
 pub mod clock;
 mod nsec;
-mod timespec;
+pub(crate) mod timespec;
 
 use core::{fmt, time::Duration};
 

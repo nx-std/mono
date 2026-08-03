@@ -9,7 +9,7 @@
 
 use core::ffi::c_int;
 
-use crate::sys::clock::aarch64::NSEC_PER_TICK;
+use crate::sys::{clock::aarch64::NSEC_PER_TICK, timespec::ClockId};
 
 /// C struct timespec
 #[repr(C)]
@@ -30,8 +30,10 @@ pub unsafe extern "C" fn __nx_time__libsysbase_syscall_clock_getres(
     clock_id: c_int,
     tp: *mut CTimespec,
 ) -> c_int {
-    // Only CLOCK_REALTIME (0) and CLOCK_MONOTONIC (1) are valid
-    if clock_id != 0 && clock_id != 1 {
+    // The decoded clock is discarded: every clock this platform implements is driven by the
+    // same counter-timer, so they share one resolution. Decoding is still how the argument is
+    // validated, rather than re-listing the accepted values here.
+    if ClockId::try_from(clock_id).is_err() {
         set_errno(EINVAL);
         return -1;
     }
