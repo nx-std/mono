@@ -8,6 +8,7 @@ extern crate nx_alloc;
 
 pub mod buf;
 pub mod error;
+pub mod page;
 pub mod shmem;
 pub mod stack;
 pub mod tmem;

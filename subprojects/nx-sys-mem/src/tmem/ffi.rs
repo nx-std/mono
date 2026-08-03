@@ -66,7 +66,7 @@ unsafe extern "C" fn __nx_sys_mem__tmem_create(
         }
         Err(err) => match err {
             sys::CreateError::OutOfMemory => LIBNX_ERR_OUT_OF_MEMORY,
-            sys::CreateError::InvalidAddress => LIBNX_ERR_BAD_INPUT,
+            sys::CreateError::InvalidAddress(_) | sys::CreateError::ZeroSize => LIBNX_ERR_BAD_INPUT,
             sys::CreateError::Svc(svc_err) => svc_err.to_rc(),
         },
     }
@@ -106,7 +106,7 @@ unsafe extern "C" fn __nx_sys_mem__tmem_create_from_memory(
         }
         Err(err) => match err {
             sys::CreateError::OutOfMemory => LIBNX_ERR_OUT_OF_MEMORY,
-            sys::CreateError::InvalidAddress => LIBNX_ERR_BAD_INPUT,
+            sys::CreateError::InvalidAddress(_) | sys::CreateError::ZeroSize => LIBNX_ERR_BAD_INPUT,
             sys::CreateError::Svc(svc_err) => svc_err.to_rc(),
         },
     }
