@@ -24,6 +24,8 @@
 
 use core::{ffi::c_void, ptr};
 
+use nx_sys_thread_tls::{ReentPtr, ThreadInfoPtr, ThreadPointer};
+
 // Linker symbols for TLS block management
 unsafe extern "C" {
     /// Start address of the main thread's TLS block
@@ -132,13 +134,17 @@ pub unsafe fn setup() {
         // Take the maximum of TCB size and required alignment
         if align > tcb_sz { align } else { tcb_sz }
     };
-    let tls_tp = (tls_start - tls_start_offset) as *mut c_void;
+    // SAFETY: `tls_start` walked back over the TCB span is the main thread's
+    // thread-pointer value.
+    let tls_tp = ThreadPointer::from_ptr_unchecked((tls_start - tls_start_offset) as *mut c_void);
 
     // Get the reent pointer (newlib reentrancy state)
+    // SAFETY: `_impure_ptr` is newlib's own re-entrancy state for this thread.
     #[cfg(feature = "ffi")]
-    let reent = unsafe { _impure_ptr };
+    let reent = ReentPtr::from_ptr_unchecked(unsafe { _impure_ptr });
+    // Without the C runtime there is no `_reent` for the footer to point at.
     #[cfg(not(feature = "ffi"))]
-    let reent = ptr::null_mut();
+    let reent = ReentPtr::NULL;
 
     // Initialize ThreadVars structure using nx-sys-thread-tls
     // SAFETY: This is called exactly once during main thread initialization,
@@ -146,7 +152,8 @@ pub unsafe fn setup() {
     unsafe {
         nx_sys_thread_tls::init_thread_vars(
             super::main_thread_handle(),
-            ptr::null_mut(), // thread_info_ptr - filled later by thread registry
+            // Filled later by the thread registry.
+            ThreadInfoPtr::NULL,
             reent,
             tls_tp,
         );

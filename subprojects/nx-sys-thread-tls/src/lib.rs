@@ -524,12 +524,10 @@ pub fn thread_vars_ptr() -> *mut ThreadVars {
 /// block has been allocated and before any user code attempts to read thread metadata. The
 /// supplied values are copied verbatim into the footer located at `TLS_base + 0x1E0`.
 ///
-/// # Parameters
-///
-/// - `handle` – Kernel handle returned by `svcCreateThread()` (or `envGetMainThreadHandle()` for main thread)
-/// - `thread_info_ptr` – Language-specific thread object (e.g., Rust `Thread` struct) or null
-/// - `reent` – Pointer to the thread's newlib re-entrancy state (`struct _reent`)
-/// - `tls_ptr` – Thread pointer value for `__aarch64_read_tp()` (typically `__tls_start - offset`)
+/// The three pointers the footer carries are distinguished by type rather than by
+/// position, because as bare `*mut c_void` any two of them could be exchanged here
+/// without the compiler objecting, and the resulting corruption would surface in
+/// unrelated thread-local state long after this call.
 ///
 /// # Safety
 ///
@@ -545,9 +543,9 @@ pub fn thread_vars_ptr() -> *mut ThreadVars {
 #[inline]
 pub unsafe fn init_thread_vars(
     handle: ThreadHandle,
-    thread_info_ptr: *mut c_void,
-    reent: *mut c_void,
-    tls_ptr: *mut c_void,
+    thread_info_ptr: ThreadInfoPtr,
+    reent: ReentPtr,
+    tls_ptr: ThreadPointer,
 ) {
     let thread_vars = thread_vars_ptr();
 
@@ -574,7 +572,9 @@ pub fn get_thread_info_ptr<T>() -> *mut T {
     let tv_ptr = thread_vars_ptr();
     // SAFETY: Reading the thread_info_ptr field from ThreadVars with volatile semantics
     // to prevent compiler optimizations from reordering the load.
-    unsafe { ptr::read_volatile(&raw const (*tv_ptr).thread_info_ptr).cast() }
+    unsafe { ptr::read_volatile(&raw const (*tv_ptr).thread_info_ptr) }
+        .to_raw()
+        .cast()
 }
 
 /// Sets the current thread's language-specific thread object pointer.
@@ -589,7 +589,9 @@ pub fn get_thread_info_ptr<T>() -> *mut T {
 pub unsafe fn set_thread_info_ptr<T>(ptr: *mut T) {
     let tv_ptr = thread_vars_ptr();
     // SAFETY: Writing the thread_info_ptr field with volatile semantics
-    unsafe { ptr::write_volatile(&raw mut (*tv_ptr).thread_info_ptr, ptr.cast()) };
+    // SAFETY: The caller's contract is that `ptr` is this thread's thread object.
+    let thread_info_ptr = ThreadInfoPtr::from_ptr_unchecked(ptr.cast());
+    unsafe { ptr::write_volatile(&raw mut (*tv_ptr).thread_info_ptr, thread_info_ptr) };
 }
 
 /// Returns the [`Handle`] of the current thread.
@@ -754,6 +756,90 @@ const_assert_eq!(
 ///
 /// The value stored here typically points to `__tls_start` (the beginning of the TLS
 /// data segment), adjusted for the Thread Control Block (TCB) alignment.
+/// Pointer to the language-specific thread object for a thread.
+///
+/// Null while the thread has no object yet; the main thread is started this way and
+/// has the pointer filled in once the thread registry reaches it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct ThreadInfoPtr(*mut c_void);
+
+impl ThreadInfoPtr {
+    /// A thread with no language-specific object yet.
+    pub const NULL: Self = Self(ptr::null_mut());
+
+    /// Wraps a raw pointer without checking what it addresses.
+    ///
+    /// The caller must ensure `ptr` addresses the thread object of the thread whose
+    /// `ThreadVars` it will be stored in, or is null. Nothing distinguishes it from
+    /// the other two pointers in that footer once it is a bare `*mut c_void`.
+    #[inline]
+    pub const fn from_ptr_unchecked(ptr: *mut c_void) -> Self {
+        Self(ptr)
+    }
+
+    /// Returns the raw pointer.
+    #[inline]
+    pub const fn to_raw(self) -> *mut c_void {
+        self.0
+    }
+}
+
+/// Pointer to a thread's newlib re-entrancy state (`struct _reent`).
+///
+/// Null in builds without the C runtime, where nothing consults it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct ReentPtr(*mut c_void);
+
+impl ReentPtr {
+    /// A thread with no newlib re-entrancy state.
+    pub const NULL: Self = Self(ptr::null_mut());
+
+    /// Wraps a raw pointer without checking what it addresses.
+    ///
+    /// The caller must ensure `ptr` addresses this thread's `struct _reent`, or is
+    /// null. newlib reads through it without validating it.
+    #[inline]
+    pub const fn from_ptr_unchecked(ptr: *mut c_void) -> Self {
+        Self(ptr)
+    }
+
+    /// Returns the raw pointer.
+    #[inline]
+    pub const fn to_raw(self) -> *mut c_void {
+        self.0
+    }
+}
+
+/// The AArch64 thread pointer (TP) for a thread.
+///
+/// This is the value `__aarch64_read_tp()` returns, and the base every thread-local
+/// access is resolved against. It is the thread's TLS segment walked back over the
+/// Thread Control Block, not the base of the TLS block itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct ThreadPointer(*mut c_void);
+
+impl ThreadPointer {
+    /// Wraps a raw pointer without checking what it addresses.
+    ///
+    /// The caller must ensure `ptr` is this thread's thread-pointer value. Every
+    /// thread-local access on this thread is resolved against it, so a pointer that
+    /// addresses anything else corrupts unrelated thread-local state rather than
+    /// failing at the point it was set.
+    #[inline]
+    pub const fn from_ptr_unchecked(ptr: *mut c_void) -> Self {
+        Self(ptr)
+    }
+
+    /// Returns the raw pointer.
+    #[inline]
+    pub const fn to_raw(self) -> *mut c_void {
+        self.0
+    }
+}
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct ThreadVars {
@@ -766,15 +852,15 @@ pub struct ThreadVars {
     /// Pointer to the current thread object (if any).
     ///
     /// Type-safe access: use [`get_thread_info_ptr::<T>()`].
-    pub thread_info_ptr: *mut c_void,
+    pub thread_info_ptr: ThreadInfoPtr,
 
     /// Pointer to the thread's newlib reentrancy state.
-    pub reent: *mut c_void,
+    pub reent: ReentPtr,
 
     /// Pointer to this thread's thread-local segment (TP).
     ///
     /// **MUST** be at offset 0x1F8 for AArch64 ABI compliance.
-    pub tls_ptr: *mut c_void,
+    pub tls_ptr: ThreadPointer,
 }
 
 // Ensure the layout stays consistent with Horizon expectations.

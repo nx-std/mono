@@ -48,6 +48,7 @@ use nx_sys_mem::{
     buf::BufferRef,
     stack::{self, MapError},
 };
+use nx_sys_thread_tls::{ReentPtr, ThreadInfoPtr, ThreadPointer};
 use static_assertions::const_assert_eq;
 
 #[cfg(feature = "ffi")]
@@ -2169,9 +2170,13 @@ unsafe extern "C" fn entry_wrap(args: *mut ThreadEntryArgs) {
     unsafe {
         nx_sys_thread_tls::init_thread_vars(
             handle,
-            thread.cast::<c_void>(),
-            args.reent,
-            tls_tp.cast::<c_void>(),
+            // SAFETY: `thread` is this thread's pinned `ThreadControl`.
+            ThreadInfoPtr::from_ptr_unchecked(thread.cast::<c_void>()),
+            // SAFETY: `args.reent` is the `_reent` slot carved for this thread.
+            ReentPtr::from_ptr_unchecked(args.reent),
+            // SAFETY: `tls_tp` is `args.tls` walked back over the TCB span, which is
+            // this thread's thread-pointer value.
+            ThreadPointer::from_ptr_unchecked(tls_tp.cast::<c_void>()),
         );
     }
 
