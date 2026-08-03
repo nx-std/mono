@@ -41,6 +41,13 @@ option(
 )
 
 option(
+    'use_nx_sys_fd',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `sys-fd` feature',
+    yield : true
+)
+
+option(
     'use_nx_sys_mem',
     type : 'feature', value : 'auto',
     description : 'Enable the `sys-mem` feature',

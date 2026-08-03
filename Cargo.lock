@@ -1325,6 +1325,7 @@ dependencies = [
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-fd",
  "nx-sys-mem",
  "nx-sys-sync",
  "nx-sys-thread",
@@ -1350,6 +1351,18 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "nx-panic-handler",
+ "thiserror",
+]
+
+[[package]]
+name = "nx-sys-fd"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-sys-sync",
+ "nx-sys-thread-tls",
+ "static_assertions",
  "thiserror",
 ]
 
