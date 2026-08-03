@@ -28,7 +28,7 @@ use core::arch::naked_asm;
 /// The `noreturn` option is used to prevent the compiler from generating
 /// a function prologue and epilogue.
 #[unsafe(naked)]
-pub unsafe extern "C" fn cntpct_el0() -> u64 {
+pub(crate) unsafe extern "C" fn cntpct_el0() -> u64 {
     naked_asm!(
         "mrs x0, cntpct_el0", // Move the value of `cntpct_el0` into the return register `x0`
         "ret",
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn cntpct_el0() -> u64 {
 /// The `noreturn` option is used to prevent the compiler from generating
 /// a function prologue and epilogue.
 #[unsafe(naked)]
-pub unsafe extern "C" fn cntfrq_el0() -> u64 {
+pub(crate) unsafe extern "C" fn cntfrq_el0() -> u64 {
     naked_asm!(
         "mrs x0, cntfrq_el0", // Move the value of `cntfrq_el0` into the return register `x0`
         "ret",
