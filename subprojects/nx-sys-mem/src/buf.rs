@@ -100,10 +100,21 @@ impl Buffer {
     ///
     /// Creates a new buffer with the specified size and alignment from the layout.
     /// The memory is zero-initialized to ensure no uninitialized data is exposed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AllocationError::ZeroSized`] for a zero-size layout, and
+    /// [`AllocationError::AllocatorFailed`] if the allocator has no such block.
     pub fn try_with_layout(layout: Layout) -> Result<Self, AllocationError> {
+        // `Layout` permits a zero size, but `alloc_zeroed` declares one undefined behaviour,
+        // so the check belongs here rather than in each caller.
+        if layout.size() == 0 {
+            return Err(AllocationError::ZeroSized);
+        }
+
         let ptr = unsafe { alloc_zeroed(layout) } as *mut c_void;
         let Some(ptr) = NonNull::new(ptr) else {
-            return Err(AllocationError);
+            return Err(AllocationError::AllocatorFailed);
         };
 
         Ok(Self { ptr, layout })
@@ -135,17 +146,22 @@ impl Buffer {
     /// The actual size may be larger to satisfy alignment requirements.
     /// The buffer will have a default alignment matching `c_void`.
     ///
-    /// Returns `Ok(Buffer)` on success, or a [`BufWithCapacityError`] if:
-    /// - Layout creation fails ([`BufWithCapacityError::InvalidLayout`])
-    /// - Memory allocation fails ([`BufWithCapacityError::AllocationFailed`])
+    /// # Errors
+    ///
+    /// Returns [`BufWithCapacityError::ZeroCapacity`] for a zero capacity,
+    /// [`BufWithCapacityError::InvalidLayout`] if the capacity and alignment do not form a
+    /// layout, and [`BufWithCapacityError::Allocation`] if the allocator refuses it.
     pub fn try_with_capacity(capacity: usize) -> Result<Self, BufWithCapacityError> {
-        // Capacity must be non-zero
-        debug_assert!(capacity != 0, "capacity must be non-zero");
+        // Rejected rather than debug-asserted: a release build would otherwise reach
+        // `alloc_zeroed` with a zero-size layout, which is undefined behaviour.
+        if capacity == 0 {
+            return Err(BufWithCapacityError::ZeroCapacity);
+        }
 
         let layout = Layout::from_size_align(capacity, align_of::<c_void>())
             .map_err(|_| BufWithCapacityError::InvalidLayout)?;
 
-        Self::try_with_layout(layout).map_err(|_| BufWithCapacityError::AllocationFailed)
+        Self::try_with_layout(layout).map_err(BufWithCapacityError::Allocation)
     }
 }
 
@@ -182,29 +198,36 @@ impl Buf for &Buffer {
     }
 }
 
-/// Error that occurs when memory buffer allocation fails.
-///
-/// The system allocator was unable to allocate the requested memory.
-/// This typically occurs when the system is out of memory or the
-/// requested size is too large.
-#[derive(Debug, thiserror::Error)]
-#[error("Memory allocation failed")]
-pub struct AllocationError;
+/// Error that occurs when a memory buffer cannot be allocated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum AllocationError {
+    /// The layout covers no bytes, which the allocator does not accept.
+    #[error("A buffer cannot be zero-sized")]
+    ZeroSized,
+    /// The system allocator was unable to allocate the requested memory.
+    ///
+    /// This typically occurs when the system is out of memory or the
+    /// requested size is too large.
+    #[error("Memory allocation failed")]
+    AllocatorFailed,
+}
 
 /// Errors that can occur when creating a buffer with a capacity.
 #[derive(Debug, thiserror::Error)]
 pub enum BufWithCapacityError {
+    /// The requested capacity is zero.
+    #[error("A buffer cannot be zero-sized")]
+    ZeroCapacity,
+
     /// Invalid layout parameters.
     ///
     /// The capacity and alignment combination resulted in an invalid layout.
     #[error("Invalid layout parameters")]
     InvalidLayout,
 
-    /// Memory allocation failed.
-    ///
-    /// The system allocator was unable to allocate the requested memory.
-    #[error("Memory allocation failed")]
-    AllocationFailed,
+    /// The buffer could not be allocated.
+    #[error("The buffer could not be allocated")]
+    Allocation(#[source] AllocationError),
 }
 
 /// A non-owning reference to a memory buffer.

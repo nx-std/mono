@@ -33,7 +33,10 @@ use nx_svc::{
 };
 use nx_sys_virtmem::virtmem;
 
-use crate::error::{_sealed, ToResultCode};
+use crate::{
+    error::{_sealed, ToResultCode},
+    page::{PAGE_SIZE, PageAlignedAddr, UnalignedAddrError},
+};
 
 /// Guard region size (0x1000), per libnx.
 const GUARD_SIZE: usize = 0x1000;
@@ -62,8 +65,14 @@ pub unsafe fn create(
     size: usize,
     perm: Permissions,
 ) -> Result<TransferMemory<Unmapped>, CreateError> {
+    // A zero-size request would build a zero-size `Layout`, which `Layout::from_size_align`
+    // accepts but `alloc_zeroed` declares undefined behaviour.
+    if size == 0 {
+        return Err(CreateError::ZeroSize);
+    }
+
     // Allocate page-aligned, zero-filled backing memory.
-    let layout = Layout::from_size_align(size, 0x1000).map_err(|_| CreateError::OutOfMemory)?;
+    let layout = Layout::from_size_align(size, PAGE_SIZE).map_err(|_| CreateError::OutOfMemory)?;
     let addr = unsafe { alloc_zeroed(layout) }.cast();
     let Some(addr) = NonNull::new(addr) else {
         return Err(CreateError::OutOfMemory);
@@ -101,17 +110,15 @@ pub unsafe fn create_from_memory(
     size: usize,
     perm: Permissions,
 ) -> Result<TransferMemory<Unmapped>, CreateError> {
-    // Check that the buffer is page-aligned and has sufficient size.
-    if (buf.as_ptr() as usize & 0xFFF) != 0 {
-        return Err(CreateError::InvalidAddress);
-    }
+    // Check that the buffer is page-aligned; the kernel refuses anything else.
+    let buf = PageAlignedAddr::try_from(buf).map_err(CreateError::InvalidAddress)?;
 
-    match svc::create_transfer_memory(buf, size, perm) {
+    match svc::create_transfer_memory(buf.to_ptr(), size, perm) {
         Ok(handle) => Ok(TransferMemory(Unmapped {
             handle,
             size,
             perm,
-            src: Some(buf),
+            src: Some(buf.to_ptr()),
         })),
         Err(err) => Err(CreateError::Svc(err)),
     }
@@ -121,8 +128,11 @@ pub unsafe fn create_from_memory(
 pub enum CreateError {
     #[error("Out of memory")]
     OutOfMemory,
+    /// A transfer memory object must cover at least one byte.
+    #[error("A transfer memory object cannot be zero-sized")]
+    ZeroSize,
     #[error("Invalid address (must be page-aligned)")]
-    InvalidAddress,
+    InvalidAddress(#[source] UnalignedAddrError),
     #[error(transparent)]
     Svc(#[from] svc::CreateTransferMemoryError),
 }
@@ -131,9 +141,10 @@ impl ToResultCode for CreateError {
     fn to_rc(self) -> ResultCode {
         match self {
             Self::OutOfMemory => KernelError::OutOfMemory.to_rc(),
-            // Rejected before the SVC, but this is the code the kernel would
-            // have returned for the same address.
-            Self::InvalidAddress => KernelError::InvalidAddress.to_rc(),
+            // Rejected before the SVC, but these are the codes the kernel would
+            // have returned for the same request.
+            Self::ZeroSize => KernelError::InvalidSize.to_rc(),
+            Self::InvalidAddress(_) => KernelError::InvalidAddress.to_rc(),
             Self::Svc(err) => err.to_rc(),
         }
     }
@@ -283,8 +294,11 @@ pub unsafe fn close(tm: TransferMemory<Unmapped>) -> Result<(), CloseError> {
 
     // Free backing memory if we own it, i.e. `src` is `Some`.
     if let Some(ptr) = src {
-        let layout = Layout::from_size_align(size, 0x1000).unwrap();
-        unsafe { dealloc(ptr.as_ptr() as *mut u8, layout) };
+        // `create` built this backing from the same size and page alignment, so the layout
+        // reconstructs; if it somehow does not, leaking beats freeing under a wrong layout.
+        if let Ok(layout) = Layout::from_size_align(size, PAGE_SIZE) {
+            unsafe { dealloc(ptr.as_ptr() as *mut u8, layout) };
+        }
     }
 
     Ok(())
@@ -412,8 +426,10 @@ pub struct WaitForPermissionRawError(#[source] pub memcore::QueryMemoryError);
 /// (use [`wait_for_permission_raw`] first).
 pub unsafe fn free_backing(backing: TransferMemoryBacking) {
     if let Some(ptr) = backing.src {
-        let layout = Layout::from_size_align(backing.size, 0x1000).unwrap();
-        unsafe { dealloc(ptr.as_ptr() as *mut u8, layout) };
+        // See `close`: the layout that allocated this backing always reconstructs.
+        if let Ok(layout) = Layout::from_size_align(backing.size, PAGE_SIZE) {
+            unsafe { dealloc(ptr.as_ptr() as *mut u8, layout) };
+        }
     }
 }
 
