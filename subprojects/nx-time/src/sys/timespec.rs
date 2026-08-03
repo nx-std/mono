@@ -36,12 +36,12 @@ impl Timespec {
     /// Create a new `Timespec` without checking the nanoseconds field.
     ///
     /// The caller must ensure `tv_nsec` is in `0..=999_999_999`; see
-    /// [`Nanoseconds::new_unchecked`] for what an out-of-range value costs.
+    /// [`Nanoseconds::from_u32_unchecked`] for what an out-of-range value costs.
     pub(crate) const fn new_unchecked(tv_sec: i64, tv_nsec: i64) -> Timespec {
         Timespec {
             tv_sec,
             // SAFETY: Delegated to this function's own precondition.
-            tv_nsec: Nanoseconds::new_unchecked(tv_nsec as u32),
+            tv_nsec: Nanoseconds::from_u32_unchecked(tv_nsec as u32),
         }
     }
 

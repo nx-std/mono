@@ -26,7 +26,7 @@ impl PageInfo {
     /// kernel's own encoding, so a word from anywhere else decodes into
     /// meaningless attributes rather than being rejected.
     #[inline]
-    pub const fn new_unchecked(raw: u32) -> Self {
+    pub const fn from_u32_unchecked(raw: u32) -> Self {
         Self(raw)
     }
 
@@ -187,7 +187,7 @@ pub fn query_memory(addr: usize) -> Result<(MemoryInfo, PageInfo), QueryMemoryEr
 
     // SAFETY: The word came from this call's own page-info out-param, which the
     // kernel filled before reporting the success checked above.
-    Ok((mem_info, PageInfo::new_unchecked(page_info)))
+    Ok((mem_info, PageInfo::from_u32_unchecked(page_info)))
 }
 
 /// Error type for query_memory operations.
