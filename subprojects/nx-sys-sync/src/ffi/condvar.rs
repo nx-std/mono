@@ -6,7 +6,11 @@
 
 use nx_svc::result::ResultCode;
 
-use crate::{condvar::Condvar, mutex::Mutex};
+use crate::{
+    condvar::Condvar,
+    mutex::Mutex,
+    wait::{Timeout, WakeCount},
+};
 
 /// Initializes a condition variable.
 ///
@@ -56,7 +60,7 @@ pub unsafe extern "C" fn __nx_sys_sync__condvar_wait_timeout(
     timeout: u64,
 ) -> ResultCode {
     let mutex = unsafe { &*mutex };
-    unsafe { &*condvar }.wait_timeout(mutex, timeout)
+    unsafe { &*condvar }.wait_timeout(mutex, Timeout::from(timeout))
 }
 
 /// Waits on a condition variable indefinitely
@@ -90,7 +94,7 @@ pub unsafe extern "C" fn __nx_sys_sync__condvar_wait(
     mutex: *mut Mutex,
 ) -> ResultCode {
     let mutex = unsafe { &*mutex };
-    unsafe { &*condvar }.wait_timeout(mutex, u64::MAX)
+    unsafe { &*condvar }.wait_timeout(mutex, Timeout::Infinite)
 }
 
 /// Wakes up a specified number of threads waiting on a condition variable.
@@ -116,7 +120,7 @@ pub unsafe extern "C" fn __nx_sys_sync__condvar_wake(
     condvar: *mut Condvar,
     num: i32,
 ) -> ResultCode {
-    unsafe { &*condvar }.wake(num);
+    unsafe { &*condvar }.wake(WakeCount::from(num));
     0
 }
 

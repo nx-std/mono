@@ -28,9 +28,18 @@ mod once;
 mod remutex;
 mod rwlock;
 mod semaphore;
+mod tag;
+mod wait;
 
 #[doc(inline)]
 pub use self::{
-    barrier::Barrier, condvar::Condvar, mutex::Mutex, once::Once, remutex::ReentrantMutex,
-    rwlock::RwLock, semaphore::Semaphore,
+    barrier::Barrier,
+    condvar::Condvar,
+    mutex::Mutex,
+    once::Once,
+    remutex::ReentrantMutex,
+    rwlock::RwLock,
+    semaphore::Semaphore,
+    tag::ThreadTag,
+    wait::{Timeout, WakeCount},
 };

@@ -17,10 +17,12 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use nx_svc::{
-    raw::{Handle, INVALID_HANDLE},
+    raw::INVALID_HANDLE,
     sync::{HANDLE_WAIT_MASK, arbitrate_lock, arbitrate_unlock},
 };
 use static_assertions::const_assert_eq;
+
+use crate::tag::ThreadTag;
 
 /// A mutual exclusion primitive useful for protecting shared data
 ///
@@ -65,7 +67,7 @@ impl Mutex {
     /// Panics if the kernel's lock arbitration fails. This should never happen under
     /// normal circumstances.
     pub fn lock(&self) {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
         let mut curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
 
         loop {
@@ -74,7 +76,7 @@ impl Mutex {
                     // Attempt to acquire the lock
                     match self.0.compare_exchange(
                         curr_state.into_raw(),
-                        MutexState::Locked(MutexTag(curr_thread_handle)).into_raw(),
+                        MutexState::Locked(MutexTag::owned_by(curr_thread_tag)).into_raw(),
                         Ordering::Acquire,
                         Ordering::Relaxed,
                     ) {
@@ -106,7 +108,11 @@ impl Mutex {
                     // Ask the kernel to arbitrate the mutex locking
                     // This will pause the current thread until the mutex is unlocked
                     let arb_result = unsafe {
-                        arbitrate_lock(tag.get_owner_handle(), self.0.as_ptr(), curr_thread_handle)
+                        arbitrate_lock(
+                            tag.owner().to_raw(),
+                            self.0.as_ptr(),
+                            curr_thread_tag.to_raw(),
+                        )
                     };
                     if arb_result.is_err() {
                         // This should never happen
@@ -115,7 +121,7 @@ impl Mutex {
 
                     // The arbitration has completed; check if we acquired the lock
                     curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
-                    if matches!(curr_state, MutexState::Locked(tag) if tag.get_owner_handle() == curr_thread_handle)
+                    if matches!(curr_state, MutexState::Locked(tag) if tag.owner() == curr_thread_tag)
                     {
                         return;
                     }
@@ -135,19 +141,16 @@ impl Mutex {
     /// This function is useful when you want to attempt to acquire the lock but
     /// don't want to block if it's not immediately available.
     ///
-    /// # Returns
-    ///
-    /// * `true` if the mutex was successfully locked
-    /// * `false` if the mutex was already locked by another thread
+    /// Returns `true` if the mutex was locked, `false` if another thread already held it.
     pub fn try_lock(&self) -> bool {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
 
         // Attempt to acquire the lock by setting it from Unlocked to Locked with the current thread's handle
         // This will fail if the mutex is already locked
         self.0
             .compare_exchange(
                 MutexState::Unlocked.into_raw(),
-                MutexState::Locked(MutexTag(curr_thread_handle)).into_raw(),
+                MutexState::Locked(MutexTag::owned_by(curr_thread_tag)).into_raw(),
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
@@ -165,7 +168,7 @@ impl Mutex {
     /// Panics if the kernel's unlock arbitration fails. This should never happen
     /// under normal circumstances.
     pub fn unlock(&self) {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
         let mut curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
 
         loop {
@@ -173,7 +176,7 @@ impl Mutex {
                 MutexState::Unlocked => return,
                 MutexState::Locked(tag) => {
                     // If the mutex is not locked by the current thread, return
-                    if tag.get_owner_handle() != curr_thread_handle {
+                    if tag.owner() != curr_thread_tag {
                         return;
                     }
 
@@ -209,10 +212,10 @@ impl Mutex {
 
     /// Checks if the mutex is locked by the current thread.
     pub fn is_locked_by_current_thread(&self) -> bool {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
         let curr_state = MutexState::from_raw(self.0.load(Ordering::Acquire));
 
-        matches!(curr_state, MutexState::Locked(tag) if tag.get_owner_handle() == curr_thread_handle)
+        matches!(curr_state, MutexState::Locked(tag) if tag.owner() == curr_thread_tag)
     }
 }
 
@@ -278,11 +281,18 @@ impl IntoRawTag for MutexState {
 pub struct MutexTag(RawMutexTag);
 
 impl MutexTag {
-    /// Get the mutex owner handle.
+    /// Builds a tag naming `owner`, with the _waiters bitflag_ clear.
+    fn owned_by(owner: ThreadTag) -> Self {
+        Self(owner.to_raw())
+    }
+
+    /// Get the mutex owner.
     ///
-    /// Returns the mutex owner's thread kernel handle with the _waiters bitflag_ cleared.
-    fn get_owner_handle(&self) -> Handle {
-        self.0 & !HANDLE_WAIT_MASK
+    /// Returns the mutex owner's tag with the _waiters bitflag_ cleared.
+    fn owner(&self) -> ThreadTag {
+        // The waiters bit is stored inside the handle word, so it is masked off before the
+        // remainder is read back as the handle the kernel assigned.
+        ThreadTag::from_u32_unchecked(self.0 & !HANDLE_WAIT_MASK)
     }
 
     /// Check if there is any other thread waiting for the mutex.
@@ -300,10 +310,4 @@ impl MutexTag {
     fn set_waiters_bitflag(&mut self) {
         self.0 |= HANDLE_WAIT_MASK;
     }
-}
-
-/// Get the current thread's kernel handle.
-#[inline(always)]
-fn get_curr_thread_handle() -> Handle {
-    nx_sys_thread_tls::get_current_thread_handle().to_raw()
 }

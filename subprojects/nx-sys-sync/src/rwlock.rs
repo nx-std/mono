@@ -4,10 +4,10 @@
 
 use core::cell::UnsafeCell;
 
-use nx_svc::raw::{Handle, INVALID_HANDLE};
 use static_assertions::const_assert_eq;
 
 use super::{Condvar, Mutex};
+use crate::tag::ThreadTag;
 
 /// Read/write lock structure that allows multiple readers or a single writer.
 #[repr(C)]
@@ -61,12 +61,12 @@ impl RwLock {
     /// - Another thread holds the write lock
     /// - There are waiting writers (to prevent writer starvation)
     pub fn read_lock(&self) {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
 
         // If the current thread already holds the write lock, increment the read count
         // without blocking.
         let read_lock_count = unsafe { &mut *self.read_lock_count.get() };
-        if self.write_owner_tag == curr_thread_handle {
+        if self.write_owner_tag == curr_thread_tag {
             *read_lock_count += 1;
             return;
         }
@@ -105,12 +105,12 @@ impl RwLock {
     ///   - The current thread holds the write lock
     /// * `false` if there was contention
     pub fn try_read_lock(&self) -> bool {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
 
         // If the current thread already holds the write lock, increment the read count
         // without blocking.
         let read_lock_count = unsafe { &mut *self.read_lock_count.get() };
-        if self.write_owner_tag == curr_thread_handle {
+        if self.write_owner_tag == curr_thread_tag {
             *read_lock_count += 1;
             return true;
         }
@@ -139,11 +139,11 @@ impl RwLock {
     /// If this is the last read lock and there are waiting writers, one of them will
     /// be woken up.
     pub fn read_unlock(&self) {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
 
         // If the current thread does not hold the write lock, decrement the read count
         // and wake up a writer if there are any.
-        if self.write_owner_tag != curr_thread_handle {
+        if self.write_owner_tag != curr_thread_tag {
             self.mutex.lock();
 
             // Decrement the read count.
@@ -192,12 +192,12 @@ impl RwLock {
     /// - Other threads hold read locks
     /// - Another thread holds the write lock
     pub fn write_lock(&self) {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
 
         // If the current thread already holds the write lock, increment the write count
         // without blocking.
         let write_lock_count = unsafe { &mut *self.write_lock_count.get() };
-        if self.write_owner_tag == curr_thread_handle {
+        if self.write_owner_tag == curr_thread_tag {
             *write_lock_count += 1;
             return;
         }
@@ -217,7 +217,7 @@ impl RwLock {
 
         // Increment the write count, and set the write owner tag to the current thread
         *write_lock_count = 1;
-        self.write_owner_tag.set(curr_thread_handle);
+        self.write_owner_tag.set(curr_thread_tag);
 
         // NOTE: The mutex is intentionally not unlocked here.
         //       It will be unlocked by a call to read_unlock or write_unlock.
@@ -236,11 +236,11 @@ impl RwLock {
     ///   - The current thread already holds the write lock
     /// * `false` if there was contention
     pub fn try_write_lock(&self) -> bool {
-        let curr_thread_handle = get_curr_thread_handle();
+        let curr_thread_tag = ThreadTag::current();
 
         // If the current thread already holds the write lock, increment the write count
         // without blocking.
-        if self.write_owner_tag == curr_thread_handle {
+        if self.write_owner_tag == curr_thread_tag {
             let write_lock_count = unsafe { &mut *self.write_lock_count.get() };
             *write_lock_count += 1;
             return true;
@@ -260,7 +260,7 @@ impl RwLock {
         // Set the write count to 1, and set the write ownWriteUnlocker tag to the current thread
         let write_lock_count = unsafe { &mut *self.write_lock_count.get() };
         *write_lock_count = 1;
-        self.write_owner_tag.set(curr_thread_handle);
+        self.write_owner_tag.set(curr_thread_tag);
 
         // NOTE: The mutex is intentionally not unlocked here.
         //       It will be unlocked by a call to read_unlock or write_unlock.
@@ -276,7 +276,7 @@ impl RwLock {
     pub fn write_unlock(&self) {
         // NOTE: This function assumes the write lock is held.
         //       This means that the mutex is locked, and the write owner tag is set
-        //       to the current thread (write_owner_tag == curr_thread_handle).
+        //       to the current thread (write_owner_tag == curr_thread_tag).
 
         let write_lock_count = unsafe { &mut *self.write_lock_count.get() };
         *write_lock_count -= 1;
@@ -307,7 +307,7 @@ impl RwLock {
     /// * `true` if the current thread holds the write lock
     /// * `false` if it does not hold the write lock or only holds read locks
     pub fn is_write_lock_held_by_current_thread(&self) -> bool {
-        self.write_owner_tag == get_curr_thread_handle() && {
+        self.write_owner_tag == ThreadTag::current() && {
             let write_lock_count = unsafe { &*self.write_lock_count.get() };
             *write_lock_count > 0
         }
@@ -324,7 +324,7 @@ impl RwLock {
     ///   acquired while it held the write lock
     /// * `false` if it does not own the lock
     pub fn is_owned_by_current_thread(&self) -> bool {
-        self.write_owner_tag == get_curr_thread_handle()
+        self.write_owner_tag == ThreadTag::current()
     }
 }
 
@@ -336,33 +336,27 @@ impl Default for RwLock {
 
 /// Tag used to identify the owner of the write lock.
 #[repr(transparent)]
-struct WriteOwnerTag(UnsafeCell<u32>);
+struct WriteOwnerTag(UnsafeCell<ThreadTag>);
 
 impl WriteOwnerTag {
-    /// Creates a new [`WriteOwnerTag`] not associated with any handle.
+    /// Creates a new [`WriteOwnerTag`] not associated with any thread.
     const fn new() -> Self {
-        Self(UnsafeCell::new(INVALID_HANDLE))
+        Self(UnsafeCell::new(ThreadTag::NONE))
     }
 
-    fn set(&self, handle: Handle) {
+    fn set(&self, tag: ThreadTag) {
         let inner = unsafe { &mut *self.0.get() };
-        *inner = handle;
+        *inner = tag;
     }
 
     fn clear(&self) {
-        self.set(INVALID_HANDLE)
+        self.set(ThreadTag::NONE)
     }
 }
 
-impl PartialEq<Handle> for WriteOwnerTag {
-    fn eq(&self, other: &Handle) -> bool {
+impl PartialEq<ThreadTag> for WriteOwnerTag {
+    fn eq(&self, other: &ThreadTag) -> bool {
         let inner = unsafe { &*self.0.get() };
         *inner == *other
     }
-}
-
-/// Get the current thread's kernel handle.
-#[inline(always)]
-fn get_curr_thread_handle() -> Handle {
-    nx_sys_thread_tls::get_current_thread_handle().to_raw()
 }
