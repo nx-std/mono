@@ -21,12 +21,13 @@ impl ObjectId {
         (raw != 0).then_some(Self(raw))
     }
 
-    /// Creates an object identifier without validating the raw value.
+    /// Wraps a raw object identifier without checking it.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure `raw != 0`.
-    pub unsafe fn new_unchecked(raw: u32) -> Self {
+    /// The caller must ensure `raw != 0`, since zero names no domain object. A zero
+    /// identifier is not undefined behaviour: this type derives [`zerocopy::FromBytes`],
+    /// which declares every byte pattern a valid instance, so the value simply reaches the
+    /// server and is rejected there.
+    pub const fn from_raw_unchecked(raw: u32) -> Self {
         Self(raw)
     }
 

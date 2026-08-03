@@ -116,7 +116,8 @@ impl Entry {
             },
             Self::KEY_OVERRIDE_SERVICE => Entry::OverrideService {
                 // SAFETY: Service names from loader config are always ASCII.
-                name: unsafe { ServiceName::from_u64(entry.value[0]) },
+                // The loader packs a NUL-padded ASCII name into this word.
+                name: ServiceName::from_u64_unchecked(entry.value[0]),
                 handle: entry.value[1] as u32,
             },
             Self::KEY_ARGV => Entry::Argv(NonNull::new(entry.value[1] as *mut c_char)),

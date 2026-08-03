@@ -71,23 +71,23 @@ impl ServiceName {
         Self { name: result }
     }
 
-    /// Creates a service name from raw bytes.
+    /// Wraps eight raw name bytes without checking them.
     ///
-    /// # Safety
-    ///
-    /// Caller must ensure all non-zero bytes are valid ASCII.
+    /// The caller must ensure the bytes hold a NUL-padded ASCII service name, as `sm`
+    /// expects it on the wire. This constructor performs no validation; a name carrying
+    /// non-ASCII bytes reaches the server and is answered with a "not registered" result
+    /// rather than faulting, which is why this is a safe function.
     #[inline]
-    pub const unsafe fn from_bytes(bytes: [u8; 8]) -> Self {
+    pub const fn from_bytes_unchecked(bytes: [u8; 8]) -> Self {
         Self { name: bytes }
     }
 
-    /// Creates a service name from a `u64`.
+    /// Wraps a service name already packed into a `u64` without checking it.
     ///
-    /// # Safety
-    ///
-    /// Caller must ensure all non-zero bytes are valid ASCII.
+    /// The bytes are read little-endian, matching [`to_u64`](Self::to_u64). The caller
+    /// carries the same obligation as [`from_bytes_unchecked`](Self::from_bytes_unchecked).
     #[inline]
-    pub const unsafe fn from_u64(value: u64) -> Self {
+    pub const fn from_u64_unchecked(value: u64) -> Self {
         Self {
             name: value.to_le_bytes(),
         }
