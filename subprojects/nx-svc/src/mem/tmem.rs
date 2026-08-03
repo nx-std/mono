@@ -31,7 +31,7 @@ pub fn create_transfer_memory(
     let mut handle = raw::INVALID_HANDLE;
     let rc = unsafe { raw::create_transfer_memory(&mut handle, addr.as_ptr(), size, perm.bits()) };
 
-    RawResult::from_raw(rc).map(Handle(handle), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::InvalidSize == desc => CreateTransferMemoryError::InvalidSize,
         desc if KError::InvalidAddress == desc => CreateTransferMemoryError::InvalidAddress,
         desc if KError::InvalidNewMemoryPermission == desc => {
@@ -40,7 +40,11 @@ pub fn create_transfer_memory(
         desc if KError::InvalidCurrentMemory == desc => CreateTransferMemoryError::InvalidMemState,
         desc if KError::LimitReached == desc => CreateTransferMemoryError::LimitReached,
         _ => CreateTransferMemoryError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    Handle::try_from(handle).map_err(CreateTransferMemoryError::NoTransferMemoryHandle)
 }
 
 /// Maps a transfer memory object into the current process.
@@ -133,6 +137,12 @@ pub enum CreateTransferMemoryError {
     InvalidMemState,
     #[error("Limit reached")]
     LimitReached,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Indicates a mismatch with the SVC ABI rather than anything the caller
+    /// passed, and no transfer memory object this process owns was created.
+    #[error("The kernel reported success without returning a transfer memory handle")]
+    NoTransferMemoryHandle(#[source] crate::handle::InvalidHandleError),
     #[error("Unknown error: {0}")]
     Unknown(Error),
 }
@@ -140,6 +150,7 @@ pub enum CreateTransferMemoryError {
 impl ToResultCode for CreateTransferMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NoTransferMemoryHandle(_) => KError::InvalidHandle.to_rc(),
             Self::InvalidSize => KError::InvalidSize.to_rc(),
             Self::InvalidAddress => KError::InvalidAddress.to_rc(),
             Self::InvalidPermission => KError::InvalidNewMemoryPermission.to_rc(),

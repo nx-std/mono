@@ -31,11 +31,15 @@ pub fn create_shared_memory(
         raw::create_shared_memory(&mut handle, size, local_perm.bits(), remote_perm.bits())
     };
 
-    RawResult::from_raw(rc).map(Handle(handle), |rc| match rc.description() {
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
         desc if KError::OutOfMemory == desc => CreateSharedMemoryError::OutOfMemory,
         desc if KError::LimitReached == desc => CreateSharedMemoryError::LimitReached,
         _ => CreateSharedMemoryError::Unknown(rc.into()),
-    })
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    Handle::try_from(handle).map_err(CreateSharedMemoryError::NoSharedMemoryHandle)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -44,6 +48,12 @@ pub enum CreateSharedMemoryError {
     OutOfMemory,
     #[error("Limit reached")]
     LimitReached,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Indicates a mismatch with the SVC ABI rather than anything the caller
+    /// passed, and no shared memory object this process owns was created.
+    #[error("The kernel reported success without returning a shared memory handle")]
+    NoSharedMemoryHandle(#[source] crate::handle::InvalidHandleError),
     #[error("Unknown error: {0}")]
     Unknown(Error),
 }
@@ -51,6 +61,7 @@ pub enum CreateSharedMemoryError {
 impl ToResultCode for CreateSharedMemoryError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NoSharedMemoryHandle(_) => KError::InvalidHandle.to_rc(),
             Self::OutOfMemory => KError::OutOfMemory.to_rc(),
             Self::LimitReached => KError::LimitReached.to_rc(),
             Self::Unknown(err) => err.to_raw(),

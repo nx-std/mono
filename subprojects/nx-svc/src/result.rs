@@ -21,7 +21,7 @@
 //! - [Switchbrew Wiki: SVC](https://switchbrew.org/wiki/SVC)
 //! - [Switchbrew Wiki: Error Codes](https://switchbrew.org/wiki/Error_codes)
 
-use crate::error::{_sealed, Module, ToResultCode};
+use crate::error::{_sealed, Module, ToResultCode, UnknownModuleError};
 
 /// Type alias for Result with [`Error`] as the error type.
 ///
@@ -63,9 +63,23 @@ pub type ResultCode = u32;
 pub struct Error(raw::ResultCode);
 
 impl Error {
-    /// Returns the module that caused the error
+    /// Returns the raw 9-bit module field.
+    ///
+    /// This is the number rendered in the `2XXX-YYYY` form, and it is defined
+    /// even for a module this build does not know.
     #[inline]
-    pub const fn module(&self) -> Module {
+    pub const fn module_id(&self) -> u32 {
+        self.0.module_id()
+    }
+
+    /// Returns the module that caused the error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UnknownModuleError`] when the module field names a module this
+    /// build does not know.
+    #[inline]
+    pub fn module(&self) -> Result<Module, UnknownModuleError> {
         self.0.module()
     }
 
@@ -102,10 +116,13 @@ impl core::fmt::Display for Error {
     /// assert_eq!(format!("{}", err), "2001-0500");
     /// ```
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Rendered from the raw module field rather than the decoded enum: the
+        // console prints this form for every code, including ones naming a
+        // module this build does not know.
         write!(
             f,
             "{:04}-{:04}",
-            2000 + self.0.module() as u32,
+            2000 + self.0.module_id(),
             self.0.description()
         )
     }
@@ -125,10 +142,17 @@ impl core::fmt::Debug for Error {
     /// );
     /// ```
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Error")
-            .field("code", &format_args!("{}", self))
-            .field("module", &self.0.module())
-            .field("description", &self.0.description())
+        let mut dbg = f.debug_struct("Error");
+        dbg.field("code", &format_args!("{}", self));
+
+        // A module this build does not know still has a number worth printing,
+        // so the field falls back to the raw id rather than dropping out.
+        match self.0.module() {
+            Ok(module) => dbg.field("module", &module),
+            Err(_) => dbg.field("module", &self.0.module_id()),
+        };
+
+        dbg.field("description", &self.0.description())
             .field("raw", &format_args!("{:#x}", self.0.to_raw()))
             .finish()
     }
@@ -146,7 +170,7 @@ impl From<raw::ResultCode> for Error {
 /// Raw representation of the result code
 // NOTE: For internal use only
 pub(crate) mod raw {
-    use crate::error::{IntoDescription, Module};
+    use crate::error::{IntoDescription, Module, UnknownModuleError};
 
     /// Successful result code
     const SUCCESS: u32 = 0;
@@ -196,10 +220,28 @@ pub(crate) mod raw {
             self.0 == SUCCESS
         }
 
-        /// Returns the module that caused the error
+        /// Returns the raw 9-bit module field.
+        ///
+        /// This is the number the console renders in a `2XXX-YYYY` code, and it
+        /// is defined for every result code, including those naming a module
+        /// this build does not know.
         #[inline]
-        pub const fn module(&self) -> Module {
-            unsafe { core::mem::transmute::<u32, Module>(self.0 & MODULE_MASK) }
+        pub const fn module_id(&self) -> u32 {
+            self.0 & MODULE_MASK
+        }
+
+        /// Returns the module that caused the error.
+        ///
+        /// # Errors
+        ///
+        /// Returns [`UnknownModuleError`] when the module field names a module
+        /// this build does not know. Use [`module_id`](Self::module_id) to read
+        /// the field itself in that case.
+        // Qualified: this module declares its own `Result`, which would otherwise
+        // shadow `core`'s here.
+        #[inline]
+        pub fn module(&self) -> core::result::Result<Module, UnknownModuleError> {
+            self.module_id().try_into()
         }
 
         /// Returns the description value

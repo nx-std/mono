@@ -294,6 +294,50 @@ pub enum MemoryType {
     Insecure = 0x17,
 }
 
+impl TryFrom<u8> for MemoryType {
+    type Error = UnknownMemoryTypeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x00 => Ok(Self::Unmapped),
+            0x01 => Ok(Self::Io),
+            0x02 => Ok(Self::Normal),
+            0x03 => Ok(Self::CodeStatic),
+            0x04 => Ok(Self::CodeMutable),
+            0x05 => Ok(Self::Heap),
+            0x06 => Ok(Self::SharedMem),
+            0x07 => Ok(Self::WeirdMappedMem),
+            0x08 => Ok(Self::ModuleCodeStatic),
+            0x09 => Ok(Self::ModuleCodeMutable),
+            0x0A => Ok(Self::IpcBuffer0),
+            0x0B => Ok(Self::MappedMemory),
+            0x0C => Ok(Self::ThreadLocal),
+            0x0D => Ok(Self::TransferMemIsolated),
+            0x0E => Ok(Self::TransferMem),
+            0x0F => Ok(Self::ProcessMem),
+            0x10 => Ok(Self::Reserved),
+            0x11 => Ok(Self::IpcBuffer1),
+            0x12 => Ok(Self::IpcBuffer3),
+            0x13 => Ok(Self::KernelStack),
+            0x14 => Ok(Self::CodeReadOnly),
+            0x15 => Ok(Self::CodeWritable),
+            0x16 => Ok(Self::Coverage),
+            0x17 => Ok(Self::Insecure),
+            unknown => Err(UnknownMemoryTypeError(unknown)),
+        }
+    }
+}
+
+/// Errors returned when decoding the [`MemoryType`] byte of [`MemoryInfo::typ`].
+///
+/// Occurs when the kernel reports a memory type this build does not know, which
+/// happens on a firmware that added a type after these variants were written.
+/// The surrounding [`MemoryInfo`] is left undecoded, so no field of it is read
+/// from a value whose meaning is unknown.
+#[derive(Debug, thiserror::Error)]
+#[error("Unknown memory type {0:#04x}")]
+pub struct UnknownMemoryTypeError(pub u8);
+
 bitflags! {
     /// Memory attributes
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

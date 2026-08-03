@@ -2,6 +2,17 @@
 
 use crate::raw::Handle;
 
+/// Errors returned when wrapping a raw handle in one of this crate's handle types.
+///
+/// Occurs when the raw value is [`INVALID_HANDLE`], which names no kernel
+/// object. Nothing is consumed by a rejected conversion, so the caller still
+/// owns whatever the raw value came from.
+///
+/// [`INVALID_HANDLE`]: crate::raw::INVALID_HANDLE
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("The raw handle names no kernel object")]
+pub struct InvalidHandleError;
+
 /// A trait for types that can be waited on by the kernel.
 pub trait Waitable: _priv::Sealed {
     /// Returns the raw handle of the waitable object.
@@ -32,12 +43,12 @@ macro_rules! define_handle_type {
 
         impl $name {
             /// Creates a new handle from a raw value, returning `None` if invalid.
-            pub const fn new(raw: $crate::raw::Handle) -> Option<Self> {
-                if raw == $crate::raw::INVALID_HANDLE {
-                    None
-                } else {
-                    Some(Self(raw))
-                }
+            ///
+            /// Delegates to the [`TryFrom`] impl, which is where the invariant is
+            /// checked; this form exists for call sites that have no use for the
+            /// rejection reason.
+            pub fn new(raw: $crate::raw::Handle) -> Option<Self> {
+                <Self as ::core::convert::TryFrom<$crate::raw::Handle>>::try_from(raw).ok()
             }
 
             /// Converts a raw handle to a [`$name`].
@@ -57,6 +68,20 @@ macro_rules! define_handle_type {
             /// Converts the [`$name`] to a raw handle.
             pub const fn to_raw(&self) -> $crate::raw::Handle {
                 self.0
+            }
+        }
+
+        impl ::core::convert::TryFrom<$crate::raw::Handle> for $name {
+            type Error = $crate::handle::InvalidHandleError;
+
+            fn try_from(
+                raw: $crate::raw::Handle,
+            ) -> ::core::result::Result<Self, Self::Error> {
+                if raw == $crate::raw::INVALID_HANDLE {
+                    Err($crate::handle::InvalidHandleError)
+                } else {
+                    Ok(Self(raw))
+                }
             }
         }
 
