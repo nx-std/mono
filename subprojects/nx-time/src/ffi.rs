@@ -66,7 +66,7 @@ pub unsafe extern "C" fn __nx_time__arm_ns_to_ticks(ns: u64) -> u64 {
 pub unsafe extern "C" fn __nx_time__arm_ticks_to_ns(tick: u64) -> u64 {
     // SAFETY: The C caller's contract for `armTicksToNs` is that this argument is a
     // counter-timer reading; nothing at this boundary can check that.
-    clock::aarch64::cpu_ticks_to_ns(Ticks::new_unchecked(tick))
+    clock::aarch64::cpu_ticks_to_ns(Ticks::from_raw_unchecked(tick))
 }
 
 //</editor-fold>

@@ -43,7 +43,7 @@ const_assert_eq!(size_of::<Nanoseconds>(), size_of::<u32>());
 impl Nanoseconds {
     /// The zero value for this type.
     // SAFETY: 0 is within the valid range.
-    pub const ZERO: Self = Nanoseconds::new_unchecked(0);
+    pub const ZERO: Self = Nanoseconds::from_u32_unchecked(0);
 
     /// Constructs an instance of this type from the underlying integer
     /// primitive without checking if the value is within the valid range.
@@ -54,7 +54,7 @@ impl Nanoseconds {
     /// [`Timespec`](crate::sys::timespec::Timespec) renders a nonsensical time.
     /// Prefer [`try_from`](Nanoseconds::try_from), which checks.
     #[inline]
-    pub const fn new_unchecked(val: u32) -> Self {
+    pub const fn from_u32_unchecked(val: u32) -> Self {
         Nanoseconds(val)
     }
 
@@ -83,7 +83,7 @@ impl TryFrom<i64> for Nanoseconds {
         if (NSEC_MIN..=NSEC_MAX).contains(&val) {
             // SAFETY: The range check above proves `val` is in `0..=999_999_999`,
             // so the cast to `u32` is lossless.
-            Ok(Nanoseconds::new_unchecked(val as u32))
+            Ok(Nanoseconds::from_u32_unchecked(val as u32))
         } else {
             Err(OutOfRangeError(val))
         }
@@ -100,7 +100,7 @@ impl TryFrom<u32> for Nanoseconds {
     fn try_from(val: u32) -> Result<Self, Self::Error> {
         if val <= NSEC_MAX as u32 {
             // SAFETY: The bound check above proves `val` is in `0..=999_999_999`.
-            Ok(Nanoseconds::new_unchecked(val))
+            Ok(Nanoseconds::from_u32_unchecked(val))
         } else {
             Err(OutOfRangeError(val))
         }
