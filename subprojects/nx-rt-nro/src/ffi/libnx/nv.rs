@@ -127,7 +127,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_ioctl(
     };
 
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
-    match service.ioctl(unsafe { Fd::new_unchecked(fd) }, request, argp_slice) {
+    match service.ioctl(Fd::from_raw_unchecked(fd), request, argp_slice) {
         Ok(()) => 0,
         Err(err) => err.to_rc(),
     }
@@ -170,12 +170,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_ioctl2(
     };
 
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
-    match service.ioctl2(
-        unsafe { Fd::new_unchecked(fd) },
-        request,
-        argp_slice,
-        inbuf_slice,
-    ) {
+    match service.ioctl2(Fd::from_raw_unchecked(fd), request, argp_slice, inbuf_slice) {
         Ok(()) => 0,
         Err(err) => nv_ioctl2_error_to_rc(err),
     }
@@ -219,7 +214,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_ioctl3(
 
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
     match service.ioctl3(
-        unsafe { Fd::new_unchecked(fd) },
+        Fd::from_raw_unchecked(fd),
         request,
         argp_slice,
         outbuf_slice,
@@ -239,7 +234,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_close(fd: u32) -> u32 {
     };
 
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
-    match service.close_fd(unsafe { Fd::new_unchecked(fd) }) {
+    match service.close_fd(Fd::from_raw_unchecked(fd)) {
         Ok(()) => 0,
         Err(err) => err.to_rc(),
     }
@@ -263,7 +258,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_query_event(
     };
 
     // SAFETY: fd is provided by the C caller who obtained it from nvOpen.
-    match service.query_event(unsafe { Fd::new_unchecked(fd) }, event_id) {
+    match service.query_event(Fd::from_raw_unchecked(fd), event_id) {
         Ok(handle) => {
             unsafe { *event_out = handle };
             0

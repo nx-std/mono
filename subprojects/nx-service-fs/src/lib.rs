@@ -1408,6 +1408,8 @@ pub fn connect_cmif(sm: &SmService) -> Result<FsService, ConnectCmifError> {
     for _ in 1..pool_size {
         let cloned_handle =
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
+        // SAFETY: Cloning a domain session yields another kernel handle addressing the same
+        // domain object table on the server side.
         let cloned_domain =
             unsafe { Domain::from_handle_unchecked(cloned_handle, pointer_buffer_size) };
         sessions.push(cloned_domain);

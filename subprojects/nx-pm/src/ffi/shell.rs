@@ -94,7 +94,8 @@ pub unsafe extern "C" fn __nx_pm__pmshell_terminate_process(process_id: u64) -> 
         return GENERIC_ERROR;
     };
 
-    match svc.terminate_process(unsafe { ProcessId::new_unchecked(process_id) }) {
+    // SAFETY: The C caller supplies a pid it obtained from a `pm:*` call.
+    match svc.terminate_process(ProcessId::from_raw_unchecked(process_id)) {
         Ok(()) => 0,
         Err(e) => e.to_rc(),
     }
@@ -108,7 +109,8 @@ pub unsafe extern "C" fn __nx_pm__pmshell_terminate_program(program_id: u64) -> 
         return GENERIC_ERROR;
     };
 
-    match svc.terminate_program(unsafe { ProgramId::new_unchecked(program_id) }) {
+    // SAFETY: The C caller supplies a program id sourced from NCM/NS or a `pm:*` call.
+    match svc.terminate_program(ProgramId::from_raw_unchecked(program_id)) {
         Ok(()) => 0,
         Err(e) => e.to_rc(),
     }
@@ -177,7 +179,8 @@ pub unsafe extern "C" fn __nx_pm__pmshell_cleanup_process(pid: u64) -> u32 {
         return GENERIC_ERROR;
     };
 
-    match svc.cleanup_process(unsafe { ProcessId::new_unchecked(pid) }) {
+    // SAFETY: The C caller supplies a pid it obtained from a `pm:*` call.
+    match svc.cleanup_process(ProcessId::from_raw_unchecked(pid)) {
         Ok(()) => 0,
         Err(e) => e.to_rc(),
     }
@@ -195,7 +198,8 @@ pub unsafe extern "C" fn __nx_pm__pmshell_clear_jit_debug_occured(pid: u64) -> u
         return GENERIC_ERROR;
     };
 
-    match svc.clear_jit_debug_occurred(unsafe { ProcessId::new_unchecked(pid) }) {
+    // SAFETY: The C caller supplies a pid it obtained from a `pm:*` call.
+    match svc.clear_jit_debug_occurred(ProcessId::from_raw_unchecked(pid)) {
         Ok(()) => 0,
         Err(e) => e.to_rc(),
     }
@@ -328,7 +332,8 @@ pub unsafe extern "C" fn __nx_pm__pmshell_get_process_id(
         return GENERIC_ERROR;
     };
 
-    match svc.get_process_id(unsafe { ProgramId::new_unchecked(program_id) }) {
+    // SAFETY: The C caller supplies a program id sourced from NCM/NS or a `pm:*` call.
+    match svc.get_process_id(ProgramId::from_raw_unchecked(program_id)) {
         Ok(pid) => {
             // SAFETY: caller guarantees `pid_out` is writable.
             unsafe { *pid_out = pid.to_u64() };

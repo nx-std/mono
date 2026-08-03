@@ -18,12 +18,12 @@ pub struct ProcessId(u64);
 impl ProcessId {
     /// Wraps a raw kernel-assigned process id without checking the invariant.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure `raw` is a process id returned by the Horizon
-    /// kernel (e.g. via a `pm:*` dispatch) or otherwise known to identify a
-    /// kernel process. See the [type-level invariant](ProcessId).
-    pub const unsafe fn new_unchecked(raw: u64) -> Self {
+    /// The caller must ensure `raw` is a process id returned by the Horizon kernel (e.g. via
+    /// a `pm:*` dispatch) or otherwise known to identify a kernel process; see the
+    /// [type-level invariant](ProcessId). Nothing here can check that, since only the kernel
+    /// knows which ids are live. A fabricated id is not undefined behaviour: the dispatch it
+    /// reaches fails with a kernel error, which is why this is a safe function.
+    pub const fn from_raw_unchecked(raw: u64) -> Self {
         Self(raw)
     }
 
@@ -49,12 +49,11 @@ pub struct ProgramId(u64);
 impl ProgramId {
     /// Wraps a raw program id without checking the invariant.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure `raw` is a program id sourced from a Horizon
-    /// system component (NCM/NS/`pm:*` IPC) rather than fabricated. See the
-    /// [type-level invariant](ProgramId).
-    pub const unsafe fn new_unchecked(raw: u64) -> Self {
+    /// The caller must ensure `raw` is a program id sourced from a Horizon system component
+    /// (NCM/NS/`pm:*` IPC) rather than fabricated; see the [type-level invariant](ProgramId).
+    /// As with [`ProcessId::from_raw_unchecked`], a fabricated id surfaces as a kernel error
+    /// on dispatch rather than as undefined behaviour.
+    pub const fn from_raw_unchecked(raw: u64) -> Self {
         Self(raw)
     }
 

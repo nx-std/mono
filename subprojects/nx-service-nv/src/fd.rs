@@ -9,14 +9,14 @@
 pub struct Fd(u32);
 
 impl Fd {
-    /// Creates a new file descriptor from a raw value.
+    /// Wraps a raw file descriptor without checking it.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure that `raw` is a valid NV driver file descriptor
-    /// returned by a previous call to [`NvService::open()`](crate::NvService::open).
+    /// The caller must ensure `raw` was returned by a previous
+    /// [`NvService::open()`](crate::NvService::open) and not since closed. The driver owns the
+    /// descriptor table, so nothing here can check that; an unknown descriptor is answered
+    /// with an NV error rather than faulting, which is why this is a safe function.
     #[inline]
-    pub const unsafe fn new_unchecked(raw: u32) -> Self {
+    pub const fn from_raw_unchecked(raw: u32) -> Self {
         Self(raw)
     }
 

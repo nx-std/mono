@@ -343,10 +343,10 @@ pub fn connect_cmif(
     let mut sessions: Vec<Domain> = Vec::with_capacity(num_sessions);
     sessions.push(root);
     for _ in 1..num_sessions {
-        // SAFETY: cloning a domain session yields another kernel handle that
-        // addresses the same domain object table on the server side.
         let cloned_handle =
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
+        // SAFETY: Cloning a domain session yields another kernel handle addressing the same
+        // domain object table on the server side.
         let cloned_domain = unsafe {
             nx_sf::service::Domain::from_handle_unchecked(cloned_handle, pointer_buffer_size)
         };
