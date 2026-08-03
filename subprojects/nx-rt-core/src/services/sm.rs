@@ -6,11 +6,11 @@
 
 pub use nx_service_sm::ConnectError;
 use nx_service_sm::SmService;
-use nx_sf::ServiceName;
 #[cfg(feature = "ffi")]
 use nx_sf::error::ToResultCode as _;
 #[cfg(feature = "ffi")]
 use nx_sf::ffi::Service;
+use nx_sf::{ServiceName, service::OwnedSessionHandle};
 use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
 #[cfg(feature = "ffi")]
 use nx_svc::error::ResultCode;
@@ -124,7 +124,8 @@ pub fn get_service(name: ServiceName) -> Result<Service, GetServiceError> {
     // by the C caller if needed).
     let handle = get_service_handle(name)?;
     Ok(Service {
-        session: handle,
+        // Ownership passes into the C-owned `Service`, which closes the handle itself.
+        session: handle.into_handle(),
         own_handle: 1,
         object_id: 0,
         pointer_buffer_size: 0,
@@ -134,7 +135,7 @@ pub fn get_service(name: ServiceName) -> Result<Service, GetServiceError> {
 /// Gets a service directly from SM (ignoring overrides).
 ///
 /// Returns the raw session handle.
-pub fn get_service_handle(name: ServiceName) -> Result<SessionHandle, GetServiceError> {
+pub fn get_service_handle(name: ServiceName) -> Result<OwnedSessionHandle, GetServiceError> {
     let session = SM_SESSION.read();
     let sm = session.as_ref().expect("SM not initialized");
     sm.get_service_handle_cmif(name).map_err(GetServiceError)
@@ -159,7 +160,7 @@ pub fn register_service(
     name: ServiceName,
     is_light: bool,
     max_sessions: i32,
-) -> Result<SessionHandle, RegisterServiceError> {
+) -> Result<OwnedSessionHandle, RegisterServiceError> {
     let session = SM_SESSION.read();
     let sm = session.as_ref().expect("SM not initialized");
 
@@ -177,7 +178,7 @@ pub fn register_service_cmif(
     name: ServiceName,
     is_light: bool,
     max_sessions: i32,
-) -> Result<SessionHandle, RegisterServiceError> {
+) -> Result<OwnedSessionHandle, RegisterServiceError> {
     let session = SM_SESSION.read();
     let sm = session.as_ref().expect("SM not initialized");
     sm.register_service_cmif(name, is_light, max_sessions)
@@ -189,7 +190,7 @@ pub fn register_service_tipc(
     name: ServiceName,
     is_light: bool,
     max_sessions: i32,
-) -> Result<SessionHandle, RegisterServiceError> {
+) -> Result<OwnedSessionHandle, RegisterServiceError> {
     let session = SM_SESSION.read();
     let sm = session.as_ref().expect("SM not initialized");
     sm.register_service_tipc(name, is_light, max_sessions)

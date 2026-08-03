@@ -30,6 +30,6 @@ pub unsafe extern "C" fn __nx_rt_nso__libnx_env_setup(
 ) {
     // SAFETY: per this function's contract, `main_thread` is the valid
     // kernel-supplied main-thread handle.
-    let main_thread = unsafe { ThreadHandle::from_raw(main_thread) };
+    let main_thread = ThreadHandle::from_raw_unchecked(main_thread);
     env::setup(main_thread, saved_lr);
 }

@@ -27,8 +27,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -52,7 +51,7 @@ pub struct TsService(Session);
 impl TsService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -102,7 +101,7 @@ impl TsService {
     pub fn open_session(&self, device_code: TsDeviceCode) -> Result<TsSession, OpenSessionError> {
         let handle = cmif::open_session(self.0.handle(), device_code as u32)?;
 
-        let service = Session::from_handle(handle, 0);
+        let service = Session::new(handle, 0);
 
         Ok(TsSession(service))
     }
@@ -117,7 +116,7 @@ pub struct TsSession(Session);
 impl TsSession {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -139,7 +138,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<TsService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(TsService(service))
 }

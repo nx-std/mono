@@ -19,15 +19,16 @@ pub struct ProcessEvent {
 impl ProcessEvent {
     /// Adopts an event copy-handle from a successful `pm:shell` dispatch.
     ///
-    /// # Safety
-    ///
-    /// `raw` must be a valid event handle owned by the current process and
-    /// not yet wrapped by any other RAII type. The handle is closed when the
-    /// returned [`ProcessEvent`] is dropped.
-    pub(crate) unsafe fn from_raw(raw: Handle) -> Self {
+    /// The caller must ensure `raw` is an event handle owned by this process that no other
+    /// RAII wrapper already holds, since the returned value closes it on drop. A second owner
+    /// closes a handle number the kernel may have reused, which tears down an unrelated object
+    /// rather than faulting, so this is a safe function.
+    pub(crate) fn from_raw_unchecked(raw: Handle) -> Self {
         Self {
-            // SAFETY: forwarded by the caller.
-            handle: unsafe { EventHandle::from_raw(raw) },
+            // SAFETY: `EventHandle` asserts only that the kernel issued this number, which
+            // this constructor's caller has already vouched for; the sole-ownership half of
+            // the obligation is discharged by the `Drop` below, not by the handle type.
+            handle: EventHandle::from_raw_unchecked(raw),
         }
     }
 
@@ -71,14 +72,15 @@ pub struct ProcessHook {
 impl ProcessHook {
     /// Adopts a hook copy-handle from a successful `pm:dmnt` dispatch.
     ///
-    /// # Safety
-    ///
-    /// `raw` must be a valid event handle owned by the current process and
-    /// not yet wrapped by any other RAII type.
-    pub(crate) unsafe fn from_raw(raw: Handle) -> Self {
+    /// The caller carries the same obligation as
+    /// [`ProcessEvent::from_raw_unchecked`], and breaking it costs the same: a close against a
+    /// handle number the kernel has since reused.
+    pub(crate) fn from_raw_unchecked(raw: Handle) -> Self {
         Self {
-            // SAFETY: forwarded by the caller.
-            handle: unsafe { EventHandle::from_raw(raw) },
+            // SAFETY: `EventHandle` asserts only that the kernel issued this number, which
+            // this constructor's caller has already vouched for; the sole-ownership half of
+            // the obligation is discharged by the `Drop` below, not by the handle type.
+            handle: EventHandle::from_raw_unchecked(raw),
         }
     }
 

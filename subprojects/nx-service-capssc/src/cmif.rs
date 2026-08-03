@@ -4,7 +4,7 @@ use nx_service_vi::ViLayerStack;
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
 /// Captures a raw RGBA8 screenshot with a timeout.
 #[allow(clippy::too_many_arguments)]
 pub fn capture_raw_image_with_timeout(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_stack: ViLayerStack,
     width: u64,
     height: u64,
@@ -70,7 +70,7 @@ pub struct ReadStreamInfo {
 
 /// Opens a raw screenshot read stream.
 pub fn open_raw_screen_shot_read_stream(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_stack: ViLayerStack,
     timeout: i64,
 ) -> Result<ReadStreamInfo, OpenReadStreamError> {
@@ -112,7 +112,7 @@ pub fn open_raw_screen_shot_read_stream(
 
 /// Closes a raw screenshot read stream.
 pub fn close_raw_screen_shot_read_stream(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(), CloseReadStreamError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -131,7 +131,7 @@ pub fn close_raw_screen_shot_read_stream(
 ///
 /// Returns the number of bytes written to the output buffer.
 pub fn read_raw_screen_shot_read_stream(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     offset: u64,
     out_buf: &mut [u8],
 ) -> Result<u64, ReadStreamError> {
@@ -157,7 +157,7 @@ pub fn read_raw_screen_shot_read_stream(
 ///
 /// Returns the size of the captured JPEG in the output buffer.
 pub fn capture_jpeg_screen_shot(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_stack: ViLayerStack,
     timeout: i64,
     out_jpeg: &mut [u8],

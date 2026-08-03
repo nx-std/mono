@@ -16,7 +16,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -39,7 +39,7 @@ pub struct GpioService(Session);
 impl GpioService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -93,7 +93,7 @@ pub struct GpioPadSession(Session);
 impl GpioPadSession {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -228,7 +228,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<GpioService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(GpioService(service))
 }

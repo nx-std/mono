@@ -3,12 +3,15 @@
 use nx_sf::{
     cmif,
     ipc::Handle,
-    service::{DispatchError, OutHandleAttr, Session},
+    service::{BorrowedSessionHandle, DispatchError, OutHandleAttr, OwnedSessionHandle, Session},
 };
 
 use crate::proto;
 
-fn dispatch_no_io(session: Handle, cmd_id: u32) -> Result<(), DispatchNoIoError> {
+fn dispatch_no_io(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<(), DispatchNoIoError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -31,7 +34,11 @@ pub enum DispatchNoIoError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_in_u32(session: Handle, cmd_id: u32, value: u32) -> Result<(), DispatchInU32Error> {
+fn dispatch_in_u32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: u32,
+) -> Result<(), DispatchInU32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -55,7 +62,11 @@ pub enum DispatchInU32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_in_bool(session: Handle, cmd_id: u32, value: bool) -> Result<(), DispatchInBoolError> {
+fn dispatch_in_bool(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+    value: bool,
+) -> Result<(), DispatchInBoolError> {
     let raw: u8 = value as u8;
 
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -81,7 +92,10 @@ pub enum DispatchInBoolError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_u32(session: Handle, cmd_id: u32) -> Result<u32, DispatchOutU32Error> {
+fn dispatch_out_u32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchOutU32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -104,7 +118,10 @@ pub enum DispatchOutU32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_bool(session: Handle, cmd_id: u32) -> Result<bool, DispatchOutBoolError> {
+fn dispatch_out_bool(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<bool, DispatchOutBoolError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -128,7 +145,7 @@ pub enum DispatchOutBoolError {
 }
 
 fn dispatch_in_u32_out_bool(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
@@ -157,7 +174,10 @@ pub enum DispatchInU32OutBoolError {
 }
 
 /// Opens a GPIO pad session by pad name.
-pub fn open_session(session: Handle, pad_name: u32) -> Result<Session, OpenSessionError> {
+pub fn open_session(
+    session: BorrowedSessionHandle<'_>,
+    pad_name: u32,
+) -> Result<Session, OpenSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -176,14 +196,19 @@ pub fn open_session(session: Handle, pad_name: u32) -> Result<Session, OpenSessi
 
     // SAFETY: the kernel returned a valid move handle for the new pad session;
     // ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle = Handle::from_raw_unchecked(raw_handle);
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // Session below becomes its sole owner.
+        OwnedSessionHandle::from_handle_unchecked(handle),
+        0,
+    ))
 }
 
 /// Opens a GPIO pad session by device code (7.0.0+).
 pub fn open_session2(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     device_code: u32,
     access_mode: u32,
 ) -> Result<Session, OpenSession2Error> {
@@ -217,14 +242,19 @@ pub fn open_session2(
 
     // SAFETY: the kernel returned a valid move handle for the new pad session;
     // ownership transfers to the new `Session`.
-    let handle = unsafe { Handle::from_raw(raw_handle) };
+    let handle = Handle::from_raw_unchecked(raw_handle);
 
-    Ok(Session::from_handle(handle, 0))
+    Ok(Session::new(
+        // SAFETY: The server returned a freshly opened session in this reply, so the
+        // Session below becomes its sole owner.
+        OwnedSessionHandle::from_handle_unchecked(handle),
+        0,
+    ))
 }
 
 /// Checks if a wake event is active for the given pad name (pre-7.0.0).
 pub fn is_wake_event_active(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     pad_name: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::IS_WAKE_EVENT_ACTIVE, pad_name)
@@ -232,59 +262,79 @@ pub fn is_wake_event_active(
 
 /// Checks if a wake event is active for the given device code (7.0.0+).
 pub fn is_wake_event_active2(
-    session: Handle,
+    session: BorrowedSessionHandle<'_>,
     device_code: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
     dispatch_in_u32_out_bool(session, proto::IS_WAKE_EVENT_ACTIVE2, device_code)
 }
 
 /// Sets the pad direction.
-pub fn pad_set_direction(session: Handle, direction: u32) -> Result<(), DispatchInU32Error> {
+pub fn pad_set_direction(
+    session: BorrowedSessionHandle<'_>,
+    direction: u32,
+) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::PAD_SET_DIRECTION, direction)
 }
 
 /// Gets the pad direction.
-pub fn pad_get_direction(session: Handle) -> Result<u32, DispatchOutU32Error> {
+pub fn pad_get_direction(session: BorrowedSessionHandle<'_>) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::PAD_GET_DIRECTION)
 }
 
 /// Sets the interrupt mode.
-pub fn pad_set_interrupt_mode(session: Handle, mode: u32) -> Result<(), DispatchInU32Error> {
+pub fn pad_set_interrupt_mode(
+    session: BorrowedSessionHandle<'_>,
+    mode: u32,
+) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::PAD_SET_INTERRUPT_MODE, mode)
 }
 
 /// Gets the interrupt mode.
-pub fn pad_get_interrupt_mode(session: Handle) -> Result<u32, DispatchOutU32Error> {
+pub fn pad_get_interrupt_mode(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::PAD_GET_INTERRUPT_MODE)
 }
 
 /// Enables or disables the interrupt.
-pub fn pad_set_interrupt_enable(session: Handle, enable: bool) -> Result<(), DispatchInBoolError> {
+pub fn pad_set_interrupt_enable(
+    session: BorrowedSessionHandle<'_>,
+    enable: bool,
+) -> Result<(), DispatchInBoolError> {
     dispatch_in_bool(session, proto::PAD_SET_INTERRUPT_ENABLE, enable)
 }
 
 /// Gets whether the interrupt is enabled.
-pub fn pad_get_interrupt_enable(session: Handle) -> Result<bool, DispatchOutBoolError> {
+pub fn pad_get_interrupt_enable(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::PAD_GET_INTERRUPT_ENABLE)
 }
 
 /// Gets the interrupt status (pre-17.0.0).
-pub fn pad_get_interrupt_status(session: Handle) -> Result<u32, DispatchOutU32Error> {
+pub fn pad_get_interrupt_status(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::PAD_GET_INTERRUPT_STATUS)
 }
 
 /// Clears the interrupt status (pre-17.0.0).
-pub fn pad_clear_interrupt_status(session: Handle) -> Result<(), DispatchNoIoError> {
+pub fn pad_clear_interrupt_status(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::PAD_CLEAR_INTERRUPT_STATUS)
 }
 
 /// Sets the pad output value.
-pub fn pad_set_value(session: Handle, value: u32) -> Result<(), DispatchInU32Error> {
+pub fn pad_set_value(
+    session: BorrowedSessionHandle<'_>,
+    value: u32,
+) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::PAD_SET_VALUE, value)
 }
 
 /// Gets the pad input value.
-pub fn pad_get_value(session: Handle) -> Result<u32, DispatchOutU32Error> {
+pub fn pad_get_value(session: BorrowedSessionHandle<'_>) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::PAD_GET_VALUE)
 }
 
@@ -306,27 +356,37 @@ pub fn pad_bind_interrupt(service: &Session) -> Result<u32, BindInterruptError> 
 }
 
 /// Unbinds the interrupt.
-pub fn pad_unbind_interrupt(session: Handle) -> Result<(), DispatchNoIoError> {
+pub fn pad_unbind_interrupt(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::PAD_UNBIND_INTERRUPT)
 }
 
 /// Enables or disables debounce.
-pub fn pad_set_debounce_enabled(session: Handle, enable: bool) -> Result<(), DispatchInBoolError> {
+pub fn pad_set_debounce_enabled(
+    session: BorrowedSessionHandle<'_>,
+    enable: bool,
+) -> Result<(), DispatchInBoolError> {
     dispatch_in_bool(session, proto::PAD_SET_DEBOUNCE_ENABLED, enable)
 }
 
 /// Gets whether debounce is enabled.
-pub fn pad_get_debounce_enabled(session: Handle) -> Result<bool, DispatchOutBoolError> {
+pub fn pad_get_debounce_enabled(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::PAD_GET_DEBOUNCE_ENABLED)
 }
 
 /// Sets the debounce time in milliseconds.
-pub fn pad_set_debounce_time(session: Handle, ms: i32) -> Result<(), DispatchInU32Error> {
+pub fn pad_set_debounce_time(
+    session: BorrowedSessionHandle<'_>,
+    ms: i32,
+) -> Result<(), DispatchInU32Error> {
     dispatch_in_u32(session, proto::PAD_SET_DEBOUNCE_TIME, ms as u32)
 }
 
 /// Gets the debounce time in milliseconds.
-pub fn pad_get_debounce_time(session: Handle) -> Result<i32, DispatchOutU32Error> {
+pub fn pad_get_debounce_time(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<i32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::PAD_GET_DEBOUNCE_TIME).map(|v| v as i32)
 }
 

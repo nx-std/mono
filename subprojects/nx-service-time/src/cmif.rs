@@ -6,7 +6,8 @@
 use nx_sf::{
     cmif,
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    ipc::Handle as SessionHandle,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
 };
 
 use crate::{
@@ -18,8 +19,8 @@ use crate::{
 ///
 /// This is IStaticService command 0.
 pub fn get_standard_user_system_clock(
-    session: SessionHandle,
-) -> Result<SessionHandle, GetSystemClockError> {
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, GetSystemClockError> {
     get_clock_session(session, static_service_cmds::GET_STANDARD_USER_SYSTEM_CLOCK)
 }
 
@@ -27,8 +28,8 @@ pub fn get_standard_user_system_clock(
 ///
 /// This is IStaticService command 1.
 pub fn get_standard_network_system_clock(
-    session: SessionHandle,
-) -> Result<SessionHandle, GetSystemClockError> {
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, GetSystemClockError> {
     get_clock_session(
         session,
         static_service_cmds::GET_STANDARD_NETWORK_SYSTEM_CLOCK,
@@ -39,8 +40,8 @@ pub fn get_standard_network_system_clock(
 ///
 /// This is IStaticService command 2.
 pub fn get_standard_steady_clock(
-    session: SessionHandle,
-) -> Result<SessionHandle, GetSteadyClockError> {
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, GetSteadyClockError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -56,15 +57,17 @@ pub fn get_standard_steady_clock(
     };
 
     // SAFETY: Handle is from a valid IPC response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Gets the time zone service (ITimeZoneService).
 ///
 /// This is IStaticService command 3.
 pub fn get_time_zone_service(
-    session: SessionHandle,
-) -> Result<SessionHandle, GetTimeZoneServiceError> {
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, GetTimeZoneServiceError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -80,14 +83,16 @@ pub fn get_time_zone_service(
     };
 
     // SAFETY: Handle is from a valid IPC response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Gets the shared memory native handle (6.0.0+).
 ///
 /// This is IStaticService command 20.
 pub fn get_shared_memory_native_handle(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<nx_svc::mem::shmem::Handle, GetSharedMemoryError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -105,13 +110,13 @@ pub fn get_shared_memory_native_handle(
     };
 
     // SAFETY: Handle is from a valid IPC response.
-    Ok(unsafe { nx_svc::mem::shmem::Handle::from_raw(handle) })
+    Ok(nx_svc::mem::shmem::Handle::from_raw_unchecked(handle))
 }
 
 /// Gets the current time from a system clock.
 ///
 /// This is ISystemClock command 0.
-pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeError> {
+pub fn get_current_time(session: BorrowedSessionHandle<'_>) -> Result<u64, GetCurrentTimeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -129,7 +134,7 @@ pub fn get_current_time(session: SessionHandle) -> Result<u64, GetCurrentTimeErr
 ///
 /// This is ITimeZoneService command 101.
 pub fn to_calendar_time_with_my_rule(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     timestamp: u64,
 ) -> Result<(TimeCalendarTime, TimeCalendarAdditionalInfo), ToCalendarTimeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -156,9 +161,9 @@ pub fn to_calendar_time_with_my_rule(
 
 /// Helper function to get a clock session (used by user and network system clocks).
 fn get_clock_session(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     command_id: u32,
-) -> Result<SessionHandle, GetSystemClockError> {
+) -> Result<OwnedSessionHandle, GetSystemClockError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -174,7 +179,9 @@ fn get_clock_session(
     };
 
     // SAFETY: Handle is from a valid IPC response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Error returned by system clock retrieval operations.

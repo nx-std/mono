@@ -174,7 +174,7 @@ pub fn connect_dmnt_cmif(sm: &SmService) -> Result<PmDmntService, ConnectDmntCmi
         .get_service_handle_cmif(proto::SERVICE_NAME)
         .map_err(ConnectDmntCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PmDmntService(service))
 }

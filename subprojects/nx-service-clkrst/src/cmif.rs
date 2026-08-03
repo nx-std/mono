@@ -3,7 +3,8 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
 };
 use zerocopy::IntoBytes as _;
 
@@ -30,10 +31,10 @@ struct GetPossibleClockRatesOut {
 
 /// Opens a [`ClkrstSession`](crate::ClkrstSession) for the given module.
 pub fn open_session(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     module_id: PcvModuleId,
     unk: u32,
-) -> Result<SessionHandle, OpenSessionError> {
+) -> Result<OwnedSessionHandle, OpenSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -55,11 +56,16 @@ pub fn open_session(
     };
 
     // SAFETY: the kernel returned a valid session handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Sets the clock rate in Hz.
-pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRateError> {
+pub fn set_clock_rate(
+    session: BorrowedSessionHandle<'_>,
+    hz: u32,
+) -> Result<(), SetClockRateError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -76,7 +82,7 @@ pub fn set_clock_rate(session: SessionHandle, hz: u32) -> Result<(), SetClockRat
 }
 
 /// Gets the current clock rate in Hz.
-pub fn get_clock_rate(session: SessionHandle) -> Result<u32, GetClockRateError> {
+pub fn get_clock_rate(session: BorrowedSessionHandle<'_>) -> Result<u32, GetClockRateError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -103,7 +109,7 @@ pub struct PossibleClockRates {
 /// Fills `rates` with up to `rates.len()` entries and returns the list
 /// type and actual count.
 pub fn get_possible_clock_rates(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     rates: &mut [u32],
 ) -> Result<PossibleClockRates, GetPossibleClockRatesError> {
     let max_count: i32 = rates.len() as i32;

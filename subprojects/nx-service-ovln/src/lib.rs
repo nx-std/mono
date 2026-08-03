@@ -19,7 +19,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -44,7 +44,7 @@ pub struct OvlnRcvService(Session);
 impl OvlnRcvService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -63,7 +63,7 @@ pub struct OvlnSndService(Session);
 impl OvlnSndService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -85,7 +85,7 @@ pub struct OvlnReceiver(Session);
 impl OvlnReceiver {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -126,7 +126,7 @@ pub struct OvlnSender(Session);
 impl OvlnSender {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> nx_svc::ipc::Handle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -153,7 +153,7 @@ pub fn connect_rcv_cmif(sm: &SmService) -> Result<OvlnRcvService, ConnectCmifErr
         .get_service_handle_cmif(SERVICE_NAME_RCV)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(OvlnRcvService(service))
 }
@@ -164,7 +164,7 @@ pub fn connect_snd_cmif(sm: &SmService) -> Result<OvlnSndService, ConnectCmifErr
         .get_service_handle_cmif(SERVICE_NAME_SND)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(OvlnSndService(service))
 }

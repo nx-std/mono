@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the multimedia service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::{proto, types::MmuModuleId};
 
@@ -24,7 +24,7 @@ struct SetAndWaitIn {
 ///
 /// Returns the server-assigned request ID.
 pub fn request_initialize(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
     unk: u32,
     autoclear: bool,
@@ -63,7 +63,7 @@ pub enum RequestInitializeError {
 ///
 /// Returns the server-assigned request ID.
 pub fn request_initialize_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
     unk: u32,
     autoclear: bool,
@@ -91,7 +91,7 @@ pub fn request_initialize_legacy(
 
 /// Finalises a multimedia request (2.0.0+). Keyed by request ID.
 pub fn request_finalize(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     request_id: u32,
 ) -> Result<(), RequestFinalizeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -120,7 +120,7 @@ pub enum RequestFinalizeError {
 
 /// Finalises a multimedia request (legacy, pre-2.0.0). Keyed by module ID.
 pub fn request_finalize_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
 ) -> Result<(), RequestFinalizeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -141,7 +141,7 @@ pub fn request_finalize_legacy(
 
 /// Sets the frequency and waits (2.0.0+). Keyed by request ID.
 pub fn request_set_and_wait(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     request_id: u32,
     freq_hz: u32,
     timeout: i32,
@@ -177,7 +177,7 @@ pub enum RequestSetAndWaitError {
 
 /// Sets the frequency and waits (legacy, pre-2.0.0). Keyed by module ID.
 pub fn request_set_and_wait_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
     freq_hz: u32,
     timeout: i32,
@@ -203,7 +203,10 @@ pub fn request_set_and_wait_legacy(
 }
 
 /// Gets the current frequency in Hz (2.0.0+). Keyed by request ID.
-pub fn request_get(session: SessionHandle, request_id: u32) -> Result<u32, RequestGetError> {
+pub fn request_get(
+    session: BorrowedSessionHandle<'_>,
+    request_id: u32,
+) -> Result<u32, RequestGetError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -231,7 +234,7 @@ pub enum RequestGetError {
 
 /// Gets the current frequency in Hz (legacy, pre-2.0.0). Keyed by module ID.
 pub fn request_get_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
 ) -> Result<u32, RequestGetError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

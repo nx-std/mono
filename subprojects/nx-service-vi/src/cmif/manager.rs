@@ -5,7 +5,7 @@
 use nx_sf::{
     cmif,
     error::{ResultCode, ToResultCode},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 
 /// Creates a managed layer.
 pub fn create_managed_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_flags: u32,
     display_id: DisplayId,
     aruid: u64,
@@ -57,7 +57,7 @@ pub fn create_managed_layer(
 
 /// Destroys a managed layer.
 pub fn destroy_managed_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
 ) -> Result<(), DestroyManagedLayerError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -78,7 +78,7 @@ pub fn destroy_managed_layer(
 
 /// Creates a stray layer on IManagerDisplayService (cmd 2012, 7.0.0+).
 pub fn create_stray_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_flags: u32,
     display_id: DisplayId,
 ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
@@ -92,7 +92,7 @@ pub fn create_stray_layer(
 
 /// Sets display alpha.
 pub fn set_display_alpha(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
     alpha: f32,
 ) -> Result<(), SetDisplayAlphaError> {
@@ -127,7 +127,7 @@ pub fn set_display_alpha(
 
 /// Sets display layer stack.
 pub fn set_display_layer_stack(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
     layer_stack: ViLayerStack,
 ) -> Result<(), SetDisplayLayerStackError> {
@@ -162,7 +162,7 @@ pub fn set_display_layer_stack(
 
 /// Sets display power state.
 pub fn set_display_power_state(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
     power_state: ViPowerState,
 ) -> Result<(), SetDisplayPowerStateError> {
@@ -198,7 +198,7 @@ pub fn set_display_power_state(
 /// Adds a layer to a stack.
 #[expect(dead_code)]
 pub fn add_to_layer_stack(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_stack: ViLayerStack,
     layer_id: LayerId,
 ) -> Result<(), AddToLayerStackError> {
@@ -233,7 +233,7 @@ pub fn add_to_layer_stack(
 
 /// Sets content visibility.
 pub fn set_content_visibility(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     visible: bool,
 ) -> Result<(), SetContentVisibilityError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

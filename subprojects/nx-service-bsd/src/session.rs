@@ -8,9 +8,8 @@
 
 use alloc::boxed::Box;
 
-use nx_sf::service::Session;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 use nx_std_sync::{condvar::Condvar, mutex::Mutex};
-use nx_svc::ipc::Handle as SessionHandle;
 
 /// Maximum number of pool slots representable in the free-mask `u32`.
 pub(crate) const MAX_SESSIONS: usize = 32;
@@ -77,7 +76,7 @@ pub(crate) struct SessionGuard<'a> {
 impl SessionGuard<'_> {
     /// Returns the IPC session handle associated with the held slot.
     #[inline]
-    pub(crate) fn session(&self) -> SessionHandle {
+    pub(crate) fn session(&self) -> BorrowedSessionHandle<'_> {
         self.pool.sessions[self.slot as usize].handle()
     }
 }

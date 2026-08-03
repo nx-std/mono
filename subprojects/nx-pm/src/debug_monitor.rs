@@ -90,9 +90,8 @@ impl DebugMonitorService {
             .inner
             .hook_to_create_process(program_id)
             .map_err(DmntHookToCreateProcessError)?;
-        // SAFETY: `raw` is a fresh kernel handle returned by a successful
-        // pm:dmnt dispatch; ownership transfers to the new `ProcessHook`.
-        Ok(unsafe { ProcessHook::from_raw(raw as Handle) })
+        // SAFETY: The dispatch above returned a fresh hook copy-handle this process owns.
+        Ok(ProcessHook::from_raw_unchecked(raw as Handle))
     }
 
     /// Installs a process-creation hook for `program_id` (pre-5.0.0).
@@ -105,9 +104,8 @@ impl DebugMonitorService {
             .hook_to_create_process_legacy(program_id)
             .map_err(DmntHookToCreateProcessLegacyError)?;
 
-        // SAFETY: `raw` is a fresh kernel handle returned by a successful
-        // pm:dmnt dispatch; ownership transfers to the new `ProcessHook`.
-        Ok(unsafe { ProcessHook::from_raw(raw as Handle) })
+        // SAFETY: The dispatch above returned a fresh hook copy-handle this process owns.
+        Ok(ProcessHook::from_raw_unchecked(raw as Handle))
     }
 
     /// Returns the application's [`ProcessId`].
@@ -138,9 +136,8 @@ impl DebugMonitorService {
             .inner
             .hook_to_create_application_process()
             .map_err(DmntHookToCreateApplicationProcessError)?;
-        // SAFETY: `raw` is a fresh kernel handle returned by a successful
-        // pm:dmnt dispatch; ownership transfers to the new `ProcessHook`.
-        Ok(unsafe { ProcessHook::from_raw(raw as Handle) })
+        // SAFETY: The dispatch above returned a fresh hook copy-handle this process owns.
+        Ok(ProcessHook::from_raw_unchecked(raw as Handle))
     }
 
     /// Installs an application-process-creation hook (pre-5.0.0).
@@ -151,9 +148,8 @@ impl DebugMonitorService {
             .inner
             .hook_to_create_application_process_legacy()
             .map_err(DmntHookToCreateApplicationProcessLegacyError)?;
-        // SAFETY: `raw` is a fresh kernel handle returned by a successful
-        // pm:dmnt dispatch; ownership transfers to the new `ProcessHook`.
-        Ok(unsafe { ProcessHook::from_raw(raw as Handle) })
+        // SAFETY: The dispatch above returned a fresh hook copy-handle this process owns.
+        Ok(ProcessHook::from_raw_unchecked(raw as Handle))
     }
 
     /// Removes a previously installed hook.

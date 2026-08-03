@@ -64,8 +64,8 @@ pub(crate) fn get_system_event_readable_handles(
         return Err(GetSystemEventHandlesError::MissingHandles);
     }
     // SAFETY: the kernel returned valid event handles in both copy slots.
-    let event_request_state = unsafe { EventHandle::from_raw(result.copy_handles[0]) };
-    let event1 = unsafe { EventHandle::from_raw(result.copy_handles[1]) };
+    let event_request_state = EventHandle::from_raw_unchecked(result.copy_handles[0]);
+    let event1 = EventHandle::from_raw_unchecked(result.copy_handles[1]);
     Ok((event_request_state, event1))
 }
 

@@ -1,11 +1,11 @@
 //! CMIF protocol operations for the spsm service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::proto;
 
 /// Initiates system shutdown or reboot.
-pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownError> {
+pub fn shutdown(session: BorrowedSessionHandle<'_>, reboot: bool) -> Result<(), ShutdownError> {
     let in_data: u8 = u8::from(reboot);
 
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -24,7 +24,7 @@ pub fn shutdown(session: SessionHandle, reboot: bool) -> Result<(), ShutdownErro
 }
 
 /// Puts the system into an error state.
-pub fn put_error_state(session: SessionHandle) -> Result<(), PutErrorStateError> {
+pub fn put_error_state(session: BorrowedSessionHandle<'_>) -> Result<(), PutErrorStateError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

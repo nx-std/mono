@@ -157,7 +157,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<FsldrService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
 
     let domain = session
         .convert_to_domain()

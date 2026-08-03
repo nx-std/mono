@@ -3,14 +3,14 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{proto, types::SystemUpdateTaskId};
 
 /// Destroys a system update task.
 pub fn destroy_system_update_task(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     task_id: &SystemUpdateTaskId,
 ) -> Result<(), DestroySystemUpdateTaskError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -33,7 +33,7 @@ pub fn destroy_system_update_task(
 /// Fills `out` with up to `out.len()` task IDs and returns the total count
 /// reported by the service.
 pub fn list_system_update_task(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     out: &mut [SystemUpdateTaskId],
 ) -> Result<i32, ListSystemUpdateTaskError> {
     // SAFETY: IPC operations are serialized on this thread, so no other

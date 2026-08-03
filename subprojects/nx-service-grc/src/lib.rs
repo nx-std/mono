@@ -26,8 +26,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -53,7 +55,7 @@ pub struct GrcdService(Session);
 impl GrcdService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -90,27 +92,32 @@ impl GrcdService {
 ///
 /// Obtained from the applet service via `appletCreateGameMovieTrimmer`.
 /// Callers wrap the resulting session handle with
-/// [`GrcGameMovieTrimmer::from_session_handle`].
+/// [`GrcGameMovieTrimmer::from_raw_unchecked`].
 #[repr(transparent)]
 pub struct GrcGameMovieTrimmer(Session);
 
 impl GrcGameMovieTrimmer {
-    /// Wraps a pre-obtained IGameMovieTrimmer session handle.
+    /// Adopts a pre-obtained IGameMovieTrimmer session handle.
     ///
-    /// # Safety
-    ///
-    /// `handle` must be a valid session handle for an IGameMovieTrimmer object.
+    /// The caller must ensure `handle` names a live IGameMovieTrimmer session this process
+    /// owns and that nothing else will close, since the returned value closes it on drop.
+    /// Neither half can be checked here: only the kernel knows which handle numbers are live,
+    /// and only the server knows which object one addresses. Breaking either costs a rejected
+    /// request or a close against a number the kernel has since reused, not a fault.
     #[inline]
-    pub unsafe fn from_session_handle(handle: u32) -> Self {
-        Self(Session::from_handle(
-            unsafe { SessionHandle::from_raw(handle) },
+    pub fn from_raw_unchecked(handle: u32) -> Self {
+        // SAFETY: Both halves are delegated to this constructor's precondition, which is the
+        // boundary at which the caller vouches for a handle it obtained from the applet
+        // service's `CreateGameMovieTrimmer`.
+        Self(Session::new(
+            OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(handle)),
             0,
         ))
     }
 
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -160,27 +167,29 @@ impl GrcGameMovieTrimmer {
 ///
 /// Obtained by calling GetGrcMovieMaker (cmd 0) on the applet's IMovieMaker
 /// object. Callers wrap the resulting session handle with
-/// [`GrcMovieMaker::from_session_handle`].
+/// [`GrcMovieMaker::from_raw_unchecked`].
 #[repr(transparent)]
 pub struct GrcMovieMaker(Session);
 
 impl GrcMovieMaker {
-    /// Wraps a pre-obtained IMovieMaker session handle.
+    /// Adopts a pre-obtained IMovieMaker session handle.
     ///
-    /// # Safety
-    ///
-    /// `handle` must be a valid session handle for a grc IMovieMaker object.
+    /// The caller carries the same obligation as
+    /// [`GrcGameMovieTrimmer::from_raw_unchecked`], for a grc IMovieMaker session rather than
+    /// an IGameMovieTrimmer one, and breaking it costs the same.
     #[inline]
-    pub unsafe fn from_session_handle(handle: u32) -> Self {
-        Self(Session::from_handle(
-            unsafe { SessionHandle::from_raw(handle) },
+    pub fn from_raw_unchecked(handle: u32) -> Self {
+        // SAFETY: Both halves are delegated to this constructor's precondition, which is the
+        // boundary at which the caller vouches for a handle it obtained from GetGrcMovieMaker.
+        Self(Session::new(
+            OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(handle)),
             0,
         ))
     }
 
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -338,7 +347,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<GrcdService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(GrcdService(service))
 }

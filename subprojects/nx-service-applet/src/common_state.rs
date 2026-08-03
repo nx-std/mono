@@ -43,7 +43,7 @@ pub fn get_event_handle(csg: &DomainObject<'_>) -> Result<EventHandle, GetEventH
     }
 
     // SAFETY: Kernel returned a valid event handle in the response.
-    Ok(unsafe { EventHandle::from_raw(result.copy_handles[0]) })
+    Ok(EventHandle::from_raw_unchecked(result.copy_handles[0]))
 }
 
 /// Error returned by [`get_event_handle`].

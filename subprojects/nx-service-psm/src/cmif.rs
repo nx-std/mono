@@ -1,13 +1,20 @@
 //! CMIF protocol operations for the power supply monitor service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
+};
 
 use crate::{
     proto,
     types::{BatteryChargeInfoFields, BatteryChargeInfoFieldsLegacy},
 };
 
-fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoIoError> {
+fn dispatch_no_io(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<(), DispatchNoIoError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -30,7 +37,10 @@ pub enum DispatchNoIoError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchOutU32Error> {
+fn dispatch_out_u32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchOutU32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -53,7 +63,10 @@ pub enum DispatchOutU32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_f64(session: SessionHandle, cmd_id: u32) -> Result<f64, DispatchOutF64Error> {
+fn dispatch_out_f64(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<f64, DispatchOutF64Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -76,7 +89,10 @@ pub enum DispatchOutF64Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, DispatchOutBoolError> {
+fn dispatch_out_bool(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<bool, DispatchOutBoolError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -100,7 +116,7 @@ pub enum DispatchOutBoolError {
 }
 
 fn dispatch_in_bool(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: bool,
 ) -> Result<(), DispatchInBoolError> {
@@ -129,7 +145,10 @@ pub enum DispatchInBoolError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_event(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchEventError> {
+fn dispatch_event(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchEventError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -158,7 +177,10 @@ pub enum DispatchEventError {
     MissingHandle,
 }
 
-fn dispatch_out_struct<T>(session: SessionHandle, cmd_id: u32) -> Result<T, DispatchOutStructError>
+fn dispatch_out_struct<T>(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<T, DispatchOutStructError>
 where
     T: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
@@ -184,7 +206,9 @@ pub enum DispatchOutStructError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_open_session(session: SessionHandle) -> Result<SessionHandle, OpenSessionError> {
+fn dispatch_open_session(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, OpenSessionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -202,7 +226,9 @@ fn dispatch_open_session(session: SessionHandle) -> Result<SessionHandle, OpenSe
         .ok_or(OpenSessionError::MissingHandle)?;
 
     // SAFETY: the handle comes from a valid IPC response.
-    Ok(unsafe { SessionHandle::from_raw(raw_handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(raw_handle),
+    ))
 }
 
 /// Error returned by [`open_session`].
@@ -216,108 +242,138 @@ pub enum OpenSessionError {
     MissingHandle,
 }
 
-pub fn get_battery_charge_percentage(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_battery_charge_percentage(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_BATTERY_CHARGE_PERCENTAGE)
 }
 
-pub fn get_charger_type(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_charger_type(session: BorrowedSessionHandle<'_>) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_CHARGER_TYPE)
 }
 
-pub fn enable_battery_charging(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn enable_battery_charging(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ENABLE_BATTERY_CHARGING)
 }
 
-pub fn disable_battery_charging(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn disable_battery_charging(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::DISABLE_BATTERY_CHARGING)
 }
 
-pub fn is_battery_charging_enabled(session: SessionHandle) -> Result<bool, DispatchOutBoolError> {
+pub fn is_battery_charging_enabled(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::IS_BATTERY_CHARGING_ENABLED)
 }
 
-pub fn acquire_controller_power_supply(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn acquire_controller_power_supply(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ACQUIRE_CONTROLLER_POWER_SUPPLY)
 }
 
-pub fn release_controller_power_supply(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn release_controller_power_supply(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::RELEASE_CONTROLLER_POWER_SUPPLY)
 }
 
-pub fn open_session(session: SessionHandle) -> Result<SessionHandle, OpenSessionError> {
+pub fn open_session(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<OwnedSessionHandle, OpenSessionError> {
     dispatch_open_session(session)
 }
 
 pub fn enable_enough_power_charge_emulation(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ENABLE_ENOUGH_POWER_CHARGE_EMULATION)
 }
 
 pub fn disable_enough_power_charge_emulation(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::DISABLE_ENOUGH_POWER_CHARGE_EMULATION)
 }
 
-pub fn enable_fast_battery_charging(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn enable_fast_battery_charging(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ENABLE_FAST_BATTERY_CHARGING)
 }
 
-pub fn disable_fast_battery_charging(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn disable_fast_battery_charging(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::DISABLE_FAST_BATTERY_CHARGING)
 }
 
-pub fn get_battery_voltage_state(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_battery_voltage_state(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_BATTERY_VOLTAGE_STATE)
 }
 
 pub fn get_raw_battery_charge_percentage(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<f64, DispatchOutF64Error> {
     dispatch_out_f64(session, proto::GET_RAW_BATTERY_CHARGE_PERCENTAGE)
 }
 
-pub fn is_enough_power_supplied(session: SessionHandle) -> Result<bool, DispatchOutBoolError> {
+pub fn is_enough_power_supplied(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::IS_ENOUGH_POWER_SUPPLIED)
 }
 
-pub fn get_battery_age_percentage(session: SessionHandle) -> Result<f64, DispatchOutF64Error> {
+pub fn get_battery_age_percentage(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<f64, DispatchOutF64Error> {
     dispatch_out_f64(session, proto::GET_BATTERY_AGE_PERCENTAGE)
 }
 
-pub fn get_battery_charge_info_event(session: SessionHandle) -> Result<u32, DispatchEventError> {
+pub fn get_battery_charge_info_event(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchEventError> {
     dispatch_event(session, proto::GET_BATTERY_CHARGE_INFO_EVENT)
 }
 
 pub fn get_battery_charge_info_fields_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<BatteryChargeInfoFieldsLegacy, DispatchOutStructError> {
     dispatch_out_struct(session, proto::GET_BATTERY_CHARGE_INFO_FIELDS)
 }
 
 pub fn get_battery_charge_info_fields(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<BatteryChargeInfoFields, DispatchOutStructError> {
     dispatch_out_struct(session, proto::GET_BATTERY_CHARGE_INFO_FIELDS)
 }
 
 pub fn get_battery_charge_calibrated_event(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, DispatchEventError> {
     dispatch_event(session, proto::GET_BATTERY_CHARGE_CALIBRATED_EVENT)
 }
 
-pub fn session_bind_state_change_event(session: SessionHandle) -> Result<u32, DispatchEventError> {
+pub fn session_bind_state_change_event(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchEventError> {
     dispatch_event(session, proto::SESSION_BIND_STATE_CHANGE_EVENT)
 }
 
-pub fn session_unbind_state_change_event(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn session_unbind_state_change_event(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::SESSION_UNBIND_STATE_CHANGE_EVENT)
 }
 
 pub fn session_set_charger_type_change_event_enabled(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     enabled: bool,
 ) -> Result<(), DispatchInBoolError> {
     dispatch_in_bool(
@@ -328,7 +384,7 @@ pub fn session_set_charger_type_change_event_enabled(
 }
 
 pub fn session_set_power_supply_change_event_enabled(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     enabled: bool,
 ) -> Result<(), DispatchInBoolError> {
     dispatch_in_bool(
@@ -339,7 +395,7 @@ pub fn session_set_power_supply_change_event_enabled(
 }
 
 pub fn session_set_battery_voltage_state_change_event_enabled(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     enabled: bool,
 ) -> Result<(), DispatchInBoolError> {
     dispatch_in_bool(

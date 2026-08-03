@@ -1,6 +1,6 @@
 //! CMIF protocol operations for the operation mode manager service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::proto;
 
@@ -8,7 +8,7 @@ use crate::proto;
 ///
 /// Returns the raw `u8` value; the caller should convert via
 /// [`OperationMode::from_raw`](crate::OperationMode::from_raw).
-pub fn get_operation_mode(session: SessionHandle) -> Result<u8, GetOperationModeError> {
+pub fn get_operation_mode(session: BorrowedSessionHandle<'_>) -> Result<u8, GetOperationModeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -35,7 +35,7 @@ pub enum GetOperationModeError {
 
 /// Sets the operation mode policy (3.0.0+).
 pub fn set_operation_mode_policy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     policy: u8,
 ) -> Result<(), SetOperationModePolicyError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -68,7 +68,7 @@ pub enum SetOperationModePolicyError {
 ///
 /// Returns `(width, height)`.
 pub fn get_default_display_resolution(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(i32, i32), GetDefaultDisplayResolutionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.

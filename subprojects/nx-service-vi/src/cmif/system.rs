@@ -5,7 +5,7 @@
 use nx_sf::{
     cmif,
     error::{ResultCode, ToResultCode},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 
 /// Creates a stray layer on ISystemDisplayService (cmd 2312, pre-7.0.0).
 pub fn create_stray_layer(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_flags: u32,
     display_id: DisplayId,
 ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
@@ -30,7 +30,7 @@ pub fn create_stray_layer(
 
 /// Gets Z-order count minimum.
 pub fn get_z_order_count_min(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<i64, GetZOrderCountError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -53,7 +53,7 @@ pub fn get_z_order_count_min(
 
 /// Gets Z-order count maximum.
 pub fn get_z_order_count_max(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<i64, GetZOrderCountError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -85,7 +85,7 @@ pub struct LogicalResolution {
 
 /// Gets display logical resolution.
 pub fn get_display_logical_resolution(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<LogicalResolution, GetDisplayLogicalResolutionError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -117,7 +117,7 @@ pub fn get_display_logical_resolution(
 
 /// Sets display magnification (3.0.0+).
 pub fn set_display_magnification(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
     x: i32,
     y: i32,
@@ -159,7 +159,7 @@ pub fn set_display_magnification(
 
 /// Sets layer position.
 pub fn set_layer_position(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
     x: f32,
     y: f32,
@@ -195,7 +195,7 @@ pub fn set_layer_position(
 
 /// Sets layer size.
 pub fn set_layer_size(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
     width: i64,
     height: i64,
@@ -231,7 +231,7 @@ pub fn set_layer_size(
 
 /// Sets layer Z-order.
 pub fn set_layer_z(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
     z: i64,
 ) -> Result<(), SetLayerZError> {
@@ -264,7 +264,7 @@ pub fn set_layer_z(
 
 /// Sets layer visibility.
 pub fn set_layer_visibility(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
     visible: bool,
 ) -> Result<(), SetLayerVisibilityError> {

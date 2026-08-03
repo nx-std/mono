@@ -20,8 +20,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -46,7 +45,7 @@ pub struct PsmService(Session);
 impl PsmService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -203,7 +202,7 @@ impl PsmService {
     #[inline]
     pub fn open_session(&self) -> Result<PsmSession, OpenSessionError> {
         let handle = cmif::open_session(self.0.handle())?;
-        Ok(PsmSession(Session::from_handle(handle, 0)))
+        Ok(PsmSession(Session::new(handle, 0)))
     }
 }
 
@@ -219,7 +218,7 @@ pub struct PsmSession(Session);
 impl PsmSession {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -273,7 +272,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<PsmService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PsmService(service))
 }

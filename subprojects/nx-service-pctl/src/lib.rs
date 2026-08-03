@@ -207,7 +207,7 @@ fn connect_factory(sm: &SmService) -> Result<Domain, ConnectCmifError> {
         .get_service_handle_cmif(proto::SERVICE_NAME_A)
         .map_err(ConnectCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
 
     session
         .convert_to_domain()

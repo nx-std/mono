@@ -32,8 +32,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -64,7 +66,7 @@ unsafe impl Sync for AccService {}
 impl AccService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -96,7 +98,12 @@ impl AccService {
     pub fn get_profile(&self, uid: AccountUid) -> Result<AccountProfile, GetProfileError> {
         let raw_handle = cmif::get_profile(&self.0, uid)?;
 
-        let service = Session::from_handle(unsafe { SessionHandle::from_raw(raw_handle) }, 0);
+        // SAFETY: The server returned a freshly opened profile session in this reply, so the
+        // `Session` below is its sole owner.
+        let handle = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
+        let service = Session::new(handle, 0);
 
         Ok(AccountProfile(service))
     }
@@ -150,7 +157,7 @@ unsafe impl Sync for AccountProfile {}
 impl AccountProfile {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -188,7 +195,7 @@ pub fn connect_cmif_application(sm: &SmService) -> Result<AccService, ConnectCmi
         .get_service_handle_cmif(SERVICE_NAME_APPLICATION)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AccService(service))
 }
@@ -199,7 +206,7 @@ pub fn connect_cmif_system(sm: &SmService) -> Result<AccService, ConnectCmifErro
         .get_service_handle_cmif(SERVICE_NAME_SYSTEM)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AccService(service))
 }
@@ -210,7 +217,7 @@ pub fn connect_cmif_administrator(sm: &SmService) -> Result<AccService, ConnectC
         .get_service_handle_cmif(SERVICE_NAME_ADMINISTRATOR)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(AccService(service))
 }

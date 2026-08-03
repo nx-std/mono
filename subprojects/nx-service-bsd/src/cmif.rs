@@ -12,8 +12,9 @@
 use nx_sf::{
     cmif::{self, ParseError},
     hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
+    service::BorrowedSessionHandle,
 };
-use nx_svc::{ipc::Handle as SessionHandle, mem::tmem::Handle as TmemHandle};
+use nx_svc::mem::tmem::Handle as TmemHandle;
 use nx_sys_thread_tls::IpcBuffer;
 
 use crate::{
@@ -31,7 +32,7 @@ use crate::{
 /// Returns the client PID the service assigned, which must subsequently be
 /// passed to [`start_monitoring`] on the monitor session.
 pub(crate) fn register_client(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     config: &BsdConfig,
     tmem_handle: TmemHandle,
     tmem_size: u64,
@@ -73,7 +74,7 @@ pub(crate) fn register_client(
 
 /// Sends `IBsdServices::StartMonitoring` (cmd 1) on `monitor_session`.
 pub(crate) fn start_monitoring(
-    monitor_session: SessionHandle,
+    monitor_session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<(), StartMonitoringError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -157,7 +158,7 @@ enum ServiceResponseFailure {
 
 /// `bsdSocket` (cmd 2).
 pub(crate) fn socket(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     domain: i32,
     type_: i32,
     protocol: i32,
@@ -186,7 +187,7 @@ pub(crate) fn socket(
 }
 
 /// `bsdClose` (cmd 26).
-pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseError> {
+pub(crate) fn close(session: BorrowedSessionHandle<'_>, fd: BsdSockFd) -> Result<(), CloseError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -208,7 +209,7 @@ pub(crate) fn close(session: SessionHandle, fd: BsdSockFd) -> Result<(), CloseEr
 
 /// `bsdBind` (cmd 13).
 pub(crate) fn bind(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     addr: &[u8],
 ) -> Result<(), BindError> {
@@ -226,7 +227,7 @@ pub(crate) fn bind(
 
 /// `bsdConnect` (cmd 14).
 pub(crate) fn connect(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     addr: &[u8],
 ) -> Result<(), ConnectError> {
@@ -246,7 +247,7 @@ pub(crate) fn connect(
 /// buffer, then drops the standard `{ ret; errno }` reply on the floor.
 #[allow(clippy::too_many_arguments)]
 fn bsd_send_recv_no_buffer_in<E>(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     sockfd: BsdSockFd,
     addr: &[u8],
@@ -277,7 +278,7 @@ fn bsd_send_recv_no_buffer_in<E>(
 /// out-only sockaddr buffer, then reads back the actual `socklen_t` length.
 #[allow(clippy::too_many_arguments)]
 fn bsd_cmd_in_sockfd_out_sockaddr<E>(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     sockfd: BsdSockFd,
     addr_buf: &mut [u8],
@@ -309,7 +310,7 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
 /// `bsdAccept` (cmd 12). Returns the new socket fd and the actual `socklen_t`
 /// length written into `addr_buf`.
 pub(crate) fn accept(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     addr_buf: &mut [u8],
 ) -> Result<(BsdSockFd, u32), AcceptError> {
@@ -327,7 +328,7 @@ pub(crate) fn accept(
 
 /// `bsdGetSockName` (cmd 16). Returns the actual `socklen_t` length.
 pub(crate) fn get_sock_name(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     addr_buf: &mut [u8],
 ) -> Result<u32, GetSockNameError> {
@@ -345,7 +346,7 @@ pub(crate) fn get_sock_name(
 
 /// `bsdGetPeerName` (cmd 15). Returns the actual `socklen_t` length.
 pub(crate) fn get_peer_name(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     addr_buf: &mut [u8],
 ) -> Result<u32, GetPeerNameError> {
@@ -363,7 +364,7 @@ pub(crate) fn get_peer_name(
 
 /// `bsdListen` (cmd 18).
 pub(crate) fn listen(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     backlog: i32,
 ) -> Result<(), ListenError> {
@@ -391,7 +392,7 @@ pub(crate) fn listen(
 
 /// `bsdShutdown` (cmd 22).
 pub(crate) fn shutdown(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     how: i32,
 ) -> Result<(), ShutdownError> {
@@ -419,7 +420,7 @@ pub(crate) fn shutdown(
 
 /// `bsdRecv` (cmd 8).
 pub(crate) fn recv(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     buf: &mut [u8],
     flags: i32,
@@ -449,7 +450,7 @@ pub(crate) fn recv(
 
 /// `bsdRecvFrom` (cmd 9). Returns `(bytes_received, actual_src_addr_len)`.
 pub(crate) fn recv_from(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     buf: &mut [u8],
     flags: i32,
@@ -482,7 +483,7 @@ pub(crate) fn recv_from(
 
 /// `bsdSend` (cmd 10).
 pub(crate) fn send(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     buf: &[u8],
     flags: i32,
@@ -512,7 +513,7 @@ pub(crate) fn send(
 
 /// `bsdSendTo` (cmd 11).
 pub(crate) fn send_to(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     buf: &[u8],
     flags: i32,
@@ -544,7 +545,7 @@ pub(crate) fn send_to(
 
 /// `bsdRead` (cmd 25).
 pub(crate) fn read(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: BsdSockFd,
     buf: &mut [u8],
 ) -> Result<usize, ReadError> {
@@ -570,7 +571,7 @@ pub(crate) fn read(
 
 /// `bsdWrite` (cmd 24).
 pub(crate) fn write(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: BsdSockFd,
     buf: &[u8],
 ) -> Result<usize, WriteError> {
@@ -596,7 +597,7 @@ pub(crate) fn write(
 
 /// `bsdGetSockOpt` (cmd 17). Returns the actual `socklen_t` written.
 pub(crate) fn get_sock_opt(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     level: i32,
     optname: i32,
@@ -629,7 +630,7 @@ pub(crate) fn get_sock_opt(
 
 /// `bsdSetSockOpt` (cmd 21).
 pub(crate) fn set_sock_opt(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
     level: i32,
     optname: i32,
@@ -663,7 +664,7 @@ pub(crate) fn set_sock_opt(
 /// other commands (e.g. returning `EOPNOTSUPP` without a server round-trip)
 /// is left to the higher layer that wraps this function.
 pub(crate) fn fcntl(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: BsdSockFd,
     cmd: i32,
     flags: i32,
@@ -699,7 +700,7 @@ pub(crate) fn fcntl(
 /// special cases (which reach into the caller's buffer to find sub-buffers)
 /// are not implemented yet.
 pub(crate) fn ioctl(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fd: BsdSockFd,
     request: i32,
     data: &mut [u8],
@@ -776,7 +777,7 @@ pub struct SelectTimeout {
 /// transmitted as null. Pass `None` for `timeout` to send the libnx
 /// `is_null=true` sentinel.
 pub(crate) fn select(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     nfds: i32,
     readfds: &mut [u8],
     writefds: &mut [u8],
@@ -840,7 +841,7 @@ pub(crate) fn select(
 /// `bsdPoll` (cmd 6). `fds` must have layout matching libnx's `pollfd` array;
 /// it is read as input and written back as output.
 pub(crate) fn poll(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fds: &mut [u8],
     nfds: u64,
     timeout: i32,

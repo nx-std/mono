@@ -45,7 +45,7 @@ pub fn connect_bm_cmif(sm: &SmService) -> Result<PmBmService, ConnectBmCmifError
         .get_service_handle_cmif(proto::SERVICE_NAME)
         .map_err(ConnectBmCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PmBmService(service))
 }

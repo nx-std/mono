@@ -44,7 +44,7 @@ pub unsafe extern "C" fn __nx_rt_nso__libnx_applet_initialize() -> u32 {
     let process_handle = env::own_process_handle()
         .map(|h| {
             // SAFETY: a handle from `env::own_process_handle()` is valid.
-            unsafe { ProcessHandle::from_raw(h.to_raw()) }
+            ProcessHandle::from_raw_unchecked(h.to_raw())
         })
         .unwrap_or_else(ProcessHandle::current_process);
 

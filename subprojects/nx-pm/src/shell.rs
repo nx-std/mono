@@ -67,8 +67,8 @@ impl ShellService {
             .inner
             .get_process_event_handle()
             .map_err(ShellGetProcessEventHandleError)?;
-        // SAFETY: `raw` was just returned by a successful pm:shell dispatch.
-        Ok(unsafe { ProcessEvent::from_raw(raw as Handle) })
+        // SAFETY: The dispatch above returned a fresh event copy-handle this process owns.
+        Ok(ProcessEvent::from_raw_unchecked(raw as Handle))
     }
 
     /// Reads the next [`ProcessEventInfo`].

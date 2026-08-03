@@ -65,7 +65,7 @@ pub fn connect_info_cmif(sm: &SmService) -> Result<PmInfoService, ConnectInfoCmi
         .get_service_handle_cmif(proto::SERVICE_NAME)
         .map_err(ConnectInfoCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PmInfoService(service))
 }

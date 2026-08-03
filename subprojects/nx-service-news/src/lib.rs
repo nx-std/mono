@@ -28,8 +28,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod dispatch;
@@ -429,8 +431,9 @@ impl NewsOverwriteEventHolder {
 fn make_service(raw_handle: u32) -> Session {
     // SAFETY: the kernel returned a valid move handle in the IPC response,
     // transferring ownership of the session to this process.
-    let handle = unsafe { SessionHandle::from_raw(raw_handle) };
-    Session::from_handle(handle, 0)
+    let handle =
+        OwnedSessionHandle::from_handle_unchecked(RawSessionHandle::from_raw_unchecked(raw_handle));
+    Session::new(handle, 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +452,7 @@ pub fn connect_cmif(
         .get_service_handle_cmif(service_type.service_name())
         .map_err(ConnectCmifError::GetService)?;
 
-    let creator = Session::from_handle(session, 0);
+    let creator = Session::new(session, 0);
 
     let service = match cmif::create_news_service(&creator) {
         Ok(handle) => make_service(handle),
@@ -471,7 +474,7 @@ pub fn connect_cmif_legacy(
         .get_service_handle_cmif(service_type.service_name())
         .map_err(ConnectCmifLegacyError::GetService)?;
 
-    let service = Session::from_handle(session, 0);
+    let service = Session::new(session, 0);
 
     Ok(NewsServiceLegacy { service })
 }

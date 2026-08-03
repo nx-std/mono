@@ -3,7 +3,7 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{proto, types::MiiimgImageAttribute};
@@ -11,7 +11,7 @@ use crate::{proto, types::MiiimgImageAttribute};
 /// Initializes the image database.
 ///
 /// Sends a `u8` mode value and returns a `u8` result.
-pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeError> {
+pub fn initialize(session: BorrowedSessionHandle<'_>, mode: u8) -> Result<u8, InitializeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -29,7 +29,7 @@ pub fn initialize(session: SessionHandle, mode: u8) -> Result<u8, InitializeErro
 }
 
 /// Reloads the image database.
-pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
+pub fn reload(session: BorrowedSessionHandle<'_>) -> Result<(), ReloadError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -44,7 +44,7 @@ pub fn reload(session: SessionHandle) -> Result<(), ReloadError> {
 }
 
 /// Gets the number of mii images in the database.
-pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
+pub fn get_count(session: BorrowedSessionHandle<'_>) -> Result<i32, GetCountError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -60,7 +60,7 @@ pub fn get_count(session: SessionHandle) -> Result<i32, GetCountError> {
 }
 
 /// Gets whether the image database is empty.
-pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
+pub fn is_empty(session: BorrowedSessionHandle<'_>) -> Result<bool, IsEmptyError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -76,7 +76,7 @@ pub fn is_empty(session: SessionHandle) -> Result<bool, IsEmptyError> {
 }
 
 /// Gets whether the image database is full.
-pub fn is_full(session: SessionHandle) -> Result<bool, IsFullError> {
+pub fn is_full(session: BorrowedSessionHandle<'_>) -> Result<bool, IsFullError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -93,7 +93,7 @@ pub fn is_full(session: SessionHandle) -> Result<bool, IsFullError> {
 
 /// Gets the image attribute for the specified index.
 pub fn get_attribute(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     index: i32,
 ) -> Result<MiiimgImageAttribute, GetAttributeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -115,7 +115,7 @@ pub fn get_attribute(
 
 /// Loads the image data (raw RGBA8) for the specified image ID.
 pub fn load_image(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     id: crate::types::MiiimgImageId,
     dst: &mut [u8],
 ) -> Result<(), LoadImageError> {

@@ -39,8 +39,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::{
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+};
 
 mod cmif;
 mod proto;
@@ -63,7 +65,7 @@ pub struct HwopusService(Session);
 impl HwopusService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 
@@ -115,9 +117,11 @@ impl HwopusService {
 
         // SAFETY: `raw_handle` is a fresh kernel session handle returned by
         // `OpenHardwareOpusDecoder`; ownership transfers to the new `Session`.
-        let session = unsafe { SessionHandle::from_raw(raw_handle) };
+        let session = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
         Ok(HwopusDecoder {
-            service: Session::from_handle(session, 0),
+            service: Session::new(session, 0),
             multistream: false,
         })
     }
@@ -144,9 +148,11 @@ impl HwopusService {
         // SAFETY: `raw_handle` is a fresh kernel session handle returned by
         // `OpenHardwareOpusDecoderForMultiStream`; ownership transfers to the
         // new `Session`.
-        let session = unsafe { SessionHandle::from_raw(raw_handle) };
+        let session = OwnedSessionHandle::from_handle_unchecked(
+            RawSessionHandle::from_raw_unchecked(raw_handle),
+        );
         Ok(HwopusDecoder {
-            service: Session::from_handle(session, 0),
+            service: Session::new(session, 0),
             multistream: true,
         })
     }
@@ -170,7 +176,7 @@ unsafe impl Sync for HwopusDecoder {}
 impl HwopusDecoder {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.service.handle()
     }
 
@@ -252,7 +258,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<HwopusService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(HwopusService(service))
 }

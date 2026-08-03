@@ -1,10 +1,13 @@
 //! CMIF protocol operations for the backlight service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 
 use crate::proto;
 
-fn dispatch_no_io(session: SessionHandle, cmd_id: u32) -> Result<(), DispatchNoIoError> {
+fn dispatch_no_io(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<(), DispatchNoIoError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -28,7 +31,7 @@ pub enum DispatchNoIoError {
 }
 
 fn dispatch_in_u64(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: u64,
 ) -> Result<(), DispatchInU64Error> {
@@ -57,7 +60,7 @@ pub enum DispatchInU64Error {
 }
 
 fn dispatch_in_f32(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     value: f32,
 ) -> Result<(), DispatchInF32Error> {
@@ -85,7 +88,10 @@ pub enum DispatchInF32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_f32(session: SessionHandle, cmd_id: u32) -> Result<f32, DispatchOutF32Error> {
+fn dispatch_out_f32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<f32, DispatchOutF32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -108,7 +114,10 @@ pub enum DispatchOutF32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_bool(session: SessionHandle, cmd_id: u32) -> Result<bool, DispatchOutBoolError> {
+fn dispatch_out_bool(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<bool, DispatchOutBoolError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -131,7 +140,10 @@ pub enum DispatchOutBoolError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-fn dispatch_out_u32(session: SessionHandle, cmd_id: u32) -> Result<u32, DispatchOutU32Error> {
+fn dispatch_out_u32(
+    session: BorrowedSessionHandle<'_>,
+    cmd_id: u32,
+) -> Result<u32, DispatchOutU32Error> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -154,27 +166,29 @@ pub enum DispatchOutU32Error {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-pub fn save_current_setting(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn save_current_setting(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::SAVE_CURRENT_SETTING)
 }
 
-pub fn load_current_setting(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn load_current_setting(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::LOAD_CURRENT_SETTING)
 }
 
 pub fn set_current_brightness_setting(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     brightness: f32,
 ) -> Result<(), DispatchInF32Error> {
     dispatch_in_f32(session, proto::SET_CURRENT_BRIGHTNESS_SETTING, brightness)
 }
 
-pub fn get_current_brightness_setting(session: SessionHandle) -> Result<f32, DispatchOutF32Error> {
+pub fn get_current_brightness_setting(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<f32, DispatchOutF32Error> {
     dispatch_out_f32(session, proto::GET_CURRENT_BRIGHTNESS_SETTING)
 }
 
 pub fn apply_current_brightness_setting_to_backlight(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(
         session,
@@ -183,64 +197,72 @@ pub fn apply_current_brightness_setting_to_backlight(
 }
 
 pub fn get_brightness_setting_applied_to_backlight(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<f32, DispatchOutF32Error> {
     dispatch_out_f32(session, proto::GET_BRIGHTNESS_SETTING_APPLIED_TO_BACKLIGHT)
 }
 
 pub fn switch_backlight_on(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fade_time: u64,
 ) -> Result<(), DispatchInU64Error> {
     dispatch_in_u64(session, proto::SWITCH_BACKLIGHT_ON, fade_time)
 }
 
 pub fn switch_backlight_off(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     fade_time: u64,
 ) -> Result<(), DispatchInU64Error> {
     dispatch_in_u64(session, proto::SWITCH_BACKLIGHT_OFF, fade_time)
 }
 
-pub fn get_backlight_switch_status(session: SessionHandle) -> Result<u32, DispatchOutU32Error> {
+pub fn get_backlight_switch_status(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<u32, DispatchOutU32Error> {
     dispatch_out_u32(session, proto::GET_BACKLIGHT_SWITCH_STATUS)
 }
 
-pub fn enable_dimming(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn enable_dimming(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ENABLE_DIMMING)
 }
 
-pub fn disable_dimming(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn disable_dimming(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::DISABLE_DIMMING)
 }
 
-pub fn is_dimming_enabled(session: SessionHandle) -> Result<bool, DispatchOutBoolError> {
+pub fn is_dimming_enabled(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::IS_DIMMING_ENABLED)
 }
 
-pub fn enable_auto_brightness_control(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn enable_auto_brightness_control(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ENABLE_AUTO_BRIGHTNESS_CONTROL)
 }
 
-pub fn disable_auto_brightness_control(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn disable_auto_brightness_control(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::DISABLE_AUTO_BRIGHTNESS_CONTROL)
 }
 
 pub fn is_auto_brightness_control_enabled(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::IS_AUTO_BRIGHTNESS_CONTROL_ENABLED)
 }
 
 pub fn set_ambient_light_sensor_value(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     value: f32,
 ) -> Result<(), DispatchInF32Error> {
     dispatch_in_f32(session, proto::SET_AMBIENT_LIGHT_SENSOR_VALUE, value)
 }
 
 pub fn get_ambient_light_sensor_value(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<GetAmbientLightSensorValueOut, GetAmbientLightSensorValueError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
@@ -284,13 +306,13 @@ pub enum GetAmbientLightSensorValueError {
 }
 
 pub fn is_ambient_light_sensor_available(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::IS_AMBIENT_LIGHT_SENSOR_AVAILABLE)
 }
 
 pub fn set_current_brightness_setting_for_vr_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     brightness: f32,
 ) -> Result<(), DispatchInF32Error> {
     dispatch_in_f32(
@@ -301,19 +323,21 @@ pub fn set_current_brightness_setting_for_vr_mode(
 }
 
 pub fn get_current_brightness_setting_for_vr_mode(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<f32, DispatchOutF32Error> {
     dispatch_out_f32(session, proto::GET_CURRENT_BRIGHTNESS_SETTING_FOR_VR_MODE)
 }
 
-pub fn enable_vr_mode(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn enable_vr_mode(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::ENABLE_VR_MODE)
 }
 
-pub fn disable_vr_mode(session: SessionHandle) -> Result<(), DispatchNoIoError> {
+pub fn disable_vr_mode(session: BorrowedSessionHandle<'_>) -> Result<(), DispatchNoIoError> {
     dispatch_no_io(session, proto::DISABLE_VR_MODE)
 }
 
-pub fn is_vr_mode_enabled(session: SessionHandle) -> Result<bool, DispatchOutBoolError> {
+pub fn is_vr_mode_enabled(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<bool, DispatchOutBoolError> {
     dispatch_out_bool(session, proto::IS_VR_MODE_ENABLED)
 }

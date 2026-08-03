@@ -150,7 +150,7 @@ fn connect_domain(sm: &SmService, name: nx_sf::ServiceName) -> Result<Domain, Co
         .get_service_handle_cmif(name)
         .map_err(ConnectCmifError::GetService)?;
 
-    let session = Session::new(handle);
+    let session = Session::open(handle);
 
     session
         .convert_to_domain()

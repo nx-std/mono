@@ -8,7 +8,7 @@ use core::{mem::size_of, slice};
 use nx_sf::{
     error::{ResultCode, ToResultCode},
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
     tipc,
 };
 
@@ -20,7 +20,7 @@ use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, Firmwar
 /// Requires HOS 12.0.0+ or Atmosphere.
 #[inline]
 pub fn get_firmware_version(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
     get_firmware_version_inner(session, CMD_GET_FIRMWARE_VERSION_2)
 }
@@ -31,14 +31,14 @@ pub fn get_firmware_version(
 /// This command zeros the revision field in the output.
 #[inline]
 pub fn get_firmware_version_legacy(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
     get_firmware_version_inner(session, CMD_GET_FIRMWARE_VERSION)
 }
 
 /// Inner implementation that takes a command ID.
 fn get_firmware_version_inner(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
     // Allocate output buffer on stack.

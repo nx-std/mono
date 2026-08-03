@@ -7,9 +7,9 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     hipc::{BufferMode, InputBuffer},
+    service::BorrowedSessionHandle,
     tipc,
 };
-use nx_svc::ipc::Handle as SessionHandle;
 
 use crate::proto;
 
@@ -22,7 +22,7 @@ use crate::proto;
 /// Requires HOS 12.0.0+ or Atmosphere.
 #[inline]
 pub fn register_process(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     acid_sac: &[u8],
     aci0_sac: &[u8],
@@ -62,7 +62,10 @@ pub enum RegisterProcessError {
 ///
 /// Requires HOS 12.0.0+ or Atmosphere.
 #[inline]
-pub fn unregister_process(session: SessionHandle, pid: u64) -> Result<(), UnregisterProcessError> {
+pub fn unregister_process(
+    session: BorrowedSessionHandle<'_>,
+    pid: u64,
+) -> Result<(), UnregisterProcessError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

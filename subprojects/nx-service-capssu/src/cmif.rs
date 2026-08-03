@@ -5,7 +5,7 @@ use core::mem::size_of;
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
 
 /// Sets the shim library version. Called during initialization on 7.0.0+.
 pub fn set_shim_library_version(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     version: u64,
     applet_resource_user_id: u64,
 ) -> Result<(), SetShimVersionError> {
@@ -44,7 +44,7 @@ pub fn set_shim_library_version(
 
 /// Saves a screenshot with the given attributes.
 pub fn save_screen_shot_ex0(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     attr: &ScreenShotAttribute,
     report_option: u32,
     applet_resource_user_id: u64,
@@ -76,7 +76,7 @@ pub fn save_screen_shot_ex0(
 
 /// Saves a screenshot with attributes and application data. [7.0.0+]
 pub fn save_screen_shot_ex1(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     attr: &ScreenShotAttribute,
     report_option: u32,
     applet_resource_user_id: u64,
@@ -119,7 +119,7 @@ pub fn save_screen_shot_ex1(
 
 /// Saves a screenshot with attributes and user IDs. [6.0.0+]
 pub fn save_screen_shot_ex2(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     attr: &ScreenShotAttribute,
     report_option: u32,
     applet_resource_user_id: u64,

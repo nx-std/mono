@@ -3,7 +3,7 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
 
 /// Decodes a JPEG buffer into RGBA8.
 pub fn decode_jpeg(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     width: u32,
     height: u32,
     opts: &ScreenShotDecodeOption,
@@ -44,7 +44,7 @@ pub fn decode_jpeg(
 
 /// Shrinks a JPEG's dimensions by 2 with auto-quality selection.
 pub fn shrink_jpeg(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     width: u32,
     height: u32,
     opts: &ScreenShotDecodeOption,
@@ -77,7 +77,7 @@ pub fn shrink_jpeg(
 
 /// Shrinks a JPEG with explicit target dimensions and quality.
 pub fn shrink_jpeg_ex(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     scaled_width: u32,
     scaled_height: u32,
     jpeg_quality: u32,

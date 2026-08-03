@@ -23,7 +23,11 @@ use core::mem::{self, size_of};
 use nx_svc::{ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
 use static_assertions::const_assert_eq;
 
-use crate::{cmif::ObjectId, error::ToResultCode as _, service};
+use crate::{
+    cmif::ObjectId,
+    error::ToResultCode as _,
+    service::{self, handle::BorrowedSessionHandle},
+};
 
 /// libnx-compatible `Service` struct.
 ///
@@ -72,8 +76,8 @@ impl Service {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sf__service_create(s: *mut Service, h: u32) {
     // SAFETY: h is a valid handle per caller contract.
-    let handle = unsafe { SessionHandle::from_raw(h) };
-    let pointer_buffer_size = service::query_pointer_buffer_size(handle).unwrap_or(0);
+    let handle = SessionHandle::from_raw_unchecked(h);
+    let pointer_buffer_size = service::query_pointer_buffer_size(borrow(handle)).unwrap_or(0);
 
     // SAFETY: Caller guarantees s points to valid memory.
     unsafe {
@@ -103,7 +107,7 @@ pub unsafe extern "C" fn __nx_sf__service_create_non_domain_subservice(
 
     if h != INVALID_HANDLE {
         // SAFETY: h is a valid handle per caller contract.
-        let handle = unsafe { SessionHandle::from_raw(h) };
+        let handle = SessionHandle::from_raw_unchecked(h);
         // SAFETY: s points to valid memory.
         unsafe {
             *s = Service {
@@ -164,9 +168,9 @@ pub unsafe extern "C" fn __nx_sf__service_close(s: *mut Service) {
     // the shared handle; everything else with `own_handle != 0` sends a
     // session close and releases the handle.
     if srv.own_handle != 0 {
-        service::control::close_session(srv.session);
+        service::control::close_session(borrow(srv.session));
     } else if let Some(object_id) = ObjectId::new(srv.object_id) {
-        service::control::close_object(srv.session, object_id);
+        service::control::close_object(borrow(srv.session), object_id);
     }
 
     // SAFETY: s points to valid writable memory.
@@ -184,10 +188,10 @@ pub unsafe extern "C" fn __nx_sf__service_clone(s: *const Service, out_s: *mut S
     let srv = unsafe { &*s };
     let out = unsafe { &mut *out_s };
 
-    match service::clone_current_object(srv.session) {
+    match service::clone_current_object(borrow(srv.session)) {
         Ok(new_handle) => {
             *out = Service {
-                session: new_handle,
+                session: new_handle.into_handle(),
                 own_handle: 1,
                 object_id: 0,
                 pointer_buffer_size: srv.pointer_buffer_size,
@@ -213,10 +217,10 @@ pub unsafe extern "C" fn __nx_sf__service_clone_ex(
     let srv = unsafe { &*s };
     let out = unsafe { &mut *out_s };
 
-    match service::clone_current_object_ex(srv.session, tag) {
+    match service::clone_current_object_ex(borrow(srv.session), tag) {
         Ok(new_handle) => {
             *out = Service {
-                session: new_handle,
+                session: new_handle.into_handle(),
                 own_handle: 1,
                 object_id: 0,
                 pointer_buffer_size: srv.pointer_buffer_size,
@@ -240,16 +244,16 @@ pub unsafe extern "C" fn __nx_sf__service_convert_to_domain(s: *mut Service) -> 
     // For override services, clone first to obtain an owned handle, matching
     // libnx behavior.
     if srv.is_override() {
-        match service::clone_current_object_ex(srv.session, 0) {
+        match service::clone_current_object_ex(borrow(srv.session), 0) {
             Ok(new_handle) => {
-                srv.session = new_handle;
+                srv.session = new_handle.into_handle();
                 srv.own_handle = 1;
             }
             Err(err) => return err.to_rc(),
         }
     }
 
-    match service::convert_current_object_to_domain(srv.session) {
+    match service::convert_current_object_to_domain(borrow(srv.session)) {
         Ok(object_id) => {
             srv.object_id = object_id.to_raw();
             0
@@ -326,4 +330,16 @@ pub unsafe extern "C" fn __nx_sf__service_get_object_id(s: *const Service) -> u3
     }
     // SAFETY: Caller guarantees s is null or points to valid Service.
     unsafe { (*s).object_id }
+}
+
+/// Borrows the session handle held in a C-owned [`Service`] struct.
+///
+/// The C caller owns the `Service` and closes its handle, so every call this module makes
+/// borrows for the duration of the call rather than adopting ownership. A handle the C side
+/// closes while a borrow is live names a number the kernel may have reused.
+#[inline]
+fn borrow(handle: SessionHandle) -> BorrowedSessionHandle<'static> {
+    // SAFETY: The `Service` struct outlives each individual call made through it, as the C
+    // ownership contract on these entry points requires.
+    BorrowedSessionHandle::from_handle_unchecked(handle)
 }

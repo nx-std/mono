@@ -8,7 +8,7 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, InputBuffer, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::proto::{
@@ -40,7 +40,7 @@ pub struct GetHostByNameResult {
 /// `name` is passed as a NUL-terminated byte slice (libnx sends `strlen + 1`).
 /// Pass `None` to send a zero-length buffer (libnx allows a null pointer).
 pub fn get_host_by_name(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cancel_handle: Option<CancelHandle>,
     use_nsd: bool,
     name: Option<&[u8]>,
@@ -103,7 +103,7 @@ pub struct GetHostByAddrResult {
 
 /// Reverse-resolves an address into the wire-format hostent buffer.
 pub fn get_host_by_addr(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cancel_handle: Option<CancelHandle>,
     addr_type: u32,
     addr: &[u8],
@@ -154,7 +154,7 @@ pub enum GetHostByAddrError {
 
 /// Writes the textual description of an `h_errno` value into `out_str`.
 pub fn get_host_string_error(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     err: u32,
     out_str: &mut [u8],
 ) -> Result<(), GetHostStringErrorError> {
@@ -177,7 +177,7 @@ pub enum GetHostStringErrorError {
 
 /// Writes the textual description of a `getaddrinfo` error code into `out_str`.
 pub fn get_gai_string_error(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     err: u32,
     out_str: &mut [u8],
 ) -> Result<(), GetGaiStringErrorError> {
@@ -214,7 +214,7 @@ pub struct GetAddrInfoResult {
 /// `node`, `service` are NUL-terminated byte slices (or `None` for a null
 /// pointer with zero length). `hints` is a serialized addrinfo template.
 pub fn get_addr_info(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cancel_handle: Option<CancelHandle>,
     use_nsd: bool,
     node: Option<&[u8]>,
@@ -281,7 +281,7 @@ pub struct GetNameInfoResult {
 
 /// Performs a `getnameinfo`-style reverse lookup, populating `host` and `serv`.
 pub fn get_name_info(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cancel_handle: Option<CancelHandle>,
     flags: u32,
     sockaddr: &[u8],
@@ -331,7 +331,9 @@ pub enum GetNameInfoError {
 }
 
 /// Allocates a fresh cancel-token from the service.
-pub fn get_cancel_handle(session: SessionHandle) -> Result<CancelHandle, GetCancelHandleError> {
+pub fn get_cancel_handle(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<CancelHandle, GetCancelHandleError> {
     // libnx encodes the input as a `u64 pid_placeholder` so the request still
     // carries an 8-byte payload alongside the send-PID flag.
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -365,7 +367,7 @@ pub enum GetCancelHandleError {
 }
 
 /// Cancels any pending resolver call tagged with `handle`.
-pub fn cancel(session: SessionHandle, handle: CancelHandle) -> Result<(), CancelError> {
+pub fn cancel(session: BorrowedSessionHandle<'_>, handle: CancelHandle) -> Result<(), CancelError> {
     let input = CancelIn {
         cancel_handle: handle.to_raw(),
         _padding: 0,
@@ -413,7 +415,7 @@ enum StringErrorError {
 }
 
 fn string_error_impl(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
     err: u32,
     out_str: &mut [u8],

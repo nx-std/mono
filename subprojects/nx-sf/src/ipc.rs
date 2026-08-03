@@ -35,6 +35,8 @@
 pub use nx_svc::ipc::{Handle, Handle as SessionHandle, SendSyncError};
 use nx_sys_thread_tls::IpcBuffer;
 
+use crate::service::handle::BorrowedSessionHandle;
+
 /// Sends a synchronous IPC request on `session`, using `buf` as the
 /// request/response area.
 ///
@@ -53,7 +55,7 @@ use nx_sys_thread_tls::IpcBuffer;
 #[inline]
 pub(crate) unsafe fn send_sync_request(
     buf: &mut IpcBuffer,
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
 ) -> Result<(), SendSyncError> {
     // The buffer is identified to the kernel implicitly via TPIDRRO_EL0;
     // `buf` does not need to be passed through as a parameter. Its role
@@ -63,5 +65,5 @@ pub(crate) unsafe fn send_sync_request(
     // SAFETY: descriptor-target validity is this function's own `# Safety`
     // precondition, forwarded verbatim; the `&mut IpcBuffer` reborrow
     // guarantees no reference into the TLS bytes is live across the call.
-    unsafe { nx_svc::ipc::send_sync_request(session) }
+    unsafe { nx_svc::ipc::send_sync_request(session.to_handle()) }
 }

@@ -81,11 +81,11 @@ pub unsafe fn setup(
                 }
                 Entry::MainThreadHandle(raw) => {
                     // SAFETY: The handle is provided by the loader and guaranteed valid.
-                    state.main_thread_handle = Some(unsafe { ThreadHandle::from_raw(raw) });
+                    state.main_thread_handle = Some(ThreadHandle::from_raw_unchecked(raw));
                 }
                 Entry::ProcessHandle(raw) => {
                     // SAFETY: The handle is provided by the loader and guaranteed valid.
-                    state.process_handle = Some(unsafe { ProcessHandle::from_raw(raw) });
+                    state.process_handle = Some(ProcessHandle::from_raw_unchecked(raw));
                 }
                 Entry::OverrideHeap { addr, size } => {
                     state.heap_override = addr.map(|a| (a, size));
@@ -122,7 +122,7 @@ pub unsafe fn setup(
                 }
                 Entry::OverrideService { name, handle } => {
                     // SAFETY: The handle is provided by the loader and guaranteed valid.
-                    let service_handle = unsafe { ServiceHandle::from_raw(handle) };
+                    let service_handle = ServiceHandle::from_raw_unchecked(handle);
                     if state.service_override_count < MAX_SERVICE_OVERRIDES {
                         state.service_overrides[state.service_override_count] =
                             Some(ServiceOverride::new(name, service_handle));

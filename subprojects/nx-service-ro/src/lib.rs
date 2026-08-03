@@ -153,7 +153,7 @@ fn connect_ro_impl(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectCmifError::GetService)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     if let Err(err) = cmif::initialize(&service) {
         return Err(ConnectCmifError::Initialize(err));
@@ -170,7 +170,7 @@ pub fn connect_ro_dmnt_cmif(sm: &SmService) -> Result<RoDmntService, ConnectDmnt
         .get_service_handle_cmif(proto::RO_DMNT_SERVICE_NAME)
         .map_err(ConnectDmntCmifError::GetService)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(RoDmntService(service))
 }

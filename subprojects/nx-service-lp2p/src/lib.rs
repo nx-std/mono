@@ -31,7 +31,9 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use alloc::{boxed::Box, vec::Vec};
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, Session, clone_current_object};
+use nx_sf::service::{
+    ConvertToDomainError, DispatchError, Domain, OwnedSessionHandle, Session, clone_current_object,
+};
 use nx_svc::ipc::Handle as SessionHandle;
 
 mod cmif;
@@ -326,7 +328,7 @@ pub fn connect_cmif(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectCmifError::GetService)?;
 
-    let root_session = Session::new(root_handle);
+    let root_session = Session::open(root_handle);
     let pointer_buffer_size = root_session.pointer_buffer_size();
 
     let root = root_session
@@ -347,9 +349,8 @@ pub fn connect_cmif(
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
         // SAFETY: Cloning a domain session yields another kernel handle addressing the same
         // domain object table on the server side.
-        let cloned_domain = unsafe {
-            nx_sf::service::Domain::from_handle_unchecked(cloned_handle, pointer_buffer_size)
-        };
+        let cloned_domain =
+            nx_sf::service::Domain::new_unchecked(cloned_handle, pointer_buffer_size);
         sessions.push(cloned_domain);
     }
 
@@ -360,7 +361,7 @@ pub fn connect_cmif(
         .get_service_handle_cmif(service_name)
         .map_err(ConnectCmifError::GetService)?;
 
-    let monitor_root = Session::from_handle(monitor_root_handle, 0);
+    let monitor_root = Session::new(monitor_root_handle, 0);
 
     // Create INetworkServiceMonitor sub-object (cmd 8, non-domain).
     // Returns a move handle — the sub-object owns its own session.
@@ -371,8 +372,10 @@ pub fn connect_cmif(
     drop(monitor_root);
 
     // SAFETY: the move handle from CreateNetworkServiceMonitor is a valid session.
-    let monitor = Session::from_handle(
-        unsafe { SessionHandle::from_raw(monitor_session_handle) },
+    let monitor = Session::new(
+        OwnedSessionHandle::from_handle_unchecked(SessionHandle::from_raw_unchecked(
+            monitor_session_handle,
+        )),
         0,
     );
 

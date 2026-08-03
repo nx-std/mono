@@ -37,7 +37,7 @@ use core::mem::{size_of, size_of_val};
 
 use nx_svc::{
     error::{ResultCode, ToResultCode as _},
-    ipc::{Handle as SessionHandle, SendSyncError},
+    ipc::SendSyncError,
     raw::Handle as RawHandle,
 };
 use nx_sys_thread_tls::IpcBuffer;
@@ -49,6 +49,7 @@ use super::wire::{
 use crate::{
     array_vec::ArrayVec,
     error::{GENERIC_ERROR, ToResultCode},
+    service::handle::BorrowedSessionHandle,
 };
 
 /// Maximum descriptors of any single kind that fit in an HIPC header
@@ -158,7 +159,7 @@ impl<P: HipcPayload> HipcRequest<P> {
     pub(crate) fn send_inner(
         self,
         buf: &mut IpcBuffer,
-        session: SessionHandle,
+        session: BorrowedSessionHandle<'_>,
     ) -> Result<(), SendError> {
         self.write_to(buf.as_array_mut())
             .map_err(SendError::Layout)?;

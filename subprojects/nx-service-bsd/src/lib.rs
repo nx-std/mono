@@ -25,7 +25,10 @@ extern crate nx_panic_handler as _;
 use alloc::{boxed::Box, vec::Vec};
 
 use nx_service_sm::SmService;
-use nx_sf::{ServiceName, service::Session};
+use nx_sf::{
+    ServiceName,
+    service::{OwnedSessionHandle, Session},
+};
 use nx_svc::mem::tmem::MemoryPermission;
 use nx_sys_mem::tmem::{self, TransferMemoryBacking};
 
@@ -411,8 +414,8 @@ fn open_main_service(
 /// Wraps a raw session handle in a `Session` with default metadata. Mirrors
 /// what NV does — pointer-buffer-size is left at 0 so every auto-select buffer
 /// is transmitted as a MapAlias buffer, which the BSD server accepts.
-fn make_service(handle: nx_svc::ipc::Handle) -> Session {
-    Session::from_handle(handle, 0)
+fn make_service(handle: OwnedSessionHandle) -> Session {
+    Session::new(handle, 0)
 }
 
 /// Errors returned by [`connect_with_options`]. One variant per distinct source.

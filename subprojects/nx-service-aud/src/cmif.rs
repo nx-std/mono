@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{cmif, service::BorrowedSessionHandle};
 use static_assertions::const_assert_eq;
 
 use crate::proto;
@@ -31,7 +31,7 @@ const_assert_eq!(size_of::<SetVolumeIn>(), 0x18);
 
 /// Suspends audio for a process.
 pub fn request_suspend_audio(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
@@ -40,7 +40,7 @@ pub fn request_suspend_audio(
 
 /// Resumes audio for a process.
 pub fn request_resume_audio(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
@@ -49,7 +49,7 @@ pub fn request_resume_audio(
 
 /// Gets the master volume for a process's audio output.
 pub fn get_audio_output_process_master_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<f32, GetVolumeError> {
     dispatch_get_volume(session, proto::GET_AUDIO_OUTPUT_PROCESS_MASTER_VOLUME, pid)
@@ -57,7 +57,7 @@ pub fn get_audio_output_process_master_volume(
 
 /// Sets the master volume for a process's audio output.
 pub fn set_audio_output_process_master_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
     volume: f32,
@@ -73,7 +73,7 @@ pub fn set_audio_output_process_master_volume(
 
 /// Gets the master volume for a process's audio input.
 pub fn get_audio_input_process_master_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<f32, GetVolumeError> {
     dispatch_get_volume(session, proto::GET_AUDIO_INPUT_PROCESS_MASTER_VOLUME, pid)
@@ -81,7 +81,7 @@ pub fn get_audio_input_process_master_volume(
 
 /// Sets the master volume for a process's audio input and output.
 pub fn set_audio_input_process_master_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
     volume: f32,
@@ -97,7 +97,7 @@ pub fn set_audio_input_process_master_volume(
 
 /// Gets the record volume for a process's audio output.
 pub fn get_audio_output_process_record_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<f32, GetVolumeError> {
     dispatch_get_volume(session, proto::GET_AUDIO_OUTPUT_PROCESS_RECORD_VOLUME, pid)
@@ -105,7 +105,7 @@ pub fn get_audio_output_process_record_volume(
 
 /// Sets the record volume for a process's audio output.
 pub fn set_audio_output_process_record_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
     volume: f32,
@@ -121,7 +121,7 @@ pub fn set_audio_output_process_record_volume(
 
 /// Suspends audio for a process (debug).
 pub fn request_suspend_audio_for_debug(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
@@ -130,7 +130,7 @@ pub fn request_suspend_audio_for_debug(
 
 /// Resumes audio for a process (debug).
 pub fn request_resume_audio_for_debug(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     pid: u64,
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
@@ -138,7 +138,7 @@ pub fn request_resume_audio_for_debug(
 }
 
 fn dispatch_pid_delay(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd: u32,
     pid: u64,
     delay: u64,
@@ -160,7 +160,11 @@ fn dispatch_pid_delay(
     Ok(())
 }
 
-fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32, GetVolumeError> {
+fn dispatch_get_volume(
+    session: BorrowedSessionHandle<'_>,
+    cmd: u32,
+    pid: u64,
+) -> Result<f32, GetVolumeError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -177,7 +181,7 @@ fn dispatch_get_volume(session: SessionHandle, cmd: u32, pid: u64) -> Result<f32
 }
 
 fn dispatch_set_volume(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     cmd: u32,
     pid: u64,
     delay: u64,

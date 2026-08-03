@@ -17,8 +17,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -35,7 +34,7 @@ pub struct FanService(Session);
 impl FanService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -46,7 +45,7 @@ impl FanService {
     #[inline]
     pub fn open_controller(&self, device_code: u32) -> Result<FanController, OpenControllerError> {
         let handle = cmif::open_controller(self.0.handle(), device_code)?;
-        let service = Session::from_handle(handle, 0);
+        let service = Session::new(handle, 0);
         Ok(FanController(service))
     }
 }
@@ -61,7 +60,7 @@ pub struct FanController(Session);
 impl FanController {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -91,7 +90,7 @@ pub fn connect_cmif(sm: &SmService) -> Result<FanService, ConnectCmifError> {
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(FanService(service))
 }

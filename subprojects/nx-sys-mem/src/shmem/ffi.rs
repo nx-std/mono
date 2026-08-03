@@ -99,10 +99,13 @@ unsafe extern "C" fn __nx_sys_mem__shmem_map(s: *mut SharedMemory) -> u32 {
         return LIBNX_ERR_ALREADY_MAPPED;
     }
 
+    // SAFETY: The C caller owns the `SharedMemory` struct and the handle inside it, both of
+    // which it keeps alive across this call; the fields were written by a prior
+    // `__nx_sys_mem__shmem_*` call, so they describe the unmapped state this reconstructs.
     let unmapped = unsafe {
         {
             sys::SharedMemory::<Unmapped>::from_parts(
-                Handle::from_raw(sm.handle),
+                Handle::from_raw_unchecked(sm.handle),
                 sm.size,
                 sys::Permissions::from_bits_retain(sm.perm),
             )
@@ -139,9 +142,12 @@ unsafe extern "C" fn __nx_sys_mem__shmem_unmap(s: *mut SharedMemory) -> u32 {
         return 0;
     };
 
+    // SAFETY: The C caller owns the `SharedMemory` struct and the handle inside it, both of
+    // which it keeps alive across this call; `map_addr` was checked non-null above, so the
+    // fields describe the mapped state this reconstructs.
     let mapped = unsafe {
         sys::SharedMemory::<Mapped>::from_parts(
-            Handle::from_raw(sm.handle),
+            Handle::from_raw_unchecked(sm.handle),
             sm.size,
             sys::Permissions::from_bits_retain(sm.perm),
             map_addr,

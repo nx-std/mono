@@ -22,7 +22,6 @@ deps = [
     nx_panic_handler_dep,
     nx_service_sm_dep,
     nx_sf_dep,
-    nx_svc_dep,
     nx_sys_thread_tls_dep,
 ]
 

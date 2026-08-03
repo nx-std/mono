@@ -3,14 +3,17 @@
 use nx_sf::{
     cmif,
     hipc::{BufferMode, OutputBuffer},
-    ipc::Handle as SessionHandle,
+    service::BorrowedSessionHandle,
 };
 
 use crate::proto;
 
 /// Fills `out` with cryptographically-secure random bytes.
 #[inline]
-pub fn get_random_bytes(session: SessionHandle, out: &mut [u8]) -> Result<(), GetRandomBytesError> {
+pub fn get_random_bytes(
+    session: BorrowedSessionHandle<'_>,
+    out: &mut [u8],
+) -> Result<(), GetRandomBytesError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

@@ -10,13 +10,12 @@
 //! object close on its side). Dropping a `DomainObject` sends a per-object
 //! close request on the parent session without touching the handle.
 
-use core::mem::ManuallyDrop;
-
-use nx_svc::ipc::Handle as SessionHandle;
+use core::{marker::PhantomData, mem::ManuallyDrop};
 
 use super::{
     control::{self, CloneObjectError, CopyFromDomainError},
     dispatch::DomainDispatch,
+    handle::{BorrowedSessionHandle, OwnedSessionHandle},
     session::Session,
 };
 use crate::cmif::ObjectId;
@@ -24,37 +23,75 @@ use crate::cmif::ObjectId;
 /// Owned domain root: a session converted via CMIF control request 0.
 #[derive(Debug)]
 pub struct Domain {
-    handle: SessionHandle,
+    handle: OwnedSessionHandle,
     pointer_buffer_size: u16,
 }
 
 impl Domain {
     /// Wraps a handle that has already been converted to a domain.
     ///
-    /// # Safety
-    ///
-    /// The caller must own `handle`, the server must have converted it to a
-    /// domain, and `pointer_buffer_size` must reflect the server's value.
+    /// Taking an [`OwnedSessionHandle`] is what makes this a safe function: ownership is
+    /// established once, where the handle is adopted, so this cannot manufacture a second
+    /// closer for a session something else already owns. The caller must still ensure the
+    /// server has converted the session to a domain and that `pointer_buffer_size` reflects
+    /// the server's value; a wrong size mis-sizes pointer buffers rather than faulting.
     #[inline]
-    pub unsafe fn from_handle_unchecked(handle: SessionHandle, pointer_buffer_size: u16) -> Self {
+    pub fn new_unchecked(handle: OwnedSessionHandle, pointer_buffer_size: u16) -> Self {
         Self {
             handle,
             pointer_buffer_size,
         }
     }
 
+    /// Builds a `Domain`-typed alias of this domain that must not be dropped.
+    ///
+    /// This is the one hole left in the ownership split [`OwnedSessionHandle`] otherwise
+    /// closes: the alias holds a second owner of the same handle, and safe code can reach the
+    /// double close through [`ManuallyDrop::into_inner`]. It exists only for callers that need
+    /// a field of type `Domain` and cannot hold a borrow, which today is `nx-service-applet`'s
+    /// self-referential `Proxy<R>`. Prefer [`as_borrowed`](Self::as_borrowed), which cannot be
+    /// dropped wrongly at all.
+    // TODO: Remove once `nx-service-applet` stores object ids and builds its sub-interface
+    //       views on demand, at which point every caller can hold a `DomainRef` instead.
+    #[inline]
+    pub fn alias(&self) -> ManuallyDrop<Self> {
+        ManuallyDrop::new(Self {
+            // SAFETY: The `ManuallyDrop` suppresses the alias's destructor, so the owner this
+            // borrows from remains the only closer for as long as the caller upholds the
+            // must-not-be-dropped contract above.
+            handle: OwnedSessionHandle::from_handle_unchecked(
+                self.handle.as_borrowed().to_handle(),
+            ),
+            pointer_buffer_size: self.pointer_buffer_size,
+        })
+    }
+
+    /// Borrows the domain as a non-owning view.
+    ///
+    /// The view dispatches exactly as the domain does but has no destructor, so it cannot close
+    /// the session; the lifetime keeps it from outliving the owner.
+    #[inline]
+    pub fn as_borrowed(&self) -> DomainRef<'_> {
+        DomainRef {
+            handle: self.handle.as_borrowed(),
+            pointer_buffer_size: self.pointer_buffer_size,
+            owner: PhantomData,
+        }
+    }
+
     /// Transfers the kernel handle out of the `Domain` without closing it.
     /// Used at the FFI boundary.
     #[inline]
-    pub fn into_handle(self) -> SessionHandle {
+    pub fn into_handle(self) -> OwnedSessionHandle {
         let this = ManuallyDrop::new(self);
-        this.handle
+        // SAFETY: `this` is never dropped and never read again, so the handle moves out once.
+        unsafe { core::ptr::read(&this.handle) }
     }
 
     /// Returns the underlying session handle without transferring ownership.
     #[inline]
-    pub fn handle(&self) -> SessionHandle {
-        self.handle
+    pub fn handle(&self) -> BorrowedSessionHandle<'_> {
+        self.handle.as_borrowed()
     }
 
     /// Returns the server's pointer-buffer size.
@@ -110,15 +147,16 @@ impl Domain {
         &self,
         object: &DomainObject<'_>,
     ) -> Result<Session, CopyFromDomainError> {
-        let new_handle = control::copy_from_current_domain(self.handle, object.object_id)?;
-        Ok(Session::from_handle(new_handle, self.pointer_buffer_size))
+        let new_handle =
+            control::copy_from_current_domain(self.handle.as_borrowed(), object.object_id)?;
+        Ok(Session::new(new_handle, self.pointer_buffer_size))
     }
 
     /// Clones the underlying session via CMIF control request 2. The clone
     /// is a fresh non-domain [`Session`], matching libnx semantics.
     pub fn try_clone(&self) -> Result<Session, CloneObjectError> {
-        let new_handle = control::clone_current_object(self.handle)?;
-        Ok(Session::from_handle(new_handle, self.pointer_buffer_size))
+        let new_handle = control::clone_current_object(self.handle.as_borrowed())?;
+        Ok(Session::new(new_handle, self.pointer_buffer_size))
     }
 
     /// Starts a [`DomainDispatch`] builder addressing the domain root
@@ -128,7 +166,7 @@ impl Domain {
     pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'_> {
         DomainDispatch::new(
             self,
-            self.handle,
+            self.handle.as_borrowed(),
             self.pointer_buffer_size,
             None,
             request_id,
@@ -136,9 +174,28 @@ impl Domain {
     }
 }
 
-impl Drop for Domain {
-    fn drop(&mut self) {
-        control::close_session(self.handle);
+/// Borrowed view onto a [`Domain`] that does not own its handle.
+///
+/// Dispatches like a `Domain` but has no destructor, so aliasing one costs neither an `unsafe`
+/// block nor a `ManuallyDrop` to suppress a close that would otherwise happen twice.
+#[derive(Debug, Clone, Copy)]
+pub struct DomainRef<'d> {
+    handle: BorrowedSessionHandle<'d>,
+    pointer_buffer_size: u16,
+    owner: PhantomData<&'d Domain>,
+}
+
+impl<'d> DomainRef<'d> {
+    /// Returns the borrowed session handle.
+    #[inline]
+    pub fn handle(&self) -> BorrowedSessionHandle<'d> {
+        self.handle
+    }
+
+    /// Returns the server's pointer-buffer size.
+    #[inline]
+    pub fn pointer_buffer_size(&self) -> u16 {
+        self.pointer_buffer_size
     }
 }
 
@@ -171,7 +228,7 @@ impl<'d> DomainObject<'d> {
     pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
         DomainDispatch::new(
             self.domain,
-            self.domain.handle,
+            self.domain.handle.as_borrowed(),
             self.domain.pointer_buffer_size,
             Some(self.object_id),
             request_id,
@@ -181,6 +238,6 @@ impl<'d> DomainObject<'d> {
 
 impl Drop for DomainObject<'_> {
     fn drop(&mut self) {
-        control::close_object(self.domain.handle, self.object_id);
+        control::close_object(self.domain.handle.as_borrowed(), self.object_id);
     }
 }

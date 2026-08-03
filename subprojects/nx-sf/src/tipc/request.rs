@@ -5,7 +5,7 @@
 
 use core::ptr;
 
-use nx_svc::{ipc::Handle as SessionHandle, raw::Handle as RawHandle};
+use nx_svc::raw::Handle as RawHandle;
 use nx_sys_thread_tls::IpcBuffer;
 
 use super::wire::CommandType;
@@ -15,6 +15,7 @@ use crate::{
         self, BufferDescriptor, HIPC_MAX_DESCRIPTORS, HipcPayload, HipcRequest, HipcRequestBuilder,
         InOutBuffer, InputBuffer, OutputBuffer,
     },
+    service::handle::BorrowedSessionHandle,
 };
 
 /// Layout error for TIPC request serialization.
@@ -172,7 +173,11 @@ impl TipcRequest<'_> {
     /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
     /// when the kernel rejects the underlying `SendSyncRequest`.
     #[inline]
-    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+    pub fn send(
+        self,
+        buf: &mut IpcBuffer,
+        session: BorrowedSessionHandle<'_>,
+    ) -> Result<(), SendError> {
         self.send_inner(buf, session)
     }
 }
@@ -228,7 +233,11 @@ impl TipcCloseRequest {
     /// in the IPC buffer (nothing is sent), and [`SendError::SendRequest`]
     /// when the kernel rejects the underlying `SendSyncRequest`.
     #[inline]
-    pub fn send(self, buf: &mut IpcBuffer, session: SessionHandle) -> Result<(), SendError> {
+    pub fn send(
+        self,
+        buf: &mut IpcBuffer,
+        session: BorrowedSessionHandle<'_>,
+    ) -> Result<(), SendError> {
         self.hipc.send_inner(buf, session)
     }
 }

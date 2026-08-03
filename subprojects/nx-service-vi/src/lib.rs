@@ -14,9 +14,8 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    service::Session,
+    service::{BorrowedSessionHandle, Session},
 };
-use nx_svc::ipc::Handle as SessionHandle;
 
 pub mod binder;
 mod cmif;
@@ -112,7 +111,7 @@ impl ViService {
 
     /// Returns the IApplicationDisplayService session handle.
     #[inline]
-    pub fn application_display_session(&self) -> SessionHandle {
+    pub fn application_display_session(&self) -> BorrowedSessionHandle<'_> {
         self.application_display.handle()
     }
 
@@ -124,25 +123,25 @@ impl ViService {
 
     /// Returns the ISystemDisplayService session handle, if available.
     #[inline]
-    pub fn system_display_session(&self) -> Option<SessionHandle> {
+    pub fn system_display_session(&self) -> Option<BorrowedSessionHandle<'_>> {
         self.system_display.as_ref().map(|s| s.handle())
     }
 
     /// Returns the IManagerDisplayService session handle, if available.
     #[inline]
-    pub fn manager_display_session(&self) -> Option<SessionHandle> {
+    pub fn manager_display_session(&self) -> Option<BorrowedSessionHandle<'_>> {
         self.manager_display.as_ref().map(|s| s.handle())
     }
 
     /// Returns the IHOSBinderDriverIndirect session handle, if available.
     #[inline]
-    pub fn binder_indirect_session(&self) -> Option<SessionHandle> {
+    pub fn binder_indirect_session(&self) -> Option<BorrowedSessionHandle<'_>> {
         self.binder_indirect.as_ref().map(|s| s.handle())
     }
 
     /// Returns the root service session handle (Manager only, 16.0.0+).
     #[inline]
-    pub fn root_service_session(&self) -> Option<SessionHandle> {
+    pub fn root_service_session(&self) -> Option<BorrowedSessionHandle<'_>> {
         self.root_service.as_ref().map(|s| s.handle())
     }
 
@@ -775,8 +774,9 @@ pub fn connect_with_options(
 
     // Get IApplicationDisplayService
     // Command ID equals the service type value (0=Application, 1=System, 2=Manager)
-    let application_display = cmif::root::get_display_service(root_handle, actual_type)
-        .map_err(ConnectError::GetDisplayService)?;
+    let application_display =
+        cmif::root::get_display_service(root_handle.as_borrowed(), actual_type)
+            .map_err(ConnectError::GetDisplayService)?;
 
     // Keep root service only for Manager when the caller signals we are on
     // HOS ≥ 16.0.0 (the version that introduced the fatal-display commands).
@@ -784,10 +784,13 @@ pub fn connect_with_options(
     if keep_root {
         // libnx does not query the root service's pointer-buffer-size;
         // skip the kernel round-trip and adopt the handle as-is.
-        root_service_handle = Some(Session::from_handle(root_handle, 0));
+        // The handle moves into the `Session`, which owns and closes it from here.
+        root_service_handle = Some(Session::new(root_handle, 0));
     } else {
-        // Close root service handle
-        let _ = nx_svc::ipc::close_handle(root_handle);
+        // Close root service handle. `into_raw` gives up ownership first, so this closes the
+        // handle directly as libnx does, rather than sending the CMIF close that dropping an
+        // owned handle would.
+        let _ = nx_svc::ipc::close_handle(root_handle.into_handle());
     }
 
     // Get IHOSBinderDriverRelay.

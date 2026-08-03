@@ -18,8 +18,7 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::Session;
-use nx_svc::ipc::Handle as SessionHandle;
+use nx_sf::service::{BorrowedSessionHandle, Session};
 
 mod cmif;
 mod proto;
@@ -43,7 +42,7 @@ pub struct PlService(Session);
 impl PlService {
     /// Returns the underlying session handle.
     #[inline]
-    pub fn session(&self) -> SessionHandle {
+    pub fn session(&self) -> BorrowedSessionHandle<'_> {
         self.0.handle()
     }
 }
@@ -114,7 +113,7 @@ pub fn connect_plu_cmif(sm: &SmService) -> Result<PlService, ConnectPluCmifError
         .get_service_handle_cmif(PLU_SERVICE_NAME)
         .map_err(ConnectPluCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PlService(service))
 }
@@ -130,7 +129,7 @@ pub fn connect_pls_cmif(sm: &SmService) -> Result<PlService, ConnectPlsCmifError
         .get_service_handle_cmif(PLS_SERVICE_NAME)
         .map_err(ConnectPlsCmifError)?;
 
-    let service = Session::from_handle(handle, 0);
+    let service = Session::new(handle, 0);
 
     Ok(PlService(service))
 }

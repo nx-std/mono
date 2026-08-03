@@ -588,9 +588,10 @@ pub fn get_thread_info_ptr<T>() -> *mut T {
 #[inline]
 pub unsafe fn set_thread_info_ptr<T>(ptr: *mut T) {
     let tv_ptr = thread_vars_ptr();
-    // SAFETY: Writing the thread_info_ptr field with volatile semantics
     // SAFETY: The caller's contract is that `ptr` is this thread's thread object.
     let thread_info_ptr = ThreadInfoPtr::from_ptr_unchecked(ptr.cast());
+    // SAFETY: Writing the thread_info_ptr field of ThreadVars with volatile semantics
+    // to prevent compiler optimizations from reordering the store.
     unsafe { ptr::write_volatile(&raw mut (*tv_ptr).thread_info_ptr, thread_info_ptr) };
 }
 

@@ -19,6 +19,7 @@
 pub(crate) mod control;
 mod dispatch;
 mod domain;
+pub(crate) mod handle;
 mod override_service;
 mod session;
 
@@ -32,7 +33,8 @@ pub use self::{
         BufferAttr, Dispatch, DispatchError, DispatchResult, DomainDispatch, DomainDispatchResult,
         MAX_BUFFERS, MAX_IN_HANDLES, MAX_IN_OBJECTS, MAX_OUT_OBJECTS, OutHandleAttr,
     },
-    domain::{Domain, DomainObject},
+    domain::{Domain, DomainObject, DomainRef},
+    handle::{BorrowedSessionHandle, OwnedSessionHandle},
     override_service::OverrideService,
     session::Session,
 };

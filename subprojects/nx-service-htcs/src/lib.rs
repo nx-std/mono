@@ -424,14 +424,14 @@ pub fn connect_cmif(sm: &SmService, num_sessions: usize) -> Result<HtcsService, 
         .get_service_handle_cmif(SERVICE_NAME)
         .map_err(ConnectCmifError::GetService)?;
 
-    let manager_session = Session::new(manager_handle);
+    let manager_session = Session::open(manager_handle);
     let pointer_buffer_size = manager_session.pointer_buffer_size();
 
     let manager = manager_session
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectCmifError::ConvertToDomain(err))?;
 
-    let monitor = Session::from_handle(monitor_handle, 0);
+    let monitor = Session::new(monitor_handle, 0);
 
     // PID init on the domain manager (cmd 100).
     cmif::manager_pid_init(&manager).map_err(ConnectCmifError::ManagerPidInit)?;
@@ -449,8 +449,7 @@ pub fn connect_cmif(sm: &SmService, num_sessions: usize) -> Result<HtcsService, 
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
         // SAFETY: Cloning a domain session yields another kernel handle addressing the same
         // domain object table on the server side.
-        let cloned_domain =
-            unsafe { Domain::from_handle_unchecked(cloned_handle, pointer_buffer_size) };
+        let cloned_domain = Domain::new_unchecked(cloned_handle, pointer_buffer_size);
         sessions.push(cloned_domain);
     }
 

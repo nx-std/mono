@@ -1,14 +1,18 @@
 //! CMIF protocol operations for the fan service.
 
-use nx_sf::{cmif, ipc::Handle as SessionHandle};
+use nx_sf::{
+    cmif,
+    ipc::Handle as RawSessionHandle,
+    service::{BorrowedSessionHandle, OwnedSessionHandle},
+};
 
 use crate::proto;
 
 /// Opens an `IController` session for the given device code.
 pub fn open_controller(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     device_code: u32,
-) -> Result<SessionHandle, OpenControllerError> {
+) -> Result<OwnedSessionHandle, OpenControllerError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -26,12 +30,14 @@ pub fn open_controller(
     };
 
     // SAFETY: the kernel returned a valid session handle in the response.
-    Ok(unsafe { SessionHandle::from_raw(handle) })
+    Ok(OwnedSessionHandle::from_handle_unchecked(
+        RawSessionHandle::from_raw_unchecked(handle),
+    ))
 }
 
 /// Sets the fan rotation speed level on the controller.
 pub fn set_rotation_speed_level(
-    session: SessionHandle,
+    session: BorrowedSessionHandle<'_>,
     level: f32,
 ) -> Result<(), SetRotationSpeedLevelError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
@@ -50,7 +56,9 @@ pub fn set_rotation_speed_level(
 }
 
 /// Gets the current fan rotation speed level from the controller.
-pub fn get_rotation_speed_level(session: SessionHandle) -> Result<f32, GetRotationSpeedLevelError> {
+pub fn get_rotation_speed_level(
+    session: BorrowedSessionHandle<'_>,
+) -> Result<f32, GetRotationSpeedLevelError> {
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
