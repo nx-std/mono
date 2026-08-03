@@ -62,8 +62,11 @@ unsafe extern "C" fn __nx_std_sync__oneshot_send(tx: *mut Sender, value: DataTyp
     }
 
     match unsafe { Box::from_raw(tx) }.0.send(value) {
-        Ok(_) => 0,
-        Err(_) => -1,
+        Ok(()) => 0,
+        // The receiver was dropped. `SendError` hands the value back so a Rust caller can
+        // reclaim it, but this signature has no out-parameter to return it through, so the
+        // C caller keeps whatever ownership it had before the call.
+        Err(oneshot::SendError(_)) => -1,
     }
 }
 
@@ -85,11 +88,23 @@ unsafe extern "C" fn __nx_std_sync__oneshot_recv(
         return -1;
     }
 
-    match unsafe { Box::from_raw(rx) }.0.recv() {
-        Ok(value) if !out_value.is_null() => {
+    // Ownership is taken whatever the outcome, as this function's contract states: the box is
+    // dropped when `receiver` leaves scope on every path below.
+    let receiver = unsafe { Box::from_raw(rx) };
+
+    // Checked before receiving, not after. Receiving first would take the channel's one and
+    // only value and then have nowhere to put it, destroying it while reporting the same `-1`
+    // that a dropped sender reports.
+    if out_value.is_null() {
+        return -1;
+    }
+
+    match receiver.0.recv() {
+        Ok(value) => {
             unsafe { *out_value = value };
             0
         }
-        _ => -1,
+        // The sender was dropped without ever sending.
+        Err(oneshot::RecvError) => -1,
     }
 }
