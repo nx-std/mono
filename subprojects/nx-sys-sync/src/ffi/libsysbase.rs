@@ -13,7 +13,7 @@ use core::ffi::c_int;
 
 use nx_svc::error::{KernelError, ToResultCode as _};
 
-use crate::{condvar::Condvar, mutex::Mutex, remutex::ReentrantMutex};
+use crate::{condvar::Condvar, mutex::Mutex, remutex::ReentrantMutex, wait::Timeout};
 
 /// POSIX error: Bad file descriptor (used when recursive lock counter != 1).
 const EBADF: c_int = 9;
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait(
     lock: *mut Mutex,
     timeout_ns: u64,
 ) -> c_int {
-    let result = unsafe { &*cond }.wait_timeout(unsafe { &*lock }, timeout_ns);
+    let result = unsafe { &*cond }.wait_timeout(unsafe { &*lock }, Timeout::from(timeout_ns));
     errno_from_result(result)
 }
 
@@ -159,8 +159,10 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait_recursive(
     lock: *mut ReentrantMutex,
     timeout_ns: u64,
 ) -> c_int {
-    match unsafe { &*lock }.cond_wait(unsafe { &*cond }, timeout_ns) {
+    match unsafe { &*lock }.cond_wait(unsafe { &*cond }, Timeout::from(timeout_ns)) {
         Ok(result) => errno_from_result(result),
-        Err(()) => EBADF,
+        // The caller does not hold the mutex exactly once, so there is no lock state this
+        // wait could correctly release and restore.
+        Err(_) => EBADF,
     }
 }

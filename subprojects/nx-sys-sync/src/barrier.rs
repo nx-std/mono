@@ -8,11 +8,12 @@
 //! synchronization capabilities. It maintains an internal counter that tracks the number of
 //! threads that have reached the barrier.
 
-use core::cell::UnsafeCell;
+use core::{cell::UnsafeCell, num::NonZeroU32};
 
 use static_assertions::const_assert_eq;
 
 use super::{Condvar, Mutex};
+use crate::wait::WakeCount;
 
 /// Barrier structure
 ///
@@ -79,7 +80,14 @@ impl Barrier {
         let count = unsafe { &mut *self.count.get() };
         if *count == self.total {
             *count = 0;
-            self.condvar.wake(self.total as i32);
+            // A barrier's participant count always fits a `u32`. A count of zero reaches
+            // the SVC as "wake all", which is what the previous `wake(0)` did and is
+            // harmless: a barrier with no other participants has no waiters to release.
+            let waiters = u32::try_from(self.total).unwrap_or(u32::MAX);
+            self.condvar.wake(match NonZeroU32::new(waiters) {
+                Some(count) => WakeCount::AtMost(count),
+                None => WakeCount::All,
+            });
         } else {
             *count = count.checked_add(1).expect("Barrier count overflow");
             self.condvar.wait(&self.mutex);

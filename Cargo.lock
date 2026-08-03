@@ -1426,6 +1426,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-thread-tls",
  "static_assertions",
+ "thiserror",
 ]
 
 [[package]]
