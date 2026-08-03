@@ -49,7 +49,7 @@ pub const MAX_OUT_OBJECTS: usize = 8;
 
 /// Buffer attribute flags for service dispatch.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct BufferAttr(pub u32);
+pub struct BufferAttr(u32);
 
 impl BufferAttr {
     /// Input buffer (data sent to service).

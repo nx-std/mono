@@ -38,7 +38,7 @@ impl ThreadTag {
     /// some other kernel object compares unequal to every thread, so a lock tagged with one can
     /// never be unlocked by its owner.
     #[inline]
-    pub const fn from_u32_unchecked(raw: Handle) -> Self {
+    pub const fn from_raw_unchecked(raw: Handle) -> Self {
         Self(raw)
     }
 

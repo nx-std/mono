@@ -292,7 +292,7 @@ impl MutexTag {
     fn owner(&self) -> ThreadTag {
         // The waiters bit is stored inside the handle word, so it is masked off before the
         // remainder is read back as the handle the kernel assigned.
-        ThreadTag::from_u32_unchecked(self.0 & !HANDLE_WAIT_MASK)
+        ThreadTag::from_raw_unchecked(self.0 & !HANDLE_WAIT_MASK)
     }
 
     /// Check if there is any other thread waiting for the mutex.

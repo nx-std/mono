@@ -54,11 +54,23 @@ a value that is already correct is rarely what a profile blames.
 
 ## 3. Naming and Visibility
 
-The name states both the input and the bypass, so a reader never has to open the definition to know a check was
-skipped:
+The name states both the input and the bypass, so a reader never has to open the definition to know a check
+was skipped. **Which input the name states is decided by what the value is, not by how it is stored.** An
+identifier that lives in a `u32` is not a `u32`, and a constructor that says otherwise has named the field
+width in place of the thing the caller must vouch for.
 
-- `from_bytes_unchecked` / `from_str_unchecked` for the borrowed and owned forms of a fixed-width name newtype
-- `from_raw_unchecked`, `from_u32_unchecked` for typed sources
+| The wrapped value is | The name | What the caller asserts |
+|---|---|---|
+| A quantity: a count, a rate, a duration | `from_u64_unchecked`, `from_u32_unchecked` | A number in the unit the type names, where the width is part of the value supplied |
+| An identity or an opaque encoding: an id, a handle, a packed flags word | `from_raw_unchecked` | That the token came from the authority that issues it |
+| A name, borrowed or owned | `from_bytes_unchecked`, `from_str_unchecked` | That the text is well-formed for the wire field |
+| An address | `from_ptr_unchecked` | That the pointer addresses what the type names |
+| Several of the type's own inputs, with no single source | `new_unchecked` | Each input separately ([rust-fn §1](rust-fn.md#1-constructors)) |
+
+`Bytes::from_u64_unchecked` and `SlotId::from_raw_unchecked` sit on either side of the split, and both wrap an
+integer. A caller of the first supplies a number, so the width is the useful half of the name. A caller of the
+second supplies a token some authority minted, and naming it `from_u64_unchecked` would invite handing it any
+arithmetic result that happens to be the right width — which is the substitution the newtype exists to stop.
 
 Keep the constructor as narrow as its callers allow. A `pub(crate)` unchecked constructor cannot be reached by
 a consumer who does not hold the proof; a `pub` one is part of the API and every downstream crate — every
@@ -179,6 +191,9 @@ Before committing code, verify:
 - [ ] The type's validating constructor is `FromStr` or `TryFrom`, and it is the only place the invariant is
       checked
 - [ ] Every constructor that skips validation has `_unchecked` in its name
+- [ ] The name states the source for what the value is, not how it is stored: the integer width for a
+      quantity, `raw` for an identity or an opaque encoding, `bytes`/`str` for a name, `ptr` for an address,
+      and a bare `new_unchecked` only where there is no single source to name
 - [ ] The constructor is `unsafe fn` if and only if breaking its precondition is undefined behavior — a raw
       pointer, an unchecked cast, a handle asserted live, an asserted lifetime
 - [ ] An `unsafe` unchecked constructor carries a `# Safety` section; a safe one states its precondition in
@@ -199,6 +214,8 @@ Before committing code, verify:
   that an unchecked constructor asserts
 - [principle-least-surprise](principle-least-surprise.md) - Foundation: `FromStr`/`TryFrom` are the constructors a
   reader expects; a bypass must announce itself in its name
+- [rust-fn](rust-fn.md) - Related: Owns the constructor names a checked build takes, including when a fallible
+  one is `create` rather than `TryFrom`
 - [rust-docs-rustdoc](rust-docs-rustdoc.md) - Related: The rustdoc sections a `# Safety` block sits among, and
   module-level invariant docs
 - [rust-docs-comments](rust-docs-comments.md) - Related: The voice of the plain `//` comment that justifies a
