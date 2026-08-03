@@ -5,7 +5,7 @@
 //!
 //! For the Nintendo Switch, the frequency of the system counter-timer is 19.2MHz.
 
-use nx_cpu::control_regs;
+use nx_cpu::counter;
 
 use crate::sys::timespec::Timespec;
 
@@ -22,7 +22,7 @@ pub const NSEC_PER_TICK: u64 = 1_000_000_000 / 19_200_000; // ns
 /// CPU counter-timer.
 #[inline]
 pub fn get_system_tick() -> u64 {
-    unsafe { control_regs::cntpct_el0() }
+    counter::ticks().to_raw()
 }
 
 /// Gets the system counter-timer frequency.
@@ -34,7 +34,7 @@ pub fn get_system_tick() -> u64 {
 #[cfg(feature = "ffi")]
 #[inline]
 pub fn get_system_tick_freq() -> u64 {
-    unsafe { control_regs::cntfrq_el0() }
+    counter::frequency().to_raw()
 }
 
 /// Converts time from nanoseconds to CPU ticks.

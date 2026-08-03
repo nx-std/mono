@@ -11,3 +11,4 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 pub mod barrier;
 pub mod control_regs;
+pub mod counter;

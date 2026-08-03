@@ -169,7 +169,7 @@ impl TimeService {
     /// Computes the steady clock time from the time point context.
     fn compute_steady_time(context: &TimeStandardSteadyClockTimePointType) -> u64 {
         // Read current system tick counter
-        let current_tick = unsafe { nx_cpu::control_regs::cntpct_el0() };
+        let current_tick = nx_cpu::counter::ticks().to_raw();
 
         // Convert ticks to nanoseconds
         // Formula: (tick * 1_000_000_000ns) / 19_200_000Hz = (tick * 625) / 12
