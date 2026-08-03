@@ -34,7 +34,7 @@ impl Ticks {
     /// value in nanoseconds or hertz is accepted here and only goes wrong later,
     /// in whatever arithmetic treats it as a count.
     #[inline]
-    pub const fn new_unchecked(raw: u64) -> Self {
+    pub const fn from_u64_unchecked(raw: u64) -> Self {
         Self(raw)
     }
 
@@ -58,7 +58,7 @@ impl Hz {
     /// is a well-formed frequency, so a tick count is accepted here and only
     /// goes wrong later, in whatever arithmetic treats it as a rate.
     #[inline]
-    pub const fn new_unchecked(raw: u64) -> Self {
+    pub const fn from_u64_unchecked(raw: u64) -> Self {
         Self(raw)
     }
 
@@ -80,7 +80,7 @@ pub fn ticks() -> Ticks {
     let raw = unsafe { control_regs::cntpct_el0() };
     // SAFETY: `raw` is the counter-timer count register's own value, so it is a
     // tick count by construction.
-    Ticks::new_unchecked(raw)
+    Ticks::from_u64_unchecked(raw)
 }
 
 /// Reads the rate the counter-timer advances at.
@@ -94,5 +94,5 @@ pub fn frequency() -> Hz {
     let raw = unsafe { control_regs::cntfrq_el0() };
     // SAFETY: `raw` is the counter-timer frequency register's own value, so it
     // is a rate in hertz by construction.
-    Hz::new_unchecked(raw)
+    Hz::from_u64_unchecked(raw)
 }

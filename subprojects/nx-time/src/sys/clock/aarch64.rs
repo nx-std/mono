@@ -17,7 +17,7 @@ use crate::sys::{nsec::NSEC_PER_SEC, timespec::Timespec};
 
 /// System counter-timer frequency (19.2MHz).
 // SAFETY: A frequency in hertz, which is the unit `Hz` names.
-pub const TIMER_FREQ: Hz = Hz::new_unchecked(19_200_000);
+pub const TIMER_FREQ: Hz = Hz::from_u64_unchecked(19_200_000);
 
 /// The number of nanoseconds in a second, as a `u64`.
 ///
@@ -49,7 +49,7 @@ const_assert_eq!(NSEC_PER_RATIO, 625);
 /// One tick is not a whole number of nanoseconds, so this is the floor. It is reported to
 /// `clock_getres`, which has no way to express a fractional resolution.
 #[cfg(feature = "ffi")]
-pub const NSEC_PER_TICK: u64 = cpu_ticks_to_ns(Ticks::new_unchecked(1));
+pub const NSEC_PER_TICK: u64 = cpu_ticks_to_ns(Ticks::from_u64_unchecked(1));
 
 /// Computes the greatest common divisor of `a` and `b` by Euclid's algorithm.
 const fn gcd(a: u64, b: u64) -> u64 {
@@ -93,7 +93,7 @@ pub fn get_system_tick_freq() -> Hz {
 #[inline]
 pub const fn ns_to_cpu_ticks(ns: u64) -> Ticks {
     // SAFETY: Scaling a nanosecond count by the tick/nanosecond ratio yields a tick count.
-    Ticks::new_unchecked((ns * TICKS_PER_RATIO) / NSEC_PER_RATIO)
+    Ticks::from_u64_unchecked((ns * TICKS_PER_RATIO) / NSEC_PER_RATIO)
 }
 
 /// Converts from CPU ticks to nanoseconds.
@@ -120,7 +120,7 @@ pub fn gettime() -> Result<Timespec, i32> {
     // Convert to seconds and nanoseconds
     let seconds = now / TIMER_FREQ.to_raw();
     // SAFETY: A remainder of a tick count is itself a tick count.
-    let subsec_ticks = Ticks::new_unchecked(now % TIMER_FREQ.to_raw());
+    let subsec_ticks = Ticks::from_u64_unchecked(now % TIMER_FREQ.to_raw());
     let nanoseconds = cpu_ticks_to_ns(subsec_ticks);
 
     // Create timespec with monotonic time (time since boot)
