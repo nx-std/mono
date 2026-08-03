@@ -8,6 +8,14 @@ nx-std is a Meson-based monorepo implementing a Rust replacement for `libnx` (th
 
 **Strategy**: Incremental replacement. Rust crates expose C-FFI bindings that replace `libnx` functions at link time, allowing gradual migration from C to Rust while maintaining compatibility with existing homebrew code.
 
+**The `std` port is a goal, not a side effect.** Every crate under `sys/` is a building block for it, and this shapes design decisions throughout the workspace:
+
+- **`sys/` mirrors `std::sys`.** The `nx-sys-*` crates track the platform-abstraction-layer (PAL) module tree inside Rust's `library/std/src/sys/` — `nx-sys-sync` ↔ `std::sys::sync`, `nx-sys-thread` ↔ `std::sys::thread`, and so on. When adding a `sys/` crate, name it after the `std::sys` module it will eventually back.
+- **The substrate is newlib, and `std` already targets one.** Rust's Unix PAL has a `target_os = "horizon"` branch for the 3DS — devkitPro + newlib + libsysbase, the same C substrate used here. It works because devkitPro supplies libsysbase's implementation of that interface. Providing the same interface in Rust is what puts a Switch `std` within reach.
+- **Prefer the shape `std` expects.** Where a design choice is open, pick the one the Unix PAL can consume unmodified (integer file descriptors, `errno` conventions, POSIX-shaped signatures) over a more elegant Rust-native abstraction that `std` would have to be taught about. Novel abstractions belong above the PAL boundary, not below it.
+
+This is why the C-FFI surface is not merely a compatibility shim: the interface that lets existing C homebrew link against these crates is the same interface a future `std` port consumes.
+
 **How it works**:
 
 1. Rust crates implement Switch OS functionality (memory, threads, sync primitives, etc.)
