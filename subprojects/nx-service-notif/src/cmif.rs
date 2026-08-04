@@ -2,9 +2,17 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Domain,
+};
 
-use crate::{dispatch::dispatch_in, proto, types::AlarmSetting};
+use crate::{
+    dispatch::dispatch_in,
+    proto,
+    types::AlarmSetting,
+};
 
 /// Initializes the Application variant (cmd 1000). Sends PID.
 pub(crate) fn initialize(domain: &Domain) -> Result<(), DispatchError> {

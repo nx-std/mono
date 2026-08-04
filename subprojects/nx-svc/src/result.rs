@@ -21,7 +21,12 @@
 //! - [Switchbrew Wiki: SVC](https://switchbrew.org/wiki/SVC)
 //! - [Switchbrew Wiki: Error Codes](https://switchbrew.org/wiki/Error_codes)
 
-use crate::error::{_sealed, Module, ToResultCode, UnknownModuleError};
+use crate::error::{
+    _sealed,
+    Module,
+    ToResultCode,
+    UnknownModuleError,
+};
 
 /// Type alias for Result with [`Error`] as the error type.
 ///
@@ -50,7 +55,10 @@ pub type ResultCode = u32;
 ///  - `YYYY` is the `description`
 ///
 /// ```rust
-/// use nx_svc::rc::{Error, ErrorModule};
+/// use nx_svc::rc::{
+///     Error,
+///     ErrorModule,
+/// };
 ///
 /// let err = Error::from_parts(ErrorModule::Kernel, 404);
 ///
@@ -109,7 +117,10 @@ impl core::fmt::Display for Error {
     /// Formats the error code as a `2XXX-YYYY` string.
     ///
     /// ```rust
-    /// use nx_svc::rc::{Error, ErrorModule};
+    /// use nx_svc::rc::{
+    ///     Error,
+    ///     ErrorModule,
+    /// };
     ///
     /// let err = Error::from_parts(ErrorModule::Kernel, 500);
     ///
@@ -132,7 +143,10 @@ impl core::fmt::Debug for Error {
     /// Formats the error code as a debug string.
     ///
     /// ```rust
-    /// use nx_svc::rc::{Error, ErrorModule};
+    /// use nx_svc::rc::{
+    ///     Error,
+    ///     ErrorModule,
+    /// };
     ///
     /// let error = Error::from_parts(ErrorModule::FS, 500);
     ///
@@ -170,7 +184,11 @@ impl From<raw::ResultCode> for Error {
 /// Raw representation of the result code
 // NOTE: For internal use only
 pub(crate) mod raw {
-    use crate::error::{IntoDescription, Module, UnknownModuleError};
+    use crate::error::{
+        IntoDescription,
+        Module,
+        UnknownModuleError,
+    };
 
     /// Successful result code
     const SUCCESS: u32 = 0;

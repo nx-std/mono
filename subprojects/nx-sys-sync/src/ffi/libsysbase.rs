@@ -11,9 +11,17 @@
 
 use core::ffi::c_int;
 
-use nx_svc::error::{KernelError, ToResultCode as _};
+use nx_svc::error::{
+    KernelError,
+    ToResultCode as _,
+};
 
-use crate::{condvar::Condvar, mutex::Mutex, remutex::ReentrantMutex, wait::Timeout};
+use crate::{
+    condvar::Condvar,
+    mutex::Mutex,
+    remutex::ReentrantMutex,
+    wait::Timeout,
+};
 
 /// POSIX error: Bad file descriptor (used when recursive lock counter != 1).
 const EBADF: c_int = 9;

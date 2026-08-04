@@ -28,7 +28,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -36,18 +39,49 @@ mod proto;
 mod types;
 
 pub use self::{
-    cmif::{AcquireEventError, AcquireEventWithFlagError},
+    cmif::{
+        AcquireEventError,
+        AcquireEventWithFlagError,
+    },
     proto::SERVICE_NAME,
     types::{
-        BtdrvAddress, BtdrvBleAdvertisePacketParameter, BtdrvBleConnectionInfo, BtdrvBleScanResult,
-        BtdrvGattAttributeUuid, BtmAudioDevice, BtmBdName, BtmBleDataPath, BtmBluetoothMode,
-        BtmClassOfDevice, BtmConnectedDeviceV1, BtmConnectedDeviceV13, BtmDeviceConditionV100,
-        BtmDeviceConditionV510, BtmDeviceConditionV800, BtmDeviceConditionV900, BtmDeviceInfoList,
-        BtmDeviceInfoV1, BtmDeviceInfoV13, BtmDeviceProperty, BtmDevicePropertyList,
-        BtmDeviceSlotMode, BtmDeviceSlotModeList, BtmGattCharacteristic,
-        BtmGattClientConditionList, BtmGattDescriptor, BtmGattService, BtmHidDeviceInfo,
-        BtmHostDevicePropertyV1, BtmHostDevicePropertyV13, BtmLinkKey, BtmProfile, BtmSlotMode,
-        BtmState, BtmTsiMode, BtmWlanMode, BtmZeroRetransmissionList,
+        BtdrvAddress,
+        BtdrvBleAdvertisePacketParameter,
+        BtdrvBleConnectionInfo,
+        BtdrvBleScanResult,
+        BtdrvGattAttributeUuid,
+        BtmAudioDevice,
+        BtmBdName,
+        BtmBleDataPath,
+        BtmBluetoothMode,
+        BtmClassOfDevice,
+        BtmConnectedDeviceV1,
+        BtmConnectedDeviceV13,
+        BtmDeviceConditionV100,
+        BtmDeviceConditionV510,
+        BtmDeviceConditionV800,
+        BtmDeviceConditionV900,
+        BtmDeviceInfoList,
+        BtmDeviceInfoV1,
+        BtmDeviceInfoV13,
+        BtmDeviceProperty,
+        BtmDevicePropertyList,
+        BtmDeviceSlotMode,
+        BtmDeviceSlotModeList,
+        BtmGattCharacteristic,
+        BtmGattClientConditionList,
+        BtmGattDescriptor,
+        BtmGattService,
+        BtmHidDeviceInfo,
+        BtmHostDevicePropertyV1,
+        BtmHostDevicePropertyV13,
+        BtmLinkKey,
+        BtmProfile,
+        BtmSlotMode,
+        BtmState,
+        BtmTsiMode,
+        BtmWlanMode,
+        BtmZeroRetransmissionList,
     },
 };
 

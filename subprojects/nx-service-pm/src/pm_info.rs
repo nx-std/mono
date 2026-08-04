@@ -4,14 +4,23 @@ use core::mem::size_of;
 
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    service::{DispatchError, Session},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        DispatchError,
+        Session,
+    },
 };
 use static_assertions::const_assert_eq;
 
 use super::{
     cmif,
-    types::{ProcessId, ProgramId},
+    types::{
+        ProcessId,
+        ProgramId,
+    },
 };
 
 /// Connected `pm:info` (process info) service wrapper.

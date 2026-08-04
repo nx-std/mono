@@ -6,7 +6,10 @@
 
 use core::{
     ptr,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{
+        AtomicU64,
+        Ordering,
+    },
 };
 
 use super::types::InputState;

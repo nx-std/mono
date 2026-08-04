@@ -1,12 +1,21 @@
 //! TIPC response parsing.
 
-use nx_svc::{error::ResultCode, raw::Handle as RawHandle};
+use nx_svc::{
+    error::ResultCode,
+    raw::Handle as RawHandle,
+};
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
 use zerocopy::little_endian::U32;
 
 use crate::{
-    cursor::{Cursor, ResponsePayload},
-    error::{GENERIC_ERROR, ToResultCode},
+    cursor::{
+        Cursor,
+        ResponsePayload,
+    },
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
     hipc,
 };
 

@@ -5,10 +5,18 @@
 
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     hipc::InputBuffer,
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 use crate::proto::root_cmds;

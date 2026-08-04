@@ -10,7 +10,10 @@
 //! `ResultCode` are. `ThreadTag` keeps the one that identifies a thread apart from the rest, and
 //! gives the "who am I" read a single home rather than a copy in each primitive.
 
-use nx_svc::raw::{Handle, INVALID_HANDLE};
+use nx_svc::raw::{
+    Handle,
+    INVALID_HANDLE,
+};
 
 /// The kernel handle of the thread owning a synchronization primitive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

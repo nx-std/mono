@@ -3,16 +3,29 @@
 //! This module manages the VI service session and provides a singleton interface
 //! for accessing display and layer functionality throughout the application lifecycle.
 
-use nx_rt_core::error::{ResultCode, ToResultCode};
+use nx_rt_core::error::{
+    ResultCode,
+    ToResultCode,
+};
 use nx_service_vi::{
-    ConnectOptions, ViService,
-    types::{ViLayerFlags, ViServiceType},
+    ConnectOptions,
+    ViService,
+    types::{
+        ViLayerFlags,
+        ViServiceType,
+    },
 };
 use nx_sf::error::ToResultCode as _;
-use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
+use nx_std_sync::{
+    once_lock::OnceLock,
+    rwlock::RwLock,
+};
 
 use crate::{
-    env::hos_version::{self, HosVersion},
+    env::hos_version::{
+        self,
+        HosVersion,
+    },
     services::sm,
 };
 

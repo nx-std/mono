@@ -29,10 +29,19 @@
 extern crate alloc;
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, Session, clone_current_object};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    Session,
+    clone_current_object,
+};
 
 mod cmif;
 mod proto;
@@ -43,16 +52,26 @@ pub use nx_sf::service::DispatchError as IpcDispatchError;
 
 use crate::{
     cmif::CreateFriendServiceError,
-    session::{FRIENDS_POOL_SIZE, SessionPool},
+    session::{
+        FRIENDS_POOL_SIZE,
+        SessionPool,
+    },
 };
 pub use crate::{
     proto::{
-        SERVICE_NAME_ADMIN, SERVICE_NAME_MANAGER, SERVICE_NAME_SYSTEM, SERVICE_NAME_USER,
+        SERVICE_NAME_ADMIN,
+        SERVICE_NAME_MANAGER,
+        SERVICE_NAME_SYSTEM,
+        SERVICE_NAME_USER,
         SERVICE_NAME_VIEWER,
     },
     types::{
-        AccountUid, FriendInvitationGameModeDescription, FriendInvitationGroupId,
-        FriendInvitationId, FriendsUserSetting, InAppScreenName,
+        AccountUid,
+        FriendInvitationGameModeDescription,
+        FriendInvitationGroupId,
+        FriendInvitationId,
+        FriendsUserSetting,
+        InAppScreenName,
     },
 };
 

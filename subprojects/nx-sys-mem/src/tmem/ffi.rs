@@ -5,13 +5,22 @@
 
 use core::{
     ffi::c_void,
-    ptr::{self, NonNull},
+    ptr::{
+        self,
+        NonNull,
+    },
 };
 
 use nx_svc::{
-    error::{KernelError, ToResultCode},
+    error::{
+        KernelError,
+        ToResultCode,
+    },
     mem::tmem::Handle,
-    raw::{Handle as RawHandle, INVALID_HANDLE},
+    raw::{
+        Handle as RawHandle,
+        INVALID_HANDLE,
+    },
 };
 
 use super::sys;

@@ -41,5 +41,8 @@ pub use self::{
     rwlock::RwLock,
     semaphore::Semaphore,
     tag::ThreadTag,
-    wait::{Timeout, WakeCount},
+    wait::{
+        Timeout,
+        WakeCount,
+    },
 };

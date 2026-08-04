@@ -1,19 +1,31 @@
 //! CMIF protocol operations for the UART service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
     cmif,
     ipc::Handle,
     service::{
-        BorrowedSessionHandle, BufferAttr, DispatchError, OutHandleAttr, OwnedSessionHandle,
+        BorrowedSessionHandle,
+        BufferAttr,
+        DispatchError,
+        OutHandleAttr,
+        OwnedSessionHandle,
         Session,
     },
 };
 
 use crate::{
     proto,
-    types::{BindPortEventIn, OpenPortLegacyIn, OpenPortV6In, OpenPortV7In},
+    types::{
+        BindPortEventIn,
+        OpenPortLegacyIn,
+        OpenPortV6In,
+        OpenPortV7In,
+    },
 };
 
 fn dispatch_in_u32_out_bool(

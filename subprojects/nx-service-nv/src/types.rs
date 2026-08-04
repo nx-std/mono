@@ -1,6 +1,10 @@
 //! NV service data types.
 
-use nx_sf::error::{GENERIC_ERROR, ResultCode, ToResultCode};
+use nx_sf::error::{
+    GENERIC_ERROR,
+    ResultCode,
+    ToResultCode,
+};
 
 /// NV service type selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

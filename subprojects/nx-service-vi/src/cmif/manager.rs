@@ -4,14 +4,25 @@
 
 use nx_sf::{
     cmif,
-    error::{ResultCode, ToResultCode},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
-    cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
+    cmif::application::{
+        CreateStrayLayerError,
+        CreateStrayLayerOutput,
+    },
     proto::manager_cmds,
-    types::{DisplayId, LayerId, ViLayerStack, ViPowerState},
+    types::{
+        DisplayId,
+        LayerId,
+        ViLayerStack,
+        ViPowerState,
+    },
 };
 
 /// Creates a managed layer.

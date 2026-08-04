@@ -16,7 +16,12 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    Session,
+};
 
 mod cmif;
 mod proto;

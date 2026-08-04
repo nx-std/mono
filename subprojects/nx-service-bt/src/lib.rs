@@ -15,16 +15,27 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
 mod types;
 
 pub use self::{
-    cmif::{DispatchError, GetLeEventInfoError, RegisterBleEventError},
+    cmif::{
+        DispatchError,
+        GetLeEventInfoError,
+        RegisterBleEventError,
+    },
     proto::SERVICE_NAME,
-    types::{BtdrvBleEventType, BtdrvGattAttributeUuid, BtdrvGattId},
+    types::{
+        BtdrvBleEventType,
+        BtdrvGattAttributeUuid,
+        BtdrvGattId,
+    },
 };
 
 /// Bluetooth user service wrapper.

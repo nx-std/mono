@@ -12,8 +12,15 @@ use super::wire::CommandType;
 use crate::{
     array_vec::ArrayVec,
     hipc::{
-        self, BufferDescriptor, HIPC_MAX_DESCRIPTORS, HipcPayload, HipcRequest, HipcRequestBuilder,
-        InOutBuffer, InputBuffer, OutputBuffer,
+        self,
+        BufferDescriptor,
+        HIPC_MAX_DESCRIPTORS,
+        HipcPayload,
+        HipcRequest,
+        HipcRequestBuilder,
+        InOutBuffer,
+        InputBuffer,
+        OutputBuffer,
     },
     service::handle::BorrowedSessionHandle,
 };

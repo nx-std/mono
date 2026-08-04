@@ -3,13 +3,22 @@
 //! This module implements SM commands using the TIPC (Tiny IPC) protocol,
 //! which is used on HOS 12.0.0+ and Atmosphere for certain operations.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
     ServiceName,
-    error::{GENERIC_ERROR, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
     tipc,
 };
 use nx_svc::error::ResultCode;

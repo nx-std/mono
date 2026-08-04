@@ -1,4 +1,7 @@
-use core::{error::Error, fmt};
+use core::{
+    error::Error,
+    fmt,
+};
 
 /// A type alias for the result of a nonblocking locking method.
 ///

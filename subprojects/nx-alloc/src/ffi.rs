@@ -1,6 +1,12 @@
-use core::{ffi::c_void, ptr};
+use core::{
+    ffi::c_void,
+    ptr,
+};
 
-use self::meta::{Allocation, Layout};
+use self::meta::{
+    Allocation,
+    Layout,
+};
 use crate::global as global_allocator;
 
 /// Allocates an uninitialized block of at least `size` bytes.
@@ -208,7 +214,10 @@ mod newlib {
     use core::ffi::c_void;
 
     use super::{
-        __nx_alloc__aligned_alloc, __nx_alloc__calloc, __nx_alloc__free, __nx_alloc__malloc,
+        __nx_alloc__aligned_alloc,
+        __nx_alloc__calloc,
+        __nx_alloc__free,
+        __nx_alloc__malloc,
         __nx_alloc__realloc,
     };
 
@@ -260,7 +269,12 @@ mod newlib {
 }
 
 mod meta {
-    use core::{alloc::Layout as AllocLayout, ffi::c_void, mem, ptr};
+    use core::{
+        alloc::Layout as AllocLayout,
+        ffi::c_void,
+        mem,
+        ptr,
+    };
 
     /// A memory allocation with metadata.
     ///

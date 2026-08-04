@@ -1,6 +1,9 @@
 //! Album control wire-layout types.
 
-use nx_service_caps::{AlbumEntry, AlbumFileId};
+use nx_service_caps::{
+    AlbumEntry,
+    AlbumFileId,
+};
 use static_assertions::const_assert_eq;
 
 /// Application ID structure used by the album control service.

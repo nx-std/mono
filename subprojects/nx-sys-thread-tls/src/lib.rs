@@ -205,11 +205,20 @@
 
 extern crate nx_panic_handler; // Provides #[panic_handler]
 
-use core::{cell::UnsafeCell, ffi::c_void, mem::offset_of, ptr, ptr::NonNull};
+use core::{
+    cell::UnsafeCell,
+    ffi::c_void,
+    mem::offset_of,
+    ptr,
+    ptr::NonNull,
+};
 
 use nx_cpu::control_regs;
 use nx_svc::thread::Handle as ThreadHandle;
-use static_assertions::{assert_not_impl_any, const_assert_eq};
+use static_assertions::{
+    assert_not_impl_any,
+    const_assert_eq,
+};
 
 #[cfg(feature = "ffi")]
 pub mod ffi;

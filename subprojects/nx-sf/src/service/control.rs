@@ -11,13 +11,27 @@
 
 use nx_svc::{
     error::ResultCode,
-    ipc::{self, Handle as SessionHandle},
+    ipc::{
+        self,
+        Handle as SessionHandle,
+    },
 };
 
-use super::handle::{BorrowedSessionHandle, OwnedSessionHandle};
+use super::handle::{
+    BorrowedSessionHandle,
+    OwnedSessionHandle,
+};
 use crate::{
-    cmif::{self, CmifCloseRequest, CmifControlRequestBuilder, ObjectId},
-    error::{GENERIC_ERROR, ToResultCode},
+    cmif::{
+        self,
+        CmifCloseRequest,
+        CmifControlRequestBuilder,
+        ObjectId,
+    },
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
 };
 
 /// Control request: convert session to domain.

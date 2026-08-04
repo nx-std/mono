@@ -7,11 +7,24 @@
 //! The main functionality is centered around the [`get_info`] system call, which provides
 //! a type-safe way to query various system properties and kernel object information.
 
-pub use super::raw::{CUR_PROCESS_HANDLE, Handle, INVALID_HANDLE};
+pub use super::raw::{
+    CUR_PROCESS_HANDLE,
+    Handle,
+    INVALID_HANDLE,
+};
 use super::{
-    error::{_sealed, KernelError, ResultCode, ToResultCode},
+    error::{
+        _sealed,
+        KernelError,
+        ResultCode,
+        ToResultCode,
+    },
     raw,
-    result::{Error, Result, raw::Result as RawResult},
+    result::{
+        Error,
+        Result,
+        raw::Result as RawResult,
+    },
 };
 
 /// Retrieves random entropy.

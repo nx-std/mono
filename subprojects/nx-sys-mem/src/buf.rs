@@ -11,8 +11,17 @@
 //! - [`Buffer`]: An owned buffer with custom layout support
 //! - [`BufferRef`]: A non-owning reference to externally managed memory
 
-use alloc::alloc::{Layout, alloc_zeroed, dealloc};
-use core::{ffi::c_void, marker::PhantomData, mem::align_of, ptr::NonNull};
+use alloc::alloc::{
+    Layout,
+    alloc_zeroed,
+    dealloc,
+};
+use core::{
+    ffi::c_void,
+    marker::PhantomData,
+    mem::align_of,
+    ptr::NonNull,
+};
 
 /// Trait for memory buffer implementations.
 ///

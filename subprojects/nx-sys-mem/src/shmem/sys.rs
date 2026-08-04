@@ -23,17 +23,31 @@
 //!     classes of misuse (double-mapping, premature unmapping, etc.)
 //!     impossible to represent in safe Rust.
 
-use core::{ffi::c_void, ptr::NonNull};
+use core::{
+    ffi::c_void,
+    ptr::NonNull,
+};
 
 use nx_svc::{
-    error::{KernelError, ResultCode, ToResultCode as _},
+    error::{
+        KernelError,
+        ResultCode,
+        ToResultCode as _,
+    },
     mem::shmem::{
-        self as svc, Handle, LocalShmemPermission, MemoryPermission, RemoteShmemPermission,
+        self as svc,
+        Handle,
+        LocalShmemPermission,
+        MemoryPermission,
+        RemoteShmemPermission,
     },
 };
 use nx_sys_virtmem::virtmem;
 
-use crate::error::{_sealed, ToResultCode};
+use crate::error::{
+    _sealed,
+    ToResultCode,
+};
 
 /// Size of the guard region for shared memory mappings (4 KiB).
 ///

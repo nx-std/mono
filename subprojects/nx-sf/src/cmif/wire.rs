@@ -5,7 +5,10 @@
 //! sibling `request` and `response` modules.
 
 use static_assertions::const_assert_eq;
-use zerocopy::{IntoBytes, KnownLayout};
+use zerocopy::{
+    IntoBytes,
+    KnownLayout,
+};
 
 use crate::hipc;
 

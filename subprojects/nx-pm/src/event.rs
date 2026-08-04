@@ -5,7 +5,10 @@
 //! closed when the wrapper is dropped, and both expose a blocking
 //! [`wait`](ProcessEvent::wait) via `svcWaitSynchronization`.
 
-use nx_svc::{raw::Handle, sync::EventHandle};
+use nx_svc::{
+    raw::Handle,
+    sync::EventHandle,
+};
 
 /// Owned process event handle returned by `pm:shell GetProcessEventHandle`.
 ///

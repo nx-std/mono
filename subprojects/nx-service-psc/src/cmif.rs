@@ -1,11 +1,23 @@
 //! CMIF protocol operations for the power state controller service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Domain,
+    DomainObject,
+    OutHandleAttr,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_no_io},
+    dispatch::{
+        dispatch_in,
+        dispatch_no_io,
+    },
     proto,
     types::GetRequestOut,
 };

@@ -29,18 +29,33 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
 
 pub use self::{
     cmif::{
-        CancelError, GetAddrInfoError, GetAddrInfoResult, GetCancelHandleError,
-        GetGaiStringErrorError, GetHostByAddrError, GetHostByAddrResult, GetHostByNameError,
-        GetHostByNameResult, GetHostStringErrorError, GetNameInfoError, GetNameInfoResult,
+        CancelError,
+        GetAddrInfoError,
+        GetAddrInfoResult,
+        GetCancelHandleError,
+        GetGaiStringErrorError,
+        GetHostByAddrError,
+        GetHostByAddrResult,
+        GetHostByNameError,
+        GetHostByNameResult,
+        GetHostStringErrorError,
+        GetNameInfoError,
+        GetNameInfoResult,
     },
-    proto::{CancelHandle, SERVICE_NAME},
+    proto::{
+        CancelHandle,
+        SERVICE_NAME,
+    },
 };
 
 /// DNS Resolver Service (`sfdnsres`) session wrapper.

@@ -1,22 +1,49 @@
 //! CMIF protocol operations for the album accessor service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_service_caps::{
-    AlbumCache, AlbumEntry, AlbumFileId, AlbumUsage2, AlbumUsage3, AlbumUsage16,
-    ApplicationAlbumEntry, LoadAlbumScreenShotImageOutput, ScreenShotAttribute,
+    AlbumCache,
+    AlbumEntry,
+    AlbumFileId,
+    AlbumUsage2,
+    AlbumUsage3,
+    AlbumUsage16,
+    ApplicationAlbumEntry,
+    LoadAlbumScreenShotImageOutput,
+    ScreenShotAttribute,
     ScreenShotDecodeOption,
 };
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in_no_out, dispatch_in_out, dispatch_in_pid_out, dispatch_out},
+    dispatch::{
+        dispatch_in_no_out,
+        dispatch_in_out,
+        dispatch_in_pid_out,
+        dispatch_out,
+    },
     proto,
     types::{
-        GetAlbumCacheExIn, GetAlbumEntryFromAppEntryAruidIn, GetAlbumEntryFromAppEntryIn,
-        GetLastOverlayThumbnailOut, GetMinMaxAppletIdOut, GetRequiredStorageSizeIn,
-        LoadScreenShotEx0Out, LoadScreenShotExIn, LoadScreenShotOut, ReadStreamIn,
-        StorageCopyAlbumFileIn, StorageFlagsIn,
+        GetAlbumCacheExIn,
+        GetAlbumEntryFromAppEntryAruidIn,
+        GetAlbumEntryFromAppEntryIn,
+        GetLastOverlayThumbnailOut,
+        GetMinMaxAppletIdOut,
+        GetRequiredStorageSizeIn,
+        LoadScreenShotEx0Out,
+        LoadScreenShotExIn,
+        LoadScreenShotOut,
+        ReadStreamIn,
+        StorageCopyAlbumFileIn,
+        StorageFlagsIn,
     },
 };
 

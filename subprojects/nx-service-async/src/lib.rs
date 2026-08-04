@@ -28,14 +28,24 @@
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use nx_sf::service::{DispatchError, Session};
-use nx_svc::sync::{self, EventHandle, WaitSyncError};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
+use nx_svc::sync::{
+    self,
+    EventHandle,
+    WaitSyncError,
+};
 
 mod cmif;
 mod proto;
 pub mod types;
 
-pub use self::types::{ErrorContext, ErrorContextKind};
+pub use self::types::{
+    ErrorContext,
+    ErrorContextKind,
+};
 
 /// IAsyncValue sub-object wrapper.
 ///

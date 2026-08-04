@@ -21,7 +21,10 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
 use nx_service_vi::ViLayerStack;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -29,8 +32,12 @@ mod types;
 
 pub use self::{
     cmif::{
-        CaptureJpegError, CaptureRawImageError, CloseReadStreamError, OpenReadStreamError,
-        ReadStreamError, ReadStreamInfo,
+        CaptureJpegError,
+        CaptureRawImageError,
+        CloseReadStreamError,
+        OpenReadStreamError,
+        ReadStreamError,
+        ReadStreamInfo,
     },
     proto::SERVICE_NAME,
     types::JPEG_BUFFER_SIZE,

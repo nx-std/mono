@@ -5,19 +5,29 @@
 //! with mutexes to handle situations where a thread needs to wait for some condition
 //! that depends on other threads.
 
-use core::{num::NonZeroU32, sync::atomic::AtomicU32};
+use core::{
+    num::NonZeroU32,
+    sync::atomic::AtomicU32,
+};
 
 use nx_svc::{
     error::ToResultCode,
     result::ResultCode,
-    sync::{WaitProcessWideKeyError, signal_process_wide_key, wait_process_wide_key_atomic},
+    sync::{
+        WaitProcessWideKeyError,
+        signal_process_wide_key,
+        wait_process_wide_key_atomic,
+    },
 };
 use static_assertions::const_assert_eq;
 
 use super::Mutex;
 use crate::{
     tag::ThreadTag,
-    wait::{Timeout, WakeCount},
+    wait::{
+        Timeout,
+        WakeCount,
+    },
 };
 
 /// A condition variable primitive for thread synchronization.

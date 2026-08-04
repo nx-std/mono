@@ -35,7 +35,12 @@
 /// The runtime sits directly on top of `nx-sf` and reports the same codes, so
 /// the two must not drift. `nx-sf` is the lowest crate in the libnx-replacement
 /// stack that needs them, which is why they are declared there and not here.
-pub use nx_sf::error::{GENERIC_ERROR, LibnxError, ResultCode, libnx_error};
+pub use nx_sf::error::{
+    GENERIC_ERROR,
+    LibnxError,
+    ResultCode,
+    libnx_error,
+};
 
 /// Converts an `nx-rt-*` runtime error into the raw result code a C caller
 /// receives.

@@ -8,7 +8,10 @@
 
 use nx_svc::ipc::Handle as SessionHandle;
 
-use super::{dispatch::Dispatch, handle::BorrowedSessionHandle};
+use super::{
+    dispatch::Dispatch,
+    handle::BorrowedSessionHandle,
+};
 
 /// Non-owning service view; drop does not close the handle.
 #[derive(Debug, Clone, Copy)]

@@ -2,14 +2,27 @@
 
 use core::mem::size_of;
 
-use nx_svc::{error::ResultCode, raw::Handle as RawHandle};
+use nx_svc::{
+    error::ResultCode,
+    raw::Handle as RawHandle,
+};
 
 use super::wire::{
-    Header, MIN_PREFIX_BUF_SIZE, RECV_LIST_WIRE_NONE, SpecialHeader, StaticDescriptor,
+    Header,
+    MIN_PREFIX_BUF_SIZE,
+    RECV_LIST_WIRE_NONE,
+    SpecialHeader,
+    StaticDescriptor,
 };
 use crate::{
-    cursor::{Cursor, ResponsePayload},
-    error::{GENERIC_ERROR, ToResultCode},
+    cursor::{
+        Cursor,
+        ResponsePayload,
+    },
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
 };
 
 /// Parses a full HIPC response into the envelope plus a typed payload.

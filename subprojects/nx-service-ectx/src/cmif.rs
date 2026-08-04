@@ -2,7 +2,10 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, OutputBuffer},
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 

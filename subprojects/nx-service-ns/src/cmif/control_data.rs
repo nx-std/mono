@@ -1,13 +1,25 @@
 //! IReadOnlyApplicationControlDataInterface CMIF commands.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use super::app_manager::AsyncCommandError;
 use crate::{
     proto,
-    types::{ControlData2In, ControlDataSourceAppIdIn, ListApplicationTitleIn},
+    types::{
+        ControlData2In,
+        ControlDataSourceAppIdIn,
+        ListApplicationTitleIn,
+    },
 };
 
 /// GetApplicationControlData (cmd 0).

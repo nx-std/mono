@@ -15,7 +15,11 @@
 //! `ThreadControl` directly.
 
 use alloc::{
-    alloc::{Layout, alloc_zeroed, dealloc},
+    alloc::{
+        Layout,
+        alloc_zeroed,
+        dealloc,
+    },
     boxed::Box,
     sync::Arc,
     vec::Vec,
@@ -23,41 +27,88 @@ use alloc::{
 use core::{
     cell::UnsafeCell,
     ffi::c_void,
-    mem::{MaybeUninit, offset_of},
+    mem::{
+        MaybeUninit,
+        offset_of,
+    },
     num::NonZeroU64,
-    ptr::{self, NonNull},
-    sync::atomic::{AtomicPtr, AtomicU8, AtomicU64, Ordering},
+    ptr::{
+        self,
+        NonNull,
+    },
+    sync::atomic::{
+        AtomicPtr,
+        AtomicU8,
+        AtomicU64,
+        Ordering,
+    },
     time::Duration,
 };
 
 #[cfg(feature = "ffi")]
-use nx_svc::error::{KernelError, ResultCode, ToResultCode as _};
+use nx_svc::error::{
+    KernelError,
+    ResultCode,
+    ToResultCode as _,
+};
 use nx_svc::{
-    mem::{UnmapMemoryError, query_memory, unmap_memory},
+    mem::{
+        UnmapMemoryError,
+        query_memory,
+        unmap_memory,
+    },
     raw::ThreadContext,
     result::Error,
     sync::{
-        MAX_WAIT_HANDLES, WaitSyncError, wait_synchronization_multiple, wait_synchronization_single,
+        MAX_WAIT_HANDLES,
+        WaitSyncError,
+        wait_synchronization_multiple,
+        wait_synchronization_single,
     },
     thread::{
-        CloseHandleError, CreateThreadError, GetContext3Error, Handle, PauseThreadError,
-        ResumeThreadError, StartThreadError, close_handle,
+        CloseHandleError,
+        CreateThreadError,
+        GetContext3Error,
+        Handle,
+        PauseThreadError,
+        ResumeThreadError,
+        StartThreadError,
+        close_handle,
     },
 };
 use nx_sys_mem::{
     buf::BufferRef,
-    stack::{self, MapError},
+    stack::{
+        self,
+        MapError,
+    },
 };
-use nx_sys_thread_tls::{ReentPtr, ThreadInfoPtr, ThreadPointer};
+use nx_sys_thread_tls::{
+    ReentPtr,
+    ThreadInfoPtr,
+    ThreadPointer,
+};
 use static_assertions::const_assert_eq;
 
 #[cfg(feature = "ffi")]
-use crate::error::{_sealed, ToResultCode};
+use crate::error::{
+    _sealed,
+    ToResultCode,
+};
 use crate::{
-    detach::{self, DetachState, Detachable},
+    detach::{
+        self,
+        DetachState,
+        Detachable,
+    },
     tcb::Tcb,
-    thread_list, tls_block,
-    tsd::{self, NUM_TSD_KEYS, ThreadRuntime},
+    thread_list,
+    tls_block,
+    tsd::{
+        self,
+        NUM_TSD_KEYS,
+        ThreadRuntime,
+    },
 };
 
 /// Horizon OS memory page size, in bytes.

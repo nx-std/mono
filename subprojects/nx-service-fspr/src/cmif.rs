@@ -2,7 +2,11 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Domain,
+};
 
 use crate::proto;
 

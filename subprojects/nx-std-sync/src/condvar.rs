@@ -4,7 +4,10 @@ use core::fmt;
 
 use nx_sys_sync as sys;
 
-use crate::mutex::{self, MutexGuard};
+use crate::mutex::{
+    self,
+    MutexGuard,
+};
 
 /// A Condition Variable
 ///

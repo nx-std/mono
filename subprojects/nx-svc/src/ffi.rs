@@ -1,12 +1,31 @@
 //! Raw _Supervisor Call (SVC)_ API.
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{
+    c_char,
+    c_int,
+    c_void,
+};
 
 use crate::{
     raw::{
-        self, ArbitrationType, BreakReason, CodeMapOperation, DebugThreadParam, Handle, IoPoolType,
-        LastThreadContext, LimitableResource, MemoryInfo, MemoryMapping, PhysicalMemoryInfo,
-        ProcessActivity, ProcessInfoType, SecmonArgs, SignalType, ThreadActivity, ThreadContext,
+        self,
+        ArbitrationType,
+        BreakReason,
+        CodeMapOperation,
+        DebugThreadParam,
+        Handle,
+        IoPoolType,
+        LastThreadContext,
+        LimitableResource,
+        MemoryInfo,
+        MemoryMapping,
+        PhysicalMemoryInfo,
+        ProcessActivity,
+        ProcessInfoType,
+        SecmonArgs,
+        SignalType,
+        ThreadActivity,
+        ThreadContext,
     },
     result::ResultCode,
 };

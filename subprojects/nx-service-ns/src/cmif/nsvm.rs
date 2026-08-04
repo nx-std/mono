@@ -1,8 +1,15 @@
 //! ns:vm CMIF commands.
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
-use crate::{dispatch::dispatch_out, proto, types::NcmContentMetaKey};
+use crate::{
+    dispatch::dispatch_out,
+    proto,
+    types::NcmContentMetaKey,
+};
 
 /// NeedsUpdateVulnerability (cmd 1200).
 #[inline]

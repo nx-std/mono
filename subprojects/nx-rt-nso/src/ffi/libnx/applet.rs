@@ -16,7 +16,10 @@
 use nx_rt_core::error::ToResultCode as _;
 use nx_svc::process::Handle as ProcessHandle;
 
-use crate::{applet as nso_applet, env};
+use crate::{
+    applet as nso_applet,
+    env,
+};
 
 /// Global applet type (C-compatible).
 ///

@@ -2,13 +2,23 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+    },
     proto,
     types::{
-        GetPossibleClockRatesIn, GetPossibleClockRatesOut, SetClockRateIn, SetVoltageEnabledIn,
+        GetPossibleClockRatesIn,
+        GetPossibleClockRatesOut,
+        SetClockRateIn,
+        SetVoltageEnabledIn,
     },
 };
 

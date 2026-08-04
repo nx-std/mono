@@ -20,7 +20,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -28,12 +31,21 @@ mod types;
 
 pub use self::{
     cmif::{
-        DispatchEventError, DispatchInBoolError, DispatchNoIoError, DispatchOutBoolError,
-        DispatchOutF64Error, DispatchOutStructError, DispatchOutU32Error, OpenSessionError,
+        DispatchEventError,
+        DispatchInBoolError,
+        DispatchNoIoError,
+        DispatchOutBoolError,
+        DispatchOutF64Error,
+        DispatchOutStructError,
+        DispatchOutU32Error,
+        OpenSessionError,
     },
     proto::SERVICE_NAME,
     types::{
-        BatteryChargeInfoFields, BatteryChargeInfoFieldsLegacy, BatteryVoltageState, ChargerType,
+        BatteryChargeInfoFields,
+        BatteryChargeInfoFieldsLegacy,
+        BatteryVoltageState,
+        ChargerType,
         Vdd50State,
     },
 };

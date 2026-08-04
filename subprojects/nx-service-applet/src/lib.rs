@@ -317,8 +317,16 @@
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Domain, DomainObjectRef, Session};
-use nx_svc::{process::Handle as ProcessHandle, sync::EventHandle};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Domain,
+    DomainObjectRef,
+    Session,
+};
+use nx_svc::{
+    process::Handle as ProcessHandle,
+    sync::EventHandle,
+};
 
 use crate::aruid::Aruid;
 
@@ -331,19 +339,39 @@ pub mod role;
 
 pub use self::{
     cmif::{
-        AcquireForegroundRightsError, ConnectError, CreateManagedDisplayLayerError,
-        GetAppletResourceUserIdError, GetApplicationFunctionsError, GetCommonStateGetterError,
-        GetSelfControllerError, GetSubInterfaceError, GetWindowControllerError, NotifyRunningError,
-        OpenProxyError, SetFocusHandlingModeError, SetOperationModeChangedNotificationError,
-        SetOutOfFocusSuspendingEnabledError, SetPerformanceModeChangedNotificationError,
+        AcquireForegroundRightsError,
+        ConnectError,
+        CreateManagedDisplayLayerError,
+        GetAppletResourceUserIdError,
+        GetApplicationFunctionsError,
+        GetCommonStateGetterError,
+        GetSelfControllerError,
+        GetSubInterfaceError,
+        GetWindowControllerError,
+        NotifyRunningError,
+        OpenProxyError,
+        SetFocusHandlingModeError,
+        SetOperationModeChangedNotificationError,
+        SetOutOfFocusSuspendingEnabledError,
+        SetPerformanceModeChangedNotificationError,
     },
     common_state::{
-        GetCurrentFocusStateError, GetEventHandleError, GetOperationModeError,
-        GetPerformanceModeError, ReceiveMessageError,
+        GetCurrentFocusStateError,
+        GetEventHandleError,
+        GetOperationModeError,
+        GetPerformanceModeError,
+        ReceiveMessageError,
     },
     proto::{
-        AppletAttribute, AppletFocusHandlingMode, AppletFocusState, AppletMessage,
-        AppletOperationMode, AppletPerformanceMode, AppletType, SERVICE_NAME_AE, SERVICE_NAME_OE,
+        AppletAttribute,
+        AppletFocusHandlingMode,
+        AppletFocusState,
+        AppletMessage,
+        AppletOperationMode,
+        AppletPerformanceMode,
+        AppletType,
+        SERVICE_NAME_AE,
+        SERVICE_NAME_OE,
     },
 };
 

@@ -24,7 +24,10 @@ pub use nx_std_sync::ffi as sync;
 pub use nx_svc::ffi as svc;
 #[cfg(feature = "sys-mem")]
 pub mod sys_mem {
-    pub use nx_sys_mem::{shmem::ffi as shmem, tmem::ffi as tmem};
+    pub use nx_sys_mem::{
+        shmem::ffi as shmem,
+        tmem::ffi as tmem,
+    };
 }
 #[cfg(feature = "sys-sync")]
 pub use nx_sys_sync::ffi as sys_sync;

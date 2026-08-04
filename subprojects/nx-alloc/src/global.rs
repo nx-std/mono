@@ -4,12 +4,18 @@
 //! It is used to allocate memory for the entire program.
 
 use core::{
-    alloc::{GlobalAlloc, Layout},
+    alloc::{
+        GlobalAlloc,
+        Layout,
+    },
     ffi::c_void,
     ptr::NonNull,
 };
 
-use nx_sys_sync::data::{Mutex, MutexGuard};
+use nx_sys_sync::data::{
+    Mutex,
+    MutexGuard,
+};
 
 use crate::llffalloc;
 

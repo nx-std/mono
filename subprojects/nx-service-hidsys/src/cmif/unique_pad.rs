@@ -2,15 +2,27 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use super::AcquireEventError;
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_out,
+    },
     proto,
     types::{
-        BtdrvAddress, SetNotificationLedPatternIn, SetNotificationLedPatternWithTimeoutIn,
-        UniquePadId, UniquePadSerialNumber,
+        BtdrvAddress,
+        SetNotificationLedPatternIn,
+        SetNotificationLedPatternWithTimeoutIn,
+        UniquePadId,
+        UniquePadSerialNumber,
     },
 };
 

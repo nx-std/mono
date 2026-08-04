@@ -19,7 +19,12 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    Domain,
+    DomainObject,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -31,7 +36,10 @@ pub use nx_sf::service::DispatchError;
 pub use self::{
     cmif::GetVersionListImporterError,
     proto::SERVICE_NAME,
-    types::{AvmRequiredVersionEntry, AvmVersionListEntry},
+    types::{
+        AvmRequiredVersionEntry,
+        AvmVersionListEntry,
+    },
 };
 
 /// Connected AVM service wrapper.

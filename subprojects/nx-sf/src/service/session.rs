@@ -9,10 +9,18 @@
 //! [`Domain`](super::Domain), which unlocks domain object multiplexing.
 
 use super::{
-    control::{self, CloneObjectError, CloneObjectExError, ConvertToDomainError},
+    control::{
+        self,
+        CloneObjectError,
+        CloneObjectExError,
+        ConvertToDomainError,
+    },
     dispatch::Dispatch,
     domain::Domain,
-    handle::{BorrowedSessionHandle, OwnedSessionHandle},
+    handle::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 
 /// Owned IPC session — not a domain.

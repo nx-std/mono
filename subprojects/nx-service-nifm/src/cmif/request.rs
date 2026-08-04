@@ -7,18 +7,36 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, OutHandleAttr};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+    OutHandleAttr,
+};
 use nx_svc::sync::EventHandle;
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto::{
-        CMD_REQ_CANCEL, CMD_REQ_GET_APPLET_INFO, CMD_REQ_GET_REQUEST_STATE, CMD_REQ_GET_RESULT,
-        CMD_REQ_GET_SYSTEM_EVENT_READABLE_HANDLES, CMD_REQ_REGISTER_SOCKET_DESCRIPTOR,
-        CMD_REQ_SET_KEPT_IN_SLEEP, CMD_REQ_SET_NETWORK_PROFILE_ID, CMD_REQ_SUBMIT,
+        CMD_REQ_CANCEL,
+        CMD_REQ_GET_APPLET_INFO,
+        CMD_REQ_GET_REQUEST_STATE,
+        CMD_REQ_GET_RESULT,
+        CMD_REQ_GET_SYSTEM_EVENT_READABLE_HANDLES,
+        CMD_REQ_REGISTER_SOCKET_DESCRIPTOR,
+        CMD_REQ_SET_KEPT_IN_SLEEP,
+        CMD_REQ_SET_NETWORK_PROFILE_ID,
+        CMD_REQ_SUBMIT,
         CMD_REQ_UNREGISTER_SOCKET_DESCRIPTOR,
     },
-    types::{AppletInfo, Uuid},
+    types::{
+        AppletInfo,
+        Uuid,
+    },
 };
 
 /// `GetRequestState` (cmd 0). Returns the raw `u32` state without validating it

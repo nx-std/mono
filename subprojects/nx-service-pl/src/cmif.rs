@@ -2,12 +2,18 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, OutputBuffer},
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 use zerocopy::IntoBytes as _;
 
-use crate::{proto, types::GetSharedFontOut};
+use crate::{
+    proto,
+    types::GetSharedFontOut,
+};
 
 /// Requests loading of a shared font into shared memory.
 pub fn request_load(

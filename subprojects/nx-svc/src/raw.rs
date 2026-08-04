@@ -1,10 +1,17 @@
 //! Raw _Supervisor Call (SVC)_ API.
 
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{
+    c_char,
+    c_int,
+    c_void,
+};
 
 use bitflags::bitflags;
 
-use crate::{code::*, result::ResultCode};
+use crate::{
+    code::*,
+    result::ResultCode,
+};
 
 //<editor-fold desc="Types and Constants">
 

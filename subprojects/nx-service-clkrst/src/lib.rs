@@ -23,7 +23,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -31,11 +34,17 @@ mod types;
 
 pub use self::{
     cmif::{
-        GetClockRateError, GetPossibleClockRatesError, OpenSessionError, PossibleClockRates,
+        GetClockRateError,
+        GetPossibleClockRatesError,
+        OpenSessionError,
+        PossibleClockRates,
         SetClockRateError,
     },
     proto::SERVICE_NAME,
-    types::{ClockRatesListType, PcvModuleId},
+    types::{
+        ClockRatesListType,
+        PcvModuleId,
+    },
 };
 
 /// Clock/Reset manager (`IClkrstManager`) session wrapper.

@@ -2,12 +2,22 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+        OutputBuffer,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 
-use crate::{proto, types::AudioDeviceName};
+use crate::{
+    proto,
+    types::AudioDeviceName,
+};
 
 /// Opens an `IAudioDevice` session from the `audren:u` manager.
 ///

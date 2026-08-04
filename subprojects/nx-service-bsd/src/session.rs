@@ -8,8 +8,14 @@
 
 use alloc::boxed::Box;
 
-use nx_sf::service::{BorrowedSessionHandle, Session};
-use nx_std_sync::{condvar::Condvar, mutex::Mutex};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
+use nx_std_sync::{
+    condvar::Condvar,
+    mutex::Mutex,
+};
 
 /// Maximum number of pool slots representable in the free-mask `u32`.
 pub(crate) const MAX_SESSIONS: usize = 32;

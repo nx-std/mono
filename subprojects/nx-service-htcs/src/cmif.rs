@@ -1,16 +1,34 @@
 //! CMIF protocol operations for the HTCS service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::service::{
-    BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr, Session,
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+    DomainRef,
+    OutHandleAttr,
+    Session,
 };
 
 use crate::{
     proto,
     types::{
-        AcceptResultsOut, ContinueSendOut, EndSelectOut, FcntlIn, HtcsPeerName, HtcsSockAddr,
-        HtcsTimeVal, RecvStartIn, SocketResult, StartSendOut, StartTransferIn, TransferResult,
+        AcceptResultsOut,
+        ContinueSendOut,
+        EndSelectOut,
+        FcntlIn,
+        HtcsPeerName,
+        HtcsSockAddr,
+        HtcsTimeVal,
+        RecvStartIn,
+        SocketResult,
+        StartSendOut,
+        StartTransferIn,
+        TransferResult,
     },
 };
 

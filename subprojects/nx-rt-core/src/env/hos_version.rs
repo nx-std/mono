@@ -3,7 +3,10 @@
 //! This module provides APIs for querying and managing the Horizon OS version
 //! information, including detection of Atmosphere custom firmware.
 
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{
+    AtomicU32,
+    Ordering,
+};
 
 /// Atmosphere flag bit position (bit 31)
 const ATMOSPHERE_BIT: u32 = 1 << 31;

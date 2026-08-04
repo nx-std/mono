@@ -4,14 +4,23 @@
 
 use nx_sf::{
     cmif,
-    error::{ResultCode, ToResultCode},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
-    cmif::application::{CreateStrayLayerError, CreateStrayLayerOutput},
+    cmif::application::{
+        CreateStrayLayerError,
+        CreateStrayLayerOutput,
+    },
     proto::system_cmds,
-    types::{DisplayId, LayerId},
+    types::{
+        DisplayId,
+        LayerId,
+    },
 };
 
 /// Creates a stray layer on ISystemDisplayService (cmd 2312, pre-7.0.0).

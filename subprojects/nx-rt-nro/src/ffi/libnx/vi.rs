@@ -1,13 +1,27 @@
 //! Visual Interface (VI) service FFI
 
-use core::{ffi::c_void, mem::MaybeUninit};
+use core::{
+    ffi::c_void,
+    mem::MaybeUninit,
+};
 
 use nx_rt_core::error::ToResultCode as _;
-use nx_sf::{error::ToResultCode, ffi::Service};
+use nx_sf::{
+    error::ToResultCode,
+    ffi::Service,
+};
 
 use crate::{
-    ffi::common::{GENERIC_ERROR, LibnxError, SyncUnsafeCell, libnx_error},
-    services::{applet, vi},
+    ffi::common::{
+        GENERIC_ERROR,
+        LibnxError,
+        SyncUnsafeCell,
+        libnx_error,
+    },
+    services::{
+        applet,
+        vi,
+    },
 };
 
 /// Static buffer for VI IApplicationDisplayService FFI session access.

@@ -30,10 +30,19 @@
 extern crate alloc;
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, Session, clone_current_object};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    Session,
+    clone_current_object,
+};
 
 mod cmif;
 mod proto;
@@ -45,15 +54,39 @@ pub use nx_sf::service::DispatchError as IpcDispatchError;
 use crate::session::SessionPool;
 pub use crate::{
     cmif::{
-        AcceptResultsError, AcceptStartError, CreateSocketError, RecvStartError, SendStartError,
-        StartRecvError, StartSelectError, StartSendError,
+        AcceptResultsError,
+        AcceptStartError,
+        CreateSocketError,
+        RecvStartError,
+        SendStartError,
+        StartRecvError,
+        StartSelectError,
+        StartSendError,
     },
     proto::SERVICE_NAME,
     types::{
-        AcceptResultData, ContinueSendResult, EndSelectResult, FD_SET_SIZE, HtcsAddressFamily,
-        HtcsFcntlFlag, HtcsFcntlOperation, HtcsFdSet, HtcsMessageFlag, HtcsPeerName, HtcsPortName,
-        HtcsShutdownType, HtcsSockAddr, HtcsSocketError, HtcsTimeVal, PEER_NAME_MAX, PORT_NAME_MAX,
-        SESSION_COUNT_MAX, SOCKET_COUNT_MAX, SocketResult, StartSendResult, TransferResult,
+        AcceptResultData,
+        ContinueSendResult,
+        EndSelectResult,
+        FD_SET_SIZE,
+        HtcsAddressFamily,
+        HtcsFcntlFlag,
+        HtcsFcntlOperation,
+        HtcsFdSet,
+        HtcsMessageFlag,
+        HtcsPeerName,
+        HtcsPortName,
+        HtcsShutdownType,
+        HtcsSockAddr,
+        HtcsSocketError,
+        HtcsTimeVal,
+        PEER_NAME_MAX,
+        PORT_NAME_MAX,
+        SESSION_COUNT_MAX,
+        SOCKET_COUNT_MAX,
+        SocketResult,
+        StartSendResult,
+        TransferResult,
     },
 };
 

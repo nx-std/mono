@@ -9,14 +9,25 @@ pub mod ffi;
 pub mod common;
 mod sys;
 
-pub use core::time::{Duration, TryFromFloatSecsError};
+pub use core::time::{
+    Duration,
+    TryFromFloatSecsError,
+};
 use core::{
     error::Error,
     fmt,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{
+        Add,
+        AddAssign,
+        Sub,
+        SubAssign,
+    },
 };
 
-use crate::common::{FromInner, IntoInner};
+use crate::common::{
+    FromInner,
+    IntoInner,
+};
 
 /// A measurement of a monotonically nondecreasing clock.
 /// Opaque and useful only with [`Duration`].

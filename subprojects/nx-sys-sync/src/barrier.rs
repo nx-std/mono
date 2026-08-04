@@ -8,11 +8,17 @@
 //! synchronization capabilities. It maintains an internal counter that tracks the number of
 //! threads that have reached the barrier.
 
-use core::{cell::UnsafeCell, num::NonZeroU32};
+use core::{
+    cell::UnsafeCell,
+    num::NonZeroU32,
+};
 
 use static_assertions::const_assert_eq;
 
-use super::{Condvar, Mutex};
+use super::{
+    Condvar,
+    Mutex,
+};
 use crate::wait::WakeCount;
 
 /// Barrier structure

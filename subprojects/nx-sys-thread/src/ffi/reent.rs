@@ -14,7 +14,10 @@
 //! stays in C next to the provisioning code.
 
 use core::{
-    ffi::{c_int, c_void},
+    ffi::{
+        c_int,
+        c_void,
+    },
     ptr::NonNull,
 };
 

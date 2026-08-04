@@ -2,13 +2,20 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
     proto,
-    types::{FatalCpuContext, FatalPolicy, ThrowFatalIn},
+    types::{
+        FatalCpuContext,
+        FatalPolicy,
+        ThrowFatalIn,
+    },
 };
 
 /// Throws a fatal error with the given policy (no CPU context).

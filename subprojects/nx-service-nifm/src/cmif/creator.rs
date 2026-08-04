@@ -3,9 +3,15 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, DomainRef};
+use nx_sf::service::{
+    DispatchError,
+    DomainRef,
+};
 
-use crate::proto::{CMD_CREATE_GENERAL_SERVICE, CMD_CREATE_GENERAL_SERVICE_OLD};
+use crate::proto::{
+    CMD_CREATE_GENERAL_SERVICE,
+    CMD_CREATE_GENERAL_SERVICE_OLD,
+};
 
 /// `CreateGeneralServiceOld` (cmd 4, pre-`[3.0.0]`): no `send_pid`, no payload.
 ///

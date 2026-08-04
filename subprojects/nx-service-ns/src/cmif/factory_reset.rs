@@ -1,8 +1,14 @@
 //! IFactoryResetInterface CMIF commands.
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
-use crate::{dispatch::dispatch_no_io, proto};
+use crate::{
+    dispatch::dispatch_no_io,
+    proto,
+};
 
 #[inline]
 pub(crate) fn reset_to_factory_settings(service: &Session) -> Result<(), DispatchError> {

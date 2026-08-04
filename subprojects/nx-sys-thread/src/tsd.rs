@@ -30,16 +30,29 @@
 
 use core::{
     ffi::c_void,
-    ptr::{NonNull, null_mut},
+    ptr::{
+        NonNull,
+        null_mut,
+    },
 };
 
 #[cfg(feature = "ffi")]
-use nx_svc::error::{KernelError, ResultCode, ToResultCode as _};
+use nx_svc::error::{
+    KernelError,
+    ResultCode,
+    ToResultCode as _,
+};
 use nx_sys_sync::data::RwLock;
 
 #[cfg(feature = "ffi")]
-use crate::error::{_sealed, ToResultCode};
-use crate::{thread::ThreadControl, thread_list};
+use crate::error::{
+    _sealed,
+    ToResultCode,
+};
+use crate::{
+    thread::ThreadControl,
+    thread_list,
+};
 
 /// Number of runtime TSD key slots — musl libc's `PTHREAD_KEYS_MAX` (128).
 ///

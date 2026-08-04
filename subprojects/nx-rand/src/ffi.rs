@@ -3,7 +3,10 @@
 //! This module provides `#[no_mangle]` C functions that follow the nx-rand
 //! naming convention for internal random operations.
 
-use core::{ffi::c_void, slice};
+use core::{
+    ffi::c_void,
+    slice,
+};
 
 use super::sys;
 

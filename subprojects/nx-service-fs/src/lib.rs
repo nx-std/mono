@@ -4,11 +4,19 @@ extern crate alloc;
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{
+    AtomicU32,
+    Ordering,
+};
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
-    ConvertToDomainError, DispatchError, Domain, DomainObjectRef, Session, clone_current_object,
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    DomainObjectRef,
+    Session,
+    clone_current_object,
 };
 
 mod cmif;
@@ -18,7 +26,10 @@ mod session;
 pub mod types;
 
 use self::session::SessionPool;
-pub use self::{proto::SERVICE_NAME, types::*};
+pub use self::{
+    proto::SERVICE_NAME,
+    types::*,
+};
 
 struct FsContext {
     pool: SessionPool,

@@ -7,9 +7,15 @@ pub mod clock;
 mod nsec;
 pub(crate) mod timespec;
 
-use core::{fmt, time::Duration};
+use core::{
+    fmt,
+    time::Duration,
+};
 
-use self::timespec::{ClockId, Timespec};
+use self::timespec::{
+    ClockId,
+    Timespec,
+};
 
 // An anchor in time which can be used to create new `SystemTime` instances or
 /// learn about where in time a `SystemTime` lies.

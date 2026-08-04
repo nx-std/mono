@@ -100,7 +100,12 @@ use nx_service_wlaninf::WlaninfService;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
-pub use nx_service_wlaninf::{GetRssiError, GetStateError, Rssi, WlanInfState};
+pub use nx_service_wlaninf::{
+    GetRssiError,
+    GetStateError,
+    Rssi,
+    WlanInfState,
+};
 
 /// Connected `wlan:inf` (WLAN InfraManager) service.
 pub struct WlanInfService {

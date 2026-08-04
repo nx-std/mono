@@ -4,10 +4,18 @@
 
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{DispatchError, DomainRef, OwnedSessionHandle, Session},
+    service::{
+        DispatchError,
+        DomainRef,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
-use crate::proto::{CMD_CREATE_CLIENT_PROCESS_MONITOR, CMD_CREATE_SERVICE};
+use crate::proto::{
+    CMD_CREATE_CLIENT_PROCESS_MONITOR,
+    CMD_CREATE_SERVICE,
+};
 
 /// Invokes `CreateUserLocalCommService` / `CreateSystemLocalCommService`
 /// (cmd 0) on the converted-to-domain `ldn:u`/`ldn:s` creator.

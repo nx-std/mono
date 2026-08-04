@@ -21,7 +21,10 @@
 use nx_sf::error::ToResultCode as _;
 use nx_svc::raw::INVALID_HANDLE;
 
-use crate::{ffi::common::GENERIC_ERROR, services::applet};
+use crate::{
+    ffi::common::GENERIC_ERROR,
+    services::applet,
+};
 
 /// Closes the applet service connection.
 ///

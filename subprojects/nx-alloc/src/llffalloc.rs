@@ -6,13 +6,22 @@
 //! It is based on the [linked_list_allocator](https://github.com/rust-osdev/linked_list_allocator) crate.
 use core::{
     alloc::Layout,
-    ffi::{c_char, c_void},
-    ptr::{self, NonNull},
+    ffi::{
+        c_char,
+        c_void,
+    },
+    ptr::{
+        self,
+        NonNull,
+    },
 };
 
 use nx_svc::{
     mem::set_heap_size,
-    misc::{get_total_memory_size, get_used_memory_size},
+    misc::{
+        get_total_memory_size,
+        get_used_memory_size,
+    },
 };
 
 /// A wrapper around the linked list allocator that provides

@@ -7,13 +7,25 @@
 //! [`AppletSingleton`] enum so a single `OnceLock<RwLock<...>>` can hold
 //! whichever role the current process is.
 
-use core::sync::atomic::{AtomicU8, AtomicU32};
+use core::sync::atomic::{
+    AtomicU8,
+    AtomicU32,
+};
 
 use nx_service_applet::{
-    CommonStateGetter, SelfController, WindowController,
+    CommonStateGetter,
+    SelfController,
+    WindowController,
     aruid::Aruid,
     proxy::Proxy,
-    role::{Application, LibraryApplet, OverlayApplet, Role, SystemApplet, SystemApplication},
+    role::{
+        Application,
+        LibraryApplet,
+        OverlayApplet,
+        Role,
+        SystemApplet,
+        SystemApplication,
+    },
 };
 
 /// Lock-free cache of AM state values that change asynchronously via the

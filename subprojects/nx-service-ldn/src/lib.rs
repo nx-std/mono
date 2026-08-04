@@ -59,11 +59,19 @@ extern crate alloc;
 // `nx_panic_handler` provides `#[panic_handler]`.
 extern crate nx_panic_handler as _;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
-    ConvertToDomainError, Domain, DomainObjectRef, DomainRef, OwnedSessionHandle, Session,
+    ConvertToDomainError,
+    Domain,
+    DomainObjectRef,
+    DomainRef,
+    OwnedSessionHandle,
+    Session,
     clone_current_object,
 };
 
@@ -76,22 +84,47 @@ pub mod types;
 use nx_sf::service::DispatchError;
 
 use crate::{
-    cmif::{creator, lcs, monitor},
-    session::{LDN_POOL_SIZE, SessionPool},
+    cmif::{
+        creator,
+        lcs,
+        monitor,
+    },
+    session::{
+        LDN_POOL_SIZE,
+        SessionPool,
+    },
 };
 pub use crate::{
     cmif::{
-        creator::{CreateClientProcessMonitorError, CreateServiceError},
+        creator::{
+            CreateClientProcessMonitorError,
+            CreateServiceError,
+        },
         lcs::{
-            GetDisconnectReasonError, GetStateChangeEventError, GetStateError as LcsGetStateError,
-            RecvActionFrameOut, channel_band_to_channel, channel_to_band, channel_to_old_band,
+            GetDisconnectReasonError,
+            GetStateChangeEventError,
+            GetStateError as LcsGetStateError,
+            RecvActionFrameOut,
+            channel_band_to_channel,
+            channel_to_band,
+            channel_to_old_band,
         },
         monitor::GetStateError as MonitorGetStateError,
     },
     proto::{
-        LDN_PRIORITY_SYSTEM, LDN_PRIORITY_USER, LdnAcceptPolicy, LdnDisconnectReason,
-        LdnOperationMode, LdnProtocol, LdnScanFilterFlag, LdnSecurityMode, LdnServiceType,
-        LdnState, LdnWirelessControllerRestriction, SERVICE_NAME_MONITOR, SERVICE_NAME_SYSTEM,
+        LDN_PRIORITY_SYSTEM,
+        LDN_PRIORITY_USER,
+        LdnAcceptPolicy,
+        LdnDisconnectReason,
+        LdnOperationMode,
+        LdnProtocol,
+        LdnScanFilterFlag,
+        LdnSecurityMode,
+        LdnServiceType,
+        LdnState,
+        LdnWirelessControllerRestriction,
+        SERVICE_NAME_MONITOR,
+        SERVICE_NAME_SYSTEM,
         SERVICE_NAME_USER,
     },
 };

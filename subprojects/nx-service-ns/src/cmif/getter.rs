@@ -1,6 +1,9 @@
 //! Getter interface commands — obtain sub-interface sessions from ns:am2.
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 use crate::proto;
 

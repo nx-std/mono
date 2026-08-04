@@ -1,6 +1,9 @@
 //! CMIF protocol operations for the backlight service.
 
-use nx_sf::{cmif, service::BorrowedSessionHandle};
+use nx_sf::{
+    cmif,
+    service::BorrowedSessionHandle,
+};
 
 use crate::proto;
 

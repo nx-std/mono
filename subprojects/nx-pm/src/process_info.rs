@@ -1,7 +1,11 @@
 //! `pm:info` (process info) service.
 
 pub use nx_service_pm::ResourceLimitValues;
-use nx_service_pm::{PmInfoService, ProcessId, ProgramId};
+use nx_service_pm::{
+    PmInfoService,
+    ProcessId,
+    ProgramId,
+};
 use nx_sf::service::DispatchError;
 
 /// Connected `pm:info` (process info) service.

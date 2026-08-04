@@ -4,13 +4,24 @@
 
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
+    hipc::{
+        BufferMode,
+        InputBuffer,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 use nx_svc::raw::Handle as RawHandle;
 
-use crate::{proto::binder_cmds, types::BinderObjectId};
+use crate::{
+    proto::binder_cmds,
+    types::BinderObjectId,
+};
 
 /// Performs a parcel transaction.
 ///

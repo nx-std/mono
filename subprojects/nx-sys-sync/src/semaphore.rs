@@ -8,7 +8,10 @@ use core::cell::UnsafeCell;
 
 use static_assertions::const_assert_eq;
 
-use super::{Condvar, Mutex};
+use super::{
+    Condvar,
+    Mutex,
+};
 
 /// A counting semaphore synchronization primitive.
 ///

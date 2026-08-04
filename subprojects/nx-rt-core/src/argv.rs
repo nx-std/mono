@@ -11,12 +11,20 @@
 //! nxlink-suffix handling, stay with each entry crate; only the scanner,
 //! storage, and iterator are shared here.
 
-use alloc::{boxed::Box, ffi::CString, string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    ffi::CString,
+    string::String,
+    vec::Vec,
+};
 #[cfg(feature = "ffi")]
 use core::ffi::c_char;
 use core::{
     ptr,
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::{
+        AtomicPtr,
+        Ordering,
+    },
 };
 
 use nx_sys_sync::Once;

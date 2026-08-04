@@ -15,7 +15,11 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, DispatchError, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    DispatchError,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -23,27 +27,70 @@ mod proto;
 mod types;
 
 use self::types::{
-    AddGattCharacteristicIn, AddGattDescriptorIn, AddGattServiceIn, AddrU8In, AddrU32In,
-    AddrU32U32In, CancelConnectGattServerIn, ConfigureAttMtuIn, ConnectGattClientIn,
-    ConnectGattServerIn, DisconnectGattClientLegacyIn, EnableGattServiceIn, GattNotificationIn,
-    GetGattAttributeLegacyIn, GetGattFirstCharacteristicIn, GetGattFirstDescriptorIn,
-    GetGattNextCharacteristicIn, GetGattNextDescriptorIn, GetGattServiceIn, GetHidReportIn,
-    LegacyRespondToPinRequestIn, ReadGattCharacteristicIn, ReadGattDescriptorIn,
-    RespondToPinRequestIn, RespondToSspRequestIn, RespondToSspRequestLegacyIn,
-    SetBleAdvertiseParameterIn, SetBleConnectionParameterIn, SetBleScanParameterIn, SetHidReportIn,
-    StartAudioOutIn, StartInquiryIn, TriggerConnectionIn, TwoBoolsIn, WriteGattCharacteristicIn,
+    AddGattCharacteristicIn,
+    AddGattDescriptorIn,
+    AddGattServiceIn,
+    AddrU8In,
+    AddrU32In,
+    AddrU32U32In,
+    CancelConnectGattServerIn,
+    ConfigureAttMtuIn,
+    ConnectGattClientIn,
+    ConnectGattServerIn,
+    DisconnectGattClientLegacyIn,
+    EnableGattServiceIn,
+    GattNotificationIn,
+    GetGattAttributeLegacyIn,
+    GetGattFirstCharacteristicIn,
+    GetGattFirstDescriptorIn,
+    GetGattNextCharacteristicIn,
+    GetGattNextDescriptorIn,
+    GetGattServiceIn,
+    GetHidReportIn,
+    LegacyRespondToPinRequestIn,
+    ReadGattCharacteristicIn,
+    ReadGattDescriptorIn,
+    RespondToPinRequestIn,
+    RespondToSspRequestIn,
+    RespondToSspRequestLegacyIn,
+    SetBleAdvertiseParameterIn,
+    SetBleConnectionParameterIn,
+    SetBleScanParameterIn,
+    SetHidReportIn,
+    StartAudioOutIn,
+    StartInquiryIn,
+    TriggerConnectionIn,
+    TwoBoolsIn,
+    WriteGattCharacteristicIn,
     WriteGattDescriptorIn,
 };
 pub use self::{
     cmif::AcquireEventError,
     proto::SERVICE_NAME,
     types::{
-        BtdrvAdapterProperty, BtdrvAdapterPropertyOld, BtdrvAdapterPropertySet, BtdrvAddress,
-        BtdrvAudioControlButtonState, BtdrvBleAdvertiseFilter, BtdrvBleAdvertisePacketData,
-        BtdrvBleAdvertisement, BtdrvBleConnectionParameter, BtdrvBluetoothPinCode,
-        BtdrvChannelMapList, BtdrvClassOfDevice, BtdrvFatalReason, BtdrvGattAttributeUuid,
-        BtdrvGattId, BtdrvHidData, BtdrvHidReport, BtdrvLeConnectionParams, BtdrvPcmParameter,
-        BtdrvPinCode, BtdrvPlrList, BtdrvPlrStatistics, SetSysBluetoothDevicesSettings,
+        BtdrvAdapterProperty,
+        BtdrvAdapterPropertyOld,
+        BtdrvAdapterPropertySet,
+        BtdrvAddress,
+        BtdrvAudioControlButtonState,
+        BtdrvBleAdvertiseFilter,
+        BtdrvBleAdvertisePacketData,
+        BtdrvBleAdvertisement,
+        BtdrvBleConnectionParameter,
+        BtdrvBluetoothPinCode,
+        BtdrvChannelMapList,
+        BtdrvClassOfDevice,
+        BtdrvFatalReason,
+        BtdrvGattAttributeUuid,
+        BtdrvGattId,
+        BtdrvHidData,
+        BtdrvHidReport,
+        BtdrvLeConnectionParams,
+        BtdrvPcmParameter,
+        BtdrvPinCode,
+        BtdrvPlrList,
+        BtdrvPlrStatistics,
+        SetSysBluetoothDevicesSettings,
     },
 };
 

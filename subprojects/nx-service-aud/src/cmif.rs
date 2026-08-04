@@ -2,7 +2,10 @@
 
 use core::mem::size_of;
 
-use nx_sf::{cmif, service::BorrowedSessionHandle};
+use nx_sf::{
+    cmif,
+    service::BorrowedSessionHandle,
+};
 use static_assertions::const_assert_eq;
 
 use crate::proto;

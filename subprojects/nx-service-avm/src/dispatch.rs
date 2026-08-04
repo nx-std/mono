@@ -2,7 +2,10 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, DomainObject};
+use nx_sf::service::{
+    DispatchError,
+    DomainObject,
+};
 
 /// CMIF request with no input payload and no output payload.
 #[inline]

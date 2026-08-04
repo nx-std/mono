@@ -2,11 +2,17 @@
 
 use core::mem::MaybeUninit;
 
-use nx_sf::{ServiceName, ffi::Service};
+use nx_sf::{
+    ServiceName,
+    ffi::Service,
+};
 
 use crate::{
     error::ToResultCode as _,
-    ffi::common::{GENERIC_ERROR, SyncUnsafeCell},
+    ffi::common::{
+        GENERIC_ERROR,
+        SyncUnsafeCell,
+    },
     services::sm,
 };
 

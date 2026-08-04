@@ -17,10 +17,20 @@ use core::ptr::NonNull;
 
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    service::{BorrowedSessionHandle, Session},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        BorrowedSessionHandle,
+        Session,
+    },
 };
-use nx_sys_mem::shmem::{self as sys_shmem, Mapped, Permissions};
+use nx_sys_mem::shmem::{
+    self as sys_shmem,
+    Mapped,
+    Permissions,
+};
 
 mod cmif;
 mod proto;
@@ -29,16 +39,27 @@ pub mod types;
 
 pub use self::{
     cmif::{
-        GetCurrentTimeError, GetSharedMemoryError, GetSteadyClockError, GetSystemClockError,
-        GetTimeZoneServiceError, ToCalendarTimeError,
+        GetCurrentTimeError,
+        GetSharedMemoryError,
+        GetSteadyClockError,
+        GetSystemClockError,
+        GetTimeZoneServiceError,
+        ToCalendarTimeError,
     },
     proto::{
-        SERVICE_NAME_MENU, SERVICE_NAME_REPAIR, SERVICE_NAME_SYSTEM, SERVICE_NAME_SYSTEM_USER,
+        SERVICE_NAME_MENU,
+        SERVICE_NAME_REPAIR,
+        SERVICE_NAME_SYSTEM,
+        SERVICE_NAME_SYSTEM_USER,
         SERVICE_NAME_USER,
     },
     types::{
-        TimeCalendarAdditionalInfo, TimeCalendarTime, TimeServiceType,
-        TimeStandardSteadyClockTimePointType, TimeSteadyClockTimePoint, TimeSystemClockContext,
+        TimeCalendarAdditionalInfo,
+        TimeCalendarTime,
+        TimeServiceType,
+        TimeStandardSteadyClockTimePointType,
+        TimeSteadyClockTimePoint,
+        TimeSystemClockContext,
         TimeType,
     },
 };

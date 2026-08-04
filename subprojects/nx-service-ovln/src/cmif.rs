@@ -3,13 +3,21 @@
 use nx_sf::{
     cmif,
     ipc::Handle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 use crate::{
     proto,
     types::{
-        OvlnQueueAttribute, OvlnRawMessage, OvlnSendOption, OvlnSourceName, ReceiveWithTickOut,
+        OvlnQueueAttribute,
+        OvlnRawMessage,
+        OvlnSendOption,
+        OvlnSourceName,
+        ReceiveWithTickOut,
     },
 };
 

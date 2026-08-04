@@ -10,7 +10,10 @@
 #[cfg(feature = "ffi")]
 use nx_sf::error::ToResultCode as _;
 #[cfg(feature = "ffi")]
-use nx_svc::error::{ResultCode, ToResultCode as _};
+use nx_svc::error::{
+    ResultCode,
+    ToResultCode as _,
+};
 
 #[cfg(feature = "ffi")]
 use crate::error::ToResultCode;

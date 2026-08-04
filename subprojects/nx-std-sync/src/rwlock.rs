@@ -6,13 +6,19 @@ use core::{
     cell::UnsafeCell,
     fmt,
     marker::PhantomData,
-    ops::{Deref, DerefMut},
+    ops::{
+        Deref,
+        DerefMut,
+    },
     ptr::NonNull,
 };
 
 use nx_sys_sync as sys;
 
-pub use crate::result::{TryLockError, TryLockResult};
+pub use crate::result::{
+    TryLockError,
+    TryLockResult,
+};
 
 /// A reader-writer lock
 ///

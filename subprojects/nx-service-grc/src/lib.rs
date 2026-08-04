@@ -28,7 +28,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -39,9 +44,18 @@ mod types;
 pub use nx_service_caps::ApplicationAlbumEntry;
 
 pub use self::{
-    cmif::{CompleteFinishEx1Error, CreateVideoProxyError, TransferError},
+    cmif::{
+        CompleteFinishEx1Error,
+        CreateVideoProxyError,
+        TransferError,
+    },
     proto::SERVICE_NAME,
-    types::{GameMovieId, GrcStream, OffscreenRecordingParameter, TransferResult},
+    types::{
+        GameMovieId,
+        GrcStream,
+        OffscreenRecordingParameter,
+        TransferResult,
+    },
 };
 
 // ---------------------------------------------------------------------------

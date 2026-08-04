@@ -27,7 +27,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -35,11 +38,18 @@ mod types;
 
 pub use self::{
     cmif::{
-        GetTemperatureError, GetTemperatureMilliCError, GetTemperatureRangeError, OpenSessionError,
+        GetTemperatureError,
+        GetTemperatureMilliCError,
+        GetTemperatureRangeError,
+        OpenSessionError,
         SessionGetTemperatureError,
     },
     proto::SERVICE_NAME,
-    types::{TemperatureRange, TsDeviceCode, TsLocation},
+    types::{
+        TemperatureRange,
+        TsDeviceCode,
+        TsLocation,
+    },
 };
 
 /// Temperature measurement service wrapper.

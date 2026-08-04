@@ -53,11 +53,20 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 pub use nx_sf::ServiceName;
 use nx_sf::{
     error::ToResultCode,
-    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 use nx_svc::{
-    error::{ResultCode, ToResultCode as _},
-    ipc::{self},
+    error::{
+        ResultCode,
+        ToResultCode as _,
+    },
+    ipc::{
+        self,
+    },
 };
 
 mod cmif;
@@ -66,14 +75,16 @@ mod tipc;
 
 pub use self::{
     cmif::{
-        DetachClientError as DetachClientCmifError, GetServiceError as GetServiceCmifError,
+        DetachClientError as DetachClientCmifError,
+        GetServiceError as GetServiceCmifError,
         RegisterClientError as RegisterClientCmifError,
         RegisterServiceError as RegisterServiceCmifError,
         UnregisterServiceError as UnregisterServiceCmifError,
     },
     proto::SM_PORT_NAME,
     tipc::{
-        DetachClientError as DetachClientTipcError, GetServiceError as GetServiceTipcError,
+        DetachClientError as DetachClientTipcError,
+        GetServiceError as GetServiceTipcError,
         RegisterClientError as RegisterClientTipcError,
         RegisterServiceError as RegisterServiceTipcError,
         UnregisterServiceError as UnregisterServiceTipcError,

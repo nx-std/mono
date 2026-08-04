@@ -2,10 +2,18 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, DomainObjectRef, DomainRef, OutHandleAttr};
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
+    DomainRef,
+    OutHandleAttr,
+};
 
 use crate::{
-    dispatch::{dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
     types::PctlRestrictionSettings,
 };

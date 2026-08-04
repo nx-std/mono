@@ -7,7 +7,10 @@
 use core::{
     cell::UnsafeCell,
     marker::PhantomData,
-    ops::{Deref, DerefMut},
+    ops::{
+        Deref,
+        DerefMut,
+    },
 };
 
 use crate::mutex::Mutex as RawMutex;

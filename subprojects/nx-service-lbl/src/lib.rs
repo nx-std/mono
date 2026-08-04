@@ -26,7 +26,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -34,11 +37,19 @@ mod types;
 
 pub use self::{
     cmif::{
-        DispatchInF32Error, DispatchInU64Error, DispatchNoIoError, DispatchOutBoolError,
-        DispatchOutF32Error, DispatchOutU32Error, GetAmbientLightSensorValueError,
+        DispatchInF32Error,
+        DispatchInU64Error,
+        DispatchNoIoError,
+        DispatchOutBoolError,
+        DispatchOutF32Error,
+        DispatchOutU32Error,
+        GetAmbientLightSensorValueError,
     },
     proto::SERVICE_NAME,
-    types::{AmbientLightSensorValue, BacklightSwitchStatus},
+    types::{
+        AmbientLightSensorValue,
+        BacklightSwitchStatus,
+    },
 };
 
 /// Backlight service (`lbl`) session wrapper.

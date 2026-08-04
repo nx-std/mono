@@ -1,8 +1,15 @@
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+};
 
-use crate::{proto, types::SaveDataInfo};
+use crate::{
+    proto,
+    types::SaveDataInfo,
+};
 
 pub(crate) fn read(
     object: DomainObjectRef<'_>,

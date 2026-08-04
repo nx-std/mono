@@ -1,15 +1,31 @@
 //! ns:dev CMIF commands.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
     types::{
-        LaunchProperties, NsdevLaunchApplicationForDevelopIn,
-        NsdevLaunchApplicationWithStorageIdIn, NsdevLaunchProgramIn, ShellEventInfo,
+        LaunchProperties,
+        NsdevLaunchApplicationForDevelopIn,
+        NsdevLaunchApplicationWithStorageIdIn,
+        NsdevLaunchProgramIn,
+        ShellEventInfo,
     },
 };
 

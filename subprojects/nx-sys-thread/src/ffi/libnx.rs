@@ -30,12 +30,21 @@
 
 use alloc::boxed::Box;
 use core::{
-    ffi::{c_int, c_void},
+    ffi::{
+        c_int,
+        c_void,
+    },
     mem::offset_of,
-    ptr::{NonNull, null_mut},
+    ptr::{
+        NonNull,
+        null_mut,
+    },
 };
 
-use nx_svc::error::{KernelError, ToResultCode as _};
+use nx_svc::error::{
+    KernelError,
+    ToResultCode as _,
+};
 /// Re-export of the ABI-visible AArch64 register-dump structure.
 ///
 /// `nx-svc` already defines the `#[repr(C)]` layout that matches libnx's
@@ -47,7 +56,14 @@ use static_assertions::const_assert_eq;
 use super::registry::SideRegistry;
 use crate::{
     error::ToResultCode as _,
-    thread::{self, Builder, CoreId, Priority, StackSpec, ThreadControl},
+    thread::{
+        self,
+        Builder,
+        CoreId,
+        Priority,
+        StackSpec,
+        ThreadControl,
+    },
     tsd,
 };
 

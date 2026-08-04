@@ -4,16 +4,32 @@
 
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    hipc::{BufferMode, OutputBuffer},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 use nx_svc::raw::Handle as RawHandle;
 
 use crate::{
     proto::application_cmds,
-    types::{DisplayId, DisplayName, LayerId, ViScalingMode},
+    types::{
+        DisplayId,
+        DisplayName,
+        LayerId,
+        ViScalingMode,
+    },
 };
 
 /// Gets IHOSBinderDriverRelay session.

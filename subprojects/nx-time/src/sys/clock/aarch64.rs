@@ -10,10 +10,17 @@
 //! resolution one tick represents. Writing any of those out by hand is how the four constants this
 //! module used to carry drifted apart from each other.
 
-use nx_cpu::counter::{self, Hz, Ticks};
+use nx_cpu::counter::{
+    self,
+    Hz,
+    Ticks,
+};
 use static_assertions::const_assert_eq;
 
-use crate::sys::{nsec::NSEC_PER_SEC, timespec::Timespec};
+use crate::sys::{
+    nsec::NSEC_PER_SEC,
+    timespec::Timespec,
+};
 
 /// System counter-timer frequency (19.2MHz).
 // SAFETY: A frequency in hertz, which is the unit `Hz` names.

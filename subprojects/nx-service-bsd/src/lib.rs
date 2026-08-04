@@ -22,15 +22,24 @@ extern crate alloc;
 // `nx_panic_handler` provides `#[panic_handler]`.
 extern crate nx_panic_handler as _;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 
 use nx_service_sm::SmService;
 use nx_sf::{
     ServiceName,
-    service::{OwnedSessionHandle, Session},
+    service::{
+        OwnedSessionHandle,
+        Session,
+    },
 };
 use nx_svc::mem::tmem::MemoryPermission;
-use nx_sys_mem::tmem::{self, TransferMemoryBacking};
+use nx_sys_mem::tmem::{
+    self,
+    TransferMemoryBacking,
+};
 
 mod cmif;
 mod fd;
@@ -40,15 +49,41 @@ mod types;
 
 pub use crate::{
     cmif::{
-        AcceptError, BindError, CloseError, ConnectError as CmifConnectError, FcntlError,
-        GetPeerNameError, GetSockNameError, GetSockOptError, IoctlError, ListenError, PollError,
-        ReadError, RecvError, RecvFromError, RegisterClientError, SelectError, SelectTimeout,
-        SendError, SendToError, SetSockOptError, ShutdownError, SocketError, StartMonitoringError,
+        AcceptError,
+        BindError,
+        CloseError,
+        ConnectError as CmifConnectError,
+        FcntlError,
+        GetPeerNameError,
+        GetSockNameError,
+        GetSockOptError,
+        IoctlError,
+        ListenError,
+        PollError,
+        ReadError,
+        RecvError,
+        RecvFromError,
+        RegisterClientError,
+        SelectError,
+        SelectTimeout,
+        SendError,
+        SendToError,
+        SetSockOptError,
+        ShutdownError,
+        SocketError,
+        StartMonitoringError,
         WriteError,
     },
     fd::BsdSockFd,
-    proto::{SERVICE_NAME_SYSTEM, SERVICE_NAME_USER},
-    types::{BsdConfig, BsdServiceType, ConnectOptions},
+    proto::{
+        SERVICE_NAME_SYSTEM,
+        SERVICE_NAME_USER,
+    },
+    types::{
+        BsdConfig,
+        BsdServiceType,
+        ConnectOptions,
+    },
 };
 
 /// Owns a connected BSD socket service.

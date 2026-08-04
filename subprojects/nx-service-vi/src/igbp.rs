@@ -18,12 +18,20 @@
 //! `binderConvertErrorCode`.
 
 use nx_sf::{
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     service::Session,
 };
 
 use crate::{
-    binder::{Binder, BinderError, TransactError},
+    binder::{
+        Binder,
+        BinderError,
+        TransactError,
+    },
     parcel::Parcel,
 };
 

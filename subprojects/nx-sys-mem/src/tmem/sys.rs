@@ -20,22 +20,44 @@
 //! layer (`crate::tmem::ffi`) is a thin shim translating between the C structs
 //! declared in `nx_tmem.h` and the high-level Rust API below.
 
-use alloc::alloc::{Layout, alloc_zeroed, dealloc};
-use core::{ffi::c_void, ptr::NonNull};
+use alloc::alloc::{
+    Layout,
+    alloc_zeroed,
+    dealloc,
+};
+use core::{
+    ffi::c_void,
+    ptr::NonNull,
+};
 
 use nx_svc::{
-    error::{KernelError, ResultCode, ToResultCode as _},
+    error::{
+        KernelError,
+        ResultCode,
+        ToResultCode as _,
+    },
     mem::{
-        core as memcore, tmem as svc,
-        tmem::{Handle, MemoryPermission},
+        core as memcore,
+        tmem as svc,
+        tmem::{
+            Handle,
+            MemoryPermission,
+        },
     },
     thread,
 };
 use nx_sys_virtmem::virtmem;
 
 use crate::{
-    error::{_sealed, ToResultCode},
-    page::{PAGE_SIZE, PageAlignedAddr, UnalignedAddrError},
+    error::{
+        _sealed,
+        ToResultCode,
+    },
+    page::{
+        PAGE_SIZE,
+        PageAlignedAddr,
+        UnalignedAddrError,
+    },
 };
 
 /// Guard region size (0x1000), per libnx.

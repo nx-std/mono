@@ -2,20 +2,42 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in_out, dispatch_in_pid_no_out},
+    dispatch::{
+        dispatch_in_out,
+        dispatch_in_pid_no_out,
+    },
     proto,
     types::{
-        ActivateWithFunctionLevelIn, CheckFirmwareVersionIn, GetImageTransferProcessorStateIn,
-        HandleAruidIn, ImageTransferProcessorState, IrCameraHandle,
-        PackedClusteringProcessorConfig, PackedFunctionLevel, PackedImageTransferProcessorConfig,
-        PackedImageTransferProcessorExConfig, PackedIrLedProcessorConfig, PackedMcuVersion,
-        PackedMomentProcessorConfig, PackedPointingProcessorConfig,
-        PackedTeraPluginProcessorConfig, RunClusteringProcessorIn, RunImageTransferExProcessorIn,
-        RunImageTransferProcessorIn, RunIrLedProcessorIn, RunMomentProcessorIn,
-        RunPointingProcessorIn, RunTeraPluginProcessorIn,
+        ActivateWithFunctionLevelIn,
+        CheckFirmwareVersionIn,
+        GetImageTransferProcessorStateIn,
+        HandleAruidIn,
+        ImageTransferProcessorState,
+        IrCameraHandle,
+        PackedClusteringProcessorConfig,
+        PackedFunctionLevel,
+        PackedImageTransferProcessorConfig,
+        PackedImageTransferProcessorExConfig,
+        PackedIrLedProcessorConfig,
+        PackedMcuVersion,
+        PackedMomentProcessorConfig,
+        PackedPointingProcessorConfig,
+        PackedTeraPluginProcessorConfig,
+        RunClusteringProcessorIn,
+        RunImageTransferExProcessorIn,
+        RunImageTransferProcessorIn,
+        RunIrLedProcessorIn,
+        RunMomentProcessorIn,
+        RunPointingProcessorIn,
+        RunTeraPluginProcessorIn,
     },
 };
 

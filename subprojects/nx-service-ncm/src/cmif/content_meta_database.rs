@@ -2,15 +2,33 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+    },
     proto,
     types::{
-        GetContentIdByTypeAndIdOffsetIn, GetContentIdByTypeIn, HasContentIn, ListContentInfoIn,
-        ListIn, ListOut, NcmApplicationContentMetaKey, NcmContentId, NcmContentInfo,
-        NcmContentMetaInfo, NcmContentMetaKey, NcmContentMetaType, NcmContentType,
+        GetContentIdByTypeAndIdOffsetIn,
+        GetContentIdByTypeIn,
+        HasContentIn,
+        ListContentInfoIn,
+        ListIn,
+        ListOut,
+        NcmApplicationContentMetaKey,
+        NcmContentId,
+        NcmContentInfo,
+        NcmContentMetaInfo,
+        NcmContentMetaKey,
+        NcmContentMetaType,
+        NcmContentType,
     },
 };
 

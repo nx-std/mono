@@ -23,7 +23,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -32,16 +35,22 @@ mod types;
 
 pub use self::{
     cmif::{
-        DispatchError as DispatchCmifError, GetEventObserverError as GetEventObserverCmifError,
+        DispatchError as DispatchCmifError,
+        GetEventObserverError as GetEventObserverCmifError,
         GetProcessEventError as GetProcessEventCmifError,
     },
     proto::SERVICE_NAME,
     tipc::{
-        DispatchError as DispatchTipcError, GetEventObserverError as GetEventObserverTipcError,
+        DispatchError as DispatchTipcError,
+        GetEventObserverError as GetEventObserverTipcError,
         GetProcessEventError as GetProcessEventTipcError,
     },
     types::{
-        ContentMetaInfo, NcmProgramLocation, PglLaunchFlag, ProcessEvent, ProcessEventInfo,
+        ContentMetaInfo,
+        NcmProgramLocation,
+        PglLaunchFlag,
+        ProcessEvent,
+        ProcessEventInfo,
         SnapShotDumpType,
     },
 };

@@ -21,7 +21,12 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    Domain,
+    DomainObject,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -33,7 +38,10 @@ pub use nx_sf::service::DispatchError;
 pub use self::{
     cmif::OpenCodeFileSystemError,
     proto::SERVICE_NAME,
-    types::{FS_MAX_PATH, FsCodeInfo},
+    types::{
+        FS_MAX_PATH,
+        FsCodeInfo,
+    },
 };
 
 /// Connected filesystem-proxy-for-loader (`fsp-ldr`) service wrapper.

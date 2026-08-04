@@ -4,7 +4,10 @@
 //! configuration passed by libnx's CRT0.
 
 use core::{
-    ffi::{c_char, c_void},
+    ffi::{
+        c_char,
+        c_void,
+    },
     ptr::NonNull,
 };
 

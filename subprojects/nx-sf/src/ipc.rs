@@ -32,7 +32,11 @@
 //! [`IpcBuffer::as_array`]: nx_sys_thread_tls::IpcBuffer::as_array
 //! [`ipc_buffer`]: nx_sys_thread_tls::ipc_buffer
 
-pub use nx_svc::ipc::{Handle, Handle as SessionHandle, SendSyncError};
+pub use nx_svc::ipc::{
+    Handle,
+    Handle as SessionHandle,
+    SendSyncError,
+};
 use nx_sys_thread_tls::IpcBuffer;
 
 use crate::service::handle::BorrowedSessionHandle;

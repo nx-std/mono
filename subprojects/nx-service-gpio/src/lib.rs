@@ -16,7 +16,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -24,12 +27,24 @@ mod types;
 
 pub use self::{
     cmif::{
-        BindInterruptError, DispatchInBoolError, DispatchInU32Error, DispatchInU32OutBoolError,
-        DispatchNoIoError, DispatchOutBoolError, DispatchOutU32Error, OpenSession2Error,
+        BindInterruptError,
+        DispatchInBoolError,
+        DispatchInU32Error,
+        DispatchInU32OutBoolError,
+        DispatchNoIoError,
+        DispatchOutBoolError,
+        DispatchOutU32Error,
+        OpenSession2Error,
         OpenSessionError,
     },
     proto::SERVICE_NAME,
-    types::{GpioDirection, GpioInterruptMode, GpioInterruptStatus, GpioPadName, GpioValue},
+    types::{
+        GpioDirection,
+        GpioInterruptMode,
+        GpioInterruptStatus,
+        GpioPadName,
+        GpioValue,
+    },
 };
 
 /// GPIO manager service wrapper.

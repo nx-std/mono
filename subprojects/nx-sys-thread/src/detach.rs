@@ -34,10 +34,17 @@ use core::{
     cell::UnsafeCell,
     mem::MaybeUninit,
     ptr::NonNull,
-    sync::atomic::{AtomicBool, AtomicU8, Ordering},
+    sync::atomic::{
+        AtomicBool,
+        AtomicU8,
+        Ordering,
+    },
 };
 
-use crate::thread::{self, ThreadControl};
+use crate::thread::{
+    self,
+    ThreadControl,
+};
 
 /// `svcExitThread` syscall immediate (`nx_svc::code::EXIT_THREAD`).
 ///

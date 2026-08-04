@@ -3,10 +3,19 @@
 //! This module manages the Time service session and provides a singleton interface
 //! for accessing time functionality throughout the application lifecycle.
 
-use nx_rt_core::error::{ResultCode, ToResultCode};
-use nx_service_time::{TimeService, TimeServiceType};
+use nx_rt_core::error::{
+    ResultCode,
+    ToResultCode,
+};
+use nx_service_time::{
+    TimeService,
+    TimeServiceType,
+};
 use nx_sf::error::ToResultCode as _;
-use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
+use nx_std_sync::{
+    once_lock::OnceLock,
+    rwlock::RwLock,
+};
 
 use crate::services::sm;
 

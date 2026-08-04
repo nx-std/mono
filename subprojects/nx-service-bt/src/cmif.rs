@@ -2,16 +2,26 @@
 
 use nx_sf::{
     cmif,
-    hipc::{InPointer, OutPointer},
+    hipc::{
+        InPointer,
+        OutPointer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
     proto,
     types::{
-        BtdrvBleEventType, BtdrvGattAttributeUuid, BtdrvGattId, NotificationIn,
-        ReadCharacteristicIn, ReadDescriptorIn, SendIndicationIn, SetLeResponseIn,
-        WriteCharacteristicIn, WriteDescriptorIn,
+        BtdrvBleEventType,
+        BtdrvGattAttributeUuid,
+        BtdrvGattId,
+        NotificationIn,
+        ReadCharacteristicIn,
+        ReadDescriptorIn,
+        SendIndicationIn,
+        SetLeResponseIn,
+        WriteCharacteristicIn,
+        WriteDescriptorIn,
     },
 };
 

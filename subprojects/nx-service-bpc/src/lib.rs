@@ -25,15 +25,26 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
 mod types;
 
 pub use self::{
-    cmif::{GetPowerButtonError, GetSleepButtonStateError, RebootSystemError, ShutdownSystemError},
-    proto::{SERVICE_NAME, SERVICE_NAME_LEGACY},
+    cmif::{
+        GetPowerButtonError,
+        GetSleepButtonStateError,
+        RebootSystemError,
+        ShutdownSystemError,
+    },
+    proto::{
+        SERVICE_NAME,
+        SERVICE_NAME_LEGACY,
+    },
     types::SleepButtonState,
 };
 

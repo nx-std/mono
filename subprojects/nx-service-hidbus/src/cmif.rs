@@ -2,15 +2,24 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
     proto,
     types::{
-        BusHandle, BusHandleResIdIn, EnableExternalDeviceIn, EnableJoyPollingIn, GetBusHandleIn,
-        GetBusHandleOut, JoyPollingMode,
+        BusHandle,
+        BusHandleResIdIn,
+        EnableExternalDeviceIn,
+        EnableJoyPollingIn,
+        GetBusHandleIn,
+        GetBusHandleOut,
+        JoyPollingMode,
     },
 };
 

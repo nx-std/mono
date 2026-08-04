@@ -2,10 +2,19 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{OutHandleAttr, Session};
+use nx_sf::service::{
+    OutHandleAttr,
+    Session,
+};
 
-use super::app_manager::{AsyncCommandError, AsyncOut};
-use crate::{proto, types::AccountUid};
+use super::app_manager::{
+    AsyncCommandError,
+    AsyncOut,
+};
+use crate::{
+    proto,
+    types::AccountUid,
+};
 
 /// RequestLinkDevice (cmd 0).
 pub(crate) fn request_link_device(

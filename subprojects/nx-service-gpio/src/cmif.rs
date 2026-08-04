@@ -3,7 +3,13 @@
 use nx_sf::{
     cmif,
     ipc::Handle,
-    service::{BorrowedSessionHandle, DispatchError, OutHandleAttr, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OutHandleAttr,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 use crate::proto;

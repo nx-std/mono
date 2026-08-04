@@ -21,14 +21,24 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
 
 pub use self::{
-    cmif::{GetLastTickError, GetReadableEventError, GetWritableEventError},
-    proto::{INSR_SERVICE_NAME, INSS_SERVICE_NAME},
+    cmif::{
+        GetLastTickError,
+        GetReadableEventError,
+        GetWritableEventError,
+    },
+    proto::{
+        INSR_SERVICE_NAME,
+        INSS_SERVICE_NAME,
+    },
 };
 
 /// INS request/read (`ins:r`) session wrapper.

@@ -26,7 +26,12 @@
 use nx_sf::error::ToResultCode;
 use nx_svc::error::ResultCode;
 
-use crate::{AppletProxyService, AppletType, GetApplicationFunctionsError, GetSubInterfaceError};
+use crate::{
+    AppletProxyService,
+    AppletType,
+    GetApplicationFunctionsError,
+    GetSubInterfaceError,
+};
 
 mod sealed {
     pub trait Sealed {}

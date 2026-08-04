@@ -12,7 +12,11 @@
 use nx_rt_core::error::ToResultCode as _;
 use nx_svc::process::Handle as ProcessHandle;
 
-use crate::{env, ffi::common::GENERIC_ERROR, services::applet};
+use crate::{
+    env,
+    ffi::common::GENERIC_ERROR,
+    services::applet,
+};
 
 /// Initializes the applet service. Returns 0 on success, error code on failure.
 ///

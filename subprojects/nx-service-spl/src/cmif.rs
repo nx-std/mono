@@ -1,17 +1,41 @@
 //! CMIF protocol operations for the Security Processor Liaison service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_out,
+    },
     proto,
     types::{
-        CryptAesCtrIn, DecryptRsaPrivateKeyLegacyIn, EncryptRsaKeyForImportIn,
-        GenerateSpecificAesKeyIn, GetConfigIn, ImportSecureExpModKeyLegacyIn, KeyGenOptionIn,
-        LoadAesKeyIn, LoadContentKeyIn, RSA_BUFFER_SIZE, RsaKeyVersion, SHA256_HASH_SIZE,
-        SetConfigIn, SplKey, TwoKeyIn, UnwrapAesTitlekeyIn,
+        CryptAesCtrIn,
+        DecryptRsaPrivateKeyLegacyIn,
+        EncryptRsaKeyForImportIn,
+        GenerateSpecificAesKeyIn,
+        GetConfigIn,
+        ImportSecureExpModKeyLegacyIn,
+        KeyGenOptionIn,
+        LoadAesKeyIn,
+        LoadContentKeyIn,
+        RSA_BUFFER_SIZE,
+        RsaKeyVersion,
+        SHA256_HASH_SIZE,
+        SetConfigIn,
+        SplKey,
+        TwoKeyIn,
+        UnwrapAesTitlekeyIn,
     },
 };
 

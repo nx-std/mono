@@ -1,8 +1,16 @@
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainRef,
+};
 
-use crate::{dispatch::as_in_bytes, proto, types::*};
+use crate::{
+    dispatch::as_in_bytes,
+    proto,
+    types::*,
+};
 
 pub(crate) fn set_current_process(domain: DomainRef<'_>, ctx: u32) -> Result<(), DispatchError> {
     let pid_placeholder: u64 = 0;

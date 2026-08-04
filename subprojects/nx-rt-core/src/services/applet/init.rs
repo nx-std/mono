@@ -7,19 +7,39 @@
 //! mode-change notifications. Each `open_<role>` here returns a fully-cooked
 //! [`Slot<R>`] ready to drop into the [`AppletSingleton`].
 
-use core::sync::atomic::{AtomicU8, AtomicU32};
+use core::sync::atomic::{
+    AtomicU8,
+    AtomicU32,
+};
 
 use nx_service_applet::{
-    AppletFocusHandlingMode, AppletFocusState, AppletMessage, CommonStateGetter, SelfController,
-    proxy::{self, Proxy},
-    role::{Application, LibraryApplet, OverlayApplet, Role, SystemApplet, SystemApplication},
+    AppletFocusHandlingMode,
+    AppletFocusState,
+    AppletMessage,
+    CommonStateGetter,
+    SelfController,
+    proxy::{
+        self,
+        Proxy,
+    },
+    role::{
+        Application,
+        LibraryApplet,
+        OverlayApplet,
+        Role,
+        SystemApplet,
+        SystemApplication,
+    },
 };
 use nx_service_sm::SmService;
 use nx_svc::process::Handle as ProcessHandle;
 
 use super::{
     error::ConnectError,
-    state::{AppletCache, Slot},
+    state::{
+        AppletCache,
+        Slot,
+    },
 };
 
 /// Brings up an [`Application`]-role applet.

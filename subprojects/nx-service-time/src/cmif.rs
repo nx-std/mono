@@ -5,14 +5,28 @@
 
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 
 use crate::{
-    proto::{static_service_cmds, system_clock_cmds, timezone_service_cmds},
-    types::{TimeCalendarAdditionalInfo, TimeCalendarTime},
+    proto::{
+        static_service_cmds,
+        system_clock_cmds,
+        timezone_service_cmds,
+    },
+    types::{
+        TimeCalendarAdditionalInfo,
+        TimeCalendarTime,
+    },
 };
 
 /// Gets the standard user system clock (ISystemClock).

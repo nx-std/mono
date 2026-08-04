@@ -4,9 +4,15 @@
 //! (no-io / pod-in / pod-out). Variants with buffer attrs, `send_pid`, or
 //! out-handles live inline next to their callers.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
+};
 
 /// CMIF request with no input payload and no output payload.
 #[inline]

@@ -1,11 +1,28 @@
 //! `pm:info` (process info) FFI.
 
-use nx_service_pm::{ProcessId, ResourceLimitValues};
-use nx_sf::{error::ToResultCode as _, ffi::Service};
+use nx_service_pm::{
+    ProcessId,
+    ResourceLimitValues,
+};
+use nx_sf::{
+    error::ToResultCode as _,
+    ffi::Service,
+};
 
 use super::{
-    common::{GENERIC_ERROR, RC_INCOMPAT_SYSVER, hosversion_before, hosversionIsAtmosphere},
-    state::{INFO, INFO_SRV, clear_shadow, ensure_sm, write_shadow},
+    common::{
+        GENERIC_ERROR,
+        RC_INCOMPAT_SYSVER,
+        hosversion_before,
+        hosversionIsAtmosphere,
+    },
+    state::{
+        INFO,
+        INFO_SRV,
+        clear_shadow,
+        ensure_sm,
+        write_shadow,
+    },
 };
 
 /// `pminfoInitialize()`.

@@ -2,8 +2,14 @@
 
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    service::{DispatchError, Session},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        DispatchError,
+        Session,
+    },
 };
 
 use super::cmif;

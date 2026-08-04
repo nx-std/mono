@@ -4,10 +4,16 @@ use core::mem::MaybeUninit;
 
 use nx_rt_core::error::ToResultCode as _;
 use nx_service_apm;
-use nx_sf::{error::ToResultCode, ffi::Service};
+use nx_sf::{
+    error::ToResultCode,
+    ffi::Service,
+};
 
 use crate::{
-    ffi::common::{GENERIC_ERROR, SyncUnsafeCell},
+    ffi::common::{
+        GENERIC_ERROR,
+        SyncUnsafeCell,
+    },
     services::apm,
 };
 

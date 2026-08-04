@@ -4,7 +4,11 @@ use core::ptr::NonNull;
 
 use nx_svc::thread::Handle as ThreadHandle;
 
-use crate::env::{self, ConfigEntry, LoaderReturnFn};
+use crate::env::{
+    self,
+    ConfigEntry,
+    LoaderReturnFn,
+};
 
 /// nxlink host address (C-compatible, network byte order)
 ///

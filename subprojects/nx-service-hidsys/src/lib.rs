@@ -26,7 +26,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -37,12 +40,25 @@ pub use self::{
     cmif::AcquireEventError,
     proto::SERVICE_NAME,
     types::{
-        BtdrvAddress, HidTouchScreenConfigurationForNx, HidcfgAnalogStickAssignment,
-        HidcfgAnalogStickRotation, HidcfgButtonConfigEmbedded, HidcfgButtonConfigFull,
-        HidcfgButtonConfigLeft, HidcfgButtonConfigRight, HidcfgDigitalButtonAssignment,
-        HidcfgStorageName, HidsysButtonConfigEmbedded, HidsysButtonConfigFull,
-        HidsysButtonConfigLeft, HidsysButtonConfigRight, NotificationLedPattern,
-        NotificationLedPatternCycle, UniquePadId, UniquePadSerialNumber, UniquePadType,
+        BtdrvAddress,
+        HidTouchScreenConfigurationForNx,
+        HidcfgAnalogStickAssignment,
+        HidcfgAnalogStickRotation,
+        HidcfgButtonConfigEmbedded,
+        HidcfgButtonConfigFull,
+        HidcfgButtonConfigLeft,
+        HidcfgButtonConfigRight,
+        HidcfgDigitalButtonAssignment,
+        HidcfgStorageName,
+        HidsysButtonConfigEmbedded,
+        HidsysButtonConfigFull,
+        HidsysButtonConfigLeft,
+        HidsysButtonConfigRight,
+        NotificationLedPattern,
+        NotificationLedPatternCycle,
+        UniquePadId,
+        UniquePadSerialNumber,
+        UniquePadType,
     },
 };
 

@@ -1,10 +1,19 @@
 //! `pm:bm` (boot mode) FFI.
 
-use nx_sf::{error::ToResultCode as _, ffi::Service};
+use nx_sf::{
+    error::ToResultCode as _,
+    ffi::Service,
+};
 
 use super::{
     common::GENERIC_ERROR,
-    state::{BM, BM_SRV, clear_shadow, ensure_sm, write_shadow},
+    state::{
+        BM,
+        BM_SRV,
+        clear_shadow,
+        ensure_sm,
+        write_shadow,
+    },
 };
 
 /// `pmbmInitialize()` — opens a session to `pm:bm`.

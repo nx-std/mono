@@ -22,12 +22,22 @@
 //! emits an object id in a reply, and `DomainDispatch::send` turns each one into
 //! exactly one owner.
 
-use core::{marker::PhantomData, mem::ManuallyDrop};
+use core::{
+    marker::PhantomData,
+    mem::ManuallyDrop,
+};
 
 use super::{
-    control::{self, CloneObjectError, CopyFromDomainError},
+    control::{
+        self,
+        CloneObjectError,
+        CopyFromDomainError,
+    },
     dispatch::DomainDispatch,
-    handle::{BorrowedSessionHandle, OwnedSessionHandle},
+    handle::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
     session::Session,
 };
 use crate::cmif::ObjectId;

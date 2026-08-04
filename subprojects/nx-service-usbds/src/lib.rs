@@ -33,7 +33,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -42,10 +47,20 @@ mod proto;
 mod types;
 
 pub use self::{
-    cmif::{GetEventError, GetInterfaceError, RegisterEndpointError, RegisterInterfaceError},
+    cmif::{
+        GetEventError,
+        GetInterfaceError,
+        RegisterEndpointError,
+        RegisterInterfaceError,
+    },
     proto::SERVICE_NAME,
     types::{
-        UsbComplexId, UsbDeviceSpeed, UsbDsDeviceInfo, UsbDsReportData, UsbDsReportEntry, UsbState,
+        UsbComplexId,
+        UsbDeviceSpeed,
+        UsbDsDeviceInfo,
+        UsbDsReportData,
+        UsbDsReportEntry,
+        UsbState,
         UsbStringDescriptor,
     },
 };

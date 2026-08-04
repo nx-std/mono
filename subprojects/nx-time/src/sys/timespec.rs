@@ -2,7 +2,10 @@
 
 use core::time::Duration;
 
-use super::nsec::{NSEC_PER_SEC, Nanoseconds};
+use super::nsec::{
+    NSEC_PER_SEC,
+    Nanoseconds,
+};
 use crate::sys::clock;
 
 /// A structure representing a date and time.
