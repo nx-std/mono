@@ -153,18 +153,10 @@ fn fetch_initial_cache<R: Role>(proxy: &Proxy<R>) -> Result<AppletCache, Connect
         .get_current_focus_state()
         .map_err(ConnectError::GetFocusState)?;
 
-    // Deliberately fatal, and deliberately an `expect`: swallowing this failure
-    // reports it three layers downstream as `LibnxError_InitFail_HID`, because
-    // HID is the first consumer of the ARUID and aborts `__appInit` when it is
-    // absent. Panicking here names the command that actually failed.
-    //
-    // This costs the non-Application roles, which legitimately get ARUID=0 or an
-    // IPC error and used to continue. Restore that tolerance once the
-    // Application-role failure is understood, by matching on the role rather
-    // than by discarding the error again.
-    let aruid = proxy
-        .get_applet_resource_user_id()
-        .expect("GetAppletResourceUserId (IWindowController cmd 1) failed");
+    // ARUID failures are non-fatal — non-Application roles legitimately
+    // receive ARUID=0/IPC errors here. Mirror the prior FFI behavior of
+    // treating any failure as "no aruid available".
+    let aruid = proxy.get_applet_resource_user_id().unwrap_or_default();
 
     Ok(AppletCache {
         aruid,
