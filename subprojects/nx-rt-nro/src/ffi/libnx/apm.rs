@@ -49,7 +49,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_initialize() -> u32 {
     // pointer. APM does not use pointer buffers, so size 0 is correct.
     if let Some(service) = apm::get_service() {
         let svc = Service {
-            session: service.session(),
+            session: service.session().to_handle(),
             own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,
@@ -60,7 +60,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_initialize() -> u32 {
     }
     if let Some(session) = apm::get_session() {
         let svc = Service {
-            session: session.session(),
+            session: session.session().to_handle(),
             own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,

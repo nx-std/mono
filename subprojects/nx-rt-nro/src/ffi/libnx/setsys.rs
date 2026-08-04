@@ -39,7 +39,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_setsys_initialize() -> u32 {
         // A `own_handle = 1` snapshot would risk a double-close if libnx
         // ever invoked `serviceClose` on the cached pointer.
         let service = Service {
-            session: setsys.session(),
+            session: setsys.session().to_handle(),
             own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,

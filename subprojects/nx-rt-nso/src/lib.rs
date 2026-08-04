@@ -31,9 +31,9 @@
 //!
 //! ## Background sysmodule (`None`) profile
 //!
-//! Selecting `applet-none` builds the runtime for a background sysmodule — a
-//! `pm`-launched NSO that exists to provide a service and has no Application
-//! Manager identity. Its startup profile is deliberately minimal:
+//! Selecting `nso_applet_type=none` builds the runtime for a background
+//! sysmodule: a `pm`-launched NSO that exists to provide a service and has no
+//! Application Manager identity. Its startup profile is deliberately minimal:
 //!
 //! - **Service set** — only the Service Manager (`sm`) is brought up. The
 //!   Application Manager handshake is skipped, so no `appletOE` / `appletAE`
@@ -44,7 +44,7 @@
 //!   contacting the Application Manager, and the libnx applet runtime likewise
 //!   treats `None` as "do not initialize".
 //!
-//! Every other `applet-*` selection registers one of the five Application
+//! Every other `nso_applet_type` selection registers one of the five Application
 //! Manager identities and runs its per-role handshake; see [`applet`] for that
 //! mapping.
 //!
@@ -68,12 +68,22 @@
 //!   override symbols are emitted and the linker fragments have nothing to
 //!   bind. The kind-agnostic runtime symbols are owned by [`nx_rt_core`]'s
 //!   FFI surface.
-//! - `applet-*` — the six mutually-exclusive build-time Application Manager
-//!   identity selectors (see above); exactly one is always active.
 //! - `rt-link` — emits this crate's `pm`-launch `.crt0` (the NSO process
 //!   `_start`) for the opt-in `rustc`-driven link pipeline. It is off on the
 //!   default GCC pipeline, where `_start` is supplied by libnx's
 //!   `switch_crt0.s`; enabling it there would collide with that `_start`.
+//!
+//! # Build-time cfg
+//!
+//! - `nso_applet_type`: the build-time Application Manager identity, one of
+//!   `application`, `library-applet`, `none`, `overlay-applet`,
+//!   `system-applet` or `system-application`. The `nso_applet_type` Meson
+//!   option sets it, and the workspace `.cargo/config.toml` supplies the
+//!   `application` default a bare `cargo` invocation builds with. Any other
+//!   value, or none at all, is a `compile_error!`. It is a cfg value rather
+//!   than a set of Cargo features because the six identities are mutually
+//!   exclusive, and Cargo features are additive: `--all-features` would turn
+//!   all six on at once.
 
 #![no_std]
 
@@ -89,67 +99,24 @@ core::arch::global_asm!(include_str!("crt0.s"));
 
 // Build-time Application Manager identity selection.
 //
-// Exactly one of the six mutually-exclusive `applet-*` features must be
-// enabled — each defines [`applet::APPLET_TYPE`] to one `AppletType` value.
-// The `nso_applet_type` Meson option drives the choice; these guards turn a
-// missing or ambiguous selection into a clear diagnostic instead of a cryptic
-// "`APPLET_TYPE` is not defined / defined multiple times".
+// `applet::APPLET_TYPE` has one arm per identity, each naming its own
+// `nso_applet_type` value. A cfg that is unset, or that carries a value outside
+// the six, matches no arm; this guard reports that as the misconfiguration it
+// is, instead of leaving a cryptic "`APPLET_TYPE` is not defined" behind or
+// letting the process register as an identity nobody asked for.
 #[cfg(not(any(
-    feature = "applet-application",
-    feature = "applet-library-applet",
-    feature = "applet-none",
-    feature = "applet-overlay-applet",
-    feature = "applet-system-applet",
-    feature = "applet-system-application",
+    nso_applet_type = "application",
+    nso_applet_type = "library-applet",
+    nso_applet_type = "none",
+    nso_applet_type = "overlay-applet",
+    nso_applet_type = "system-applet",
+    nso_applet_type = "system-application",
 )))]
 compile_error!(
-    "nx-rt-nso: no applet type selected — enable exactly one `applet-*` feature \
-     (set the `nso_applet_type` Meson option)"
-);
-
-#[cfg(any(
-    all(
-        feature = "applet-application",
-        any(
-            feature = "applet-library-applet",
-            feature = "applet-none",
-            feature = "applet-overlay-applet",
-            feature = "applet-system-applet",
-            feature = "applet-system-application",
-        ),
-    ),
-    all(
-        feature = "applet-library-applet",
-        any(
-            feature = "applet-none",
-            feature = "applet-overlay-applet",
-            feature = "applet-system-applet",
-            feature = "applet-system-application",
-        ),
-    ),
-    all(
-        feature = "applet-none",
-        any(
-            feature = "applet-overlay-applet",
-            feature = "applet-system-applet",
-            feature = "applet-system-application",
-        ),
-    ),
-    all(
-        feature = "applet-overlay-applet",
-        any(
-            feature = "applet-system-applet",
-            feature = "applet-system-application"
-        ),
-    ),
-    all(
-        feature = "applet-system-applet",
-        feature = "applet-system-application"
-    ),
-))]
-compile_error!(
-    "nx-rt-nso: multiple applet types selected — enable exactly one `applet-*` \
-     feature (the `nso_applet_type` Meson option selects one)"
+    "nx-rt-nso: the `nso_applet_type` cfg is unset or names an unknown applet \
+     type; set the `nso_applet_type` Meson option (the workspace \
+     `.cargo/config.toml` carries the `application` default for bare cargo \
+     invocations)"
 );
 
 #[cfg(feature = "ffi")]

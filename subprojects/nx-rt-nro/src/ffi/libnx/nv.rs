@@ -46,7 +46,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_initialize() -> u32 {
             // cached pointer.
             if !was_initialized && let Some(service_ref) = crate::services::nv::get_service() {
                 let service = Service {
-                    session: service_ref.session(),
+                    session: service_ref.session().to_handle(),
                     own_handle: 0,
                     object_id: 0,
                     pointer_buffer_size: 0,
