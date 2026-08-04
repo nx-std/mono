@@ -3,12 +3,7 @@
 //! This module manages the HID service session and provides a singleton interface
 //! for accessing HID functionality throughout the application lifecycle.
 
-use nx_rt_core::error::{
-    ResultCode,
-    ToResultCode,
-};
 use nx_service_hid::HidService;
-use nx_sf::error::ToResultCode as _;
 use nx_std_sync::{
     once_lock::OnceLock,
     rwlock::RwLock,
@@ -92,8 +87,11 @@ impl core::ops::Deref for HidServiceRef {
 #[error("failed to connect to HID service")]
 pub struct ConnectError(#[source] pub nx_service_hid::ConnectError);
 
-impl ToResultCode for ConnectError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_rt_core::error::ToResultCode for ConnectError {
+    fn to_rc(self) -> nx_rt_core::error::ResultCode {
+        use nx_sf::error::ToResultCode as _;
+
         self.0.to_rc()
     }
 }
