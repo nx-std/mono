@@ -41,6 +41,13 @@ option(
 )
 
 option(
+    'use_nx_sys_fd',
+    type : 'feature', value : 'auto',
+    description : 'Override all libsysbase functions with nx-sys-fd functions',
+    yield : true
+)
+
+option(
     'use_nx_sys_mem',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-sys-mem functions',

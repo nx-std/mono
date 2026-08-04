@@ -1,0 +1,23 @@
+[package]
+name = "nx-sys-fd"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_sys_fd"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_sys_fd FFI
+ffi = []
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+static_assertions = "1.1.0"
+thiserror = { version = "2.0.12", default-features = false }

@@ -15,7 +15,7 @@ bench = false
 default = ["alloc", "rand", "sync", "time"]
 
 # Low-level features
-sys = ["svc", "sys-mem", "sys-sync", "sys-thread", "sys-thread-tls"]
+sys = ["svc", "sys-fd", "sys-mem", "sys-sync", "sys-thread", "sys-thread-tls"]
 
 # FFI overrides for libnx functions (only if the dependency is enabled)
 ffi = [
@@ -29,6 +29,7 @@ ffi = [
     "nx-sf?/ffi",
     "nx-std-sync?/ffi",
     "nx-svc?/ffi",
+    "nx-sys-fd?/ffi",
     "nx-sys-mem?/ffi",
     "nx-sys-sync?/ffi",
     "nx-sys-thread?/ffi",
@@ -65,6 +66,8 @@ service-vi = ["dep:nx-service-vi", "nx-rt-nro?/service-vi"]
 sf = ["dep:nx-sf"]
 svc = ["dep:nx-svc"]
 sync = ["dep:nx-std-sync", "alloc"]
+# Virtual file descriptor table and device registry, replacing libsysbase's
+sys-fd = ["dep:nx-sys-fd", "alloc"]
 sys-mem = ["dep:nx-sys-mem", "dep:nx-sys-virtmem", "alloc"]
 sys-sync = ["dep:nx-sys-sync"]
 sys-thread = ["dep:nx-sys-thread"]
@@ -94,6 +97,7 @@ nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true 
 nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
+nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd", optional = true }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }

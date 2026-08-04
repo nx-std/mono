@@ -107,6 +107,7 @@ members = [
     "subprojects/nx-std",
     "subprojects/nx-std-sync",
     "subprojects/nx-svc",
+    "subprojects/nx-sys-fd",
     "subprojects/nx-sys-mem",
     "subprojects/nx-sys-sync",
     "subprojects/nx-sys-thread",

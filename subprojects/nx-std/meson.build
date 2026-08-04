@@ -60,6 +60,17 @@ if get_option('use_nx_svc').enabled()
     deps_cargo_features += ['svc']
 endif
 
+# nx-sys-fd
+if get_option('use_nx_sys_fd').enabled()
+    nx_sys_fd_proj = subproject('nx-sys-fd')
+
+    deps += nx_sys_fd_proj.get_variable('nx_sys_fd_dep')
+    deps_override_link_args += ['-T', nx_sys_fd_proj.get_variable('nx_sys_fd_ld_override')]
+
+    debug('sys-fd feature: enabled')
+    deps_cargo_features += ['sys-fd']
+endif
+
 # nx-sys-sync
 if get_option('use_nx_sys_sync').enabled()
     nx_sys_sync_proj = subproject('nx-sys-sync')
