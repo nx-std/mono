@@ -18,24 +18,35 @@
 use core::ffi::c_int;
 
 use super::{
-    devoptab::SsizeT,
+    ctypes::SsizeT,
     reent::Reent,
 };
 use crate::{
     device::DeviceError,
     table::{
+        AttachError,
         CloseError,
+        MetadataError,
         OpenError,
         ReadError,
+        SeekError,
+        SetLenError,
+        SyncError,
         WriteError,
     },
 };
+
+/// No such file or directory.
+pub const ENOENT: c_int = 2;
 
 /// I/O error.
 pub const EIO: c_int = 5;
 
 /// Bad file descriptor.
 pub const EBADF: c_int = 9;
+
+/// File exists.
+pub const EEXIST: c_int = 17;
 
 /// No such device.
 pub const ENODEV: c_int = 19;
@@ -45,6 +56,9 @@ pub const EINVAL: c_int = 22;
 
 /// Too many open files in the system.
 pub const ENFILE: c_int = 23;
+
+/// Illegal seek.
+pub const ESPIPE: c_int = 29;
 
 /// Function not implemented.
 pub const ENOSYS: c_int = 88;
@@ -88,11 +102,21 @@ impl ToErrno for OpenError {
 
 impl _sealed::Sealed for OpenError {}
 
+impl ToErrno for AttachError {
+    fn to_errno(self) -> c_int {
+        match self {
+            Self::BadDescriptor | Self::AlreadyAttached => EBADF,
+        }
+    }
+}
+
+impl _sealed::Sealed for AttachError {}
+
 impl ToErrno for CloseError {
     fn to_errno(self) -> c_int {
         match self {
             Self::BadDescriptor => EBADF,
-            Self::Device(err) => err.to_errno(),
+            Self::File(err) => err.to_errno(),
         }
     }
 }
@@ -123,11 +147,61 @@ impl ToErrno for ReadError {
 
 impl _sealed::Sealed for ReadError {}
 
+impl ToErrno for SeekError {
+    fn to_errno(self) -> c_int {
+        match self {
+            Self::BadDescriptor => EBADF,
+            // A stream has no position, which C reports as the descriptor being the wrong kind
+            // rather than as an unimplemented operation.
+            Self::NotAFile => ESPIPE,
+            Self::File(err) => err.to_errno(),
+        }
+    }
+}
+
+impl _sealed::Sealed for SeekError {}
+
+impl ToErrno for MetadataError {
+    fn to_errno(self) -> c_int {
+        match self {
+            Self::BadDescriptor | Self::NotAFile => EBADF,
+            Self::File(err) => err.to_errno(),
+        }
+    }
+}
+
+impl _sealed::Sealed for MetadataError {}
+
+impl ToErrno for SetLenError {
+    fn to_errno(self) -> c_int {
+        match self {
+            Self::BadDescriptor | Self::NotAFile => EBADF,
+            Self::File(err) => err.to_errno(),
+        }
+    }
+}
+
+impl _sealed::Sealed for SetLenError {}
+
+impl ToErrno for SyncError {
+    fn to_errno(self) -> c_int {
+        match self {
+            Self::BadDescriptor | Self::NotAFile => EBADF,
+            Self::File(err) => err.to_errno(),
+        }
+    }
+}
+
+impl _sealed::Sealed for SyncError {}
+
 impl ToErrno for DeviceError {
     fn to_errno(self) -> c_int {
         match self {
             Self::Unsupported => ENOSYS,
             Self::Io => EIO,
+            Self::NotFound => ENOENT,
+            Self::AlreadyExists => EEXIST,
+            Self::InvalidPath => EINVAL,
         }
     }
 }

@@ -20,6 +20,14 @@
 //! any device itself: a console, a filesystem or a socket layer registers with this crate and
 //! supplies its own behaviour.
 //!
+//! ## What a device is asked to implement
+//!
+//! Three traits, not one, and the split is the crate's central design decision. [`device::Device`]
+//! owns a path namespace and is shared by every descriptor opened against it; [`device::File`] is
+//! one open file, owned by the descriptor that opened it; [`device::Dir`] is one open directory
+//! walk. The reasoning, including why [`device::Device`] still carries `write` and `read` of its
+//! own, is in [`device`].
+//!
 //! ## The two tables, and why they are separate
 //!
 //! There are two distinct questions, and conflating them is the classic design trap:
@@ -50,52 +58,52 @@
 //! free slot, which is the behaviour C programs assume even though nothing on this platform relies
 //! on it.
 //!
-//! ### Slot states
+//! ### Opening runs in two steps
 //!
-//! A slot is in one of three states, and the third is the one that carries its weight:
+//! A descriptor number has to be reserved before the device can be asked to open anything, because
+//! the C caller allocates the number first and dispatches the open second. That order is not this
+//! crate's choice, and it turns out to be the right one anyway: opening a path can block on a
+//! service for as long as it likes, and the table lock must not be held across it.
 //!
-//! - **Available**: nothing here, the number is free.
-//! - **Reserved**: the number is taken, but the backing object does not exist yet.
-//! - **Occupied**: the number is taken and the object is ready to use.
+//! So a descriptor exists in one of two conditions, and the pair is what the table stores:
 //!
-//! `Reserved` exists because opening a device is not instantaneous. The device may need to
-//! allocate per-descriptor state, talk to a service, or fail partway through. None of that can
-//! happen while the table lock is held, because a device's open or close path may block or may
-//! itself want a descriptor. But the descriptor number cannot be handed out to another thread in
-//! the meantime either.
+//! - **Named, owning nothing.** The slot records a device and no more. This is the finished state
+//!   for a stream, and the intermediate state for a path.
+//! - **Named and owning a file.** The slot additionally holds the [`device::File`] the device
+//!   produced, and every operation goes to that object.
 //!
-//! So opening runs in two phases. First, claim a slot and mark it `Reserved`, under the lock.
-//! Then release the lock and construct the object. Then take the lock again and either fill the
-//! slot, promoting it to `Occupied`, or roll it back to `Available` if construction failed.
+//! There is no third state for a half-open descriptor, because there is nothing to represent: the
+//! file is constructed with no lock held and only then handed to the table, so the slot never
+//! contains an object that is not yet valid. If the open fails, the C caller releases the number
+//! and the slot goes straight back to free.
 //!
-//! The rollback is not left to the caller to remember. A reservation is represented by a guard
-//! value that releases the slot when dropped, so an early return or a `?` cannot strand a slot in
-//! `Reserved` forever. Filling the slot consumes the guard.
+//! ### Nothing that blocks runs under the table lock
 //!
-//! Without this state, a partially opened descriptor has no representation at all: the slot would
-//! have to hold an object that is not yet valid, which is exactly the pointer-shaped hole the C
-//! implementation leaves when it allocates and populates in a single step while holding its lock.
-//!
-//! ### Closing happens outside the lock
-//!
-//! Dropping an open object is not free. It can close a kernel handle, tear down a session, or free
+//! Dropping an open file is not free. It can close a kernel handle, tear down a session, or free
 //! memory. Doing that while holding the table lock risks a long hold at best and a deadlock at
-//! worst, because a device's close path may reach back into the table.
+//! worst, because a device's close path may reach back into the table. The same is true of an
+//! ordinary write, which may sit on a storage service indefinitely.
 //!
-//! Every operation that displaces an object therefore removes it from the slot under the lock,
-//! releases the lock, and only then drops it. This applies to closing a descriptor and to any
-//! future operation that replaces one.
+//! Two rules follow, and every operation obeys them:
 //!
-//! ## Per-descriptor device state
+//! - **Resolve, release, then call.** An operation clones the handle to the open file out of the
+//!   slot under the lock, drops the lock, and only then locks the file itself. Two threads writing
+//!   the same descriptor serialize on that second lock, not on the table.
+//! - **Displace under the lock, drop outside it.** Anything removed from a slot travels out of the
+//!   locked region before it is dropped. Because the handle is reference counted, a close that
+//!   races an in-flight write frees the descriptor number immediately and releases the file when
+//!   the write finishes with it.
 //!
-//! A device declares how many bytes of private state each of its open descriptors needs. Most
-//! devices need none: a console writes to a framebuffer that is global to the device, so its
-//! descriptors carry nothing. A filesystem needs a seek position and an open file object per
-//! descriptor.
+//! ## Per-descriptor state for a C device
 //!
-//! Devices that declare no per-descriptor state allocate nothing, which keeps the common path free
-//! of the heap entirely. Devices that do declare state get exactly that many bytes, allocated when
-//! the descriptor is opened and released when it is closed.
+//! A device registered from C declares how many bytes of private state each of its descriptors
+//! needs, and reaches them through the descriptor header. That is still honoured, and it is
+//! separate from the [`device::File`] a Rust device produces: a C device's state is bytes this
+//! crate allocates and never interprets, while a Rust device's file is an object this crate owns
+//! and calls.
+//!
+//! A Rust device declares no such state, so its descriptors allocate nothing beyond the file
+//! itself, and a device with no files at all, such as a console, allocates nothing whatsoever.
 //!
 //! ## The C boundary
 //!
@@ -111,6 +119,14 @@
 //!   must return a pointer into stable storage.
 //! - The device operation table has a fixed layout with a large number of optional function
 //!   pointers, and the registry is an array of pointers to it that C indexes directly.
+//!
+//! One shared table serves every Rust device, so a shim cannot tell from the function pointer which
+//! device it was called for. It recovers that from its arguments, and where it comes from differs
+//! by operation: a descriptor number for the per-descriptor operations, the path itself for the
+//! per-path ones, and the iterator's own private state for a directory walk. A directory needs the
+//! third because it has no descriptor number to be found by; the C caller allocates one iterator per
+//! open directory, so declaring how much state to allocate behind it is enough to make the walk
+//! findable, with no table and no bound on how many may be open.
 //!
 //! Errors reach C by writing an error number into the calling thread's reentrancy structure, which
 //! is otherwise opaque to this crate. Most entry points are handed that structure directly. The
@@ -143,17 +159,25 @@
 //! surface lives under one subtree named for the archive it replaces, and none of it is compiled
 //! unless the C-facing surface is.
 //!
+//! The structures the entry points write through, `struct stat` and `struct statvfs`, are pinned
+//! field by field against the toolchain rather than transcribed from the headers, because several
+//! of their fields are narrower than their names suggest. Getting one wrong would corrupt a
+//! caller's stack rather than fail a test.
+//!
 //! ## What this crate does not do
 //!
 //! Descriptor duplication is not implemented. The symbols exist because the translation unit
-//! defines them and the link would otherwise fail, but they report failure. Implementing them
-//! requires sharing one object between several slots, which means reference counting the object
-//! and replacing a slot's contents without dropping the old object under the lock.
+//! defines them and the link would otherwise fail, but they report failure. The machinery it needs
+//! is now mostly in place, since an open file is already held behind a reference-counted handle
+//! that several slots could share and that is already dropped outside the table lock. What is
+//! missing is the C side: two descriptors sharing one file would have to agree on the header the C
+//! callers hold, and on which of them the `refcount` field describes.
 #![no_std]
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-// The `alloc` crate backs the per-descriptor state a C device asks for by declaring a size.
+// The `alloc` crate backs the open files and directory walks a device produces, and the
+// per-descriptor state a C device asks for by declaring a size.
 extern crate alloc;
 // `nx-alloc` exposes the `#[global_allocator]` backing `alloc` for this crate.
 extern crate nx_alloc as _;

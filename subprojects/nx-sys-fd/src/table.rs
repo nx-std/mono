@@ -1,87 +1,80 @@
 //! The descriptor table.
 //!
-//! One slot per descriptor number, in static storage. A descriptor is a name for a device: opening
-//! one binds a number to a device, and every operation on that number is forwarded to it.
+//! One slot per descriptor number, in static storage. A descriptor always names a device, and may
+//! additionally own the [`File`] that device produced for it. What the two cases mean, and why an
+//! open file is held behind a lock of its own rather than under the table lock, is explained in
+//! [`entry`](self::entry).
+//!
+//! Every operation here follows the same shape: take the table lock, resolve the descriptor to what
+//! backs it, release the table lock, and only then call the device or the file. Nothing that can
+//! block runs with the table locked.
+//!
+//! ## Why the storage is two arrays
+//!
+//! What a descriptor holds is one idea, and a sum type would say so. The table nonetheless stores
+//! it as two arrays side by side, and the reason is that the standard descriptors have to be open
+//! before any code runs.
+//!
+//! Filling their slots means writing them in the static initializer, and a value that owns
+//! something cannot be assigned there: the assignment would drop whatever the slot held, and a
+//! destructor cannot run at compile time. Splitting the device number, which owns nothing, from the
+//! open file, which does, lets the first array be written in the initializer while the second stays
+//! uniformly empty.
+//!
+//! The pairing is an invariant this module keeps rather than one the types enforce: a descriptor is
+//! open exactly when its device entry is set, and a file entry is meaningful only alongside one.
+//! Every access goes through the accessors below, which is what holds the two in step.
 
+mod entry;
+mod fd;
+
+use alloc::{
+    boxed::Box,
+    sync::Arc,
+};
 use core::cell::UnsafeCell;
 
 use nx_sys_sync::Mutex;
 
+use self::entry::OpenFile;
+pub use self::fd::{
+    Fd,
+    InvalidFd,
+    MAX_FD,
+};
 use crate::{
     device::{
         DeviceError,
         DeviceId,
+        File,
+        Metadata,
+        SeekFrom,
     },
     registry,
 };
 
-/// Number of descriptors the table can hold.
-///
-/// Matches the capacity the C standard library used, so a program that ran against the C table
-/// cannot run out of descriptors sooner here.
-pub const MAX_FD: usize = 1024;
-
 /// The process-wide descriptor table.
 static TABLE: Table = Table {
     mutex: Mutex::new(),
-    slots: UnsafeCell::new({
+    devices: UnsafeCell::new({
         // Descriptors 0, 1 and 2 are open before anything asks, so that early output has somewhere
-        // to go. They start on the matching standard device slots.
-        let mut slots = [None; MAX_FD];
+        // to go. They start on the matching standard device slots, owning no file of their own.
+        let mut devices = [None; MAX_FD];
         // SAFETY: the standard slots are registry constants, so they are in range by
         // construction.
-        slots[0] = Some(DeviceId::from_index_unchecked(registry::STD_IN));
-        slots[1] = Some(DeviceId::from_index_unchecked(registry::STD_OUT));
-        slots[2] = Some(DeviceId::from_index_unchecked(registry::STD_ERR));
-        slots
+        devices[0] = Some(DeviceId::from_index_unchecked(registry::STD_IN));
+        devices[1] = Some(DeviceId::from_index_unchecked(registry::STD_OUT));
+        devices[2] = Some(DeviceId::from_index_unchecked(registry::STD_ERR));
+        devices
     }),
+    files: UnsafeCell::new([const { None }; MAX_FD]),
 };
 
-/// An open descriptor.
-///
-/// A value of this type names a descriptor slot that exists; whether it is open is a separate
-/// question the table answers.
-///
-/// Validation lives in the [`TryFrom<usize>`] impl below, which is the only place the bound is
-/// checked. [`Fd::from_number_unchecked`] bypasses it for callers that already hold the proof.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Fd(u32);
-
-impl Fd {
-    /// Names descriptor `number` without checking the bound.
-    ///
-    /// The caller must ensure `number` is below [`MAX_FD`]. This constructor performs no
-    /// validation; an out-of-range descriptor is reported as not open by every operation that takes
-    /// one.
-    pub(crate) const fn from_number_unchecked(number: usize) -> Self {
-        Self(number as u32)
-    }
-
-    /// Returns the descriptor number.
-    pub const fn number(self) -> usize {
-        self.0 as usize
-    }
-}
-
-impl TryFrom<usize> for Fd {
-    type Error = InvalidFd;
-
-    fn try_from(number: usize) -> Result<Self, Self::Error> {
-        if number >= MAX_FD {
-            return Err(InvalidFd(number));
-        }
-        Ok(Self(number as u32))
-    }
-}
-
-/// Errors returned when converting a descriptor number into an [`Fd`].
-///
-/// The number is outside the table, so it names no descriptor at all. Nothing was looked up.
-#[derive(Debug, thiserror::Error)]
-#[error("Descriptor {0} is outside the table")]
-pub struct InvalidFd(usize);
-
 /// Binds the lowest free descriptor number to `device`.
+///
+/// The descriptor starts owning no file, which is the right state for a stream and the starting
+/// state for a path: the C standard library allocates the descriptor first and calls the device's
+/// open second, so [`attach`] completes it afterwards.
 ///
 /// # Errors
 ///
@@ -93,14 +86,14 @@ pub fn open(device: DeviceId) -> Result<Fd, OpenError> {
     }
 
     let mut table = TABLE.lock();
-    let slots = table.slots();
+    let devices = table.devices();
 
-    let Some(number) = slots.iter().position(Option::is_none) else {
+    let Some(number) = devices.iter().position(Option::is_none) else {
         return Err(OpenError::NoDescriptors);
     };
-    slots[number] = Some(device);
+    devices[number] = Some(device);
 
-    // SAFETY: `number` indexes `slots`, so it is below `MAX_FD` by construction.
+    // SAFETY: `number` indexes `devices`, so it is below `MAX_FD` by construction.
     Ok(Fd::from_number_unchecked(number))
 }
 
@@ -122,25 +115,82 @@ pub enum OpenError {
     NoDescriptors,
 }
 
-/// Releases `fd` and runs its device's close.
+/// Gives `fd` the file that will serve it from now on.
 ///
-/// The slot is freed before the device is told, so the device's close runs with the table unlocked
-/// and the descriptor number already reusable. A device that blocks in close therefore cannot hold
-/// up the table.
+/// This is the second half of opening a path: the descriptor already exists, and this is what the
+/// device's open produced for it.
 ///
 /// # Errors
 ///
-/// Returns [`CloseError::BadDescriptor`] when `fd` is not open, or [`CloseError::Device`] when the
-/// device reported a failure. The descriptor is released either way.
+/// Returns [`AttachError::BadDescriptor`] when `fd` is not open, and
+/// [`AttachError::AlreadyAttached`] when it already owns a file. The new file is dropped in either
+/// case, with the table unlocked.
+pub fn attach(fd: Fd, file: Box<dyn File>) -> Result<(), AttachError> {
+    let number = fd.number();
+    if number >= MAX_FD {
+        return Err(AttachError::BadDescriptor);
+    }
+
+    let open_file = Arc::new(OpenFile::new(file));
+    let mut rejected = None;
+
+    // The file is moved into the slot only on the accepting path. On either rejection it stays
+    // owned by this function and is dropped on the way out, with the table lock already gone.
+    {
+        let mut table = TABLE.lock();
+        if table.devices()[number].is_none() {
+            rejected = Some(AttachError::BadDescriptor);
+        } else if table.files()[number].is_some() {
+            rejected = Some(AttachError::AlreadyAttached);
+        } else {
+            table.files()[number] = Some(open_file);
+        }
+    }
+
+    match rejected {
+        Some(err) => Err(err),
+        None => Ok(()),
+    }
+}
+
+/// Errors returned by [`attach`].
+#[derive(Debug, thiserror::Error)]
+pub enum AttachError {
+    /// The descriptor is not open
+    ///
+    /// Occurs when the descriptor was released between being allocated and the device's open
+    /// finishing.
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// The descriptor already owns a file
+    ///
+    /// Occurs when a device's open ran twice for one descriptor, which the C standard library does
+    /// not do. The descriptor keeps the file it had.
+    #[error("Descriptor already holds an open file")]
+    AlreadyAttached,
+}
+
+/// Releases `fd` and closes whatever it held.
+///
+/// The slot is freed before the file is told, so the close runs with the table unlocked and the
+/// descriptor number already reusable. A file that blocks in close therefore cannot hold up the
+/// table.
+///
+/// A stream descriptor owns nothing, so closing one releases nothing and always succeeds.
+///
+/// # Errors
+///
+/// Returns [`CloseError::BadDescriptor`] when `fd` is not open, or [`CloseError::File`] when the
+/// file reported a failure. The descriptor is released either way.
 pub fn close(fd: Fd) -> Result<(), CloseError> {
-    let Some(device) = take(fd) else {
+    let Some((_, file)) = take_entry(fd) else {
         return Err(CloseError::BadDescriptor);
     };
 
-    match registry::get(device) {
-        Some(registered) => registered.close().map_err(CloseError::Device),
-        // The device was unregistered while the descriptor was open; there is nothing to tell.
+    match file {
         None => Ok(()),
+        Some(file) => file.lock().file().close().map_err(CloseError::File),
     }
 }
 
@@ -153,29 +203,30 @@ pub enum CloseError {
     #[error("Descriptor is not open")]
     BadDescriptor,
 
-    /// The device failed to release the descriptor
+    /// The file failed to release what it held
     ///
-    /// The descriptor number is free regardless, so this reports what the device could not finish
+    /// The descriptor number is free regardless, so this reports what the file could not finish
     /// rather than a reason to retry the close.
-    #[error("Device failed to close the descriptor")]
-    Device(#[source] DeviceError),
+    #[error("File failed to close")]
+    File(#[source] DeviceError),
 }
 
-/// Writes `buf` to the device behind `fd`, returning how many bytes it consumed.
+/// Writes `buf` to whatever backs `fd`, returning how many bytes it consumed.
 ///
 /// # Errors
 ///
-/// Returns [`WriteError::BadDescriptor`] when `fd` is not open, [`WriteError::NoDevice`] when its
-/// device is no longer registered, or [`WriteError::Device`] with whatever the device reported.
+/// Returns [`WriteError::BadDescriptor`] when `fd` is not open, [`WriteError::NoDevice`] when a
+/// stream descriptor's device is no longer registered, or [`WriteError::Device`] with whatever the
+/// device or file reported.
 pub fn write(fd: Fd, buf: &[u8]) -> Result<usize, WriteError> {
-    let Some(device) = device_of(fd) else {
-        return Err(WriteError::BadDescriptor);
-    };
-    let Some(registered) = registry::get(device) else {
-        return Err(WriteError::NoDevice);
-    };
-
-    registered.write(buf).map_err(WriteError::Device)
+    match target_of(fd) {
+        None => Err(WriteError::BadDescriptor),
+        Some(Target::File(file)) => file.lock().file().write(buf).map_err(WriteError::Device),
+        Some(Target::Stream(device)) => match registry::get(device) {
+            None => Err(WriteError::NoDevice),
+            Some(registered) => registered.write(buf).map_err(WriteError::Device),
+        },
+    }
 }
 
 /// Errors returned by [`write`].
@@ -189,8 +240,8 @@ pub enum WriteError {
 
     /// The device backing the descriptor is no longer registered
     ///
-    /// Occurs when a device is unregistered while descriptors on it are still open. Nothing was
-    /// written.
+    /// Occurs when a device is unregistered while stream descriptors on it are still open. Nothing
+    /// was written.
     #[error("No device is registered for that descriptor")]
     NoDevice,
 
@@ -199,21 +250,22 @@ pub enum WriteError {
     Device(#[source] DeviceError),
 }
 
-/// Reads from the device behind `fd` into `buf`, returning how many bytes it produced.
+/// Reads from whatever backs `fd` into `buf`, returning how many bytes it produced.
 ///
 /// # Errors
 ///
-/// Returns [`ReadError::BadDescriptor`] when `fd` is not open, [`ReadError::NoDevice`] when its
-/// device is no longer registered, or [`ReadError::Device`] with whatever the device reported.
+/// Returns [`ReadError::BadDescriptor`] when `fd` is not open, [`ReadError::NoDevice`] when a
+/// stream descriptor's device is no longer registered, or [`ReadError::Device`] with whatever the
+/// device or file reported.
 pub fn read(fd: Fd, buf: &mut [u8]) -> Result<usize, ReadError> {
-    let Some(device) = device_of(fd) else {
-        return Err(ReadError::BadDescriptor);
-    };
-    let Some(registered) = registry::get(device) else {
-        return Err(ReadError::NoDevice);
-    };
-
-    registered.read(buf).map_err(ReadError::Device)
+    match target_of(fd) {
+        None => Err(ReadError::BadDescriptor),
+        Some(Target::File(file)) => file.lock().file().read(buf).map_err(ReadError::Device),
+        Some(Target::Stream(device)) => match registry::get(device) {
+            None => Err(ReadError::NoDevice),
+            Some(registered) => registered.read(buf).map_err(ReadError::Device),
+        },
+    }
 }
 
 /// Errors returned by [`read`].
@@ -227,14 +279,149 @@ pub enum ReadError {
 
     /// The device backing the descriptor is no longer registered
     ///
-    /// Occurs when a device is unregistered while descriptors on it are still open. Nothing was
-    /// read.
+    /// Occurs when a device is unregistered while stream descriptors on it are still open. Nothing
+    /// was read.
     #[error("No device is registered for that descriptor")]
     NoDevice,
 
     /// The device could not produce bytes
     #[error("Device failed to read")]
     Device(#[source] DeviceError),
+}
+
+/// Moves the position of the file behind `fd`, returning where it ended up.
+///
+/// # Errors
+///
+/// Returns [`SeekError::BadDescriptor`] when `fd` is not open, [`SeekError::NotAFile`] when it is a
+/// stream, which has no position, or [`SeekError::File`] with whatever the file reported.
+pub fn seek(fd: Fd, pos: SeekFrom) -> Result<u64, SeekError> {
+    match target_of(fd) {
+        None => Err(SeekError::BadDescriptor),
+        Some(Target::Stream(_)) => Err(SeekError::NotAFile),
+        Some(Target::File(file)) => file.lock().file().seek(pos).map_err(SeekError::File),
+    }
+}
+
+/// Errors returned by [`seek`].
+#[derive(Debug, thiserror::Error)]
+pub enum SeekError {
+    /// The descriptor is not open
+    ///
+    /// The position is unchanged.
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// The descriptor owns no file
+    ///
+    /// Occurs on a stream descriptor, which reaches its device directly and has no position to
+    /// move.
+    #[error("Descriptor does not hold a file")]
+    NotAFile,
+
+    /// The file could not move its position
+    #[error("File failed to seek")]
+    File(#[source] DeviceError),
+}
+
+/// Reports what the file behind `fd` is and how large it is.
+///
+/// # Errors
+///
+/// Returns [`MetadataError::BadDescriptor`] when `fd` is not open, [`MetadataError::NotAFile`] when
+/// it is a stream, or [`MetadataError::File`] with whatever the file reported.
+pub fn metadata(fd: Fd) -> Result<Metadata, MetadataError> {
+    match target_of(fd) {
+        None => Err(MetadataError::BadDescriptor),
+        Some(Target::Stream(_)) => Err(MetadataError::NotAFile),
+        Some(Target::File(file)) => file.lock().file().metadata().map_err(MetadataError::File),
+    }
+}
+
+/// Errors returned by [`metadata`].
+#[derive(Debug, thiserror::Error)]
+pub enum MetadataError {
+    /// The descriptor is not open
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// The descriptor owns no file
+    ///
+    /// Occurs on a stream descriptor, which has no entry to report on.
+    #[error("Descriptor does not hold a file")]
+    NotAFile,
+
+    /// The file could not report on itself
+    #[error("File failed to report metadata")]
+    File(#[source] DeviceError),
+}
+
+/// Resizes the file behind `fd` to `len` bytes.
+///
+/// # Errors
+///
+/// Returns [`SetLenError::BadDescriptor`] when `fd` is not open, [`SetLenError::NotAFile`] when it
+/// is a stream, or [`SetLenError::File`] with whatever the file reported.
+pub fn set_len(fd: Fd, len: u64) -> Result<(), SetLenError> {
+    match target_of(fd) {
+        None => Err(SetLenError::BadDescriptor),
+        Some(Target::Stream(_)) => Err(SetLenError::NotAFile),
+        Some(Target::File(file)) => file.lock().file().set_len(len).map_err(SetLenError::File),
+    }
+}
+
+/// Errors returned by [`set_len`].
+#[derive(Debug, thiserror::Error)]
+pub enum SetLenError {
+    /// The descriptor is not open
+    ///
+    /// Nothing was resized.
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// The descriptor owns no file
+    ///
+    /// Occurs on a stream descriptor, which has no length to set.
+    #[error("Descriptor does not hold a file")]
+    NotAFile,
+
+    /// The file could not be resized
+    #[error("File failed to resize")]
+    File(#[source] DeviceError),
+}
+
+/// Commits what has been written to the file behind `fd`.
+///
+/// # Errors
+///
+/// Returns [`SyncError::BadDescriptor`] when `fd` is not open, [`SyncError::NotAFile`] when it is a
+/// stream, or [`SyncError::File`] with whatever the file reported.
+pub fn sync(fd: Fd) -> Result<(), SyncError> {
+    match target_of(fd) {
+        None => Err(SyncError::BadDescriptor),
+        Some(Target::Stream(_)) => Err(SyncError::NotAFile),
+        Some(Target::File(file)) => file.lock().file().sync().map_err(SyncError::File),
+    }
+}
+
+/// Errors returned by [`sync`].
+#[derive(Debug, thiserror::Error)]
+pub enum SyncError {
+    /// The descriptor is not open
+    ///
+    /// Nothing was committed.
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// The descriptor owns no file
+    ///
+    /// Occurs on a stream descriptor, which has nothing of its own to commit.
+    #[error("Descriptor does not hold a file")]
+    NotAFile,
+
+    /// The file could not be committed
+    #[error("File failed to sync")]
+    File(#[source] DeviceError),
 }
 
 /// Returns the device backing `fd`.
@@ -244,26 +431,68 @@ pub fn device_of(fd: Fd) -> Option<DeviceId> {
         return None;
     }
 
-    TABLE.lock().slots()[number]
+    TABLE.lock().devices()[number]
 }
 
 /// Frees `fd`, returning the device it named.
+///
+/// Whatever the descriptor owned is dropped here, with the table already unlocked.
+#[cfg(feature = "ffi")]
 pub(crate) fn take(fd: Fd) -> Option<DeviceId> {
+    take_entry(fd).map(|(device, _)| device)
+}
+
+/// What an operation on a descriptor should call into.
+enum Target {
+    /// The descriptor names a device directly.
+    Stream(DeviceId),
+    /// The descriptor owns an open file.
+    File(Arc<OpenFile>),
+}
+
+/// Resolves `fd` to what backs it, releasing the table lock before the caller uses it.
+///
+/// An open file is handed back as a new handle rather than a reference, so the caller can operate
+/// on it long after the table lock is gone and a concurrent close cannot drop it mid-operation.
+fn target_of(fd: Fd) -> Option<Target> {
     let number = fd.number();
     if number >= MAX_FD {
         return None;
     }
 
-    TABLE.lock().slots()[number].take()
+    let mut table = TABLE.lock();
+    let device = table.devices()[number]?;
+
+    match table.files()[number].as_ref() {
+        Some(file) => Some(Target::File(Arc::clone(file))),
+        None => Some(Target::Stream(device)),
+    }
+}
+
+/// Empties the slot `fd` names, returning the device it named and the file it owned.
+///
+/// Both travel out of the lock, so an open file is dropped by the caller with the table unlocked.
+fn take_entry(fd: Fd) -> Option<(DeviceId, Option<Arc<OpenFile>>)> {
+    let number = fd.number();
+    if number >= MAX_FD {
+        return None;
+    }
+
+    let mut table = TABLE.lock();
+    let device = table.devices()[number].take()?;
+    let file = table.files()[number].take();
+
+    Some((device, file))
 }
 
 /// The descriptor table.
 struct Table {
     mutex: Mutex,
-    slots: UnsafeCell<[Option<DeviceId>; MAX_FD]>,
+    devices: UnsafeCell<[Option<DeviceId>; MAX_FD]>,
+    files: UnsafeCell<[Option<Arc<OpenFile>>; MAX_FD]>,
 }
 
-// SAFETY: every access to `slots` goes through `mutex`, and the table is never moved.
+// SAFETY: every access to `devices` and `files` goes through `mutex`, and the table is never moved.
 unsafe impl Sync for Table {}
 
 impl Table {
@@ -278,10 +507,16 @@ impl Table {
 struct Locked<'a>(&'a Table);
 
 impl Locked<'_> {
-    /// Returns the slots this guard has exclusive access to.
-    fn slots(&mut self) -> &mut [Option<DeviceId>; MAX_FD] {
+    /// Returns the device each descriptor names, where a set entry means the descriptor is open.
+    fn devices(&mut self) -> &mut [Option<DeviceId>; MAX_FD] {
         // SAFETY: holding this guard means the table lock is held, so no other reference exists.
-        unsafe { &mut *self.0.slots.get() }
+        unsafe { &mut *self.0.devices.get() }
+    }
+
+    /// Returns the file each descriptor owns, which is meaningful only where a device is set.
+    fn files(&mut self) -> &mut [Option<Arc<OpenFile>>; MAX_FD] {
+        // SAFETY: holding this guard means the table lock is held, so no other reference exists.
+        unsafe { &mut *self.0.files.get() }
     }
 }
 
