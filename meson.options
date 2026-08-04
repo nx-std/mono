@@ -135,6 +135,16 @@ option(
 )
 
 option(
+    'use_nx_service_fs',
+    # Disabled by default: the override is partial. Rust owns the fsp-srv session,
+    # so libnx's `g_fsSrv` stays zeroed, and the `fs*` commands that are not
+    # redirected below deadlock in `sessionmgrAttachClient` rather than failing.
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-fs (Filesystem service)',
+    yield : true
+)
+
+option(
     'use_nx_service_hid',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-hid (Human Input Device service)',

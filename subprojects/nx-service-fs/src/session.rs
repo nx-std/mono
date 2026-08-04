@@ -38,6 +38,15 @@ impl SessionPool {
         }
     }
 
+    /// The domain every pooled session is a clone of.
+    ///
+    /// All slots address the same server-side object table, so this one stands
+    /// for the pool wherever a single session handle is needed - naming the
+    /// domain to a C caller, for instance.
+    pub(crate) fn primary(&self) -> &Domain {
+        &self.sessions[0]
+    }
+
     pub(crate) fn acquire(&self) -> SessionGuard<'_> {
         let mut guard = self.state.lock();
         guard = self.cv.wait_while(guard, |state| state.free_mask == 0);

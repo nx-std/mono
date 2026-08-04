@@ -10,13 +10,19 @@ use core::sync::atomic::{
 };
 
 use nx_service_sm::SmService;
-use nx_sf::service::{
-    ConvertToDomainError,
-    DispatchError,
-    Domain,
-    DomainObjectRef,
-    Session,
-    clone_current_object,
+use nx_sf::{
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        ConvertToDomainError,
+        DispatchError,
+        Domain,
+        DomainObjectRef,
+        Session,
+        clone_current_object,
+    },
 };
 
 mod cmif;
@@ -50,6 +56,23 @@ unsafe impl Send for FsService {}
 unsafe impl Sync for FsService {}
 
 impl FsService {
+    /// Borrows the handle of the domain every command dispatches on.
+    ///
+    /// The pooled sessions are clones addressing one server-side object table,
+    /// so a single handle names the whole pool.
+    pub fn session_handle(&self) -> nx_sf::service::BorrowedSessionHandle<'_> {
+        self.inner.pool.primary().handle()
+    }
+
+    /// Returns the id the server assigned `fsp-srv` itself when the session was
+    /// converted to a domain.
+    ///
+    /// This is the id requests aimed at `fsp-srv` carry, as opposed to the ones
+    /// aimed at a filesystem, file or directory opened through it.
+    pub fn root_object_id(&self) -> nx_sf::cmif::ObjectId {
+        self.inner.pool.primary().object_id()
+    }
+
     pub fn set_priority(&self, priority: Priority) {
         self.inner
             .priority
@@ -768,6 +791,38 @@ macro_rules! sub_object_impls {
                 let _ = guard.open_object_for_close_unchecked(self.object_id);
             }
         }
+
+        impl<'svc> $ty<'svc> {
+            /// Takes on the close obligation for `object_id`, which the caller
+            /// must not also owe elsewhere.
+            ///
+            /// This is the C-FFI seam: a C caller holds the object id across
+            /// calls, so the wrapper that owes its close is rebuilt for each
+            /// one. Pair every call with [`Self::into_raw_object_id`] unless
+            /// this is the close itself; letting the returned value drop sends
+            /// the close.
+            ///
+            /// `object_id` must name a live object the server issued within
+            /// `service`'s domain. A stale id costs a rejected request; an id
+            /// closed twice tears down whatever the server has since reissued
+            /// it to.
+            pub fn from_raw_object_id_unchecked(service: &'svc FsService, object_id: u32) -> Self {
+                Self {
+                    object_id,
+                    ctx: &service.inner,
+                }
+            }
+
+            /// Gives up the close obligation, returning the raw object id.
+            ///
+            /// The object stays open: the caller now owes its close.
+            pub fn into_raw_object_id(self) -> u32 {
+                // The close is the caller's from here, so `Drop` must not also
+                // send one.
+                let this = core::mem::ManuallyDrop::new(self);
+                this.object_id
+            }
+        }
     };
 }
 
@@ -1372,4 +1427,15 @@ pub enum ConnectCmifError {
     SetCurrentProcess(#[source] DispatchError),
     #[error("failed to clone fsp-srv session for the pool")]
     CloneSession(#[source] nx_sf::service::CloneObjectError),
+}
+
+impl ToResultCode for ConnectCmifError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::GetService(err) => err.to_rc(),
+            Self::ConvertToDomain(err) => err.to_rc(),
+            Self::SetCurrentProcess(err) => err.to_rc(),
+            Self::CloneSession(err) => err.to_rc(),
+        }
+    }
 }

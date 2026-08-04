@@ -23,6 +23,8 @@ service-apm = ["dep:nx-service-apm"]
 # Applet (am) service — gates `services::applet` + `ffi::applet`.
 # Pulls `nx-rt-core/service-applet`: the shared applet manager lives in the core.
 service-applet = ["dep:nx-service-applet", "nx-rt-core/service-applet"]
+# Filesystem (fsp-srv) service — gates `services::fs` + `ffi::fs`.
+service-fs = ["dep:nx-service-fs"]
 # Human Input Device service — gates `services::hid` + `ffi::hid`. Pulls `service-applet` (aruid lookup).
 service-hid = ["dep:nx-service-hid", "service-applet"]
 # NVIDIA driver service — gates `services::nv` + `ffi::nv`. Pulls `service-applet` (aruid lookup).
@@ -43,6 +45,7 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }

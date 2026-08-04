@@ -9,6 +9,7 @@
 #[cfg(any(
     feature = "service-apm",
     feature = "service-applet",
+    feature = "service-fs",
     feature = "service-hid",
     feature = "service-nv",
     feature = "service-set",

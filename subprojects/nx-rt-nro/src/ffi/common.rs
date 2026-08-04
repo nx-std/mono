@@ -17,6 +17,7 @@ pub use nx_rt_core::error::{
 pub use nx_rt_core::ffi::common::GENERIC_ERROR;
 #[cfg(any(
     feature = "service-apm",
+    feature = "service-fs",
     feature = "service-nv",
     feature = "service-set",
     feature = "service-vi",
