@@ -50,6 +50,7 @@ use crate::cmif::ObjectId;
 pub struct Domain {
     handle: OwnedSessionHandle,
     pointer_buffer_size: u16,
+    object_id: ObjectId,
 }
 
 impl Domain {
@@ -60,11 +61,20 @@ impl Domain {
     /// closer for a session something else already owns. The caller must still ensure the
     /// server has converted the session to a domain and that `pointer_buffer_size` reflects
     /// the server's value; a wrong size mis-sizes pointer buffers rather than faulting.
+    ///
+    /// `object_id` is the id the server assigned the original interface when it
+    /// converted the session. Requests aimed at the domain itself carry it, so a
+    /// wrong value reaches the wrong object rather than faulting.
     #[inline]
-    pub fn new_unchecked(handle: OwnedSessionHandle, pointer_buffer_size: u16) -> Self {
+    pub fn new_unchecked(
+        handle: OwnedSessionHandle,
+        pointer_buffer_size: u16,
+        object_id: ObjectId,
+    ) -> Self {
         Self {
             handle,
             pointer_buffer_size,
+            object_id,
         }
     }
 
@@ -77,8 +87,16 @@ impl Domain {
         DomainRef {
             handle: self.handle.as_borrowed(),
             pointer_buffer_size: self.pointer_buffer_size,
+            object_id: self.object_id,
             owner: PhantomData,
         }
+    }
+
+    /// Returns the id the server assigned the interface this domain was
+    /// converted from.
+    #[inline]
+    pub fn object_id(&self) -> ObjectId {
+        self.object_id
     }
 
     /// Transfers the kernel handle out of the `Domain` without closing it.
@@ -142,6 +160,7 @@ impl Domain {
 pub struct DomainRef<'d> {
     handle: BorrowedSessionHandle<'d>,
     pointer_buffer_size: u16,
+    object_id: ObjectId,
     owner: PhantomData<&'d Domain>,
 }
 
@@ -172,10 +191,22 @@ impl<'d> DomainRef<'d> {
         }
     }
 
-    /// Starts a [`DomainDispatch`] builder addressing the domain root itself.
+    /// Starts a [`DomainDispatch`] builder aimed at the domain itself.
+    ///
+    /// The request carries this domain's own object id. Once a session is
+    /// converted, the server expects a domain header on *every* request it
+    /// receives, including the ones aimed at the original interface - sending
+    /// one without is how a converted session starts answering errors.
     #[inline]
     pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
-        DomainDispatch::new(*self, None, request_id)
+        DomainDispatch::new(*self, Some(self.object_id), request_id)
+    }
+
+    /// Returns the id the server assigned the interface this domain was
+    /// converted from.
+    #[inline]
+    pub fn object_id(&self) -> ObjectId {
+        self.object_id
     }
 }
 
