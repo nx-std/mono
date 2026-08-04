@@ -39,7 +39,7 @@ ffi = [
 ]
 
 # High-level features
-services = ["service-apm", "service-applet", "service-hid", "service-nv", "service-sm", "service-set", "service-sfdnsres", "service-time", "service-vi"]
+services = ["service-apm", "service-applet", "service-fs", "service-hid", "service-nv", "service-sm", "service-set", "service-sfdnsres", "service-time", "service-vi"]
 
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
@@ -51,6 +51,7 @@ rt-nro = ["dep:nx-rt-nro", "rt"]
 rt-nso = ["dep:nx-rt-nso", "rt"]
 service-apm = ["dep:nx-service-apm", "nx-rt-nro?/service-apm"]
 service-applet = ["dep:nx-service-applet", "nx-rt-nro?/service-applet"]
+service-fs = ["dep:nx-service-fs", "nx-rt-nro?/service-fs"]
 service-hid = ["dep:nx-service-hid", "nx-rt-nro?/service-hid"]
 service-nv = ["dep:nx-service-nv", "nx-rt-nro?/service-nv"]
 service-set = ["dep:nx-service-set", "nx-rt-nro?/service-set"]
@@ -79,6 +80,7 @@ nx-rt-nro = { version = "0.1.0", path = "../nx-rt-nro", optional = true }
 nx-rt-nso = { version = "0.1.0", path = "../nx-rt-nso", optional = true }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
@@ -99,4 +101,4 @@ nx-wlaninf = { version = "0.1.0", path = "../nx-wlaninf", optional = true }
 
 # Feature-gated, linked via meson for FFI symbol re-export; not `use`d in Rust source.
 [package.metadata.cargo-machete]
-ignored = ["nx-service-nv", "nx-service-vi"]
+ignored = ["nx-service-fs", "nx-service-nv"]

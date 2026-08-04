@@ -15,6 +15,8 @@ pub mod sm;
 pub mod apm;
 #[cfg(feature = "service-applet")]
 pub mod applet;
+#[cfg(feature = "service-fs")]
+pub mod fs;
 #[cfg(feature = "service-hid")]
 pub mod hid;
 #[cfg(feature = "service-nv")]
