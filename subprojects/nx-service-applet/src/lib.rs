@@ -333,6 +333,7 @@ use crate::aruid::Aruid;
 pub mod aruid;
 mod cmif;
 mod common_state;
+pub mod library_applet;
 mod proto;
 pub mod proxy;
 pub mod role;
@@ -345,6 +346,7 @@ pub use self::{
         GetAppletResourceUserIdError,
         GetApplicationFunctionsError,
         GetCommonStateGetterError,
+        GetLibraryAppletLaunchableEventError,
         GetSelfControllerError,
         GetSubInterfaceError,
         GetWindowControllerError,
@@ -362,14 +364,22 @@ pub use self::{
         GetPerformanceModeError,
         ReceiveMessageError,
     },
+    library_applet::{
+        LibraryAppletAccessor,
+        Storage,
+        StorageAccessor,
+    },
     proto::{
         AppletAttribute,
         AppletFocusHandlingMode,
         AppletFocusState,
+        AppletId,
         AppletMessage,
         AppletOperationMode,
         AppletPerformanceMode,
         AppletType,
+        LibraryAppletExitReason,
+        LibraryAppletMode,
         SERVICE_NAME_AE,
         SERVICE_NAME_OE,
     },
@@ -475,6 +485,31 @@ sub_interface_stub! {
     ///
     /// Used by `qlaunch` and similar system applets to spawn/launch applications.
     ApplicationCreator
+}
+
+impl<'d> LibraryAppletCreator<'d> {
+    /// Creates a library applet, returning the accessor that drives it (cmd 0).
+    ///
+    /// The applet is created but not started. Callers must wait on the
+    /// launchable event first; see
+    /// [`library_applet`](crate::library_applet) for the full sequence.
+    #[inline]
+    pub fn create_library_applet(
+        &self,
+        applet_id: AppletId,
+        mode: LibraryAppletMode,
+    ) -> Result<LibraryAppletAccessor<'d>, library_applet::CreateLibraryAppletError> {
+        library_applet::create_library_applet(self.object, applet_id, mode)
+    }
+
+    /// Creates an `IStorage` of `size` bytes (cmd 10).
+    #[inline]
+    pub fn create_storage(
+        &self,
+        size: i64,
+    ) -> Result<Storage<'d>, library_applet::CreateStorageError> {
+        library_applet::create_storage(self.object, size)
+    }
 }
 
 sub_interface_stub! {
@@ -813,6 +848,17 @@ impl<'d> SelfController<'d> {
     #[inline]
     pub fn object_id(&self) -> u32 {
         self.object.object_id().to_raw()
+    }
+
+    /// Gets the event signalled when the system will host a library applet.
+    ///
+    /// Wait on this before creating a library applet; see
+    /// [`library_applet`](crate::library_applet) for the full launch sequence.
+    #[inline]
+    pub fn get_library_applet_launchable_event(
+        &self,
+    ) -> Result<EventHandle, GetLibraryAppletLaunchableEventError> {
+        cmif::get_library_applet_launchable_event(self.object)
     }
 
     /// Sets the focus handling mode.

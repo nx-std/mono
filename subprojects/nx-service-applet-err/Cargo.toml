@@ -1,22 +1,21 @@
 [package]
-name = "nx-service-applet"
+name = "nx-service-applet-err"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_service_applet"
+name = "nx_service_applet_err"
 crate-type = ["rlib"]
 test = false
 doctest = false
 bench = false
 
 [dependencies]
+nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
-nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
-nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
 zerocopy = { workspace = true }
-
