@@ -1,11 +1,11 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{dispatch::dispatch_out_i64, proto, types::DirectoryEntry};
 
 pub(crate) fn read(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     buf: &mut [DirectoryEntry],
 ) -> Result<i64, DispatchError> {
@@ -23,9 +23,6 @@ pub(crate) fn read(
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })
 }
 
-pub(crate) fn get_entry_count(
-    object: &ManuallyDrop<DomainObject<'_>>,
-    ctx: u32,
-) -> Result<i64, DispatchError> {
+pub(crate) fn get_entry_count(object: DomainObjectRef<'_>, ctx: u32) -> Result<i64, DispatchError> {
     dispatch_out_i64(object, proto::DIR_GET_ENTRY_COUNT, ctx)
 }

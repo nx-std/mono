@@ -7,7 +7,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject, OutHandleAttr};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, OutHandleAttr};
 use nx_svc::sync::EventHandle;
 
 use crate::{
@@ -21,35 +21,23 @@ use crate::{
     types::{AppletInfo, Uuid},
 };
 
-//
-// GetRequestState (cmd 0).
-//
-
 /// `GetRequestState` (cmd 0). Returns the raw `u32` state without validating it
 /// against [`crate::proto::NifmRequestState`].
-pub(crate) fn get_request_state_raw(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_request_state_raw(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out::<u32>(object, CMD_REQ_GET_REQUEST_STATE)
 }
-
-//
-// GetResult (cmd 1).
-//
 
 /// `GetResult` (cmd 1). The CMIF result code *is* the Switch-side `Result` value.
 /// Maps `Ok(())` to "request succeeded" and any [`DispatchError`] to libnx's
 /// `nifmGetResult` return code.
-pub(crate) fn get_result(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn get_result(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, CMD_REQ_GET_RESULT)
 }
-
-//
-// GetSystemEventReadableHandles (cmd 2).
-//
 
 /// `GetSystemEventReadableHandles` (cmd 2). Returns two copy-handle slots:
 /// `event_request_state` (server marks autoclear=true) and `event1`.
 pub(crate) fn get_system_event_readable_handles(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<(EventHandle, EventHandle), GetSystemEventHandlesError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -80,35 +68,23 @@ pub enum GetSystemEventHandlesError {
     MissingHandles,
 }
 
-//
-// Cancel / Submit (cmds 3, 4).
-//
-
 /// `Cancel` (cmd 3).
-pub(crate) fn cancel(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn cancel(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, CMD_REQ_CANCEL)
 }
 
 /// `Submit` (cmd 4).
-pub(crate) fn submit(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn submit(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, CMD_REQ_SUBMIT)
 }
 
-//
-// SetNetworkProfileId (cmd 9).
-//
-
 /// `SetNetworkProfileId` (cmd 9).
 pub(crate) fn set_network_profile_id(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     uuid: Uuid,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, CMD_REQ_SET_NETWORK_PROFILE_ID, uuid)
 }
-
-//
-// GetAppletInfo (cmd 21).
-//
 
 /// `GetAppletInfo` (cmd 21). Used by `nifmLaHandleNetworkRequestResult` in libnx.
 ///
@@ -116,7 +92,7 @@ pub(crate) fn set_network_profile_id(
 /// storage data; on success, [`AppletInfo::out_size`] records how many bytes
 /// the server actually wrote.
 pub(crate) fn get_applet_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     theme_color: u32,
     buffer: &mut [u8],
 ) -> Result<AppletInfo, DispatchError> {
@@ -149,26 +125,18 @@ pub(crate) fn get_applet_info(
     })
 }
 
-//
-// SetKeptInSleep (cmd 23, [3.0.0+]).
-//
-
 /// `SetKeptInSleep` (cmd 23). Caller must guard on `[3.0.0+]`.
 pub(crate) fn set_kept_in_sleep(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     flag: bool,
 ) -> Result<(), DispatchError> {
     let raw: u8 = if flag { 1 } else { 0 };
     dispatch_in(object, CMD_REQ_SET_KEPT_IN_SLEEP, raw)
 }
 
-//
-// RegisterSocketDescriptor / UnregisterSocketDescriptor (cmds 24, 25, [3.0.0+]).
-//
-
 /// `RegisterSocketDescriptor` (cmd 24). Caller must guard on `[3.0.0+]`.
 pub(crate) fn register_socket_descriptor(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sockfd: i32,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, CMD_REQ_REGISTER_SOCKET_DESCRIPTOR, sockfd as u32)
@@ -176,7 +144,7 @@ pub(crate) fn register_socket_descriptor(
 
 /// `UnregisterSocketDescriptor` (cmd 25). Caller must guard on `[3.0.0+]`.
 pub(crate) fn unregister_socket_descriptor(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sockfd: i32,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, CMD_REQ_UNREGISTER_SOCKET_DESCRIPTOR, sockfd as u32)

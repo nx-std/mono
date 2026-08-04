@@ -1,11 +1,9 @@
-use core::mem::ManuallyDrop;
-
-use nx_sf::service::{DispatchError, DomainObject, OutHandleAttr};
+use nx_sf::service::{DispatchError, DomainObjectRef, OutHandleAttr};
 
 use crate::proto;
 
 pub(crate) fn get_event_handle(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

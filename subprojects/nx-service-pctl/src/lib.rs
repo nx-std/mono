@@ -26,10 +26,8 @@
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use core::mem::ManuallyDrop;
-
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, DomainObject, Session};
+use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, DomainObjectRef, Session};
 
 mod cmif;
 mod dispatch;
@@ -63,37 +61,37 @@ impl PctlService {
     /// Checks whether parental controls restrictions are temporarily unlocked.
     #[inline]
     pub fn is_restriction_temporary_unlocked(&self) -> Result<bool, DispatchError> {
-        cmif::is_restriction_temporary_unlocked(&self.subobject()).map(|v| v & 1 != 0)
+        cmif::is_restriction_temporary_unlocked(self.subobject()).map(|v| v & 1 != 0)
     }
 
     /// Confirms stereo vision (VR mode) permission. [4.0.0+]
     #[inline]
     pub fn confirm_stereo_vision_permission(&self) -> Result<(), DispatchError> {
-        cmif::confirm_stereo_vision_permission(&self.subobject())
+        cmif::confirm_stereo_vision_permission(self.subobject())
     }
 
     /// Checks whether parental controls are enabled.
     #[inline]
     pub fn is_restriction_enabled(&self) -> Result<bool, DispatchError> {
-        cmif::is_restriction_enabled(&self.subobject()).map(|v| v & 1 != 0)
+        cmif::is_restriction_enabled(self.subobject()).map(|v| v & 1 != 0)
     }
 
     /// Gets the current safety level.
     #[inline]
     pub fn get_safety_level(&self) -> Result<u32, DispatchError> {
-        cmif::get_safety_level(&self.subobject())
+        cmif::get_safety_level(self.subobject())
     }
 
     /// Gets the current restriction settings.
     #[inline]
     pub fn get_current_settings(&self) -> Result<PctlRestrictionSettings, DispatchError> {
-        cmif::get_current_settings(&self.subobject())
+        cmif::get_current_settings(self.subobject())
     }
 
     /// Gets the count of applications that have free communication.
     #[inline]
     pub fn get_free_communication_application_list_count(&self) -> Result<u32, DispatchError> {
-        cmif::get_free_communication_application_list_count(&self.subobject())
+        cmif::get_free_communication_application_list_count(self.subobject())
     }
 
     /// Resets the confirmation done by
@@ -101,19 +99,19 @@ impl PctlService {
     /// [5.0.0+]
     #[inline]
     pub fn reset_confirmed_stereo_vision_permission(&self) -> Result<(), DispatchError> {
-        cmif::reset_confirmed_stereo_vision_permission(&self.subobject())
+        cmif::reset_confirmed_stereo_vision_permission(self.subobject())
     }
 
     /// Checks whether stereo vision (VR mode) is permitted. [5.0.0+]
     #[inline]
     pub fn is_stereo_vision_permitted(&self) -> Result<bool, DispatchError> {
-        cmif::is_stereo_vision_permitted(&self.subobject()).map(|v| v & 1 != 0)
+        cmif::is_stereo_vision_permitted(self.subobject()).map(|v| v & 1 != 0)
     }
 
     /// Checks whether pairing is active.
     #[inline]
     pub fn is_pairing_active(&self) -> Result<bool, DispatchError> {
-        cmif::is_pairing_active(&self.subobject()).map(|v| v & 1 != 0)
+        cmif::is_pairing_active(self.subobject()).map(|v| v & 1 != 0)
     }
 
     /// Gets the synchronization event handle.
@@ -121,7 +119,7 @@ impl PctlService {
     /// The caller is responsible for managing the handle lifetime.
     #[inline]
     pub fn get_synchronization_event(&self) -> Result<u32, GetEventError> {
-        cmif::get_event(&self.subobject(), proto::GET_SYNCHRONIZATION_EVENT)
+        cmif::get_event(self.subobject(), proto::GET_SYNCHRONIZATION_EVENT)
     }
 
     /// Gets the play-timer event handle for requesting suspension.
@@ -130,7 +128,7 @@ impl PctlService {
     #[inline]
     pub fn get_play_timer_event_to_request_suspension(&self) -> Result<u32, GetEventError> {
         cmif::get_event(
-            &self.subobject(),
+            self.subobject(),
             proto::GET_PLAY_TIMER_EVENT_TO_REQUEST_SUSPENSION,
         )
     }
@@ -138,7 +136,7 @@ impl PctlService {
     /// Checks whether the play-timer alarm is disabled. [4.0.0+]
     #[inline]
     pub fn is_play_timer_alarm_disabled(&self) -> Result<bool, DispatchError> {
-        cmif::is_play_timer_alarm_disabled(&self.subobject()).map(|v| v & 1 != 0)
+        cmif::is_play_timer_alarm_disabled(self.subobject()).map(|v| v & 1 != 0)
     }
 
     /// Gets the unlinked event handle.
@@ -146,22 +144,19 @@ impl PctlService {
     /// The caller is responsible for managing the handle lifetime.
     #[inline]
     pub fn get_unlinked_event(&self) -> Result<u32, GetEventError> {
-        cmif::get_event(&self.subobject(), proto::GET_UNLINKED_EVENT)
+        cmif::get_event(self.subobject(), proto::GET_UNLINKED_EVENT)
     }
 
-    /// Borrows the IParentalControlService sub-object without taking
-    /// ownership of its `DomainObject` close-on-drop semantics. The
-    /// underlying server-side object is closed implicitly when the parent
+    /// Addresses the IParentalControlService sub-object. The view closes
+    /// nothing: the server-side object is released implicitly when the parent
     /// `Domain` is dropped.
     #[inline]
-    fn subobject(&self) -> ManuallyDrop<DomainObject<'_>> {
-        // SAFETY: `object_id` was returned by `create_service*` and the
-        // server-side object stays alive for the lifetime of `self.factory`.
-        // `subobject` returns a `ManuallyDrop`, so the per-call view is the
-        // only live `DomainObject` for that id at a time.
-        let object = unsafe { self.factory.open_object_raw(self.object_id) }
-            .expect("PctlService holds a non-zero sub-object id");
-        ManuallyDrop::new(object)
+    fn subobject(&self) -> DomainObjectRef<'_> {
+        // SAFETY: `object_id` was returned by `create_service*` on this same
+        // factory domain, and the server-side object stays alive for the
+        // lifetime of `self.factory`.
+        DomainObjectRef::from_raw_unchecked(self.factory.as_borrowed(), self.object_id)
+            .expect("PctlService holds a non-zero sub-object id")
     }
 }
 
@@ -174,8 +169,8 @@ impl PctlService {
 pub fn connect_cmif_legacy(sm: &SmService) -> Result<PctlService, ConnectCmifError> {
     let factory = connect_factory(sm)?;
 
-    let object_id =
-        cmif::create_service_legacy(&factory).map_err(ConnectCmifError::CreateService)?;
+    let object_id = cmif::create_service_legacy(factory.as_borrowed())
+        .map_err(ConnectCmifError::CreateService)?;
 
     Ok(PctlService { factory, object_id })
 }
@@ -191,11 +186,12 @@ pub fn connect_cmif_legacy(sm: &SmService) -> Result<PctlService, ConnectCmifErr
 pub fn connect_cmif(sm: &SmService) -> Result<PctlService, ConnectCmifError> {
     let factory = connect_factory(sm)?;
 
-    let object_id = cmif::create_service(&factory).map_err(ConnectCmifError::CreateService)?;
+    let object_id =
+        cmif::create_service(factory.as_borrowed()).map_err(ConnectCmifError::CreateService)?;
 
     let pctl = PctlService { factory, object_id };
 
-    cmif::confirm_launch_application_permission(&pctl.subobject())
+    cmif::confirm_launch_application_permission(pctl.subobject())
         .map_err(ConnectCmifError::PostInit)?;
 
     Ok(pctl)

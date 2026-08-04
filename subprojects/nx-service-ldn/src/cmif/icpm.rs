@@ -8,13 +8,13 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, DomainObject};
+use nx_sf::service::{DispatchError, DomainObjectRef};
 
 use crate::proto::CMD_ICPM_REGISTER_CLIENT;
 
 /// `RegisterClient` (cmd 0). Sends `send_pid` + an 8-byte zero payload, per
 /// the libnx `_ldnCmdInitialize` helper.
-pub(crate) fn register_client(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn register_client(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let reserved: u64 = 0;
     // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
     // returns; viewing its bytes as a slice is sound.

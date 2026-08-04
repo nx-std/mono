@@ -7,7 +7,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_no_io, dispatch_out},
@@ -30,13 +30,9 @@ use crate::{
     },
 };
 
-//
-// GetClientId (cmd 1).
-//
-
 /// `GetClientId` (cmd 1). libnx returns `id = 0` on failure; we surface the
 /// dispatch error instead.
-pub(crate) fn get_client_id(object: &DomainObject<'_>) -> Result<NifmClientId, DispatchError> {
+pub(crate) fn get_client_id(object: DomainObjectRef<'_>) -> Result<NifmClientId, DispatchError> {
     let mut out = NifmClientId::default();
     // SAFETY: `out` is a valid `&mut` value; viewing it as a byte slice for
     // the OUT buffer is sound, and the byte slice borrows `out`.
@@ -55,15 +51,11 @@ pub(crate) fn get_client_id(object: &DomainObject<'_>) -> Result<NifmClientId, D
         .map(|_| out)
 }
 
-//
-// CreateRequest (cmd 4).
-//
-
 /// `CreateRequest` (cmd 4). Server-side `s32 = 0x2` selector; returns the
-/// newly-allocated domain sub-object id for the `IRequest`. The freshly
-/// minted `DomainObject` is kept alive via [`ManuallyDrop`] so the pool can
-/// re-open it per request.
-pub(crate) fn create_request(object: &DomainObject<'_>) -> Result<u32, CreateRequestError> {
+/// newly-allocated domain sub-object id for the `IRequest`. The close
+/// obligation is handed on rather than discharged, so the pool can re-address
+/// the id per request.
+pub(crate) fn create_request(object: DomainObjectRef<'_>) -> Result<u32, CreateRequestError> {
     let selector: i32 = 0x2;
     // SAFETY: `selector` is a `Copy` value on the stack, valid until `send()`
     // returns; viewing its bytes as a slice is sound.
@@ -82,9 +74,7 @@ pub(crate) fn create_request(object: &DomainObject<'_>) -> Result<u32, CreateReq
     let new_object = result
         .take_object(0)
         .ok_or(CreateRequestError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(new_object)
-        .object_id()
-        .to_raw())
+    Ok(new_object.into_raw_object_id())
 }
 
 /// Error returned by [`create_request`].
@@ -98,14 +88,10 @@ pub enum CreateRequestError {
     MissingObject,
 }
 
-//
-// GetCurrentNetworkProfile (cmd 5).
-//
-
 /// `GetCurrentNetworkProfile` (cmd 5). Writes to `out` after converting from the
 /// wire-side `Sf` layout.
 pub(crate) fn get_current_network_profile(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     out: &mut NifmNetworkProfileData,
 ) -> Result<(), DispatchError> {
     let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
@@ -130,15 +116,11 @@ pub(crate) fn get_current_network_profile(
     Ok(())
 }
 
-//
-// EnumerateNetworkProfiles (cmd 7).
-//
-
 /// `EnumerateNetworkProfiles` (cmd 7). Returns the total number of profiles the
 /// server reports; the caller's `buffer` is filled with up to `buffer.len()`
 /// entries, each converted from the wire layout in place.
 pub(crate) fn enumerate_network_profiles(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     kind: NifmNetworkProfileType,
     buffer: &mut [NifmNetworkProfileBasicInfo],
 ) -> Result<i32, DispatchError> {
@@ -200,13 +182,9 @@ pub(crate) fn enumerate_network_profiles(
     Ok(total_entries)
 }
 
-//
-// GetNetworkProfile (cmd 8).
-//
-
 /// `GetNetworkProfile` (cmd 8). UUID in by value, profile out via HipcPointer.
 pub(crate) fn get_network_profile(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     uuid: Uuid,
     out: &mut NifmNetworkProfileData,
 ) -> Result<(), DispatchError> {
@@ -237,14 +215,10 @@ pub(crate) fn get_network_profile(
     Ok(())
 }
 
-//
-// SetNetworkProfile (cmd 9).
-//
-
 /// `SetNetworkProfile` (cmd 9). App-layout profile in, UUID out by value.
 /// Only available with `Admin`; the caller decides whether to invoke.
 pub(crate) fn set_network_profile(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     profile: &NifmNetworkProfileData,
 ) -> Result<Uuid, DispatchError> {
     let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
@@ -272,26 +246,18 @@ pub(crate) fn set_network_profile(
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<Uuid>()) })
 }
 
-//
-// GetCurrentIpAddress (cmd 12).
-//
-
 /// `GetCurrentIpAddress` (cmd 12). Returns the IPv4 address as a 4-byte payload.
 pub(crate) fn get_current_ip_address(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<NifmIpV4Address, DispatchError> {
     dispatch_out::<NifmIpV4Address>(object, CMD_IGS_GET_CURRENT_IP_ADDRESS)
 }
-
-//
-// GetCurrentIpConfigInfo (cmd 15).
-//
 
 /// `GetCurrentIpConfigInfo` (cmd 15). libnx fetches a packed
 /// `(IpAddressSetting + DnsSetting)` payload and splits it into five `u32*`
 /// out-parameters; we surface the parsed view as [`IpConfigInfo`].
 pub(crate) fn get_current_ip_config_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<IpConfigInfo, DispatchError> {
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -309,40 +275,28 @@ pub(crate) fn get_current_ip_config_info(
     })
 }
 
-//
-// SetWirelessCommunicationEnabled (cmd 16).
-//
-
 /// `SetWirelessCommunicationEnabled` (cmd 16). libnx restricts this to
 /// `System` / `Admin`; the caller-facing wrapper enforces that, this helper
 /// dispatches unconditionally.
 pub(crate) fn set_wireless_communication_enabled(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     enable: bool,
 ) -> Result<(), DispatchError> {
     let raw: u8 = if enable { 1 } else { 0 };
     dispatch_in(object, CMD_IGS_SET_WIRELESS_COMMUNICATION_ENABLED, raw)
 }
 
-//
-// IsWirelessCommunicationEnabled (cmd 17).
-//
-
 /// `IsWirelessCommunicationEnabled` (cmd 17).
 pub(crate) fn is_wireless_communication_enabled(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<bool, DispatchError> {
     let raw = dispatch_out::<u8>(object, CMD_IGS_IS_WIRELESS_COMMUNICATION_ENABLED)?;
     Ok((raw & 1) != 0)
 }
 
-//
-// GetInternetConnectionStatus (cmd 18).
-//
-
 /// `GetInternetConnectionStatus` (cmd 18).
 pub(crate) fn get_internet_connection_status(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<InternetConnection, GetInternetConnectionStatusError> {
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -380,26 +334,18 @@ pub enum GetInternetConnectionStatusError {
     InvalidStatus(u8),
 }
 
-//
-// IsEthernetCommunicationEnabled (cmd 20).
-//
-
 /// `IsEthernetCommunicationEnabled` (cmd 20).
 pub(crate) fn is_ethernet_communication_enabled(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<bool, DispatchError> {
     let raw = dispatch_out::<u8>(object, CMD_IGS_IS_ETHERNET_COMMUNICATION_ENABLED)?;
     Ok((raw & 1) != 0)
 }
 
-//
-// IsAnyInternetRequestAccepted (cmd 21).
-//
-
 /// `IsAnyInternetRequestAccepted` (cmd 21). libnx returns `false` on dispatch
 /// failure; we surface the dispatch error instead.
 pub(crate) fn is_any_internet_request_accepted(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     id: NifmClientId,
 ) -> Result<bool, DispatchError> {
     // SAFETY: `id` is a `Copy` value on the stack, valid until `send()`
@@ -420,39 +366,27 @@ pub(crate) fn is_any_internet_request_accepted(
     Ok((result.data[0] & 1) != 0)
 }
 
-//
-// IsAnyForegroundRequestAccepted (cmd 22).
-//
-
 /// `IsAnyForegroundRequestAccepted` (cmd 22).
 pub(crate) fn is_any_foreground_request_accepted(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<bool, DispatchError> {
     let raw = dispatch_out::<u8>(object, CMD_IGS_IS_ANY_FOREGROUND_REQUEST_ACCEPTED)?;
     Ok((raw & 1) != 0)
 }
 
-//
-// PutToSleep / WakeUp (cmds 23, 24).
-//
-
 /// `PutToSleep` (cmd 23).
-pub(crate) fn put_to_sleep(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn put_to_sleep(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, CMD_IGS_PUT_TO_SLEEP)
 }
 
 /// `WakeUp` (cmd 24).
-pub(crate) fn wake_up(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn wake_up(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, CMD_IGS_WAKE_UP)
 }
 
-//
-// SetWowlDelayedWakeTime (cmd 43, [9.0.0+]).
-//
-
 /// `SetWowlDelayedWakeTime` (cmd 43). Caller must guard on `[9.0.0+]`.
 pub(crate) fn set_wowl_delayed_wake_time(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     val: i32,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, CMD_IGS_SET_WOWL_DELAYED_WAKE_TIME, val as u32)

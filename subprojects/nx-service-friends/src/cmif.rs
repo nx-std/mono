@@ -1,8 +1,8 @@
 //! CMIF protocol operations for the friends service.
 
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, DomainRef};
 
 use crate::{
     proto,
@@ -12,11 +12,11 @@ use crate::{
 /// Creates an IFriendService sub-object via domain dispatch (cmd 0).
 ///
 /// Returns the raw sub-object ID for the new `IFriendService` domain object.
-/// The freshly-minted [`DomainObject`] is wrapped in [`ManuallyDrop`] so the
-/// server-side object outlives this call — the pool-acquired slot re-opens
-/// the same id per request via [`Domain::open_object_raw`]. The kernel-side
-/// object is reclaimed when the pool's domain sessions close.
-pub(crate) fn create_friend_service(domain: &Domain) -> Result<u32, CreateFriendServiceError> {
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
+pub(crate) fn create_friend_service(
+    domain: DomainRef<'_>,
+) -> Result<u32, CreateFriendServiceError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -28,14 +28,14 @@ pub(crate) fn create_friend_service(domain: &Domain) -> Result<u32, CreateFriend
     let object = result
         .take_object(0)
         .ok_or(CreateFriendServiceError::MissingObject)?;
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Gets the user setting for the given account UID (cmd 20800).
 ///
 /// The output is written into `out` via a fixed-size HipcPointer buffer.
 pub(crate) fn get_user_setting(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     uid: AccountUid,
     out: &mut FriendsUserSetting,
 ) -> Result<(), DispatchError> {

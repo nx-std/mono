@@ -63,7 +63,8 @@ use alloc::{boxed::Box, vec::Vec};
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
-    ConvertToDomainError, Domain, DomainObject, OwnedSessionHandle, Session, clone_current_object,
+    ConvertToDomainError, Domain, DomainObjectRef, DomainRef, OwnedSessionHandle, Session,
+    clone_current_object,
 };
 
 mod cmif;
@@ -94,10 +95,6 @@ pub use crate::{
         SERVICE_NAME_USER,
     },
 };
-
-//
-// `LdnService` — `ldn:u` / `ldn:s`
-//
 
 /// Connected `ldn:u` / `ldn:s` LocalCommunicationService.
 ///
@@ -136,14 +133,15 @@ impl LdnService {
     /// Acquires a pool slot, opens a `DomainObject` view onto the LCS
     /// sub-object on that slot, runs `f`, then releases the slot.
     #[inline]
-    fn dispatch_lcs<R>(&self, f: impl FnOnce(&DomainObject<'_>) -> R) -> R {
+    fn dispatch_lcs<R>(&self, f: impl FnOnce(DomainObjectRef<'_>) -> R) -> R {
         let g = self.pool.acquire();
         // SAFETY: `lcs_object_id` was returned by the server within the pool's
         // domain table; the pool guard makes this slot exclusive, so no other
         // live `DomainObject` addresses the same id concurrently.
-        let obj = unsafe { g.open_object_raw(self.lcs_object_id) }
+        let obj = g
+            .open_object_unchecked(self.lcs_object_id)
             .expect("lcs object id validated at connect_cmif");
-        f(&obj)
+        f(obj)
     }
 
     /// Dispatches on the ICPM sub-object. Returns `Err` if the caller never
@@ -151,27 +149,24 @@ impl LdnService {
     #[inline]
     fn dispatch_icpm<R>(
         &self,
-        f: impl FnOnce(&DomainObject<'_>) -> R,
+        f: impl FnOnce(DomainObjectRef<'_>) -> R,
     ) -> Result<R, IcpmNotOpenedError> {
         let object_id = self.icpm_object_id.ok_or(IcpmNotOpenedError)?;
         let g = self.pool.acquire();
         // SAFETY: `object_id` was returned by the server within the pool's
         // domain table; the pool guard makes this slot exclusive.
-        let obj = unsafe { g.open_object_raw(object_id) }
+        let obj = g
+            .open_object_unchecked(object_id)
             .expect("icpm object id validated at open_client_process_monitor");
-        Ok(f(&obj))
+        Ok(f(obj))
     }
 
     /// Dispatches on the *creator* domain root via a pool slot.
     #[inline]
-    fn dispatch_creator<R>(&self, f: impl FnOnce(&Domain) -> R) -> R {
+    fn dispatch_creator<R>(&self, f: impl FnOnce(DomainRef<'_>) -> R) -> R {
         let g = self.pool.acquire();
         f(g.domain())
     }
-
-    //
-    // Initialize / Finalize variants — caller picks per hosversion.
-    //
 
     /// `Initialize` (cmd 400) — pre-`[7.0.0]` path. `send_pid` + zero payload.
     pub fn lcs_initialize_legacy(&self) -> Result<(), DispatchError> {
@@ -205,10 +200,6 @@ impl LdnService {
     pub fn lcs_finalize(&self) -> Result<(), DispatchError> {
         self.dispatch_lcs(lcs::finalize)
     }
-
-    //
-    // Read commands.
-    //
 
     /// `GetState` (cmd 0).
     pub fn get_state(&self) -> Result<LdnState, LcsGetStateError> {
@@ -281,10 +272,6 @@ impl LdnService {
     ) -> Result<i32, DispatchError> {
         self.dispatch_lcs(|obj| lcs::scan_private(obj, channel, filter, out))
     }
-
-    //
-    // Write commands.
-    //
 
     /// `SetWirelessControllerRestriction` (cmd 104, `[5.0.0+]`).
     pub fn set_wireless_controller_restriction(
@@ -433,10 +420,6 @@ impl LdnService {
         self.dispatch_lcs(|obj| lcs::set_operation_mode(obj, kind, mode))
     }
 
-    //
-    // `[18.0.0+]` ActionFrame family.
-    //
-
     /// `EnableActionFrame` (cmd 500).
     pub fn enable_action_frame(
         &self,
@@ -516,10 +499,6 @@ impl LdnService {
         self.dispatch_lcs(lcs::reset_tx_power)
     }
 
-    //
-    // `IClientProcessMonitor` (`[18.0.0+]`).
-    //
-
     /// Opens the `IClientProcessMonitor` sub-object via creator-cmd-1.
     /// Caller must be on `[18.0.0+]`.
     pub fn open_client_process_monitor(&mut self) -> Result<(), OpenClientProcessMonitorError> {
@@ -575,8 +554,8 @@ pub fn connect_cmif(sm: &SmService, kind: LdnServiceType) -> Result<LdnService, 
 
     // 5. CreateUser/SystemLocalCommService (creator cmd 0) — dispatched on
     //    the root domain handle of slot 0.
-    let lcs_object_id =
-        creator::create_service_domain(&sessions[0]).map_err(ConnectCmifError::CreateService)?;
+    let lcs_object_id = creator::create_service_domain(sessions[0].as_borrowed())
+        .map_err(ConnectCmifError::CreateService)?;
 
     let pool = SessionPool::new(sessions.into_boxed_slice() as Box<[Domain]>);
 
@@ -638,10 +617,6 @@ pub enum IcpmCallError {
 /// Marker error returned by [`LdnService::dispatch_icpm`] when the caller
 /// hasn't opened the ICPM sub-object yet.
 struct IcpmNotOpenedError;
-
-//
-// `LdnMonitorService` — `ldn:m`
-//
 
 /// Connected `ldn:m` IMonitorService (read-only state monitor).
 ///

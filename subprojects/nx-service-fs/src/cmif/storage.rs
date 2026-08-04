@@ -1,6 +1,6 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out_i64},
@@ -13,7 +13,7 @@ fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
 }
 
 pub(crate) fn read(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     offset: i64,
     buf: &mut [u8],
@@ -38,7 +38,7 @@ pub(crate) fn read(
 }
 
 pub(crate) fn write(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     offset: i64,
     buf: &[u8],
@@ -62,30 +62,24 @@ pub(crate) fn write(
         .map(|_| ())
 }
 
-pub(crate) fn flush(
-    object: &ManuallyDrop<DomainObject<'_>>,
-    ctx: u32,
-) -> Result<(), DispatchError> {
+pub(crate) fn flush(object: DomainObjectRef<'_>, ctx: u32) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::STORAGE_FLUSH, ctx)
 }
 
 pub(crate) fn set_size(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     size: i64,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::STORAGE_SET_SIZE, ctx, size)
 }
 
-pub(crate) fn get_size(
-    object: &ManuallyDrop<DomainObject<'_>>,
-    ctx: u32,
-) -> Result<i64, DispatchError> {
+pub(crate) fn get_size(object: DomainObjectRef<'_>, ctx: u32) -> Result<i64, DispatchError> {
     dispatch_out_i64(object, proto::STORAGE_GET_SIZE, ctx)
 }
 
 pub(crate) fn operate_range(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     op_id: u32,
     off: i64,

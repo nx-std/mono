@@ -24,7 +24,7 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, Session};
+use nx_sf::service::{ConvertToDomainError, Domain, DomainObjectRef, Session};
 
 mod cmif;
 mod dispatch;
@@ -60,19 +60,15 @@ pub const DEFAULT_MCU_VERSION_DATA: [NfcRequiredMcuVersionData; 2] = [
     },
 ];
 
-// ===========================================================================
-// NFP Service (nfp:user / nfp:dbg / nfp:sys)
-// ===========================================================================
-
 /// Connected NFP (amiibo) service wrapper.
 ///
 /// The service operates in domain mode; the interface sub-object is created
 /// during [`connect_nfp_cmif`] and initialized with PID + ARUID + MCU version
 /// data.
 pub struct NfpService {
-    interface: DomainObject<'static>,
-    #[allow(dead_code)] // keeps the domain session alive for `interface`
     domain: Domain,
+    /// Object id of the interface sub-object inside `domain`.
+    interface_id: u32,
 }
 
 // SAFETY: all operations go through the kernel which serializes
@@ -81,26 +77,39 @@ unsafe impl Send for NfpService {}
 unsafe impl Sync for NfpService {}
 
 impl NfpService {
-    // --- Device management ---
+    /// Addresses the interface sub-object inside the service's domain.
+    ///
+    /// Built on demand rather than stored: a stored view would have to name a
+    /// lifetime that borrows the `domain` field beside it, which a struct
+    /// cannot express. The view closes nothing, so the sub-object outlives
+    /// every call made through it and `Drop` finalizes it exactly once.
+    #[inline]
+    fn interface(&self) -> DomainObjectRef<'_> {
+        // SAFETY: `interface_id` was returned by `create_interface` on this
+        // same domain at connect time and is closed only in `Drop`, so it
+        // names a live server-side object for as long as `self` exists.
+        DomainObjectRef::from_raw_unchecked(self.domain.as_borrowed(), self.interface_id)
+            .expect("interface object id is non-zero once stored")
+    }
 
     /// Lists connected NFC devices.
     ///
     /// Writes device handles into `out` and returns the number written.
     #[inline]
     pub fn list_devices(&self, out: &mut [NfcDeviceHandle]) -> Result<i32, DispatchError> {
-        cmif::nfp::list_devices(&self.interface, out)
+        cmif::nfp::list_devices(self.interface(), out)
     }
 
     /// Starts NFC tag detection on the given device.
     #[inline]
     pub fn start_detection(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::start_detection(&self.interface, handle)
+        cmif::nfp::start_detection(self.interface(), handle)
     }
 
     /// Stops NFC tag detection on the given device.
     #[inline]
     pub fn stop_detection(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::stop_detection(&self.interface, handle)
+        cmif::nfp::stop_detection(self.interface(), handle)
     }
 
     /// Mounts the amiibo tag for access.
@@ -112,7 +121,7 @@ impl NfpService {
         mount_target: NfpMountTarget,
     ) -> Result<(), DispatchError> {
         cmif::nfp::mount(
-            &self.interface,
+            self.interface(),
             handle,
             device_type as u32,
             mount_target.bits(),
@@ -122,10 +131,8 @@ impl NfpService {
     /// Unmounts the amiibo tag.
     #[inline]
     pub fn unmount(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::unmount(&self.interface, handle)
+        cmif::nfp::unmount(self.interface(), handle)
     }
-
-    // --- Application area ---
 
     /// Opens the application area for the mounted amiibo.
     #[inline]
@@ -134,7 +141,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         app_id: u32,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::open_application_area(&self.interface, handle, app_id)
+        cmif::nfp::open_application_area(self.interface(), handle, app_id)
     }
 
     /// Reads from the application area.
@@ -146,7 +153,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         buf: &mut [u8],
     ) -> Result<u32, DispatchError> {
-        cmif::nfp::get_application_area(&self.interface, handle, buf)
+        cmif::nfp::get_application_area(self.interface(), handle, buf)
     }
 
     /// Writes to the application area.
@@ -156,19 +163,19 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         buf: &[u8],
     ) -> Result<(), DispatchError> {
-        cmif::nfp::set_application_area(&self.interface, handle, buf)
+        cmif::nfp::set_application_area(self.interface(), handle, buf)
     }
 
     /// Flushes pending writes to the amiibo.
     #[inline]
     pub fn flush(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::flush(&self.interface, handle)
+        cmif::nfp::flush(self.interface(), handle)
     }
 
     /// Restores the amiibo to its last saved state.
     #[inline]
     pub fn restore(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::restore(&self.interface, handle)
+        cmif::nfp::restore(self.interface(), handle)
     }
 
     /// Creates a new application area on the amiibo.
@@ -179,7 +186,7 @@ impl NfpService {
         app_id: u32,
         buf: &[u8],
     ) -> Result<(), DispatchError> {
-        cmif::nfp::create_application_area(&self.interface, handle, app_id, buf)
+        cmif::nfp::create_application_area(self.interface(), handle, app_id, buf)
     }
 
     /// Recreates the application area on the amiibo. [3.0.0+]
@@ -190,7 +197,7 @@ impl NfpService {
         app_id: u32,
         buf: &[u8],
     ) -> Result<(), DispatchError> {
-        cmif::nfp::recreate_application_area(&self.interface, handle, app_id, buf)
+        cmif::nfp::recreate_application_area(self.interface(), handle, app_id, buf)
     }
 
     /// Gets the application area size.
@@ -199,10 +206,8 @@ impl NfpService {
         &self,
         handle: &NfcDeviceHandle,
     ) -> Result<u32, DispatchError> {
-        cmif::nfp::get_application_area_size(&self.interface, handle)
+        cmif::nfp::get_application_area_size(self.interface(), handle)
     }
-
-    // --- Tag / info queries ---
 
     /// Gets tag info for the detected tag.
     #[inline]
@@ -211,7 +216,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpTagInfo,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_tag_info(&self.interface, handle, out)
+        cmif::nfp::get_tag_info(self.interface(), handle, out)
     }
 
     /// Gets register info (requires Ram mount).
@@ -221,7 +226,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpRegisterInfo,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_register_info(&self.interface, handle, out)
+        cmif::nfp::get_register_info(self.interface(), handle, out)
     }
 
     /// Gets common info (requires Ram mount).
@@ -231,7 +236,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpCommonInfo,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_common_info(&self.interface, handle, out)
+        cmif::nfp::get_common_info(self.interface(), handle, out)
     }
 
     /// Gets model info (requires Rom mount).
@@ -241,55 +246,49 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpModelInfo,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_model_info(&self.interface, handle, out)
+        cmif::nfp::get_model_info(self.interface(), handle, out)
     }
-
-    // --- Events ---
 
     /// Attaches to the activate event for a device (returns raw handle).
     #[inline]
     pub fn attach_activate_event(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfp::attach_activate_event(&self.interface, handle)
+        cmif::nfp::attach_activate_event(self.interface(), handle)
     }
 
     /// Attaches to the deactivate event for a device (returns raw handle).
     #[inline]
     pub fn attach_deactivate_event(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfp::attach_deactivate_event(&self.interface, handle)
+        cmif::nfp::attach_deactivate_event(self.interface(), handle)
     }
 
     /// Attaches to the availability change event (returns raw handle). [3.0.0+]
     #[inline]
     pub fn attach_availability_change_event(&self) -> Result<u32, DispatchError> {
-        cmif::nfp::attach_availability_change_event(&self.interface)
+        cmif::nfp::attach_availability_change_event(self.interface())
     }
-
-    // --- State ---
 
     /// Gets the service state.
     #[inline]
     pub fn get_state(&self) -> Result<u32, DispatchError> {
-        cmif::nfp::get_state(&self.interface)
+        cmif::nfp::get_state(self.interface())
     }
 
     /// Gets the device state for a handle.
     #[inline]
     pub fn get_device_state(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfp::get_device_state(&self.interface, handle)
+        cmif::nfp::get_device_state(self.interface(), handle)
     }
 
     /// Gets the NpadId for a device handle.
     #[inline]
     pub fn get_npad_id(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfp::get_npad_id(&self.interface, handle)
+        cmif::nfp::get_npad_id(self.interface(), handle)
     }
-
-    // --- System/debug-only commands ---
 
     /// Formats the amiibo tag (not available for User service type).
     #[inline]
     pub fn format(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::format(&self.interface, handle)
+        cmif::nfp::format(self.interface(), handle)
     }
 
     /// Gets admin info (not available for User service type).
@@ -299,7 +298,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpAdminInfo,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_admin_info(&self.interface, handle, out)
+        cmif::nfp::get_admin_info(self.interface(), handle, out)
     }
 
     /// Gets register info private (not available for User service type).
@@ -309,7 +308,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpRegisterInfoPrivate,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_register_info_private(&self.interface, handle, out)
+        cmif::nfp::get_register_info_private(self.interface(), handle, out)
     }
 
     /// Sets register info private (not available for User service type).
@@ -319,28 +318,26 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         info: &NfpRegisterInfoPrivate,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::set_register_info_private(&self.interface, handle, info)
+        cmif::nfp::set_register_info_private(self.interface(), handle, info)
     }
 
     /// Deletes register info (not available for User service type).
     #[inline]
     pub fn delete_register_info(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::delete_register_info(&self.interface, handle)
+        cmif::nfp::delete_register_info(self.interface(), handle)
     }
 
     /// Deletes the application area (not available for User service type).
     #[inline]
     pub fn delete_application_area(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::delete_application_area(&self.interface, handle)
+        cmif::nfp::delete_application_area(self.interface(), handle)
     }
 
     /// Checks if an application area exists (not available for User service type).
     #[inline]
     pub fn exists_application_area(&self, handle: &NfcDeviceHandle) -> Result<bool, DispatchError> {
-        cmif::nfp::exists_application_area(&self.interface, handle)
+        cmif::nfp::exists_application_area(self.interface(), handle)
     }
-
-    // --- Debug-only commands ---
 
     /// Gets all amiibo data (debug service type only).
     #[inline]
@@ -349,19 +346,19 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         out: &mut NfpData,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::get_all(&self.interface, handle, out)
+        cmif::nfp::get_all(self.interface(), handle, out)
     }
 
     /// Sets all amiibo data (debug service type only).
     #[inline]
     pub fn set_all(&self, handle: &NfcDeviceHandle, data: &NfpData) -> Result<(), DispatchError> {
-        cmif::nfp::set_all(&self.interface, handle, data)
+        cmif::nfp::set_all(self.interface(), handle, data)
     }
 
     /// Flushes in debug mode (debug service type only).
     #[inline]
     pub fn flush_debug(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfp::flush_debug(&self.interface, handle)
+        cmif::nfp::flush_debug(self.interface(), handle)
     }
 
     /// Breaks the tag (debug service type only).
@@ -371,7 +368,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         break_type: NfpBreakType,
     ) -> Result<(), DispatchError> {
-        cmif::nfp::break_tag(&self.interface, handle, break_type as u32)
+        cmif::nfp::break_tag(self.interface(), handle, break_type as u32)
     }
 
     /// Reads backup data (debug service type only).
@@ -383,7 +380,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         buf: &mut [u8],
     ) -> Result<u32, DispatchError> {
-        cmif::nfp::read_backup_data(&self.interface, handle, buf)
+        cmif::nfp::read_backup_data(self.interface(), handle, buf)
     }
 
     /// Writes backup data (debug service type only).
@@ -393,7 +390,7 @@ impl NfpService {
         handle: &NfcDeviceHandle,
         buf: &[u8],
     ) -> Result<(), DispatchError> {
-        cmif::nfp::write_backup_data(&self.interface, handle, buf)
+        cmif::nfp::write_backup_data(self.interface(), handle, buf)
     }
 
     /// Writes NTF data (debug service type only).
@@ -404,28 +401,24 @@ impl NfpService {
         write_type: u32,
         buf: &[u8],
     ) -> Result<(), DispatchError> {
-        cmif::nfp::write_ntf(&self.interface, handle, write_type, buf)
+        cmif::nfp::write_ntf(self.interface(), handle, write_type, buf)
     }
 }
 
 impl Drop for NfpService {
     fn drop(&mut self) {
-        let _ = cmif::nfp::finalize(&self.interface);
+        let _ = cmif::nfp::finalize(self.interface());
     }
 }
-
-// ===========================================================================
-// NFC Service (nfc:user / nfc:sys)
-// ===========================================================================
 
 /// Connected NFC service wrapper.
 ///
 /// The NFC service has two command ID layouts: pre-4.0.0 (legacy) and 4.0.0+.
 /// Per IC-4, both are exposed as separate methods and the caller selects.
 pub struct NfcService {
-    interface: DomainObject<'static>,
-    #[allow(dead_code)] // keeps the domain session alive for `interface`
     domain: Domain,
+    /// Object id of the interface sub-object inside `domain`.
+    interface_id: u32,
     legacy: bool,
 }
 
@@ -435,52 +428,61 @@ unsafe impl Send for NfcService {}
 unsafe impl Sync for NfcService {}
 
 impl NfcService {
-    // --- State queries (pre-4.0.0) ---
+    /// Addresses the interface sub-object inside the service's domain.
+    ///
+    /// Built on demand rather than stored: a stored view would have to name a
+    /// lifetime that borrows the `domain` field beside it, which a struct
+    /// cannot express. The view closes nothing, so the sub-object outlives
+    /// every call made through it and `Drop` finalizes it exactly once.
+    #[inline]
+    fn interface(&self) -> DomainObjectRef<'_> {
+        // SAFETY: `interface_id` was returned by `create_interface` on this
+        // same domain at connect time and is closed only in `Drop`, so it
+        // names a live server-side object for as long as `self` exists.
+        DomainObjectRef::from_raw_unchecked(self.domain.as_borrowed(), self.interface_id)
+            .expect("interface object id is non-zero once stored")
+    }
 
     /// Gets the service state (pre-4.0.0).
     #[inline]
     pub fn get_state_legacy(&self) -> Result<u32, DispatchError> {
-        cmif::nfc::get_state_legacy(&self.interface)
+        cmif::nfc::get_state_legacy(self.interface())
     }
 
     /// Checks if NFC is enabled (pre-4.0.0).
     #[inline]
     pub fn is_nfc_enabled_legacy(&self) -> Result<bool, DispatchError> {
-        cmif::nfc::is_nfc_enabled_legacy(&self.interface)
+        cmif::nfc::is_nfc_enabled_legacy(self.interface())
     }
-
-    // --- State queries (4.0.0+) ---
 
     /// Gets the service state (4.0.0+).
     #[inline]
     pub fn get_state(&self) -> Result<u32, DispatchError> {
-        cmif::nfc::get_state(&self.interface)
+        cmif::nfc::get_state(self.interface())
     }
 
     /// Checks if NFC is enabled (4.0.0+).
     #[inline]
     pub fn is_nfc_enabled(&self) -> Result<bool, DispatchError> {
-        cmif::nfc::is_nfc_enabled(&self.interface)
+        cmif::nfc::is_nfc_enabled(self.interface())
     }
-
-    // --- Device management (4.0.0+) ---
 
     /// Lists connected NFC devices (4.0.0+).
     #[inline]
     pub fn list_devices(&self, out: &mut [NfcDeviceHandle]) -> Result<i32, DispatchError> {
-        cmif::nfc::list_devices(&self.interface, out)
+        cmif::nfc::list_devices(self.interface(), out)
     }
 
     /// Gets the device state for a handle (4.0.0+).
     #[inline]
     pub fn get_device_state(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfc::get_device_state(&self.interface, handle)
+        cmif::nfc::get_device_state(self.interface(), handle)
     }
 
     /// Gets the NpadId for a device handle (4.0.0+).
     #[inline]
     pub fn get_npad_id(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfc::get_npad_id(&self.interface, handle)
+        cmif::nfc::get_npad_id(self.interface(), handle)
     }
 
     /// Starts NFC tag detection with protocol filter (4.0.0+).
@@ -490,13 +492,13 @@ impl NfcService {
         handle: &NfcDeviceHandle,
         protocol: NfcProtocol,
     ) -> Result<(), DispatchError> {
-        cmif::nfc::start_detection(&self.interface, handle, protocol.bits())
+        cmif::nfc::start_detection(self.interface(), handle, protocol.bits())
     }
 
     /// Stops NFC tag detection (4.0.0+).
     #[inline]
     pub fn stop_detection(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfc::stop_detection(&self.interface, handle)
+        cmif::nfc::stop_detection(self.interface(), handle)
     }
 
     /// Gets tag info for the detected tag (4.0.0+).
@@ -506,30 +508,26 @@ impl NfcService {
         handle: &NfcDeviceHandle,
         out: &mut NfcTagInfo,
     ) -> Result<(), DispatchError> {
-        cmif::nfc::get_tag_info(&self.interface, handle, out)
+        cmif::nfc::get_tag_info(self.interface(), handle, out)
     }
-
-    // --- Events (4.0.0+) ---
 
     /// Attaches to the activate event (4.0.0+, returns raw handle).
     #[inline]
     pub fn attach_activate_event(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfc::attach_activate_event(&self.interface, handle)
+        cmif::nfc::attach_activate_event(self.interface(), handle)
     }
 
     /// Attaches to the deactivate event (4.0.0+, returns raw handle).
     #[inline]
     pub fn attach_deactivate_event(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::nfc::attach_deactivate_event(&self.interface, handle)
+        cmif::nfc::attach_deactivate_event(self.interface(), handle)
     }
 
     /// Attaches to the availability change event (4.0.0+, returns raw handle).
     #[inline]
     pub fn attach_availability_change_event(&self) -> Result<u32, DispatchError> {
-        cmif::nfc::attach_availability_change_event(&self.interface)
+        cmif::nfc::attach_availability_change_event(self.interface())
     }
-
-    // --- Mifare commands (4.0.0+) ---
 
     /// Reads Mifare blocks (4.0.0+).
     #[inline]
@@ -540,7 +538,7 @@ impl NfcService {
         read_block_parameter: &[NfcMifareReadBlockParameter],
     ) -> Result<(), DispatchError> {
         cmif::nfc::read_mifare(
-            &self.interface,
+            self.interface(),
             handle,
             out_block_data,
             read_block_parameter,
@@ -554,10 +552,8 @@ impl NfcService {
         handle: &NfcDeviceHandle,
         write_block_parameter: &[NfcMifareWriteBlockParameter],
     ) -> Result<(), DispatchError> {
-        cmif::nfc::write_mifare(&self.interface, handle, write_block_parameter)
+        cmif::nfc::write_mifare(self.interface(), handle, write_block_parameter)
     }
-
-    // --- Pass-through commands (4.0.0+) ---
 
     /// Sends a raw command via pass-through (4.0.0+).
     ///
@@ -571,7 +567,7 @@ impl NfcService {
         reply_buf: &mut [u8],
     ) -> Result<u32, DispatchError> {
         cmif::nfc::send_command_by_pass_through(
-            &self.interface,
+            self.interface(),
             handle,
             timeout,
             cmd_buf,
@@ -582,7 +578,7 @@ impl NfcService {
     /// Keeps the pass-through session alive (4.0.0+).
     #[inline]
     pub fn keep_pass_through_session(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::nfc::keep_pass_through_session(&self.interface, handle)
+        cmif::nfc::keep_pass_through_session(self.interface(), handle)
     }
 
     /// Releases the pass-through session (4.0.0+).
@@ -591,29 +587,25 @@ impl NfcService {
         &self,
         handle: &NfcDeviceHandle,
     ) -> Result<(), DispatchError> {
-        cmif::nfc::release_pass_through_session(&self.interface, handle)
+        cmif::nfc::release_pass_through_session(self.interface(), handle)
     }
 }
 
 impl Drop for NfcService {
     fn drop(&mut self) {
         let _ = if self.legacy {
-            cmif::nfc::finalize_legacy(&self.interface)
+            cmif::nfc::finalize_legacy(self.interface())
         } else {
-            cmif::nfc::finalize(&self.interface)
+            cmif::nfc::finalize(self.interface())
         };
     }
 }
 
-// ===========================================================================
-// NFC Mifare Service (nfc:mf:u)
-// ===========================================================================
-
 /// Connected NFC Mifare service wrapper.
 pub struct NfcMifareService {
-    interface: DomainObject<'static>,
-    #[allow(dead_code)] // keeps the domain session alive for `interface`
     domain: Domain,
+    /// Object id of the interface sub-object inside `domain`.
+    interface_id: u32,
 }
 
 // SAFETY: all operations go through the kernel which serializes
@@ -622,22 +614,37 @@ unsafe impl Send for NfcMifareService {}
 unsafe impl Sync for NfcMifareService {}
 
 impl NfcMifareService {
+    /// Addresses the interface sub-object inside the service's domain.
+    ///
+    /// Built on demand rather than stored: a stored view would have to name a
+    /// lifetime that borrows the `domain` field beside it, which a struct
+    /// cannot express. The view closes nothing, so the sub-object outlives
+    /// every call made through it and `Drop` finalizes it exactly once.
+    #[inline]
+    fn interface(&self) -> DomainObjectRef<'_> {
+        // SAFETY: `interface_id` was returned by `create_interface` on this
+        // same domain at connect time and is closed only in `Drop`, so it
+        // names a live server-side object for as long as `self` exists.
+        DomainObjectRef::from_raw_unchecked(self.domain.as_borrowed(), self.interface_id)
+            .expect("interface object id is non-zero once stored")
+    }
+
     /// Lists connected NFC devices.
     #[inline]
     pub fn list_devices(&self, out: &mut [NfcDeviceHandle]) -> Result<i32, DispatchError> {
-        cmif::mifare::list_devices(&self.interface, out)
+        cmif::mifare::list_devices(self.interface(), out)
     }
 
     /// Starts NFC tag detection.
     #[inline]
     pub fn start_detection(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::mifare::start_detection(&self.interface, handle)
+        cmif::mifare::start_detection(self.interface(), handle)
     }
 
     /// Stops NFC tag detection.
     #[inline]
     pub fn stop_detection(&self, handle: &NfcDeviceHandle) -> Result<(), DispatchError> {
-        cmif::mifare::stop_detection(&self.interface, handle)
+        cmif::mifare::stop_detection(self.interface(), handle)
     }
 
     /// Reads Mifare blocks.
@@ -649,7 +656,7 @@ impl NfcMifareService {
         read_block_parameter: &[NfcMifareReadBlockParameter],
     ) -> Result<(), DispatchError> {
         cmif::mifare::read_mifare(
-            &self.interface,
+            self.interface(),
             handle,
             out_block_data,
             read_block_parameter,
@@ -663,7 +670,7 @@ impl NfcMifareService {
         handle: &NfcDeviceHandle,
         write_block_parameter: &[NfcMifareWriteBlockParameter],
     ) -> Result<(), DispatchError> {
-        cmif::mifare::write_mifare(&self.interface, handle, write_block_parameter)
+        cmif::mifare::write_mifare(self.interface(), handle, write_block_parameter)
     }
 
     /// Gets tag info.
@@ -673,55 +680,51 @@ impl NfcMifareService {
         handle: &NfcDeviceHandle,
         out: &mut NfcTagInfo,
     ) -> Result<(), DispatchError> {
-        cmif::mifare::get_tag_info(&self.interface, handle, out)
+        cmif::mifare::get_tag_info(self.interface(), handle, out)
     }
 
     /// Attaches to the activate event (returns raw handle).
     #[inline]
     pub fn attach_activate_event(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::mifare::attach_activate_event(&self.interface, handle)
+        cmif::mifare::attach_activate_event(self.interface(), handle)
     }
 
     /// Attaches to the deactivate event (returns raw handle).
     #[inline]
     pub fn attach_deactivate_event(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::mifare::attach_deactivate_event(&self.interface, handle)
+        cmif::mifare::attach_deactivate_event(self.interface(), handle)
     }
 
     /// Gets the service state.
     #[inline]
     pub fn get_state(&self) -> Result<u32, DispatchError> {
-        cmif::mifare::get_state(&self.interface)
+        cmif::mifare::get_state(self.interface())
     }
 
     /// Gets the device state.
     #[inline]
     pub fn get_device_state(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::mifare::get_device_state(&self.interface, handle)
+        cmif::mifare::get_device_state(self.interface(), handle)
     }
 
     /// Gets the NpadId for a device handle.
     #[inline]
     pub fn get_npad_id(&self, handle: &NfcDeviceHandle) -> Result<u32, DispatchError> {
-        cmif::mifare::get_npad_id(&self.interface, handle)
+        cmif::mifare::get_npad_id(self.interface(), handle)
     }
 
     /// Attaches to the availability change event (returns raw handle).
     #[inline]
     pub fn attach_availability_change_event(&self) -> Result<u32, DispatchError> {
-        cmif::mifare::attach_availability_change_event(&self.interface)
+        cmif::mifare::attach_availability_change_event(self.interface())
     }
 }
 
 impl Drop for NfcMifareService {
     fn drop(&mut self) {
-        let _ = cmif::mifare::finalize(&self.interface);
+        let _ = cmif::mifare::finalize(self.interface());
     }
 }
-
-// ===========================================================================
-// Connect functions
-// ===========================================================================
 
 /// Connects to an NFP service (amiibo).
 ///
@@ -748,23 +751,21 @@ pub fn connect_nfp_cmif(
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectNfpCmifError::ConvertToDomain(err))?;
 
-    let raw_object_id =
-        cmif::nfp::create_interface(&domain).map_err(ConnectNfpCmifError::CreateInterface)?;
+    let raw_object_id = cmif::nfp::create_interface(domain.as_borrowed())
+        .map_err(ConnectNfpCmifError::CreateInterface)?;
 
     // SAFETY: `raw_object_id` was just returned by `cmif::nfp::create_interface`
-    // on this same domain; no other `DomainObject` references it.
-    let interface = unsafe { domain.open_object_raw(raw_object_id) }
+    // on this same domain, so it names a live server-side object inside it.
+    let interface = DomainObjectRef::from_raw_unchecked(domain.as_borrowed(), raw_object_id)
         .ok_or(ConnectNfpCmifError::MissingInterface)?;
 
-    // SAFETY: the `DomainObject` borrows from `domain` which is stored alongside
-    // it in `NfpService`. The domain is never moved out or dropped before the
-    // interface because `Drop` finalizes the interface first.
-    let interface: DomainObject<'static> = unsafe { core::mem::transmute(interface) };
-
-    cmif::nfp::initialize(&interface, aruid, version_data)
+    cmif::nfp::initialize(interface, aruid, version_data)
         .map_err(ConnectNfpCmifError::Initialize)?;
 
-    Ok(NfpService { interface, domain })
+    Ok(NfpService {
+        domain,
+        interface_id: raw_object_id,
+    })
 }
 
 /// Errors returned by [`connect_nfp_cmif`].
@@ -808,27 +809,24 @@ pub fn connect_nfc_cmif(
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectNfcCmifError::ConvertToDomain(err))?;
 
-    let raw_object_id =
-        cmif::nfc::create_interface(&domain).map_err(ConnectNfcCmifError::CreateInterface)?;
+    let raw_object_id = cmif::nfc::create_interface(domain.as_borrowed())
+        .map_err(ConnectNfcCmifError::CreateInterface)?;
 
     // SAFETY: `raw_object_id` was just returned by `cmif::nfc::create_interface`
-    // on this same domain; no other `DomainObject` references it.
-    let interface = unsafe { domain.open_object_raw(raw_object_id) }
+    // on this same domain, so it names a live server-side object inside it.
+    let interface = DomainObjectRef::from_raw_unchecked(domain.as_borrowed(), raw_object_id)
         .ok_or(ConnectNfcCmifError::MissingInterface)?;
 
-    // SAFETY: same justification as NfpService above.
-    let interface: DomainObject<'static> = unsafe { core::mem::transmute(interface) };
-
     let init_result = if legacy {
-        cmif::nfc::initialize_legacy(&interface, aruid, version_data)
+        cmif::nfc::initialize_legacy(interface, aruid, version_data)
     } else {
-        cmif::nfc::initialize(&interface, aruid, version_data)
+        cmif::nfc::initialize(interface, aruid, version_data)
     };
     init_result.map_err(ConnectNfcCmifError::Initialize)?;
 
     Ok(NfcService {
-        interface,
         domain,
+        interface_id: raw_object_id,
         legacy,
     })
 }
@@ -863,21 +861,21 @@ pub fn connect_mifare_cmif(
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectMifareCmifError::ConvertToDomain(err))?;
 
-    let raw_object_id =
-        cmif::mifare::create_interface(&domain).map_err(ConnectMifareCmifError::CreateInterface)?;
+    let raw_object_id = cmif::mifare::create_interface(domain.as_borrowed())
+        .map_err(ConnectMifareCmifError::CreateInterface)?;
 
     // SAFETY: `raw_object_id` was just returned by `cmif::mifare::create_interface`
-    // on this same domain; no other `DomainObject` references it.
-    let interface = unsafe { domain.open_object_raw(raw_object_id) }
+    // on this same domain, so it names a live server-side object inside it.
+    let interface = DomainObjectRef::from_raw_unchecked(domain.as_borrowed(), raw_object_id)
         .ok_or(ConnectMifareCmifError::MissingInterface)?;
 
-    // SAFETY: same justification as NfpService above.
-    let interface: DomainObject<'static> = unsafe { core::mem::transmute(interface) };
-
-    cmif::mifare::initialize(&interface, aruid, version_data)
+    cmif::mifare::initialize(interface, aruid, version_data)
         .map_err(ConnectMifareCmifError::Initialize)?;
 
-    Ok(NfcMifareService { interface, domain })
+    Ok(NfcMifareService {
+        domain,
+        interface_id: raw_object_id,
+    })
 }
 
 /// Errors returned by [`connect_mifare_cmif`].

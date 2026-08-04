@@ -8,7 +8,7 @@ use core::{mem::size_of, ptr};
 
 use nx_sf::{
     error::{GENERIC_ERROR, ToResultCode},
-    service::{DispatchError, DomainObject, OutHandleAttr},
+    service::{DispatchError, DomainObjectRef, OutHandleAttr},
 };
 use nx_svc::{error::ResultCode, sync::EventHandle};
 
@@ -29,7 +29,7 @@ use crate::proto::{
 /// the handle is signaled and a message has been received, callers MUST reset
 /// the signal manually (e.g. via [`nx_svc::sync::reset_signal`]) or subsequent
 /// waits will return immediately and busy-loop.
-pub fn get_event_handle(csg: &DomainObject<'_>) -> Result<EventHandle, GetEventHandleError> {
+pub fn get_event_handle(csg: DomainObjectRef<'_>) -> Result<EventHandle, GetEventHandleError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = csg
@@ -72,7 +72,7 @@ impl ToResultCode for GetEventHandleError {
 ///
 /// Returns `Ok(None)` if no message is pending (error 0x680).
 pub fn receive_message(
-    csg: &DomainObject<'_>,
+    csg: DomainObjectRef<'_>,
 ) -> Result<Option<AppletMessage>, ReceiveMessageError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -131,7 +131,7 @@ impl ToResultCode for ReceiveMessageError {
 
 /// Gets the current operation mode from ICommonStateGetter.
 pub fn get_operation_mode(
-    csg: &DomainObject<'_>,
+    csg: DomainObjectRef<'_>,
 ) -> Result<AppletOperationMode, GetOperationModeError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -176,7 +176,7 @@ impl ToResultCode for GetOperationModeError {
 
 /// Gets the current performance mode from ICommonStateGetter.
 pub fn get_performance_mode(
-    csg: &DomainObject<'_>,
+    csg: DomainObjectRef<'_>,
 ) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -222,7 +222,7 @@ impl ToResultCode for GetPerformanceModeError {
 
 /// Gets the current focus state from ICommonStateGetter.
 pub fn get_current_focus_state(
-    csg: &DomainObject<'_>,
+    csg: DomainObjectRef<'_>,
 ) -> Result<AppletFocusState, GetCurrentFocusStateError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 

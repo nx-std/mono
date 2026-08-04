@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_in_out, dispatch_out},
@@ -14,9 +14,9 @@ use crate::{
 };
 
 /// CreateInterface — returns a domain sub-object ID. The freshly minted
-/// `DomainObject` is wrapped in `ManuallyDrop` so the server-side object
-/// outlives this call; the service wrapper re-opens it per request.
-pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
+pub(crate) fn create_interface(domain: DomainRef<'_>) -> Result<u32, CreateInterfaceError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -28,7 +28,7 @@ pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceEr
     let object = result
         .take_object(0)
         .ok_or(CreateInterfaceError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Error returned by [`create_interface`].
@@ -42,7 +42,7 @@ pub enum CreateInterfaceError {
 
 /// Initialize.
 pub(crate) fn initialize(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     aruid: u64,
     version_data: &[NfcRequiredMcuVersionData],
 ) -> Result<(), DispatchError> {
@@ -72,7 +72,7 @@ pub(crate) fn initialize(
 }
 
 /// Finalize.
-pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn finalize(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
@@ -83,7 +83,7 @@ pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
 
 /// ListDevices.
 pub(crate) fn list_devices(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     out: &mut [NfcDeviceHandle],
 ) -> Result<i32, DispatchError> {
     // SAFETY: `out` is a valid `&mut` slice; viewing it as bytes for the
@@ -109,7 +109,7 @@ pub(crate) fn list_devices(
 
 /// StartDetection.
 pub(crate) fn start_detection(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::MF_START_DETECTION, *handle)
@@ -117,7 +117,7 @@ pub(crate) fn start_detection(
 
 /// StopDetection.
 pub(crate) fn stop_detection(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::MF_STOP_DETECTION, *handle)
@@ -125,7 +125,7 @@ pub(crate) fn stop_detection(
 
 /// ReadMifare.
 pub(crate) fn read_mifare(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out_block_data: &mut [NfcMifareReadBlockData],
     read_block_parameter: &[NfcMifareReadBlockParameter],
@@ -167,7 +167,7 @@ pub(crate) fn read_mifare(
 
 /// WriteMifare.
 pub(crate) fn write_mifare(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     write_block_parameter: &[NfcMifareWriteBlockParameter],
 ) -> Result<(), DispatchError> {
@@ -199,7 +199,7 @@ pub(crate) fn write_mifare(
 
 /// GetTagInfo.
 pub(crate) fn get_tag_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfcTagInfo,
 ) -> Result<(), DispatchError> {
@@ -234,7 +234,7 @@ pub(crate) fn get_tag_info(
 
 /// AttachActivateEvent.
 pub(crate) fn attach_activate_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `*handle` is a `Copy` value on the stack, valid until
@@ -257,7 +257,7 @@ pub(crate) fn attach_activate_event(
 
 /// AttachDeactivateEvent.
 pub(crate) fn attach_deactivate_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `*handle` is a `Copy` value on the stack, valid until
@@ -280,7 +280,7 @@ pub(crate) fn attach_deactivate_event(
 
 /// AttachAvailabilityChangeEvent.
 pub(crate) fn attach_availability_change_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -292,13 +292,13 @@ pub(crate) fn attach_availability_change_event(
 }
 
 /// GetState.
-pub(crate) fn get_state(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_state(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::MF_GET_STATE)
 }
 
 /// GetDeviceState.
 pub(crate) fn get_device_state(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::MF_GET_DEVICE_STATE, *handle)
@@ -306,7 +306,7 @@ pub(crate) fn get_device_state(
 
 /// GetNpadId.
 pub(crate) fn get_npad_id(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::MF_GET_NPAD_ID, *handle)

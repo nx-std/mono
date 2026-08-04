@@ -7,7 +7,7 @@ use core::mem::size_of;
 use nx_sf::{
     cmif::ParseError,
     error::{GENERIC_ERROR, ToResultCode},
-    service::{BufferAttr, ConvertToDomainError, DispatchError, Domain, DomainObject},
+    service::{BufferAttr, ConvertToDomainError, DispatchError, DomainObjectRef, DomainRef},
 };
 use nx_svc::{error::ResultCode, process::Handle as ProcessHandle, thread};
 
@@ -15,7 +15,7 @@ use crate::{
     AppletCommonFunctions, AppletProxyService, ApplicationCreator, ApplicationFunctions,
     AudioController, CommonStateGetter, DebugFunctions, DisplayController, GlobalStateController,
     HomeMenuFunctions, LibraryAppletCreator, LibraryAppletSelfAccessor, ProcessWindingController,
-    SelfController, WindowController, alias_domain,
+    SelfController, WindowController,
     aruid::Aruid,
     proto::{
         AppletAttribute, AppletFocusHandlingMode, AppletType, CMD_AF_NOTIFY_RUNNING,
@@ -62,12 +62,12 @@ const AM_BUSY_DEFAULT_MAX_RETRIES: u32 = 100;
 /// from a prior process. Mirroring libnx `_appletInitialize`, this function
 /// retries up to [`AM_BUSY_DEFAULT_MAX_RETRIES`] times with a 100ms delay between
 /// attempts, returning [`OpenProxyError::Timeout`] if AM is still busy after that.
-pub fn open_proxy(
-    domain: &Domain,
+pub fn open_proxy<'d>(
+    domain: DomainRef<'d>,
     applet_type: AppletType,
     process_handle: ProcessHandle,
     attr: Option<&AppletAttribute>,
-) -> Result<AppletProxyService, OpenProxyError> {
+) -> Result<AppletProxyService<'d>, OpenProxyError> {
     // Determine command ID based on applet type
     let cmd_id = match applet_type {
         AppletType::Application => CMD_OPEN_APPLICATION_PROXY,
@@ -132,19 +132,18 @@ pub fn open_proxy(
         }
     };
 
-    // Extract the proxy domain object id; keep it alive via `ManuallyDrop`
-    // so the server-side object outlives this call and the proxy wrapper
-    // can re-open it through `alias_domain`.
+    // The proxy object outlives this call: its close obligation is handed to
+    // the root `AppletService`, whose `Drop` closes the session and lets the
+    // server cascade object-close on its side.
     let object = result.take_object(0).ok_or(OpenProxyError::MissingObject)?;
-    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
+    let object_id = object.into_raw_object_id();
 
-    // Build the proxy wrapper. The domain alias shares the parent's kernel
-    // handle and the close-on-drop is suppressed; the root [`AppletService`]
-    // closes the kernel handle once on its own [`Drop`].
-    Ok(AppletProxyService {
-        domain: alias_domain(domain),
-        object_id,
-    })
+    // SAFETY: `object_id` was just emitted by the server for an object inside
+    // `domain`, so it names a live one.
+    Ok(AppletProxyService::new(
+        DomainObjectRef::from_raw_unchecked(domain, object_id)
+            .ok_or(OpenProxyError::MissingObject)?,
+    ))
 }
 
 /// Error returned by [`open_proxy`].
@@ -176,9 +175,9 @@ impl ToResultCode for OpenProxyError {
 }
 
 /// Gets the ICommonStateGetter sub-interface from the proxy.
-pub fn get_common_state_getter(
-    proxy: &DomainObject<'_>,
-) -> Result<CommonStateGetter, GetCommonStateGetterError> {
+pub fn get_common_state_getter<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<CommonStateGetter<'d>, GetCommonStateGetterError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = proxy
@@ -190,12 +189,14 @@ pub fn get_common_state_getter(
     let object = result
         .take_object(0)
         .ok_or(GetCommonStateGetterError::MissingObject)?;
-    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
+    let object_id = object.into_raw_object_id();
 
-    Ok(CommonStateGetter {
-        domain: alias_domain(proxy.domain()),
-        object_id,
-    })
+    // SAFETY: `object_id` was just emitted by the server for an object
+    // inside this proxy's domain, so it names a live one.
+    Ok(CommonStateGetter::new(
+        DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+            .expect("server-emitted object id is non-zero"),
+    ))
 }
 
 /// Error returned by [`get_common_state_getter`].
@@ -221,9 +222,9 @@ impl ToResultCode for GetCommonStateGetterError {
 }
 
 /// Gets the ISelfController sub-interface from the proxy.
-pub fn get_self_controller(
-    proxy: &DomainObject<'_>,
-) -> Result<SelfController, GetSelfControllerError> {
+pub fn get_self_controller<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<SelfController<'d>, GetSelfControllerError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = proxy
@@ -235,12 +236,14 @@ pub fn get_self_controller(
     let object = result
         .take_object(0)
         .ok_or(GetSelfControllerError::MissingObject)?;
-    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
+    let object_id = object.into_raw_object_id();
 
-    Ok(SelfController {
-        domain: alias_domain(proxy.domain()),
-        object_id,
-    })
+    // SAFETY: `object_id` was just emitted by the server for an object
+    // inside this proxy's domain, so it names a live one.
+    Ok(SelfController::new(
+        DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+            .expect("server-emitted object id is non-zero"),
+    ))
 }
 
 /// Error returned by [`get_self_controller`].
@@ -266,9 +269,9 @@ impl ToResultCode for GetSelfControllerError {
 }
 
 /// Gets the IWindowController sub-interface from the proxy.
-pub fn get_window_controller(
-    proxy: &DomainObject<'_>,
-) -> Result<WindowController, GetWindowControllerError> {
+pub fn get_window_controller<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<WindowController<'d>, GetWindowControllerError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = proxy
@@ -280,12 +283,14 @@ pub fn get_window_controller(
     let object = result
         .take_object(0)
         .ok_or(GetWindowControllerError::MissingObject)?;
-    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
+    let object_id = object.into_raw_object_id();
 
-    Ok(WindowController {
-        domain: alias_domain(proxy.domain()),
-        object_id,
-    })
+    // SAFETY: `object_id` was just emitted by the server for an object
+    // inside this proxy's domain, so it names a live one.
+    Ok(WindowController::new(
+        DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+            .expect("server-emitted object id is non-zero"),
+    ))
 }
 
 /// Error returned by [`get_window_controller`].
@@ -312,7 +317,7 @@ impl ToResultCode for GetWindowControllerError {
 
 /// Acquires foreground rights via IWindowController.
 pub fn acquire_foreground_rights(
-    window_controller: &DomainObject<'_>,
+    window_controller: DomainObjectRef<'_>,
 ) -> Result<(), AcquireForegroundRightsError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -359,7 +364,7 @@ impl ToResultCode for AcquireForegroundRightsError {
 /// fail. The runtime targets modern HOS so this is unconditional here. Callers that
 /// must support <2.0.0 should call cmd 13 and cmd 16 separately and gate the latter.
 pub fn set_focus_handling_mode(
-    self_controller: &DomainObject<'_>,
+    self_controller: DomainObjectRef<'_>,
     mode: AppletFocusHandlingMode,
 ) -> Result<(), SetFocusHandlingModeError> {
     // Translate the high-level mode into the four-flag representation libnx uses.
@@ -417,7 +422,7 @@ impl ToResultCode for SetFocusHandlingModeError {
 
 /// Sets whether to suspend when out of focus (ISelfController, 2.0.0+).
 pub fn set_out_of_focus_suspending_enabled(
-    self_controller: &DomainObject<'_>,
+    self_controller: DomainObjectRef<'_>,
     enabled: bool,
 ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
     let input: u8 = enabled as u8;
@@ -474,7 +479,7 @@ impl ToResultCode for ConnectError {
 /// When enabled, the applet receives `OperationModeChanged` messages
 /// when the console transitions between handheld and docked modes.
 pub fn set_operation_mode_changed_notification(
-    self_controller: &DomainObject<'_>,
+    self_controller: DomainObjectRef<'_>,
     enabled: bool,
 ) -> Result<(), SetOperationModeChangedNotificationError> {
     let input: u8 = enabled as u8;
@@ -511,7 +516,7 @@ impl ToResultCode for SetOperationModeChangedNotificationError {
 /// When enabled, the applet receives `PerformanceModeChanged` messages
 /// when CPU/GPU clock speeds change.
 pub fn set_performance_mode_changed_notification(
-    self_controller: &DomainObject<'_>,
+    self_controller: DomainObjectRef<'_>,
     enabled: bool,
 ) -> Result<(), SetPerformanceModeChangedNotificationError> {
     let input: u8 = enabled as u8;
@@ -550,7 +555,7 @@ impl ToResultCode for SetPerformanceModeChangedNotificationError {
 ///
 /// Returns `Ok(None)` if the system returns ARUID 0 (invalid).
 pub fn get_applet_resource_user_id(
-    window_controller: &DomainObject<'_>,
+    window_controller: DomainObjectRef<'_>,
 ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -593,9 +598,9 @@ impl ToResultCode for GetAppletResourceUserIdError {
 }
 
 /// Gets the IApplicationFunctions sub-interface from the proxy (Application type only).
-pub fn get_application_functions(
-    proxy: &DomainObject<'_>,
-) -> Result<ApplicationFunctions, GetApplicationFunctionsError> {
+pub fn get_application_functions<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<ApplicationFunctions<'d>, GetApplicationFunctionsError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = proxy
@@ -607,12 +612,14 @@ pub fn get_application_functions(
     let object = result
         .take_object(0)
         .ok_or(GetApplicationFunctionsError::MissingObject)?;
-    let object_id = core::mem::ManuallyDrop::new(object).object_id().to_raw();
+    let object_id = object.into_raw_object_id();
 
-    Ok(ApplicationFunctions {
-        domain: alias_domain(proxy.domain()),
-        object_id,
-    })
+    // SAFETY: `object_id` was just emitted by the server for an object
+    // inside this proxy's domain, so it names a live one.
+    Ok(ApplicationFunctions::new(
+        DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+            .expect("server-emitted object id is non-zero"),
+    ))
 }
 
 /// Error returned by [`get_application_functions`].
@@ -641,7 +648,7 @@ impl ToResultCode for GetApplicationFunctionsError {
 ///
 /// This should be called after waiting for InFocus state, acquiring foreground rights,
 /// and setting up focus handling mode.
-pub fn notify_running(app_funcs: &DomainObject<'_>) -> Result<bool, NotifyRunningError> {
+pub fn notify_running(app_funcs: DomainObjectRef<'_>) -> Result<bool, NotifyRunningError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = app_funcs
@@ -683,7 +690,7 @@ impl ToResultCode for NotifyRunningError {
 
 /// Creates a managed display layer (ISelfController, cmd 40).
 pub fn create_managed_display_layer(
-    self_controller: &DomainObject<'_>,
+    self_controller: DomainObjectRef<'_>,
 ) -> Result<u64, CreateManagedDisplayLayerError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -753,11 +760,11 @@ impl ToResultCode for GetSubInterfaceError {
 }
 
 /// Generic helper: dispatches `cmd_id` and returns the raw object id.
-/// The freshly-minted `DomainObject` is wrapped in `ManuallyDrop` so the
-/// server-side object outlives this call; the caller re-opens the id via
-/// the long-lived parent domain.
+///
+/// The close obligation is handed on rather than discharged: the sub-object
+/// lives as long as the root domain, which releases it on its own close.
 fn get_sub_interface_object_id(
-    proxy: &DomainObject<'_>,
+    proxy: DomainObjectRef<'_>,
     cmd_id: u32,
 ) -> Result<u32, GetSubInterfaceError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -771,91 +778,107 @@ fn get_sub_interface_object_id(
     let object = result
         .take_object(0)
         .ok_or(GetSubInterfaceError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Gets IAudioController (cmd 3).
-pub fn get_audio_controller(
-    proxy: &DomainObject<'_>,
-) -> Result<AudioController, GetSubInterfaceError> {
-    get_sub_interface_object_id(proxy, CMD_GET_AUDIO_CONTROLLER).map(|object_id| AudioController {
-        domain: alias_domain(proxy.domain()),
-        object_id,
+pub fn get_audio_controller<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<AudioController<'d>, GetSubInterfaceError> {
+    get_sub_interface_object_id(proxy, CMD_GET_AUDIO_CONTROLLER).map(|object_id| {
+        AudioController::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IDisplayController (cmd 4).
-pub fn get_display_controller(
-    proxy: &DomainObject<'_>,
-) -> Result<DisplayController, GetSubInterfaceError> {
+pub fn get_display_controller<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<DisplayController<'d>, GetSubInterfaceError> {
     get_sub_interface_object_id(proxy, CMD_GET_DISPLAY_CONTROLLER).map(|object_id| {
-        DisplayController {
-            domain: alias_domain(proxy.domain()),
-            object_id,
-        }
+        DisplayController::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IProcessWindingController (cmd 10, LibraryApplet only).
-pub fn get_process_winding_controller(
-    proxy: &DomainObject<'_>,
-) -> Result<ProcessWindingController, GetSubInterfaceError> {
+pub fn get_process_winding_controller<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<ProcessWindingController<'d>, GetSubInterfaceError> {
     get_sub_interface_object_id(proxy, CMD_GET_PROCESS_WINDING_CONTROLLER).map(|object_id| {
-        ProcessWindingController {
-            domain: alias_domain(proxy.domain()),
-            object_id,
-        }
+        ProcessWindingController::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets ILibraryAppletCreator (cmd 11).
-pub fn get_library_applet_creator(
-    proxy: &DomainObject<'_>,
-) -> Result<LibraryAppletCreator, GetSubInterfaceError> {
+pub fn get_library_applet_creator<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<LibraryAppletCreator<'d>, GetSubInterfaceError> {
     get_sub_interface_object_id(proxy, CMD_GET_LIBRARY_APPLET_CREATOR).map(|object_id| {
-        LibraryAppletCreator {
-            domain: alias_domain(proxy.domain()),
-            object_id,
-        }
+        LibraryAppletCreator::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets ILibraryAppletSelfAccessor (cmd 20, LibraryApplet pre-15.0.0).
-pub fn get_library_applet_self_accessor(
-    proxy: &DomainObject<'_>,
-) -> Result<LibraryAppletSelfAccessor, GetSubInterfaceError> {
+pub fn get_library_applet_self_accessor<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<LibraryAppletSelfAccessor<'d>, GetSubInterfaceError> {
     get_sub_interface_object_id(proxy, CMD_GET_FUNCTIONS_OR_SELF_ACCESSOR).map(|object_id| {
-        LibraryAppletSelfAccessor {
-            domain: alias_domain(proxy.domain()),
-            object_id,
-        }
+        LibraryAppletSelfAccessor::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IAppletCommonFunctions (cmd 21 for non-SystemApplet, cmd 23 for SystemApplet).
 ///
 /// HOS 7.0.0+. Returns `MissingObject` when called for an unsupported applet type.
-pub fn get_applet_common_functions(
-    proxy: &DomainObject<'_>,
+pub fn get_applet_common_functions<'d>(
+    proxy: DomainObjectRef<'d>,
     applet_type: AppletType,
-) -> Result<AppletCommonFunctions, GetSubInterfaceError> {
+) -> Result<AppletCommonFunctions<'d>, GetSubInterfaceError> {
     let cmd_id = match applet_type {
         AppletType::SystemApplet => CMD_GET_APPLET_COMMON_FUNCTIONS_SYSTEM,
         AppletType::LibraryApplet | AppletType::OverlayApplet => CMD_GET_APPLET_COMMON_FUNCTIONS,
         _ => return Err(GetSubInterfaceError::MissingObject),
     };
-    get_sub_interface_object_id(proxy, cmd_id).map(|object_id| AppletCommonFunctions {
-        domain: alias_domain(proxy.domain()),
-        object_id,
+    get_sub_interface_object_id(proxy, cmd_id).map(|object_id| {
+        AppletCommonFunctions::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IGlobalStateController (cmd 21 for SystemApplet, cmd 23 for
 /// LibraryApplet/OverlayApplet on HOS 15.0.0+).
-pub fn get_global_state_controller(
-    proxy: &DomainObject<'_>,
+pub fn get_global_state_controller<'d>(
+    proxy: DomainObjectRef<'d>,
     applet_type: AppletType,
-) -> Result<GlobalStateController, GetSubInterfaceError> {
+) -> Result<GlobalStateController<'d>, GetSubInterfaceError> {
     let cmd_id = match applet_type {
         AppletType::SystemApplet => CMD_GET_APPLET_COMMON_FUNCTIONS,
         AppletType::LibraryApplet | AppletType::OverlayApplet => {
@@ -863,42 +886,54 @@ pub fn get_global_state_controller(
         }
         _ => return Err(GetSubInterfaceError::MissingObject),
     };
-    get_sub_interface_object_id(proxy, cmd_id).map(|object_id| GlobalStateController {
-        domain: alias_domain(proxy.domain()),
-        object_id,
+    get_sub_interface_object_id(proxy, cmd_id).map(|object_id| {
+        GlobalStateController::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IApplicationCreator (cmd 22, SystemApplet only).
-pub fn get_application_creator(
-    proxy: &DomainObject<'_>,
-) -> Result<ApplicationCreator, GetSubInterfaceError> {
+pub fn get_application_creator<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<ApplicationCreator<'d>, GetSubInterfaceError> {
     get_sub_interface_object_id(proxy, CMD_GET_APPLICATION_CREATOR).map(|object_id| {
-        ApplicationCreator {
-            domain: alias_domain(proxy.domain()),
-            object_id,
-        }
+        ApplicationCreator::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IHomeMenuFunctions (cmd 22, LibraryApplet on HOS 15.0.0+).
-pub fn get_home_menu_functions(
-    proxy: &DomainObject<'_>,
-) -> Result<HomeMenuFunctions, GetSubInterfaceError> {
+pub fn get_home_menu_functions<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<HomeMenuFunctions<'d>, GetSubInterfaceError> {
     get_sub_interface_object_id(proxy, CMD_GET_APPLICATION_CREATOR).map(|object_id| {
-        HomeMenuFunctions {
-            domain: alias_domain(proxy.domain()),
-            object_id,
-        }
+        HomeMenuFunctions::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }
 
 /// Gets IDebugFunctions (cmd 1000).
-pub fn get_debug_functions(
-    proxy: &DomainObject<'_>,
-) -> Result<DebugFunctions, GetSubInterfaceError> {
-    get_sub_interface_object_id(proxy, CMD_GET_DEBUG_FUNCTIONS).map(|object_id| DebugFunctions {
-        domain: alias_domain(proxy.domain()),
-        object_id,
+pub fn get_debug_functions<'d>(
+    proxy: DomainObjectRef<'d>,
+) -> Result<DebugFunctions<'d>, GetSubInterfaceError> {
+    get_sub_interface_object_id(proxy, CMD_GET_DEBUG_FUNCTIONS).map(|object_id| {
+        DebugFunctions::new(
+            // SAFETY: `object_id` was just emitted by the server for an
+            // object inside this proxy's domain, so it names a live one.
+            DomainObjectRef::from_raw_unchecked(proxy.domain(), object_id)
+                .expect("server-emitted object id is non-zero"),
+        )
     })
 }

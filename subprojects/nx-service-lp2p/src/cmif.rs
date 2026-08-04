@@ -2,7 +2,9 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr, Session,
+};
 
 use crate::{
     proto,
@@ -15,11 +17,10 @@ use crate::{
 /// Creates an INetworkService sub-object (cmd 0).
 ///
 /// Returns the raw sub-object ID for the new `INetworkService` domain object.
-/// The freshly-minted [`DomainObject`] is wrapped in [`core::mem::ManuallyDrop`]
-/// so the server-side object outlives this call — the pool-acquired slot
-/// re-opens the same id per request via [`Domain::open_object_raw`].
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
 pub(crate) fn create_network_service(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     inval: u32,
 ) -> Result<u32, CreateNetworkServiceError> {
     let input = CreateNetworkServiceIn {
@@ -49,7 +50,7 @@ pub(crate) fn create_network_service(
     let object = result
         .take_object(0)
         .ok_or(CreateNetworkServiceError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Creates an INetworkServiceMonitor sub-object (cmd 8, non-domain).
@@ -81,7 +82,7 @@ pub(crate) fn create_network_service_monitor(session: &Session) -> Result<u32, C
 
 /// Scans for groups (cmd 512).
 pub(crate) fn scan(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     info: &Lp2pGroupInfo,
     results: &mut [Lp2pScanResult],
 ) -> Result<i32, DispatchError> {
@@ -117,7 +118,7 @@ pub(crate) fn scan(
 
 /// Creates a group (cmd 768).
 pub(crate) fn create_group(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     info: &Lp2pGroupInfo,
 ) -> Result<(), DispatchError> {
     // SAFETY: `info` is a valid `&Lp2pGroupInfo`; viewing its bytes as a slice
@@ -138,7 +139,7 @@ pub(crate) fn create_group(
 }
 
 /// Destroys the current group (cmd 776).
-pub(crate) fn destroy_group(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn destroy_group(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
@@ -149,7 +150,7 @@ pub(crate) fn destroy_group(object: &DomainObject<'_>) -> Result<(), DispatchErr
 
 /// Sets advertise data (cmd 784).
 pub(crate) fn set_advertise_data(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &[u8],
 ) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -164,7 +165,7 @@ pub(crate) fn set_advertise_data(
 /// Sends data to another group (cmd 1536).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn send_to_other_group(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &[u8],
     addr: Lp2pMacAddress,
     group_id: Lp2pGroupId,
@@ -200,7 +201,7 @@ pub(crate) fn send_to_other_group(
 
 /// Receives data from another group (cmd 1544).
 pub(crate) fn recv_from_other_group(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     flags: u32,
     buffer: &mut [u8],
 ) -> Result<RecvFromOtherGroupOut, DispatchError> {
@@ -224,7 +225,7 @@ pub(crate) fn recv_from_other_group(
 
 /// Adds an acceptable group ID (cmd 1552).
 pub(crate) fn add_acceptable_group_id(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     group_id: Lp2pGroupId,
 ) -> Result<(), DispatchError> {
     // SAFETY: `group_id` is a `Copy` value on the stack, valid until `.send()`
@@ -242,7 +243,7 @@ pub(crate) fn add_acceptable_group_id(
 }
 
 /// Removes the acceptable group ID (cmd 1560).
-pub(crate) fn remove_acceptable_group_id(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn remove_acceptable_group_id(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object

@@ -6,11 +6,14 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{DispatchError, DomainObject};
+use nx_sf::service::{DispatchError, DomainObjectRef};
 
 /// CMIF request with no input payload and no output payload.
 #[inline]
-pub(crate) fn dispatch_no_io(object: &DomainObject<'_>, cmd_id: u32) -> Result<(), DispatchError> {
+pub(crate) fn dispatch_no_io(
+    object: DomainObjectRef<'_>,
+    cmd_id: u32,
+) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object.dispatch(cmd_id).send(&mut ipc_buf).map(|_| ())
@@ -19,7 +22,7 @@ pub(crate) fn dispatch_no_io(object: &DomainObject<'_>, cmd_id: u32) -> Result<(
 /// CMIF request with a single `Copy` input payload and no output.
 #[inline]
 pub(crate) fn dispatch_in<I: Copy>(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     input: I,
 ) -> Result<(), DispatchError> {
@@ -39,7 +42,7 @@ pub(crate) fn dispatch_in<I: Copy>(
 /// CMIF request with no input and a single `Copy` output payload.
 #[inline]
 pub(crate) fn dispatch_out<O: Copy>(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
 ) -> Result<O, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

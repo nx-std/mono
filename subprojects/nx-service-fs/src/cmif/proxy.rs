@@ -1,10 +1,10 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain};
+use nx_sf::service::{BufferAttr, DispatchError, DomainRef};
 
 use crate::{dispatch::as_in_bytes, proto, types::*};
 
-pub(crate) fn set_current_process(domain: &Domain, ctx: u32) -> Result<(), DispatchError> {
+pub(crate) fn set_current_process(domain: DomainRef<'_>, ctx: u32) -> Result<(), DispatchError> {
     let pid_placeholder: u64 = 0;
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -18,7 +18,7 @@ pub(crate) fn set_current_process(domain: &Domain, ctx: u32) -> Result<(), Dispa
 }
 
 pub(crate) fn open_file_system_legacy(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     fs_type: u32,
     content_path: &[u8; FS_MAX_PATH],
@@ -35,11 +35,11 @@ pub(crate) fn open_file_system_legacy(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_data_file_system_by_current_process(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -52,11 +52,11 @@ pub(crate) fn open_data_file_system_by_current_process(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_file_system_with_patch(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     id: u64,
     fs_type: u32,
@@ -73,11 +73,11 @@ pub(crate) fn open_file_system_with_patch(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_file_system_with_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     id: u64,
     fs_type: u32,
@@ -96,11 +96,11 @@ pub(crate) fn open_file_system_with_id(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_file_system_with_id_v16(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     id: u64,
     fs_type: u32,
@@ -125,11 +125,11 @@ pub(crate) fn open_file_system_with_id_v16(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_data_file_system_by_program_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     program_id: u64,
 ) -> Result<u32, DispatchError> {
@@ -144,11 +144,11 @@ pub(crate) fn open_data_file_system_by_program_id(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_bis_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     partition_id: u32,
     path: &[u8; FS_MAX_PATH],
@@ -165,11 +165,11 @@ pub(crate) fn open_bis_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_bis_storage(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     partition_id: u32,
 ) -> Result<u32, DispatchError> {
@@ -184,10 +184,13 @@ pub(crate) fn open_bis_storage(
     let object = result
         .take_object(0)
         .expect("server returned storage object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
-pub(crate) fn open_sd_card_file_system(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
+pub(crate) fn open_sd_card_file_system(
+    domain: DomainRef<'_>,
+    ctx: u32,
+) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -198,11 +201,11 @@ pub(crate) fn open_sd_card_file_system(domain: &Domain, ctx: u32) -> Result<u32,
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_host_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
@@ -217,11 +220,11 @@ pub(crate) fn open_host_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_host_file_system_with_option(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     flags: u32,
@@ -238,11 +241,11 @@ pub(crate) fn open_host_file_system_with_option(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn delete_save_data_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     application_id: u64,
 ) -> Result<(), DispatchError> {
@@ -257,7 +260,7 @@ pub(crate) fn delete_save_data_file_system(
 }
 
 pub(crate) fn create_save_data_file_system_raw(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &CreateSaveDataIn,
 ) -> Result<(), DispatchError> {
@@ -272,7 +275,7 @@ pub(crate) fn create_save_data_file_system_raw(
 }
 
 pub(crate) fn create_save_data_file_system_by_system_save_data_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &CreateSaveDataBySystemIdIn,
 ) -> Result<(), DispatchError> {
@@ -287,7 +290,7 @@ pub(crate) fn create_save_data_file_system_by_system_save_data_id(
 }
 
 pub(crate) fn delete_save_data_file_system_by_save_data_space_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &DeleteSaveDataBySpaceIdIn,
 ) -> Result<(), DispatchError> {
@@ -302,7 +305,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_space_id(
 }
 
 pub(crate) fn delete_save_data_file_system_by_save_data_attribute(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &DeleteSaveDataByAttributeIn,
 ) -> Result<(), DispatchError> {
@@ -316,7 +319,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_attribute(
         .map(|_| ())
 }
 
-pub(crate) fn is_exfat_supported(domain: &Domain, ctx: u32) -> Result<bool, DispatchError> {
+pub(crate) fn is_exfat_supported(domain: DomainRef<'_>, ctx: u32) -> Result<bool, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = domain
@@ -328,7 +331,7 @@ pub(crate) fn is_exfat_supported(domain: &Domain, ctx: u32) -> Result<bool, Disp
 }
 
 pub(crate) fn open_game_card_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &OpenGameCardFileSystemIn,
 ) -> Result<u32, DispatchError> {
@@ -343,11 +346,11 @@ pub(crate) fn open_game_card_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn extend_save_data_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &ExtendSaveDataIn,
 ) -> Result<(), DispatchError> {
@@ -362,7 +365,7 @@ pub(crate) fn extend_save_data_file_system(
 }
 
 pub(crate) fn open_save_data_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &OpenSaveDataIn,
 ) -> Result<u32, DispatchError> {
@@ -377,11 +380,11 @@ pub(crate) fn open_save_data_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_save_data_file_system_by_system_save_data_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &OpenSaveDataIn,
 ) -> Result<u32, DispatchError> {
@@ -396,11 +399,11 @@ pub(crate) fn open_save_data_file_system_by_system_save_data_id(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_read_only_save_data_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &OpenSaveDataIn,
 ) -> Result<u32, DispatchError> {
@@ -415,11 +418,11 @@ pub(crate) fn open_read_only_save_data_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn read_save_data_file_system_extra_data_by_save_data_space_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &ReadExtraDataBySpaceIdIn,
     buf: &mut [u8],
@@ -436,7 +439,7 @@ pub(crate) fn read_save_data_file_system_extra_data_by_save_data_space_id(
 }
 
 pub(crate) fn read_save_data_file_system_extra_data(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     save_id: u64,
     buf: &mut [u8],
@@ -453,7 +456,7 @@ pub(crate) fn read_save_data_file_system_extra_data(
 }
 
 pub(crate) fn write_save_data_file_system_extra_data(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &WriteExtraDataIn,
     buf: &[u8],
@@ -469,7 +472,10 @@ pub(crate) fn write_save_data_file_system_extra_data(
         .map(|_| ())
 }
 
-pub(crate) fn open_save_data_info_reader(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
+pub(crate) fn open_save_data_info_reader(
+    domain: DomainRef<'_>,
+    ctx: u32,
+) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -480,11 +486,11 @@ pub(crate) fn open_save_data_info_reader(domain: &Domain, ctx: u32) -> Result<u3
     let object = result
         .take_object(0)
         .expect("server returned info reader object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_save_data_info_reader_by_save_data_space_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     space_id: u8,
 ) -> Result<u32, DispatchError> {
@@ -499,11 +505,11 @@ pub(crate) fn open_save_data_info_reader_by_save_data_space_id(
     let object = result
         .take_object(0)
         .expect("server returned info reader object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_save_data_info_reader_with_filter(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &OpenSaveDataInfoReaderWithFilterIn,
 ) -> Result<u32, DispatchError> {
@@ -518,11 +524,11 @@ pub(crate) fn open_save_data_info_reader_with_filter(
     let object = result
         .take_object(0)
         .expect("server returned info reader object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_image_directory_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     image_directory_id: u32,
 ) -> Result<u32, DispatchError> {
@@ -537,11 +543,11 @@ pub(crate) fn open_image_directory_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_content_storage_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     content_storage_id: u32,
 ) -> Result<u32, DispatchError> {
@@ -556,11 +562,11 @@ pub(crate) fn open_content_storage_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_custom_storage_file_system(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     custom_storage_id: u32,
 ) -> Result<u32, DispatchError> {
@@ -575,11 +581,11 @@ pub(crate) fn open_custom_storage_file_system(
     let object = result
         .take_object(0)
         .expect("server returned filesystem object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_data_storage_by_current_process(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -592,11 +598,11 @@ pub(crate) fn open_data_storage_by_current_process(
     let object = result
         .take_object(0)
         .expect("server returned storage object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_data_storage_by_program_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     program_id: u64,
 ) -> Result<u32, DispatchError> {
@@ -611,11 +617,11 @@ pub(crate) fn open_data_storage_by_program_id(
     let object = result
         .take_object(0)
         .expect("server returned storage object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_data_storage_by_data_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     input: &OpenDataStorageByDataIdIn,
 ) -> Result<u32, DispatchError> {
@@ -630,11 +636,11 @@ pub(crate) fn open_data_storage_by_data_id(
     let object = result
         .take_object(0)
         .expect("server returned storage object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_patch_data_storage_by_current_process(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -647,10 +653,10 @@ pub(crate) fn open_patch_data_storage_by_current_process(
     let object = result
         .take_object(0)
         .expect("server returned storage object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
-pub(crate) fn open_device_operator(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
+pub(crate) fn open_device_operator(domain: DomainRef<'_>, ctx: u32) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -661,11 +667,11 @@ pub(crate) fn open_device_operator(domain: &Domain, ctx: u32) -> Result<u32, Dis
     let object = result
         .take_object(0)
         .expect("server returned device operator object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn open_sd_card_detection_event_notifier(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -678,11 +684,11 @@ pub(crate) fn open_sd_card_detection_event_notifier(
     let object = result
         .take_object(0)
         .expect("server returned event notifier object");
-    Ok(ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 pub(crate) fn get_rights_id_by_path(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<RightsId, DispatchError> {
@@ -698,7 +704,7 @@ pub(crate) fn get_rights_id_by_path(
 }
 
 pub(crate) fn get_rights_id_and_key_generation_by_path(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     has_attr: bool,
@@ -733,7 +739,7 @@ pub(crate) fn get_rights_id_and_key_generation_by_path(
 }
 
 pub(crate) fn get_program_id(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     attr: u8,
@@ -751,7 +757,7 @@ pub(crate) fn get_program_id(
 }
 
 pub(crate) fn is_signed_system_partition_on_sd_card_valid(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<bool, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -765,7 +771,7 @@ pub(crate) fn is_signed_system_partition_on_sd_card_valid(
 }
 
 pub(crate) fn get_and_clear_error_info(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<FileSystemProxyErrorInfo, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -781,7 +787,7 @@ pub(crate) fn get_and_clear_error_info(
 }
 
 pub(crate) fn get_content_storage_info_index(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<i32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -795,7 +801,7 @@ pub(crate) fn get_content_storage_info_index(
 }
 
 pub(crate) fn disable_auto_save_data_creation(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -808,7 +814,7 @@ pub(crate) fn disable_auto_save_data_creation(
 }
 
 pub(crate) fn set_global_access_log_mode(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     mode: u32,
 ) -> Result<(), DispatchError> {
@@ -822,7 +828,10 @@ pub(crate) fn set_global_access_log_mode(
         .map(|_| ())
 }
 
-pub(crate) fn get_global_access_log_mode(domain: &Domain, ctx: u32) -> Result<u32, DispatchError> {
+pub(crate) fn get_global_access_log_mode(
+    domain: DomainRef<'_>,
+    ctx: u32,
+) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = domain
@@ -834,7 +843,7 @@ pub(crate) fn get_global_access_log_mode(domain: &Domain, ctx: u32) -> Result<u3
 }
 
 pub(crate) fn output_access_log_to_sd_card(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
     log: &[u8],
 ) -> Result<(), DispatchError> {
@@ -849,7 +858,7 @@ pub(crate) fn output_access_log_to_sd_card(
 }
 
 pub(crate) fn get_program_index_for_access_log(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<ProgramIndexForAccessLogOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -865,7 +874,7 @@ pub(crate) fn get_program_index_for_access_log(
 }
 
 pub(crate) fn get_and_clear_memory_report_info(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     ctx: u32,
 ) -> Result<MemoryReportInfo, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };

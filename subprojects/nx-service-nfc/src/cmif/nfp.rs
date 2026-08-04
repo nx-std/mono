@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
@@ -15,9 +15,9 @@ use crate::{
 };
 
 /// CreateInterface — returns a domain sub-object ID. The freshly minted
-/// `DomainObject` is wrapped in `ManuallyDrop` so the server-side object
-/// outlives this call; the service wrapper re-opens it per request.
-pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
+pub(crate) fn create_interface(domain: DomainRef<'_>) -> Result<u32, CreateInterfaceError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -29,7 +29,7 @@ pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceEr
     let object = result
         .take_object(0)
         .ok_or(CreateInterfaceError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Error returned by [`create_interface`].
@@ -43,7 +43,7 @@ pub enum CreateInterfaceError {
 
 /// Initialize — sends PID + ARUID + MCU version buffer.
 pub(crate) fn initialize(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     aruid: u64,
     version_data: &[NfcRequiredMcuVersionData],
 ) -> Result<(), DispatchError> {
@@ -73,13 +73,13 @@ pub(crate) fn initialize(
 }
 
 /// Finalize.
-pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn finalize(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::NFP_FINALIZE)
 }
 
 /// ListDevices — writes device handles to buffer, returns count.
 pub(crate) fn list_devices(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     out: &mut [NfcDeviceHandle],
 ) -> Result<i32, DispatchError> {
     // SAFETY: `out` is a valid `&mut` slice; viewing it as bytes for the
@@ -105,7 +105,7 @@ pub(crate) fn list_devices(
 
 /// StartDetection (device handle).
 pub(crate) fn start_detection(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_START_DETECTION, *handle)
@@ -113,7 +113,7 @@ pub(crate) fn start_detection(
 
 /// StopDetection (device handle).
 pub(crate) fn stop_detection(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_STOP_DETECTION, *handle)
@@ -121,7 +121,7 @@ pub(crate) fn stop_detection(
 
 /// Mount (device handle + device type + mount target).
 pub(crate) fn mount(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     device_type: u32,
     mount_target: u32,
@@ -136,7 +136,7 @@ pub(crate) fn mount(
 
 /// Unmount (device handle).
 pub(crate) fn unmount(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_UNMOUNT, *handle)
@@ -144,7 +144,7 @@ pub(crate) fn unmount(
 
 /// OpenApplicationArea.
 pub(crate) fn open_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     app_id: u32,
 ) -> Result<(), DispatchError> {
@@ -157,7 +157,7 @@ pub(crate) fn open_application_area(
 
 /// GetApplicationArea — writes to buffer, returns size read.
 pub(crate) fn get_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     buf: &mut [u8],
 ) -> Result<u32, DispatchError> {
@@ -188,7 +188,7 @@ pub(crate) fn get_application_area(
 
 /// SetApplicationArea.
 pub(crate) fn set_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     buf: &[u8],
 ) -> Result<(), DispatchError> {
@@ -212,7 +212,7 @@ pub(crate) fn set_application_area(
 
 /// Flush.
 pub(crate) fn flush(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_FLUSH, *handle)
@@ -220,7 +220,7 @@ pub(crate) fn flush(
 
 /// Restore.
 pub(crate) fn restore(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_RESTORE, *handle)
@@ -228,7 +228,7 @@ pub(crate) fn restore(
 
 /// CreateApplicationArea.
 pub(crate) fn create_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     app_id: u32,
     buf: &[u8],
@@ -257,7 +257,7 @@ pub(crate) fn create_application_area(
 
 /// RecreateApplicationArea. [3.0.0+]
 pub(crate) fn recreate_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     app_id: u32,
     buf: &[u8],
@@ -286,7 +286,7 @@ pub(crate) fn recreate_application_area(
 
 /// GetApplicationAreaSize.
 pub(crate) fn get_application_area_size(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::NFP_GET_APPLICATION_AREA_SIZE, *handle)
@@ -294,7 +294,7 @@ pub(crate) fn get_application_area_size(
 
 /// GetTagInfo — writes fixed-size buffer output.
 pub(crate) fn get_tag_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpTagInfo,
 ) -> Result<(), DispatchError> {
@@ -329,7 +329,7 @@ pub(crate) fn get_tag_info(
 
 /// GetRegisterInfo.
 pub(crate) fn get_register_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpRegisterInfo,
 ) -> Result<(), DispatchError> {
@@ -364,7 +364,7 @@ pub(crate) fn get_register_info(
 
 /// GetCommonInfo.
 pub(crate) fn get_common_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpCommonInfo,
 ) -> Result<(), DispatchError> {
@@ -399,7 +399,7 @@ pub(crate) fn get_common_info(
 
 /// GetModelInfo.
 pub(crate) fn get_model_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpModelInfo,
 ) -> Result<(), DispatchError> {
@@ -434,7 +434,7 @@ pub(crate) fn get_model_info(
 
 /// AttachActivateEvent — returns a copy handle.
 pub(crate) fn attach_activate_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `*handle` is a `Copy` value on the stack, valid until
@@ -457,7 +457,7 @@ pub(crate) fn attach_activate_event(
 
 /// AttachDeactivateEvent — returns a copy handle.
 pub(crate) fn attach_deactivate_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `*handle` is a `Copy` value on the stack, valid until
@@ -480,7 +480,7 @@ pub(crate) fn attach_deactivate_event(
 
 /// AttachAvailabilityChangeEvent — returns a copy handle. [3.0.0+]
 pub(crate) fn attach_availability_change_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -492,13 +492,13 @@ pub(crate) fn attach_availability_change_event(
 }
 
 /// GetState.
-pub(crate) fn get_state(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_state(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::NFP_GET_STATE)
 }
 
 /// GetDeviceState.
 pub(crate) fn get_device_state(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::NFP_GET_DEVICE_STATE, *handle)
@@ -506,7 +506,7 @@ pub(crate) fn get_device_state(
 
 /// GetNpadId.
 pub(crate) fn get_npad_id(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::NFP_GET_NPAD_ID, *handle)
@@ -514,7 +514,7 @@ pub(crate) fn get_npad_id(
 
 /// Format (not for User).
 pub(crate) fn format(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_FORMAT, *handle)
@@ -522,7 +522,7 @@ pub(crate) fn format(
 
 /// GetAdminInfo (not for User).
 pub(crate) fn get_admin_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpAdminInfo,
 ) -> Result<(), DispatchError> {
@@ -557,7 +557,7 @@ pub(crate) fn get_admin_info(
 
 /// GetRegisterInfoPrivate (not for User).
 pub(crate) fn get_register_info_private(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpRegisterInfoPrivate,
 ) -> Result<(), DispatchError> {
@@ -592,7 +592,7 @@ pub(crate) fn get_register_info_private(
 
 /// SetRegisterInfoPrivate (not for User).
 pub(crate) fn set_register_info_private(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     info: &NfpRegisterInfoPrivate,
 ) -> Result<(), DispatchError> {
@@ -627,7 +627,7 @@ pub(crate) fn set_register_info_private(
 
 /// DeleteRegisterInfo (not for User).
 pub(crate) fn delete_register_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_DELETE_REGISTER_INFO, *handle)
@@ -635,7 +635,7 @@ pub(crate) fn delete_register_info(
 
 /// DeleteApplicationArea (not for User).
 pub(crate) fn delete_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_DELETE_APPLICATION_AREA, *handle)
@@ -643,7 +643,7 @@ pub(crate) fn delete_application_area(
 
 /// ExistsApplicationArea (not for User).
 pub(crate) fn exists_application_area(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<bool, DispatchError> {
     let val: u32 = dispatch_in_out(object, proto::NFP_EXISTS_APPLICATION_AREA, *handle)?;
@@ -652,7 +652,7 @@ pub(crate) fn exists_application_area(
 
 /// GetAll (debug only).
 pub(crate) fn get_all(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfpData,
 ) -> Result<(), DispatchError> {
@@ -684,7 +684,7 @@ pub(crate) fn get_all(
 
 /// SetAll (debug only).
 pub(crate) fn set_all(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     data: &NfpData,
 ) -> Result<(), DispatchError> {
@@ -716,7 +716,7 @@ pub(crate) fn set_all(
 
 /// FlushDebug (debug only).
 pub(crate) fn flush_debug(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFP_FLUSH_DEBUG, *handle)
@@ -724,7 +724,7 @@ pub(crate) fn flush_debug(
 
 /// BreakTag (debug only).
 pub(crate) fn break_tag(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     break_type: u32,
 ) -> Result<(), DispatchError> {
@@ -737,7 +737,7 @@ pub(crate) fn break_tag(
 
 /// ReadBackupData (debug only).
 pub(crate) fn read_backup_data(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     buf: &mut [u8],
 ) -> Result<u32, DispatchError> {
@@ -768,7 +768,7 @@ pub(crate) fn read_backup_data(
 
 /// WriteBackupData (debug only).
 pub(crate) fn write_backup_data(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     buf: &[u8],
 ) -> Result<(), DispatchError> {
@@ -792,7 +792,7 @@ pub(crate) fn write_backup_data(
 
 /// WriteNtf (debug only).
 pub(crate) fn write_ntf(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     write_type: u32,
     buf: &[u8],

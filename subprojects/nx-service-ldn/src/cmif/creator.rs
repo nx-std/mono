@@ -4,7 +4,7 @@
 
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{DispatchError, Domain, OwnedSessionHandle, Session},
+    service::{DispatchError, DomainRef, OwnedSessionHandle, Session},
 };
 
 use crate::proto::{CMD_CREATE_CLIENT_PROCESS_MONITOR, CMD_CREATE_SERVICE};
@@ -12,11 +12,11 @@ use crate::proto::{CMD_CREATE_CLIENT_PROCESS_MONITOR, CMD_CREATE_SERVICE};
 /// Invokes `CreateUserLocalCommService` / `CreateSystemLocalCommService`
 /// (cmd 0) on the converted-to-domain `ldn:u`/`ldn:s` creator.
 ///
-/// Returns the raw domain sub-object id assigned by the server. The freshly
-/// minted [`DomainObject`] is wrapped in [`ManuallyDrop`] so the server-side
-/// object outlives this call — callers re-open the id per request via
-/// [`Domain::open_object_raw`].
-pub(crate) fn create_service_domain(creator: &Domain) -> Result<u32, CreateServiceError> {
+/// Returns the raw domain sub-object id assigned by the server. The close
+/// obligation is handed on rather than discharged, so the server-side object
+/// outlives this call; callers re-address the id per request via
+/// [`SessionGuard::open_object_unchecked`](crate::session::SessionGuard::open_object_unchecked).
+pub(crate) fn create_service_domain(creator: DomainRef<'_>) -> Result<u32, CreateServiceError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -29,7 +29,7 @@ pub(crate) fn create_service_domain(creator: &Domain) -> Result<u32, CreateServi
     let object = result
         .take_object(0)
         .ok_or(CreateServiceError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Invokes `CreateMonitorService` (cmd 0) on the non-domain `ldn:m` creator.
@@ -68,10 +68,10 @@ pub enum CreateServiceError {
 
 /// Invokes `CreateClientProcessMonitor` (cmd 1, `[18.0.0+]`) on the
 /// `ldn:u`/`ldn:s` creator domain. Returns the raw ICPM domain sub-object id;
-/// the [`DomainObject`] is wrapped in [`ManuallyDrop`] so the server-side
-/// object outlives this call.
+/// the close obligation is handed on rather than discharged, so the
+/// server-side object outlives this call.
 pub(crate) fn create_client_process_monitor(
-    creator: &Domain,
+    creator: DomainRef<'_>,
 ) -> Result<u32, CreateClientProcessMonitorError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -85,7 +85,7 @@ pub(crate) fn create_client_process_monitor(
     let object = result
         .take_object(0)
         .ok_or(CreateClientProcessMonitorError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Error returned by [`create_client_process_monitor`].

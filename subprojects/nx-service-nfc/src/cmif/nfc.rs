@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_in_out, dispatch_out},
@@ -15,9 +15,9 @@ use crate::{
 };
 
 /// CreateInterface — returns a domain sub-object ID. The freshly minted
-/// `DomainObject` is wrapped in `ManuallyDrop` so the server-side object
-/// outlives this call; the service wrapper re-opens it per request.
-pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceError> {
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
+pub(crate) fn create_interface(domain: DomainRef<'_>) -> Result<u32, CreateInterfaceError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
@@ -29,7 +29,7 @@ pub(crate) fn create_interface(domain: &Domain) -> Result<u32, CreateInterfaceEr
     let object = result
         .take_object(0)
         .ok_or(CreateInterfaceError::MissingObject)?;
-    Ok(core::mem::ManuallyDrop::new(object).object_id().to_raw())
+    Ok(object.into_raw_object_id())
 }
 
 /// Error returned by [`create_interface`].
@@ -43,7 +43,7 @@ pub enum CreateInterfaceError {
 
 /// Initialize — pre-4.0.0 command ID layout.
 pub(crate) fn initialize_legacy(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     aruid: u64,
     version_data: &[NfcRequiredMcuVersionData],
 ) -> Result<(), DispatchError> {
@@ -52,7 +52,7 @@ pub(crate) fn initialize_legacy(
 
 /// Initialize — 4.0.0+ command ID layout.
 pub(crate) fn initialize(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     aruid: u64,
     version_data: &[NfcRequiredMcuVersionData],
 ) -> Result<(), DispatchError> {
@@ -60,7 +60,7 @@ pub(crate) fn initialize(
 }
 
 fn initialize_impl(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     aruid: u64,
     version_data: &[NfcRequiredMcuVersionData],
     cmd_id: u32,
@@ -91,7 +91,7 @@ fn initialize_impl(
 }
 
 /// Finalize — pre-4.0.0 command ID layout.
-pub(crate) fn finalize_legacy(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn finalize_legacy(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
@@ -101,7 +101,7 @@ pub(crate) fn finalize_legacy(object: &DomainObject<'_>) -> Result<(), DispatchE
 }
 
 /// Finalize — 4.0.0+ command ID layout.
-pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn finalize(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
@@ -111,30 +111,30 @@ pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
 }
 
 /// GetState (pre-4.0.0).
-pub(crate) fn get_state_legacy(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_state_legacy(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::NFC_GET_STATE_LEGACY)
 }
 
 /// IsNfcEnabled (pre-4.0.0).
-pub(crate) fn is_nfc_enabled_legacy(object: &DomainObject<'_>) -> Result<bool, DispatchError> {
+pub(crate) fn is_nfc_enabled_legacy(object: DomainObjectRef<'_>) -> Result<bool, DispatchError> {
     let val: u8 = dispatch_out(object, proto::NFC_IS_NFC_ENABLED_LEGACY)?;
     Ok(val & 1 != 0)
 }
 
 /// GetState (4.0.0+).
-pub(crate) fn get_state(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_state(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out(object, proto::NFC_GET_STATE)
 }
 
 /// IsNfcEnabled (4.0.0+).
-pub(crate) fn is_nfc_enabled(object: &DomainObject<'_>) -> Result<bool, DispatchError> {
+pub(crate) fn is_nfc_enabled(object: DomainObjectRef<'_>) -> Result<bool, DispatchError> {
     let val: u8 = dispatch_out(object, proto::NFC_IS_NFC_ENABLED)?;
     Ok(val & 1 != 0)
 }
 
 /// ListDevices (4.0.0+).
 pub(crate) fn list_devices(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     out: &mut [NfcDeviceHandle],
 ) -> Result<i32, DispatchError> {
     // SAFETY: `out` is a valid `&mut` slice; viewing it as bytes for the
@@ -160,7 +160,7 @@ pub(crate) fn list_devices(
 
 /// GetDeviceState (4.0.0+).
 pub(crate) fn get_device_state(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::NFC_GET_DEVICE_STATE, *handle)
@@ -168,7 +168,7 @@ pub(crate) fn get_device_state(
 
 /// GetNpadId (4.0.0+).
 pub(crate) fn get_npad_id(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     dispatch_in_out(object, proto::NFC_GET_NPAD_ID, *handle)
@@ -176,7 +176,7 @@ pub(crate) fn get_npad_id(
 
 /// StartDetection (4.0.0+ — device handle + protocol).
 pub(crate) fn start_detection(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     protocol: u32,
 ) -> Result<(), DispatchError> {
@@ -189,7 +189,7 @@ pub(crate) fn start_detection(
 
 /// StopDetection (4.0.0+).
 pub(crate) fn stop_detection(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFC_STOP_DETECTION, *handle)
@@ -197,7 +197,7 @@ pub(crate) fn stop_detection(
 
 /// GetTagInfo (4.0.0+).
 pub(crate) fn get_tag_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out: &mut NfcTagInfo,
 ) -> Result<(), DispatchError> {
@@ -232,7 +232,7 @@ pub(crate) fn get_tag_info(
 
 /// AttachActivateEvent (4.0.0+).
 pub(crate) fn attach_activate_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `*handle` is a `Copy` value on the stack, valid until
@@ -255,7 +255,7 @@ pub(crate) fn attach_activate_event(
 
 /// AttachDeactivateEvent (4.0.0+).
 pub(crate) fn attach_deactivate_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<u32, DispatchError> {
     // SAFETY: `*handle` is a `Copy` value on the stack, valid until
@@ -278,7 +278,7 @@ pub(crate) fn attach_deactivate_event(
 
 /// AttachAvailabilityChangeEvent (4.0.0+).
 pub(crate) fn attach_availability_change_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -291,7 +291,7 @@ pub(crate) fn attach_availability_change_event(
 
 /// ReadMifare (4.0.0+).
 pub(crate) fn read_mifare(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     out_block_data: &mut [NfcMifareReadBlockData],
     read_block_parameter: &[NfcMifareReadBlockParameter],
@@ -333,7 +333,7 @@ pub(crate) fn read_mifare(
 
 /// WriteMifare (4.0.0+).
 pub(crate) fn write_mifare(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     write_block_parameter: &[NfcMifareWriteBlockParameter],
 ) -> Result<(), DispatchError> {
@@ -365,7 +365,7 @@ pub(crate) fn write_mifare(
 
 /// SendCommandByPassThrough (4.0.0+).
 pub(crate) fn send_command_by_pass_through(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
     timeout: u64,
     cmd_buf: &[u8],
@@ -403,7 +403,7 @@ pub(crate) fn send_command_by_pass_through(
 
 /// KeepPassThroughSession (4.0.0+).
 pub(crate) fn keep_pass_through_session(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFC_KEEP_PASS_THROUGH_SESSION, *handle)
@@ -411,7 +411,7 @@ pub(crate) fn keep_pass_through_session(
 
 /// ReleasePassThroughSession (4.0.0+).
 pub(crate) fn release_pass_through_session(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     handle: &NfcDeviceHandle,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::NFC_RELEASE_PASS_THROUGH_SESSION, *handle)

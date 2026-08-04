@@ -7,7 +7,7 @@
 
 use alloc::boxed::Box;
 
-use nx_sf::service::Domain;
+use nx_sf::service::{Domain, DomainRef};
 use nx_std_sync::{condvar::Condvar, mutex::Mutex};
 
 /// Maximum number of pool slots representable in the free-mask `u32`.
@@ -60,8 +60,8 @@ pub(crate) struct SessionGuard<'a> {
 
 impl<'a> SessionGuard<'a> {
     #[inline]
-    pub(crate) fn domain(&self) -> &'a Domain {
-        &self.pool.sessions[self.slot as usize]
+    pub(crate) fn domain(&self) -> DomainRef<'a> {
+        self.pool.sessions[self.slot as usize].as_borrowed()
     }
 }
 

@@ -111,9 +111,10 @@ impl FriendsService {
         // and the kernel-side object stays alive for the lifetime of the
         // pool's domain sessions. The pool guard makes this slot exclusive,
         // so no other `DomainObject` in this `Domain` addresses the id.
-        let object = unsafe { guard.open_object_raw(self.friend_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.friend_service_object_id)
             .expect("friend_service object id validated at connect_cmif");
-        cmif::get_user_setting(&object, uid, out)
+        cmif::get_user_setting(object, uid, out)
     }
 }
 
@@ -152,8 +153,8 @@ pub fn connect_cmif(
     }
 
     let factory = &sessions[0];
-    let friend_service_object_id =
-        cmif::create_friend_service(factory).map_err(ConnectCmifError::CreateService)?;
+    let friend_service_object_id = cmif::create_friend_service(factory.as_borrowed())
+        .map_err(ConnectCmifError::CreateService)?;
 
     let pool = SessionPool::new(sessions.into_boxed_slice() as Box<[Domain]>);
 

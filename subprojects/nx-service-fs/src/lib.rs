@@ -7,7 +7,9 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, Session, clone_current_object};
+use nx_sf::service::{
+    ConvertToDomainError, DispatchError, Domain, DomainObjectRef, Session, clone_current_object,
+};
 
 mod cmif;
 mod dispatch;
@@ -17,10 +19,6 @@ pub mod types;
 
 use self::session::SessionPool;
 pub use self::{proto::SERVICE_NAME, types::*};
-
-// ---------------------------------------------------------------------------
-// FsContext — shared state for the root service and all sub-objects
-// ---------------------------------------------------------------------------
 
 struct FsContext {
     pool: SessionPool,
@@ -32,10 +30,6 @@ impl FsContext {
         self.priority.load(Ordering::Relaxed)
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsService (root — IFileSystemProxy)
-// ---------------------------------------------------------------------------
 
 pub struct FsService {
     inner: FsContext,
@@ -725,31 +719,53 @@ impl FsService {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Sub-object helper macro
-// ---------------------------------------------------------------------------
-
-macro_rules! sub_object_drop {
+/// Defines the two things every `Fs*` sub-object wrapper does with its stored
+/// object id: address it for the duration of one call, and close it once at the
+/// end of its life.
+///
+/// Both take a pool slot, and both assert the same thing about `object_id` -
+/// that the server issued it for this pool's domain and it is still open. That
+/// assertion is written once here rather than at each of the call sites that
+/// dispatch through it, which is what keeps it a single fact to re-check when
+/// the invariant changes.
+macro_rules! sub_object_impls {
     ($ty:ident) => {
+        impl $ty<'_> {
+            /// Runs `f` against this sub-object, holding a pool slot for the
+            /// duration of the call.
+            ///
+            /// The view `f` receives closes nothing, so the sub-object outlives
+            /// the call; the close happens once, in `Drop`.
+            #[inline]
+            fn with_object<R>(&self, f: impl FnOnce(DomainObjectRef<'_>) -> R) -> R {
+                let guard = self.ctx.pool.acquire();
+                // SAFETY: `object_id` was returned by the server within this
+                // pool's domain and is closed only by this wrapper's `Drop`, so
+                // it names a live object for as long as `self` exists.
+                let object = guard
+                    .open_object_unchecked(self.object_id)
+                    .expect(concat!(stringify!($ty), " object id obtained from server"));
+                f(object)
+            }
+        }
+
         impl Drop for $ty<'_> {
             fn drop(&mut self) {
                 let guard = self.ctx.pool.acquire();
-                let _ = unsafe { guard.open_for_close(self.object_id) };
+                // SAFETY: as in `with_object`, and this is the one place the
+                // close is owed: `Drop` runs once and the wrapper is gone after.
+                let _ = guard.open_object_for_close_unchecked(self.object_id);
             }
         }
     };
 }
-
-// ---------------------------------------------------------------------------
-// FsFileSystem (IFileSystem sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsFileSystem<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsFileSystem);
+sub_object_impls!(FsFileSystem);
 
 impl<'svc> FsFileSystem<'svc> {
     pub fn create_file(
@@ -758,46 +774,51 @@ impl<'svc> FsFileSystem<'svc> {
         size: i64,
         option: CreateOption,
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::create_file(&object, self.ctx.ctx(), path, size, option.bits())
+        self.with_object(|object| {
+            cmif::filesystem::create_file(object, self.ctx.ctx(), path, size, option.bits())
+        })
     }
 
     pub fn delete_file(&self, path: &[u8; FS_MAX_PATH]) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_path(&object, self.ctx.ctx(), proto::FS_DELETE_FILE, path)
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_path(object, self.ctx.ctx(), proto::FS_DELETE_FILE, path)
+        })
     }
 
     pub fn create_directory(&self, path: &[u8; FS_MAX_PATH]) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_path(&object, self.ctx.ctx(), proto::FS_CREATE_DIRECTORY, path)
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_path(
+                object,
+                self.ctx.ctx(),
+                proto::FS_CREATE_DIRECTORY,
+                path,
+            )
+        })
     }
 
     pub fn delete_directory(&self, path: &[u8; FS_MAX_PATH]) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_path(&object, self.ctx.ctx(), proto::FS_DELETE_DIRECTORY, path)
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_path(
+                object,
+                self.ctx.ctx(),
+                proto::FS_DELETE_DIRECTORY,
+                path,
+            )
+        })
     }
 
     pub fn delete_directory_recursively(
         &self,
         path: &[u8; FS_MAX_PATH],
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_path(
-            &object,
-            self.ctx.ctx(),
-            proto::FS_DELETE_DIRECTORY_RECURSIVELY,
-            path,
-        )
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_path(
+                object,
+                self.ctx.ctx(),
+                proto::FS_DELETE_DIRECTORY_RECURSIVELY,
+                path,
+            )
+        })
     }
 
     pub fn rename_file(
@@ -805,16 +826,15 @@ impl<'svc> FsFileSystem<'svc> {
         cur_path: &[u8; FS_MAX_PATH],
         new_path: &[u8; FS_MAX_PATH],
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_two_paths(
-            &object,
-            self.ctx.ctx(),
-            proto::FS_RENAME_FILE,
-            cur_path,
-            new_path,
-        )
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_two_paths(
+                object,
+                self.ctx.ctx(),
+                proto::FS_RENAME_FILE,
+                cur_path,
+                new_path,
+            )
+        })
     }
 
     pub fn rename_directory(
@@ -822,26 +842,24 @@ impl<'svc> FsFileSystem<'svc> {
         cur_path: &[u8; FS_MAX_PATH],
         new_path: &[u8; FS_MAX_PATH],
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_two_paths(
-            &object,
-            self.ctx.ctx(),
-            proto::FS_RENAME_DIRECTORY,
-            cur_path,
-            new_path,
-        )
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_two_paths(
+                object,
+                self.ctx.ctx(),
+                proto::FS_RENAME_DIRECTORY,
+                cur_path,
+                new_path,
+            )
+        })
     }
 
     pub fn get_entry_type(&self, path: &[u8; FS_MAX_PATH]) -> Result<DirEntryType, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        let raw = cmif::filesystem::get_entry_type(&object, self.ctx.ctx(), path)?;
-        Ok(match raw {
-            0 => DirEntryType::Dir,
-            _ => DirEntryType::File,
+        self.with_object(|object| {
+            let raw = cmif::filesystem::get_entry_type(object, self.ctx.ctx(), path)?;
+            Ok(match raw {
+                0 => DirEntryType::Dir,
+                _ => DirEntryType::File,
+            })
         })
     }
 
@@ -850,13 +868,12 @@ impl<'svc> FsFileSystem<'svc> {
         path: &[u8; FS_MAX_PATH],
         mode: OpenMode,
     ) -> Result<FsFile<'svc>, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        let raw = cmif::filesystem::open_file(&object, self.ctx.ctx(), path, mode.bits())?;
-        Ok(FsFile {
-            object_id: raw,
-            ctx: self.ctx,
+        self.with_object(|object| {
+            let raw = cmif::filesystem::open_file(object, self.ctx.ctx(), path, mode.bits())?;
+            Ok(FsFile {
+                object_id: raw,
+                ctx: self.ctx,
+            })
         })
     }
 
@@ -865,60 +882,52 @@ impl<'svc> FsFileSystem<'svc> {
         path: &[u8; FS_MAX_PATH],
         mode: DirOpenMode,
     ) -> Result<FsDir<'svc>, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        let raw = cmif::filesystem::open_directory(&object, self.ctx.ctx(), path, mode.bits())?;
-        Ok(FsDir {
-            object_id: raw,
-            ctx: self.ctx,
+        self.with_object(|object| {
+            let raw = cmif::filesystem::open_directory(object, self.ctx.ctx(), path, mode.bits())?;
+            Ok(FsDir {
+                object_id: raw,
+                ctx: self.ctx,
+            })
         })
     }
 
     pub fn commit(&self) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::commit(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::filesystem::commit(object, self.ctx.ctx()))
     }
 
     pub fn get_free_space(&self, path: &[u8; FS_MAX_PATH]) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::get_space(&object, self.ctx.ctx(), proto::FS_GET_FREE_SPACE, path)
+        self.with_object(|object| {
+            cmif::filesystem::get_space(object, self.ctx.ctx(), proto::FS_GET_FREE_SPACE, path)
+        })
     }
 
     pub fn get_total_space(&self, path: &[u8; FS_MAX_PATH]) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::get_space(&object, self.ctx.ctx(), proto::FS_GET_TOTAL_SPACE, path)
+        self.with_object(|object| {
+            cmif::filesystem::get_space(object, self.ctx.ctx(), proto::FS_GET_TOTAL_SPACE, path)
+        })
     }
 
     pub fn clean_directory_recursively(
         &self,
         path: &[u8; FS_MAX_PATH],
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::cmd_with_path(
-            &object,
-            self.ctx.ctx(),
-            proto::FS_CLEAN_DIRECTORY_RECURSIVELY,
-            path,
-        )
+        self.with_object(|object| {
+            cmif::filesystem::cmd_with_path(
+                object,
+                self.ctx.ctx(),
+                proto::FS_CLEAN_DIRECTORY_RECURSIVELY,
+                path,
+            )
+        })
     }
 
     pub fn get_file_time_stamp_raw(
         &self,
         path: &[u8; FS_MAX_PATH],
     ) -> Result<TimeStampRaw, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::get_file_time_stamp_raw(&object, self.ctx.ctx(), path)
+        self.with_object(|object| {
+            cmif::filesystem::get_file_time_stamp_raw(object, self.ctx.ctx(), path)
+        })
     }
 
     pub fn query_entry(
@@ -928,37 +937,31 @@ impl<'svc> FsFileSystem<'svc> {
         in_buf: &[u8],
         out_buf: &mut [u8],
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::query_entry(
-            &object,
-            self.ctx.ctx(),
-            path,
-            query_id as u32,
-            in_buf,
-            out_buf,
-        )
+        self.with_object(|object| {
+            cmif::filesystem::query_entry(
+                object,
+                self.ctx.ctx(),
+                path,
+                query_id as u32,
+                in_buf,
+                out_buf,
+            )
+        })
     }
 
     pub fn get_file_system_attribute(&self) -> Result<FileSystemAttribute, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("filesystem object_id obtained from server");
-        cmif::filesystem::get_file_system_attribute(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::filesystem::get_file_system_attribute(object, self.ctx.ctx())
+        })
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsFile (IFile sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsFile<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsFile);
+sub_object_impls!(FsFile);
 
 impl FsFile<'_> {
     pub fn read(
@@ -968,17 +971,16 @@ impl FsFile<'_> {
         read_size: u64,
         option: ReadOption,
     ) -> Result<u64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("file object_id obtained from server");
-        cmif::file::read(
-            &object,
-            self.ctx.ctx(),
-            offset,
-            buf,
-            read_size,
-            option.bits(),
-        )
+        self.with_object(|object| {
+            cmif::file::read(
+                object,
+                self.ctx.ctx(),
+                offset,
+                buf,
+                read_size,
+                option.bits(),
+            )
+        })
     }
 
     pub fn write(
@@ -988,38 +990,28 @@ impl FsFile<'_> {
         write_size: u64,
         option: WriteOption,
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("file object_id obtained from server");
-        cmif::file::write(
-            &object,
-            self.ctx.ctx(),
-            offset,
-            buf,
-            write_size,
-            option.bits(),
-        )
+        self.with_object(|object| {
+            cmif::file::write(
+                object,
+                self.ctx.ctx(),
+                offset,
+                buf,
+                write_size,
+                option.bits(),
+            )
+        })
     }
 
     pub fn flush(&self) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("file object_id obtained from server");
-        cmif::file::flush(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::file::flush(object, self.ctx.ctx()))
     }
 
     pub fn set_size(&self, size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("file object_id obtained from server");
-        cmif::file::set_size(&object, self.ctx.ctx(), size)
+        self.with_object(|object| cmif::file::set_size(object, self.ctx.ctx(), size))
     }
 
     pub fn get_size(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("file object_id obtained from server");
-        cmif::file::get_size(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::file::get_size(object, self.ctx.ctx()))
     }
 
     pub fn operate_range(
@@ -1028,85 +1020,59 @@ impl FsFile<'_> {
         offset: i64,
         len: i64,
     ) -> Result<RangeInfo, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("file object_id obtained from server");
-        cmif::file::operate_range(&object, self.ctx.ctx(), op_id as u32, offset, len)
+        self.with_object(|object| {
+            cmif::file::operate_range(object, self.ctx.ctx(), op_id as u32, offset, len)
+        })
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsDir (IDirectory sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsDir<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsDir);
+sub_object_impls!(FsDir);
 
 impl FsDir<'_> {
     pub fn read(&self, buf: &mut [DirectoryEntry]) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("directory object_id obtained from server");
-        cmif::dir::read(&object, self.ctx.ctx(), buf)
+        self.with_object(|object| cmif::dir::read(object, self.ctx.ctx(), buf))
     }
 
     pub fn get_entry_count(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("directory object_id obtained from server");
-        cmif::dir::get_entry_count(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::dir::get_entry_count(object, self.ctx.ctx()))
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsStorage (IStorage sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsStorage<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsStorage);
+sub_object_impls!(FsStorage);
 
 impl FsStorage<'_> {
     pub fn read(&self, offset: i64, buf: &mut [u8], read_size: u64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("storage object_id obtained from server");
-        cmif::storage::read(&object, self.ctx.ctx(), offset, buf, read_size)
+        self.with_object(|object| {
+            cmif::storage::read(object, self.ctx.ctx(), offset, buf, read_size)
+        })
     }
 
     pub fn write(&self, offset: i64, buf: &[u8], write_size: u64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("storage object_id obtained from server");
-        cmif::storage::write(&object, self.ctx.ctx(), offset, buf, write_size)
+        self.with_object(|object| {
+            cmif::storage::write(object, self.ctx.ctx(), offset, buf, write_size)
+        })
     }
 
     pub fn flush(&self) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("storage object_id obtained from server");
-        cmif::storage::flush(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::storage::flush(object, self.ctx.ctx()))
     }
 
     pub fn set_size(&self, size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("storage object_id obtained from server");
-        cmif::storage::set_size(&object, self.ctx.ctx(), size)
+        self.with_object(|object| cmif::storage::set_size(object, self.ctx.ctx(), size))
     }
 
     pub fn get_size(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("storage object_id obtained from server");
-        cmif::storage::get_size(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::storage::get_size(object, self.ctx.ctx()))
     }
 
     pub fn operate_range(
@@ -1115,98 +1081,74 @@ impl FsStorage<'_> {
         offset: i64,
         len: i64,
     ) -> Result<RangeInfo, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("storage object_id obtained from server");
-        cmif::storage::operate_range(&object, self.ctx.ctx(), op_id as u32, offset, len)
+        self.with_object(|object| {
+            cmif::storage::operate_range(object, self.ctx.ctx(), op_id as u32, offset, len)
+        })
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsSaveDataInfoReader (ISaveDataInfoReader sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsSaveDataInfoReader<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsSaveDataInfoReader);
+sub_object_impls!(FsSaveDataInfoReader);
 
 impl FsSaveDataInfoReader<'_> {
     pub fn read(&self, buf: &mut [SaveDataInfo]) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("save data info reader object_id obtained from server");
-        cmif::save_data_info_reader::read(&object, self.ctx.ctx(), buf)
+        self.with_object(|object| cmif::save_data_info_reader::read(object, self.ctx.ctx(), buf))
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsEventNotifier (IEventNotifier sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsEventNotifier<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsEventNotifier);
+sub_object_impls!(FsEventNotifier);
 
 impl FsEventNotifier<'_> {
     pub fn get_event_handle(&self) -> Result<u32, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("event notifier object_id obtained from server");
-        cmif::event_notifier::get_event_handle(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::event_notifier::get_event_handle(object, self.ctx.ctx()))
     }
 }
-
-// ---------------------------------------------------------------------------
-// FsDeviceOperator (IDeviceOperator sub-object)
-// ---------------------------------------------------------------------------
 
 pub struct FsDeviceOperator<'svc> {
     object_id: u32,
     ctx: &'svc FsContext,
 }
 
-sub_object_drop!(FsDeviceOperator);
+sub_object_impls!(FsDeviceOperator);
 
 impl FsDeviceOperator<'_> {
     pub fn is_sd_card_inserted(&self) -> Result<bool, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::is_sd_card_inserted(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::is_sd_card_inserted(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_sd_card_speed_mode(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_sd_card_speed_mode(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::get_sd_card_speed_mode(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_sd_card_cid(&self, dst: &mut [u8], size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_sd_card_cid(&object, self.ctx.ctx(), dst, size)
+        self.with_object(|object| {
+            cmif::device_operator::get_sd_card_cid(object, self.ctx.ctx(), dst, size)
+        })
     }
 
     pub fn get_sd_card_user_area_size(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_sd_card_user_area_size(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::get_sd_card_user_area_size(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_sd_card_protected_area_size(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_sd_card_protected_area_size(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::get_sd_card_protected_area_size(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_and_clear_sd_card_error_info(
@@ -1214,38 +1156,32 @@ impl FsDeviceOperator<'_> {
         size: i64,
         dst: &mut [u8],
     ) -> Result<(StorageErrorInfo, i64), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        let out = cmif::device_operator::get_and_clear_storage_error_info(
-            &object,
-            self.ctx.ctx(),
-            proto::DEVICE_OPERATOR_GET_AND_CLEAR_SD_CARD_ERROR_INFO,
-            size,
-            dst,
-        )?;
-        Ok((out.error_info, out.log_size))
+        self.with_object(|object| {
+            let out = cmif::device_operator::get_and_clear_storage_error_info(
+                object,
+                self.ctx.ctx(),
+                proto::DEVICE_OPERATOR_GET_AND_CLEAR_SD_CARD_ERROR_INFO,
+                size,
+                dst,
+            )?;
+            Ok((out.error_info, out.log_size))
+        })
     }
 
     pub fn get_mmc_cid(&self, dst: &mut [u8], size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_mmc_cid(&object, self.ctx.ctx(), dst, size)
+        self.with_object(|object| {
+            cmif::device_operator::get_mmc_cid(object, self.ctx.ctx(), dst, size)
+        })
     }
 
     pub fn get_mmc_speed_mode(&self) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_mmc_speed_mode(&object, self.ctx.ctx())
+        self.with_object(|object| cmif::device_operator::get_mmc_speed_mode(object, self.ctx.ctx()))
     }
 
     pub fn get_mmc_patrol_count(&self) -> Result<u32, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_mmc_patrol_count(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::get_mmc_patrol_count(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_and_clear_mmc_error_info(
@@ -1253,55 +1189,53 @@ impl FsDeviceOperator<'_> {
         size: i64,
         dst: &mut [u8],
     ) -> Result<(StorageErrorInfo, i64), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        let out = cmif::device_operator::get_and_clear_storage_error_info(
-            &object,
-            self.ctx.ctx(),
-            proto::DEVICE_OPERATOR_GET_AND_CLEAR_MMC_ERROR_INFO,
-            size,
-            dst,
-        )?;
-        Ok((out.error_info, out.log_size))
+        self.with_object(|object| {
+            let out = cmif::device_operator::get_and_clear_storage_error_info(
+                object,
+                self.ctx.ctx(),
+                proto::DEVICE_OPERATOR_GET_AND_CLEAR_MMC_ERROR_INFO,
+                size,
+                dst,
+            )?;
+            Ok((out.error_info, out.log_size))
+        })
     }
 
     pub fn get_mmc_extended_csd(&self, dst: &mut [u8], size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_mmc_extended_csd(&object, self.ctx.ctx(), dst, size)
+        self.with_object(|object| {
+            cmif::device_operator::get_mmc_extended_csd(object, self.ctx.ctx(), dst, size)
+        })
     }
 
     pub fn is_game_card_inserted(&self) -> Result<bool, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::is_game_card_inserted(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::is_game_card_inserted(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_game_card_handle(&self) -> Result<GameCardHandle, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_handle(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_handle(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_game_card_update_partition_info(
         &self,
         handle: &GameCardHandle,
     ) -> Result<GameCardUpdatePartitionInfo, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_update_partition_info(&object, self.ctx.ctx(), handle)
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_update_partition_info(
+                object,
+                self.ctx.ctx(),
+                handle,
+            )
+        })
     }
 
     pub fn get_game_card_attribute(&self, handle: &GameCardHandle) -> Result<u8, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_attribute(&object, self.ctx.ctx(), handle)
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_attribute(object, self.ctx.ctx(), handle)
+        })
     }
 
     pub fn get_game_card_device_certificate_legacy(
@@ -1310,16 +1244,15 @@ impl FsDeviceOperator<'_> {
         size: i64,
         dst: &mut [u8],
     ) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_device_certificate_legacy(
-            &object,
-            self.ctx.ctx(),
-            handle,
-            size,
-            dst,
-        )
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_device_certificate_legacy(
+                object,
+                self.ctx.ctx(),
+                handle,
+                size,
+                dst,
+            )
+        })
     }
 
     pub fn get_game_card_device_certificate(
@@ -1328,39 +1261,35 @@ impl FsDeviceOperator<'_> {
         size: i64,
         dst: &mut [u8],
     ) -> Result<i64, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_device_certificate(
-            &object,
-            self.ctx.ctx(),
-            handle,
-            size,
-            dst,
-        )
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_device_certificate(
+                object,
+                self.ctx.ctx(),
+                handle,
+                size,
+                dst,
+            )
+        })
     }
 
     pub fn get_game_card_id_set(&self, dst: &mut [u8], size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_id_set(&object, self.ctx.ctx(), dst, size)
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_id_set(object, self.ctx.ctx(), dst, size)
+        })
     }
 
     pub fn get_game_card_error_report_info(
         &self,
     ) -> Result<GameCardErrorReportInfo, DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_error_report_info(&object, self.ctx.ctx())
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_error_report_info(object, self.ctx.ctx())
+        })
     }
 
     pub fn get_game_card_device_id(&self, dst: &mut [u8], size: i64) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::get_game_card_device_id(&object, self.ctx.ctx(), dst, size)
+        self.with_object(|object| {
+            cmif::device_operator::get_game_card_device_id(object, self.ctx.ctx(), dst, size)
+        })
     }
 
     pub fn challenge_card_existence(
@@ -1370,23 +1299,18 @@ impl FsDeviceOperator<'_> {
         seed: &[u8],
         value: &[u8],
     ) -> Result<(), DispatchError> {
-        let guard = self.ctx.pool.acquire();
-        let object = unsafe { guard.open_transient(self.object_id) }
-            .expect("device operator object_id obtained from server");
-        cmif::device_operator::challenge_card_existence(
-            &object,
-            self.ctx.ctx(),
-            handle,
-            dst,
-            seed,
-            value,
-        )
+        self.with_object(|object| {
+            cmif::device_operator::challenge_card_existence(
+                object,
+                self.ctx.ctx(),
+                handle,
+                dst,
+                seed,
+                value,
+            )
+        })
     }
 }
-
-// ---------------------------------------------------------------------------
-// connect_cmif
-// ---------------------------------------------------------------------------
 
 pub fn connect_cmif(sm: &SmService) -> Result<FsService, ConnectCmifError> {
     let handle = sm
@@ -1400,7 +1324,8 @@ pub fn connect_cmif(sm: &SmService) -> Result<FsService, ConnectCmifError> {
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectCmifError::ConvertToDomain(err))?;
 
-    cmif::proxy::set_current_process(&creator, 0).map_err(ConnectCmifError::SetCurrentProcess)?;
+    cmif::proxy::set_current_process(creator.as_borrowed(), 0)
+        .map_err(ConnectCmifError::SetCurrentProcess)?;
 
     let pool_size = proto::FS_POOL_SIZE;
     let mut sessions: Vec<Domain> = Vec::with_capacity(pool_size);

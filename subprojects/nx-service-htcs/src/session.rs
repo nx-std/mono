@@ -7,7 +7,7 @@
 
 use alloc::boxed::Box;
 
-use nx_sf::service::{Domain, DomainObject};
+use nx_sf::service::{Domain, DomainObject, DomainObjectRef, DomainRef};
 use nx_std_sync::{condvar::Condvar, mutex::Mutex};
 
 /// Maximum number of pool slots representable in the free-mask `u32`.
@@ -57,24 +57,41 @@ pub(crate) struct SessionGuard<'a> {
 
 impl<'a> SessionGuard<'a> {
     #[inline]
-    pub(crate) fn domain(&self) -> &'a Domain {
-        &self.pool.sessions[self.slot as usize]
+    pub(crate) fn domain(&self) -> DomainRef<'a> {
+        self.pool.sessions[self.slot as usize].as_borrowed()
     }
 
-    /// Mints a transient [`DomainObject`] addressing `raw_object_id` inside
-    /// this pool slot's domain.
+    /// Addresses `raw_object_id` inside this pool slot's domain. The view
+    /// closes nothing, so the socket outlives every call made through it.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure `raw_object_id` is a live server-side object
-    /// in this pool slot's [`Domain`] and that no other live `DomainObject`
-    /// addresses the same id concurrently within this slot. The
-    /// [`SessionGuard`] free-mask makes the slot exclusive, so callers that
-    /// only mint one transient object per acquired guard uphold this.
+    /// The caller must ensure `raw_object_id` names a live server-side object
+    /// in this pool slot's domain; a stale id is answered with an error by the
+    /// request it reaches.
     #[inline]
-    pub(crate) unsafe fn open_object_raw(&self, raw_object_id: u32) -> Option<DomainObject<'a>> {
-        // SAFETY: forwarded to the caller.
-        unsafe { self.domain().open_object_raw(raw_object_id) }
+    pub(crate) fn open_object_unchecked(&self, raw_object_id: u32) -> Option<DomainObjectRef<'a>> {
+        // SAFETY: the liveness of `raw_object_id` is this function's own
+        // precondition, forwarded to its caller; the view closes nothing, so a
+        // stale id costs a rejected request rather than a wrong close.
+        DomainObjectRef::from_raw_unchecked(self.domain(), raw_object_id)
+    }
+
+    /// Takes on the obligation to close the server-side object, which happens
+    /// when the returned value drops. Use only where the close is owed, which
+    /// for a socket means the teardown methods that consume it.
+    ///
+    /// The caller must additionally ensure no other live [`DomainObject`]
+    /// addresses the same id within this slot, since a second one closes an id
+    /// the server may have reused. The [`SessionGuard`] free-mask makes the
+    /// slot exclusive, which is what discharges that for a single guard.
+    #[inline]
+    pub(crate) fn open_object_for_close_unchecked(
+        &self,
+        raw_object_id: u32,
+    ) -> Option<DomainObject<'a>> {
+        // SAFETY: both halves of the precondition - a live id, and no other
+        // owner for it in this slot - are this function's own, forwarded to its
+        // caller.
+        DomainObject::from_raw_unchecked(self.domain(), raw_object_id)
     }
 }
 

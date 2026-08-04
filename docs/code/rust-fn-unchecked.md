@@ -29,9 +29,9 @@ misbehave?**
   is documented in prose, but the compiler's `unsafe` keyword is not the tool for it, and spending it here
   makes it worthless where it matters.
 - **Undefined behavior → the constructor is `unsafe fn`.** A raw pointer nothing has validated, a `zerocopy`
-  cast over a buffer that may be shorter or less aligned than the target type, a handle asserted live that the
-  kernel may already have closed, a `'static` lifetime asserted over a mapping that can be torn down. Here
-  misuse is not a wrong answer; it is a fault, a use-after-close, or a silently corrupted address space.
+  cast over a buffer that may be shorter or less aligned than the target type, a `'static` lifetime asserted
+  over a mapping that can be torn down. Here misuse is not a wrong answer; it is a fault or a silently
+  corrupted address space.
 
 The rest of this document is that split applied to declarations ([§4](#4-the-declaration-states-what-the-caller-must-uphold))
 and to call sites ([§5](#5-the-call-site-records-why-the-proof-exists)).
@@ -107,21 +107,28 @@ impl ServiceName {
 The section names the state of the world the caller is asserting, not the shape of the argument.
 
 ```rust
-// ✅ Good — `unsafe` is spent where misuse is a real fault: the wrapper closes the handle on
-// drop, so a stale or borrowed value closes a descriptor another owner is still using.
-impl SessionHandle {
-    /// Adopt a raw kernel handle as an owned session.
+// ✅ Good — `unsafe` is spent where misuse is a real fault: nothing here can check that the
+// mapping is still live or that the bytes satisfy the header's alignment, and a wrong answer
+// is a read of freed address space rather than a rejected request.
+impl SharedMemoryView {
+    /// Adopt a mapped shared-memory range as a typed view.
     ///
     /// # Safety
     ///
-    /// `raw` must name a live session handle that the kernel has not closed, and the caller
-    /// must be its sole owner: this wrapper closes the handle on drop, so a second owner
-    /// observes a closed descriptor and a later `send_sync_request` faults on it.
-    pub unsafe fn from_raw_unchecked(raw: u32) -> Self {
-        Self(raw)
+    /// `base` must address a mapping this process owns that stays mapped for `'a`, and it
+    /// must be aligned for `Header` and at least `size_of::<Header>()` bytes long. A range
+    /// that has been unmapped, or one shorter than the header, is read anyway: the load
+    /// faults or returns whatever now occupies the address.
+    pub unsafe fn from_ptr_unchecked<'a>(base: *const u8) -> &'a Header {
+        unsafe { &*base.cast::<Header>() }
     }
 }
 ```
+
+A handle is the case that most often looks like this one and is not. A wrapper that closes a kernel handle on
+drop can be duplicated into a double close, but the second close tears down an unrelated object rather than
+faulting — a resource error, so its constructor stays a safe `fn` and the duplication is prevented by the type
+system instead ([handles](handles.md#2-one-closer-per-resource)).
 
 A type that offers either kind of unchecked constructor also says so at the module level: a `//!` block stating
 which invariants the type maintains, and where validation actually happens.
@@ -152,7 +159,7 @@ impl SmClient {
         let raw = self.dispatch(request)?.into_raw_handle();
         // SAFETY: `sm` returns a freshly created session handle owned by this process, and
         // `dispatch` yields it exactly once, so this wrapper is its sole owner.
-        Ok(Session::new(unsafe { SessionHandle::from_raw_unchecked(raw) }))
+        Ok(Session::new(OwnedSessionHandle::from_raw_unchecked(raw)))
     }
 }
 ```
@@ -199,7 +206,7 @@ Before committing code, verify:
       quantity, `raw` for an identity or an opaque encoding, `bytes`/`str` for a name, `ptr` for an address,
       and a bare `new_unchecked` only where there is no single source to name
 - [ ] The constructor is `unsafe fn` if and only if breaking its precondition is undefined behavior — a raw
-      pointer, an unchecked cast, a handle asserted live, an asserted lifetime
+      pointer, an unchecked cast, an asserted lifetime
 - [ ] An `unsafe` unchecked constructor carries a `# Safety` section; a safe one states its precondition in
       prose and carries no `# Safety` section
 - [ ] The constructor's visibility is as narrow as its callers allow
@@ -223,3 +230,5 @@ Before committing code, verify:
   module-level invariant docs
 - [rust-docs-comments](rust-docs-comments.md) - Related: The voice a `// SAFETY:` note is written in, and the
   bar it has to clear to count as a justification
+- [handles](handles.md) - Related: Why a kernel handle's adopting constructor is the safe half of the split,
+  and what stops the duplication instead
