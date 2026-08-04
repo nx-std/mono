@@ -122,7 +122,7 @@ pub const fn cpu_ticks_to_ns(ticks: Ticks) -> u64 {
 /// # References
 ///
 /// - [switchbrew/nx: `__syscall_clock_gettime`](https://github.com/switchbrew/libnx/blob/60bf943ec14b1fb2ae169e627e64ab93a24c042b/nx/source/runtime/newlib.c#L361-L386)
-pub fn gettime() -> Result<Timespec, i32> {
+pub fn gettime() -> Timespec {
     // Get current tick count relative to boot
     let now = get_system_tick().to_raw();
 
@@ -135,5 +135,5 @@ pub fn gettime() -> Result<Timespec, i32> {
     // Create timespec with monotonic time (time since boot)
     // SAFETY: `subsec_ticks` is strictly less than one second's worth of ticks, so the
     // nanoseconds it converts to are within `0..NSEC_PER_SEC`.
-    Ok(Timespec::new_unchecked(seconds as i64, nanoseconds as i64))
+    Timespec::new_unchecked(seconds as i64, nanoseconds as i64)
 }

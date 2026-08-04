@@ -7,7 +7,9 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 pub mod ffi;
 
 pub mod common;
+pub mod realtime;
 mod sys;
+pub mod tz;
 
 pub use core::time::{
     Duration,

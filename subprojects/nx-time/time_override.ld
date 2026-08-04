@@ -14,5 +14,9 @@ armTicksToNs = __nx_time__arm_ticks_to_ns;
 
 /* libsysbase (newlib) syscall overrides */
 EXTERN(__nx_time__libsysbase_syscall_clock_getres);
+EXTERN(__nx_time__libsysbase_syscall_clock_gettime);
+EXTERN(__nx_time__libsysbase_syscall_gettod_r);
 
-__syscall_clock_getres = __nx_time__libsysbase_syscall_clock_getres;
+__syscall_clock_getres  = __nx_time__libsysbase_syscall_clock_getres;
+__syscall_clock_gettime = __nx_time__libsysbase_syscall_clock_gettime;
+__syscall_gettod_r      = __nx_time__libsysbase_syscall_gettod_r;

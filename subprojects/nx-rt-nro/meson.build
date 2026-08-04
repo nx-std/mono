@@ -111,9 +111,15 @@ if get_option('use_nx_service_set').enabled()
 endif
 
 # nx-service-time
+#
+# `nx-time` comes along with it: the startup wall-clock anchoring this manager performs
+# (`__libnx_init_time`) installs its reading into `nx-time`, which owns the realtime clock the
+# newlib `clock_gettime`/`gettimeofday` syscalls read back out.
 if get_option('use_nx_service_time').enabled()
     nx_service_time_proj = subproject('nx-service-time')
+    nx_time_proj = subproject('nx-time')
     deps += nx_service_time_proj.get_variable('nx_service_time_dep')
+    deps += nx_time_proj.get_variable('nx_time_dep')
     cargo_features += 'service-time'
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_time.ld'
 endif

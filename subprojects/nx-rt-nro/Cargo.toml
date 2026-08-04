@@ -34,8 +34,9 @@ service-hid = ["dep:nx-service-hid", "service-applet"]
 service-nv = ["dep:nx-service-nv", "service-applet"]
 # System Settings (set:sys) service — gates `services::set` + `ffi::setsys`.
 service-set = ["dep:nx-service-set"]
-# Time service — gates `services::time` + `ffi::time`.
-service-time = ["dep:nx-service-time"]
+# Time service — gates `services::time` + `ffi::time`. Pulls `nx-time`, which owns the
+# realtime clock this manager anchors at startup.
+service-time = ["dep:nx-service-time", "dep:nx-time"]
 # Visual Interface (display/layer) service — gates `services::vi` + `ffi::vi`.
 # Pulls `service-applet` (the managed-display-layer fallback in `viCreateLayer`
 # and ARUID lookup in `viGetIndirectLayerImageMap` both reach into the applet
@@ -61,6 +62,7 @@ nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
 thiserror = { version = "2", default-features = false }
 
 # `nx-sys-mem` and `nx-sys-thread-tls` are linked via meson for FFI symbol

@@ -58,15 +58,16 @@ impl Timespec {
     pub fn now(clock: ClockId) -> Timespec {
         match clock {
             ClockId::Realtime => {
-                // Get the current time from the RTC service
-                clock::service::gettime()
+                // Wall-clock time, derived from the anchor the runtime installs at startup.
+                // Before that happens there is no realtime clock to read, and this infallible
+                // signature has nowhere to say so, so it reports the epoch.
+                clock::service::gettime().unwrap_or(Timespec::zero())
             }
             ClockId::Monotonic => {
                 // Get the current time from the AArch64 CPU counter
                 clock::aarch64::gettime()
             }
         }
-        .unwrap_or(Timespec::zero())
     }
 
     /// Get the number of whole seconds.
