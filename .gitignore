@@ -10,10 +10,7 @@
 /.agents/*
 !/.agents/skills/
 
-# Junie
-/.junie/*
-!/.junie/skills
-
+/.junie
 /.codex
 
 
