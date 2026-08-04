@@ -113,7 +113,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_application_show(
 
     match ApplicationError::from_arg(arg).show(&self_controller.get(), &creator.get()) {
         Ok(()) => 0,
-        Err(err) => err.to_rc().to_raw(),
+        Err(err) => err.to_rc(),
     }
 }
 
