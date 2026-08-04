@@ -4,26 +4,139 @@
  * libnx: services/fs.c
  *
  * `g_fsSrv` and `g_fsSessionMgr` are `static` in fs.c, so no alias can reach
- * them. This fragment instead redirects every `fs*` entry point fsdev calls,
- * which is what keeps the C globals from ever being read. Leaving one out
- * would send a non-domain request against a domain object id.
+ * them. Every reader of those globals is itself an `fs*` command, so
+ * redirecting the whole set is what keeps them from ever being read.
+ *
+ * The redirect has to be total. A command left to libnx does not fail cleanly
+ * against the zeroed `g_fsSrv`: `_fsObjectIsChild` compares its session against
+ * itself, `0 == 0` holds, and the call parks forever inside
+ * `sessionmgrAttachClient` waiting on a condvar nothing will signal.
+ *
+ * Grouped by interface, so the Rust side decides how a command is served and
+ * this file only records that it is ours.
+ *
+ * The `fsdev*`, `fsldr*` and `fspr*` families are absent by design. fsdev is
+ * the devoptab layer that calls these commands rather than being one of them,
+ * and fs:ldr and fs:pr are separate services holding their own sessions.
+ */
+
+/*
+ * Service lifecycle
  */
 EXTERN(__nx_rt_nro__libnx_fs_initialize);
 EXTERN(__nx_rt_nro__libnx_fs_exit);
 EXTERN(__nx_rt_nro__libnx_fs_get_service_session);
 EXTERN(__nx_rt_nro__libnx_fs_set_priority);
-EXTERN(__nx_rt_nro__libnx_fs_open_sd_card_file_system);
 
 fsInitialize = __nx_rt_nro__libnx_fs_initialize;
 fsExit = __nx_rt_nro__libnx_fs_exit;
 fsGetServiceSession = __nx_rt_nro__libnx_fs_get_service_session;
 fsSetPriority = __nx_rt_nro__libnx_fs_set_priority;
+
+/*
+ * Filesystem openers
+ */
+EXTERN(__nx_rt_nro__libnx_fs_open_sd_card_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_bis_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_content_storage_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_custom_storage_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_data_file_system_by_current_process);
+EXTERN(__nx_rt_nro__libnx_fs_open_data_file_system_by_program_id);
+EXTERN(__nx_rt_nro__libnx_fs_open_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_file_system_with_id);
+EXTERN(__nx_rt_nro__libnx_fs_open_file_system_with_patch);
+EXTERN(__nx_rt_nro__libnx_fs_open_game_card_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_host_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_host_file_system_with_option);
+EXTERN(__nx_rt_nro__libnx_fs_open_image_directory_file_system);
+
 fsOpenSdCardFileSystem = __nx_rt_nro__libnx_fs_open_sd_card_file_system;
+fsOpenBisFileSystem = __nx_rt_nro__libnx_fs_open_bis_file_system;
+fsOpenContentStorageFileSystem = __nx_rt_nro__libnx_fs_open_content_storage_file_system;
+fsOpenCustomStorageFileSystem = __nx_rt_nro__libnx_fs_open_custom_storage_file_system;
+fsOpenDataFileSystemByCurrentProcess = __nx_rt_nro__libnx_fs_open_data_file_system_by_current_process;
+fsOpenDataFileSystemByProgramId = __nx_rt_nro__libnx_fs_open_data_file_system_by_program_id;
+fsOpenFileSystem = __nx_rt_nro__libnx_fs_open_file_system;
+fsOpenFileSystemWithId = __nx_rt_nro__libnx_fs_open_file_system_with_id;
+fsOpenFileSystemWithPatch = __nx_rt_nro__libnx_fs_open_file_system_with_patch;
+fsOpenGameCardFileSystem = __nx_rt_nro__libnx_fs_open_game_card_file_system;
+fsOpenHostFileSystem = __nx_rt_nro__libnx_fs_open_host_file_system;
+fsOpenHostFileSystemWithOption = __nx_rt_nro__libnx_fs_open_host_file_system_with_option;
+fsOpenImageDirectoryFileSystem = __nx_rt_nro__libnx_fs_open_image_directory_file_system;
+
+/*
+ * Savedata openers
+ */
+EXTERN(__nx_rt_nro__libnx_fs_open_save_data);
+EXTERN(__nx_rt_nro__libnx_fs_open_save_data_read_only);
+EXTERN(__nx_rt_nro__libnx_fs_open_bcat_save_data);
+EXTERN(__nx_rt_nro__libnx_fs_open_device_save_data);
+EXTERN(__nx_rt_nro__libnx_fs_open_temporary_storage);
+EXTERN(__nx_rt_nro__libnx_fs_open_cache_storage);
+EXTERN(__nx_rt_nro__libnx_fs_open_system_save_data);
+EXTERN(__nx_rt_nro__libnx_fs_open_system_bcat_save_data);
+EXTERN(__nx_rt_nro__libnx_fs_open_save_data_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_open_save_data_file_system_by_system_save_data_id);
+EXTERN(__nx_rt_nro__libnx_fs_open_read_only_save_data_file_system);
+
+fsOpen_SaveData = __nx_rt_nro__libnx_fs_open_save_data;
+fsOpen_SaveDataReadOnly = __nx_rt_nro__libnx_fs_open_save_data_read_only;
+fsOpen_BcatSaveData = __nx_rt_nro__libnx_fs_open_bcat_save_data;
+fsOpen_DeviceSaveData = __nx_rt_nro__libnx_fs_open_device_save_data;
+fsOpen_TemporaryStorage = __nx_rt_nro__libnx_fs_open_temporary_storage;
+fsOpen_CacheStorage = __nx_rt_nro__libnx_fs_open_cache_storage;
+fsOpen_SystemSaveData = __nx_rt_nro__libnx_fs_open_system_save_data;
+fsOpen_SystemBcatSaveData = __nx_rt_nro__libnx_fs_open_system_bcat_save_data;
+fsOpenSaveDataFileSystem = __nx_rt_nro__libnx_fs_open_save_data_file_system;
+fsOpenSaveDataFileSystemBySystemSaveDataId = __nx_rt_nro__libnx_fs_open_save_data_file_system_by_system_save_data_id;
+fsOpenReadOnlySaveDataFileSystem = __nx_rt_nro__libnx_fs_open_read_only_save_data_file_system;
+
+/*
+ * Savedata management
+ */
+EXTERN(__nx_rt_nro__libnx_fs_create_save_data_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_create_save_data_file_system_by_system_save_data_id);
+EXTERN(__nx_rt_nro__libnx_fs_create_system_save_data);
+EXTERN(__nx_rt_nro__libnx_fs_create_system_save_data_with_owner);
+EXTERN(__nx_rt_nro__libnx_fs_create_temporary_storage);
+EXTERN(__nx_rt_nro__libnx_fs_delete_save_data_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_data_attribute);
+EXTERN(__nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_data_space_id);
+EXTERN(__nx_rt_nro__libnx_fs_extend_save_data_file_system);
+EXTERN(__nx_rt_nro__libnx_fs_read_save_data_file_system_extra_data);
+EXTERN(__nx_rt_nro__libnx_fs_read_save_data_file_system_extra_data_by_save_data_space_id);
+EXTERN(__nx_rt_nro__libnx_fs_write_save_data_file_system_extra_data);
+EXTERN(__nx_rt_nro__libnx_fs_disable_auto_save_data_creation);
+
+fsCreateSaveDataFileSystem = __nx_rt_nro__libnx_fs_create_save_data_file_system;
+fsCreateSaveDataFileSystemBySystemSaveDataId = __nx_rt_nro__libnx_fs_create_save_data_file_system_by_system_save_data_id;
+fsCreate_SystemSaveData = __nx_rt_nro__libnx_fs_create_system_save_data;
+fsCreate_SystemSaveDataWithOwner = __nx_rt_nro__libnx_fs_create_system_save_data_with_owner;
+fsCreate_TemporaryStorage = __nx_rt_nro__libnx_fs_create_temporary_storage;
+fsDeleteSaveDataFileSystem = __nx_rt_nro__libnx_fs_delete_save_data_file_system;
+fsDeleteSaveDataFileSystemBySaveDataAttribute = __nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_data_attribute;
+fsDeleteSaveDataFileSystemBySaveDataSpaceId = __nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_data_space_id;
+fsExtendSaveDataFileSystem = __nx_rt_nro__libnx_fs_extend_save_data_file_system;
+fsReadSaveDataFileSystemExtraData = __nx_rt_nro__libnx_fs_read_save_data_file_system_extra_data;
+fsReadSaveDataFileSystemExtraDataBySaveDataSpaceId = __nx_rt_nro__libnx_fs_read_save_data_file_system_extra_data_by_save_data_space_id;
+fsWriteSaveDataFileSystemExtraData = __nx_rt_nro__libnx_fs_write_save_data_file_system_extra_data;
+fsDisableAutoSaveDataCreation = __nx_rt_nro__libnx_fs_disable_auto_save_data_creation;
+
+/*
+ * ISaveDataInfoReader commands
+ */
+EXTERN(__nx_rt_nro__libnx_fs_open_save_data_info_reader);
+EXTERN(__nx_rt_nro__libnx_fs_open_save_data_info_reader_with_filter);
+EXTERN(__nx_rt_nro__libnx_fs_save_data_info_reader_read);
+EXTERN(__nx_rt_nro__libnx_fs_save_data_info_reader_close);
+
+fsOpenSaveDataInfoReader = __nx_rt_nro__libnx_fs_open_save_data_info_reader;
+fsOpenSaveDataInfoReaderWithFilter = __nx_rt_nro__libnx_fs_open_save_data_info_reader_with_filter;
+fsSaveDataInfoReaderRead = __nx_rt_nro__libnx_fs_save_data_info_reader_read;
+fsSaveDataInfoReaderClose = __nx_rt_nro__libnx_fs_save_data_info_reader_close;
 
 /*
  * IFileSystem commands
- * Rust: ffi/libnx/fs.rs
- * libnx: services/fs.c
  */
 EXTERN(__nx_rt_nro__libnx_fs_fs_create_file);
 EXTERN(__nx_rt_nro__libnx_fs_fs_delete_file);
@@ -42,6 +155,8 @@ EXTERN(__nx_rt_nro__libnx_fs_fs_get_total_space);
 EXTERN(__nx_rt_nro__libnx_fs_fs_get_file_time_stamp_raw);
 EXTERN(__nx_rt_nro__libnx_fs_fs_set_concatenation_file_attribute);
 EXTERN(__nx_rt_nro__libnx_fs_fs_is_valid_signed_system_partition_on_sd_card);
+EXTERN(__nx_rt_nro__libnx_fs_fs_query_entry);
+EXTERN(__nx_rt_nro__libnx_fs_fs_get_file_system_attribute);
 EXTERN(__nx_rt_nro__libnx_fs_fs_close);
 
 fsFsCreateFile = __nx_rt_nro__libnx_fs_fs_create_file;
@@ -61,18 +176,19 @@ fsFsGetTotalSpace = __nx_rt_nro__libnx_fs_fs_get_total_space;
 fsFsGetFileTimeStampRaw = __nx_rt_nro__libnx_fs_fs_get_file_time_stamp_raw;
 fsFsSetConcatenationFileAttribute = __nx_rt_nro__libnx_fs_fs_set_concatenation_file_attribute;
 fsFsIsValidSignedSystemPartitionOnSdCard = __nx_rt_nro__libnx_fs_fs_is_valid_signed_system_partition_on_sd_card;
+fsFsQueryEntry = __nx_rt_nro__libnx_fs_fs_query_entry;
+fsFsGetFileSystemAttribute = __nx_rt_nro__libnx_fs_fs_get_file_system_attribute;
 fsFsClose = __nx_rt_nro__libnx_fs_fs_close;
 
 /*
  * IFile commands
- * Rust: ffi/libnx/fs.rs
- * libnx: services/fs.c
  */
 EXTERN(__nx_rt_nro__libnx_fs_file_read);
 EXTERN(__nx_rt_nro__libnx_fs_file_write);
 EXTERN(__nx_rt_nro__libnx_fs_file_flush);
 EXTERN(__nx_rt_nro__libnx_fs_file_set_size);
 EXTERN(__nx_rt_nro__libnx_fs_file_get_size);
+EXTERN(__nx_rt_nro__libnx_fs_file_operate_range);
 EXTERN(__nx_rt_nro__libnx_fs_file_close);
 
 fsFileRead = __nx_rt_nro__libnx_fs_file_read;
@@ -80,12 +196,11 @@ fsFileWrite = __nx_rt_nro__libnx_fs_file_write;
 fsFileFlush = __nx_rt_nro__libnx_fs_file_flush;
 fsFileSetSize = __nx_rt_nro__libnx_fs_file_set_size;
 fsFileGetSize = __nx_rt_nro__libnx_fs_file_get_size;
+fsFileOperateRange = __nx_rt_nro__libnx_fs_file_operate_range;
 fsFileClose = __nx_rt_nro__libnx_fs_file_close;
 
 /*
  * IDirectory commands
- * Rust: ffi/libnx/fs.rs
- * libnx: services/fs.c
  */
 EXTERN(__nx_rt_nro__libnx_fs_dir_read);
 EXTERN(__nx_rt_nro__libnx_fs_dir_get_entry_count);
@@ -94,3 +209,121 @@ EXTERN(__nx_rt_nro__libnx_fs_dir_close);
 fsDirRead = __nx_rt_nro__libnx_fs_dir_read;
 fsDirGetEntryCount = __nx_rt_nro__libnx_fs_dir_get_entry_count;
 fsDirClose = __nx_rt_nro__libnx_fs_dir_close;
+
+/*
+ * IStorage commands
+ */
+EXTERN(__nx_rt_nro__libnx_fs_open_bis_storage);
+EXTERN(__nx_rt_nro__libnx_fs_open_data_storage_by_current_process);
+EXTERN(__nx_rt_nro__libnx_fs_open_data_storage_by_data_id);
+EXTERN(__nx_rt_nro__libnx_fs_open_data_storage_by_program_id);
+EXTERN(__nx_rt_nro__libnx_fs_open_patch_data_storage_by_current_process);
+EXTERN(__nx_rt_nro__libnx_fs_storage_read);
+EXTERN(__nx_rt_nro__libnx_fs_storage_write);
+EXTERN(__nx_rt_nro__libnx_fs_storage_flush);
+EXTERN(__nx_rt_nro__libnx_fs_storage_set_size);
+EXTERN(__nx_rt_nro__libnx_fs_storage_get_size);
+EXTERN(__nx_rt_nro__libnx_fs_storage_operate_range);
+EXTERN(__nx_rt_nro__libnx_fs_storage_close);
+
+fsOpenBisStorage = __nx_rt_nro__libnx_fs_open_bis_storage;
+fsOpenDataStorageByCurrentProcess = __nx_rt_nro__libnx_fs_open_data_storage_by_current_process;
+fsOpenDataStorageByDataId = __nx_rt_nro__libnx_fs_open_data_storage_by_data_id;
+fsOpenDataStorageByProgramId = __nx_rt_nro__libnx_fs_open_data_storage_by_program_id;
+fsOpenPatchDataStorageByCurrentProcess = __nx_rt_nro__libnx_fs_open_patch_data_storage_by_current_process;
+fsStorageRead = __nx_rt_nro__libnx_fs_storage_read;
+fsStorageWrite = __nx_rt_nro__libnx_fs_storage_write;
+fsStorageFlush = __nx_rt_nro__libnx_fs_storage_flush;
+fsStorageSetSize = __nx_rt_nro__libnx_fs_storage_set_size;
+fsStorageGetSize = __nx_rt_nro__libnx_fs_storage_get_size;
+fsStorageOperateRange = __nx_rt_nro__libnx_fs_storage_operate_range;
+fsStorageClose = __nx_rt_nro__libnx_fs_storage_close;
+
+/*
+ * IDeviceOperator commands
+ */
+EXTERN(__nx_rt_nro__libnx_fs_open_device_operator);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_is_sd_card_inserted);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_sd_card_speed_mode);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_sd_card_cid);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_sd_card_user_area_size);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_sd_card_protected_area_size);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_and_clear_sd_card_error_info);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_mmc_cid);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_mmc_speed_mode);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_mmc_patrol_count);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_mmc_extended_csd);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_and_clear_mmc_error_info);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_is_game_card_inserted);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_handle);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_attribute);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_device_id);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_device_certificate);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_id_set);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_error_report_info);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_get_game_card_update_partition_info);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_challenge_card_existence);
+EXTERN(__nx_rt_nro__libnx_fs_device_operator_close);
+
+fsOpenDeviceOperator = __nx_rt_nro__libnx_fs_open_device_operator;
+fsDeviceOperatorIsSdCardInserted = __nx_rt_nro__libnx_fs_device_operator_is_sd_card_inserted;
+fsDeviceOperatorGetSdCardSpeedMode = __nx_rt_nro__libnx_fs_device_operator_get_sd_card_speed_mode;
+fsDeviceOperatorGetSdCardCid = __nx_rt_nro__libnx_fs_device_operator_get_sd_card_cid;
+fsDeviceOperatorGetSdCardUserAreaSize = __nx_rt_nro__libnx_fs_device_operator_get_sd_card_user_area_size;
+fsDeviceOperatorGetSdCardProtectedAreaSize = __nx_rt_nro__libnx_fs_device_operator_get_sd_card_protected_area_size;
+fsDeviceOperatorGetAndClearSdCardErrorInfo = __nx_rt_nro__libnx_fs_device_operator_get_and_clear_sd_card_error_info;
+fsDeviceOperatorGetMmcCid = __nx_rt_nro__libnx_fs_device_operator_get_mmc_cid;
+fsDeviceOperatorGetMmcSpeedMode = __nx_rt_nro__libnx_fs_device_operator_get_mmc_speed_mode;
+fsDeviceOperatorGetMmcPatrolCount = __nx_rt_nro__libnx_fs_device_operator_get_mmc_patrol_count;
+fsDeviceOperatorGetMmcExtendedCsd = __nx_rt_nro__libnx_fs_device_operator_get_mmc_extended_csd;
+fsDeviceOperatorGetAndClearMmcErrorInfo = __nx_rt_nro__libnx_fs_device_operator_get_and_clear_mmc_error_info;
+fsDeviceOperatorIsGameCardInserted = __nx_rt_nro__libnx_fs_device_operator_is_game_card_inserted;
+fsDeviceOperatorGetGameCardHandle = __nx_rt_nro__libnx_fs_device_operator_get_game_card_handle;
+fsDeviceOperatorGetGameCardAttribute = __nx_rt_nro__libnx_fs_device_operator_get_game_card_attribute;
+fsDeviceOperatorGetGameCardDeviceId = __nx_rt_nro__libnx_fs_device_operator_get_game_card_device_id;
+fsDeviceOperatorGetGameCardDeviceCertificate = __nx_rt_nro__libnx_fs_device_operator_get_game_card_device_certificate;
+fsDeviceOperatorGetGameCardIdSet = __nx_rt_nro__libnx_fs_device_operator_get_game_card_id_set;
+fsDeviceOperatorGetGameCardErrorReportInfo = __nx_rt_nro__libnx_fs_device_operator_get_game_card_error_report_info;
+fsDeviceOperatorGetGameCardUpdatePartitionInfo = __nx_rt_nro__libnx_fs_device_operator_get_game_card_update_partition_info;
+fsDeviceOperatorChallengeCardExistence = __nx_rt_nro__libnx_fs_device_operator_challenge_card_existence;
+fsDeviceOperatorClose = __nx_rt_nro__libnx_fs_device_operator_close;
+
+/*
+ * IEventNotifier commands
+ */
+EXTERN(__nx_rt_nro__libnx_fs_open_sd_card_detection_event_notifier);
+EXTERN(__nx_rt_nro__libnx_fs_event_notifier_get_event_handle);
+EXTERN(__nx_rt_nro__libnx_fs_event_notifier_close);
+
+fsOpenSdCardDetectionEventNotifier = __nx_rt_nro__libnx_fs_open_sd_card_detection_event_notifier;
+fsEventNotifierGetEventHandle = __nx_rt_nro__libnx_fs_event_notifier_get_event_handle;
+fsEventNotifierClose = __nx_rt_nro__libnx_fs_event_notifier_close;
+
+/*
+ * Global queries and settings
+ */
+EXTERN(__nx_rt_nro__libnx_fs_get_and_clear_error_info);
+EXTERN(__nx_rt_nro__libnx_fs_get_and_clear_memory_report_info);
+EXTERN(__nx_rt_nro__libnx_fs_get_content_storage_info_index);
+EXTERN(__nx_rt_nro__libnx_fs_get_global_access_log_mode);
+EXTERN(__nx_rt_nro__libnx_fs_set_global_access_log_mode);
+EXTERN(__nx_rt_nro__libnx_fs_get_program_id);
+EXTERN(__nx_rt_nro__libnx_fs_get_program_index_for_access_log);
+EXTERN(__nx_rt_nro__libnx_fs_get_rights_id_by_path);
+EXTERN(__nx_rt_nro__libnx_fs_get_rights_id_and_key_generation_by_path);
+EXTERN(__nx_rt_nro__libnx_fs_is_ex_fat_supported);
+EXTERN(__nx_rt_nro__libnx_fs_is_signed_system_partition_on_sd_card_valid);
+EXTERN(__nx_rt_nro__libnx_fs_output_access_log_to_sd_card);
+
+fsGetAndClearErrorInfo = __nx_rt_nro__libnx_fs_get_and_clear_error_info;
+fsGetAndClearMemoryReportInfo = __nx_rt_nro__libnx_fs_get_and_clear_memory_report_info;
+fsGetContentStorageInfoIndex = __nx_rt_nro__libnx_fs_get_content_storage_info_index;
+fsGetGlobalAccessLogMode = __nx_rt_nro__libnx_fs_get_global_access_log_mode;
+fsSetGlobalAccessLogMode = __nx_rt_nro__libnx_fs_set_global_access_log_mode;
+fsGetProgramId = __nx_rt_nro__libnx_fs_get_program_id;
+fsGetProgramIndexForAccessLog = __nx_rt_nro__libnx_fs_get_program_index_for_access_log;
+fsGetRightsIdByPath = __nx_rt_nro__libnx_fs_get_rights_id_by_path;
+fsGetRightsIdAndKeyGenerationByPath = __nx_rt_nro__libnx_fs_get_rights_id_and_key_generation_by_path;
+fsIsExFatSupported = __nx_rt_nro__libnx_fs_is_ex_fat_supported;
+fsIsSignedSystemPartitionOnSdCardValid = __nx_rt_nro__libnx_fs_is_signed_system_partition_on_sd_card_valid;
+fsOutputAccessLogToSdCard = __nx_rt_nro__libnx_fs_output_access_log_to_sd_card;
