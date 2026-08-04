@@ -13,7 +13,7 @@
 //! typed handle whose method set reflects the actual sub-interface menu for
 //! that role.
 
-use core::{ops::Deref, sync::atomic::Ordering};
+use core::sync::atomic::Ordering;
 
 use nx_service_applet::{
     AppletFocusHandlingMode, AppletFocusState, AppletMessage, AppletOperationMode,
@@ -51,10 +51,6 @@ static APPLET_STATE: OnceLock<RwLock<Option<AppletSingleton>>> = OnceLock::new()
 fn state() -> &'static RwLock<Option<AppletSingleton>> {
     APPLET_STATE.get_or_init(|| RwLock::new(None))
 }
-
-// =====================================================================
-// Lifecycle
-// =====================================================================
 
 /// Initializes the applet service.
 ///
@@ -170,10 +166,6 @@ pub fn process_message(msg: AppletMessage) {
     }
 }
 
-// =====================================================================
-// Role-specific handle accessors
-// =====================================================================
-//
 // Each `as_<role>` is public API of the shared applet manager: the
 // per-output-kind entry crates (`nx-rt-nro`, `nx-rt-nso`) consume them from
 // their own FFI shims to route role-gated commands through the typed proxy.
@@ -245,12 +237,8 @@ pub fn as_system_application() -> Option<SystemApplicationHandle> {
     }
 }
 
-// =====================================================================
-// Top-level shared accessors (role-agnostic)
-// =====================================================================
-
 /// Gets the [`CommonStateGetter`] sub-interface.
-pub fn get_common_state_getter() -> Option<impl Deref<Target = CommonStateGetter> + 'static> {
+pub fn get_common_state_getter() -> Option<CommonStateGetterRef> {
     let guard = state().read();
     if guard.is_some() {
         Some(CommonStateGetterRef(guard))
@@ -260,7 +248,7 @@ pub fn get_common_state_getter() -> Option<impl Deref<Target = CommonStateGetter
 }
 
 /// Gets the [`SelfController`] sub-interface.
-pub fn get_self_controller() -> Option<impl Deref<Target = SelfController> + 'static> {
+pub fn get_self_controller() -> Option<SelfControllerRef> {
     let guard = state().read();
     if guard.is_some() {
         Some(SelfControllerRef(guard))
@@ -270,7 +258,7 @@ pub fn get_self_controller() -> Option<impl Deref<Target = SelfController> + 'st
 }
 
 /// Gets the [`WindowController`] sub-interface.
-pub fn get_window_controller() -> Option<impl Deref<Target = WindowController> + 'static> {
+pub fn get_window_controller() -> Option<WindowControllerRef> {
     let guard = state().read();
     if guard.is_some() {
         Some(WindowControllerRef(guard))
@@ -325,21 +313,23 @@ pub fn cached_performance_mode() -> AppletPerformanceMode {
         .unwrap_or_default()
 }
 
-// =====================================================================
-// Read-guard wrappers for the universal accessors
-// =====================================================================
-//
 // Each wrapper holds a read lock on the singleton and projects to a single
 // core sub-interface via `AppletSingleton`'s role-erased accessors.
+//
+// The projection is an inherent `get`, not a `Deref`: a sub-interface is a
+// borrowed view carrying the domain's lifetime, so it is built on each call
+// rather than stored, and `Deref` can only hand back a reference to something
+// the wrapper already holds.
 
 macro_rules! define_core_ref {
-    ($Ref:ident, $Target:ty, $method:ident) => {
-        struct $Ref(RwLockReadGuard<'static, Option<AppletSingleton>>);
+    ($Ref:ident, $Target:ident, $method:ident) => {
+        pub struct $Ref(RwLockReadGuard<'static, Option<AppletSingleton>>);
 
-        impl Deref for $Ref {
-            type Target = $Target;
-
-            fn deref(&self) -> &Self::Target {
+        impl $Ref {
+            /// Borrows the sub-interface for the duration of `&self`, which is
+            /// what keeps it from outliving the read lock.
+            #[inline]
+            pub fn get(&self) -> $Target<'_> {
                 match self.0.as_ref() {
                     Some(singleton) => singleton.$method(),
                     // SAFETY: construction is guarded by `is_some()` in the

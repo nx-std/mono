@@ -1,6 +1,6 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 #[inline]
 pub(crate) fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
@@ -8,7 +8,7 @@ pub(crate) fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
 }
 
 pub(crate) fn dispatch_no_io(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<(), DispatchError> {
@@ -22,7 +22,7 @@ pub(crate) fn dispatch_no_io(
 }
 
 pub(crate) fn dispatch_in<I: Copy>(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
     input: I,
@@ -38,7 +38,7 @@ pub(crate) fn dispatch_in<I: Copy>(
 }
 
 pub(crate) fn dispatch_out<O: Copy>(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<O, DispatchError> {
@@ -53,7 +53,7 @@ pub(crate) fn dispatch_out<O: Copy>(
 }
 
 pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
     input: I,
@@ -70,7 +70,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
 }
 
 pub(crate) fn dispatch_out_u8(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<u8, DispatchError> {
@@ -78,7 +78,7 @@ pub(crate) fn dispatch_out_u8(
 }
 
 pub(crate) fn dispatch_out_bool(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<bool, DispatchError> {
@@ -86,7 +86,7 @@ pub(crate) fn dispatch_out_bool(
 }
 
 pub(crate) fn dispatch_out_u32(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
@@ -94,7 +94,7 @@ pub(crate) fn dispatch_out_u32(
 }
 
 pub(crate) fn dispatch_out_i64(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<i64, DispatchError> {
@@ -102,7 +102,7 @@ pub(crate) fn dispatch_out_i64(
 }
 
 pub(crate) fn dispatch_in_size_out_buffer(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
     size: i64,

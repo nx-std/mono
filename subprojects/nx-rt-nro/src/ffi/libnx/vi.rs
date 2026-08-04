@@ -555,7 +555,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_vi_create_layer(
         let Some(self_controller) = applet::get_self_controller() else {
             return GENERIC_ERROR;
         };
-        match self_controller.create_managed_display_layer() {
+        match self_controller.get().create_managed_display_layer() {
             Ok(id) => layer_id = id,
             Err(_) => return GENERIC_ERROR,
         }

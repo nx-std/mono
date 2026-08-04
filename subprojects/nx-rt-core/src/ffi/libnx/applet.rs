@@ -90,7 +90,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_get_message_event_handle() -
         return INVALID_HANDLE;
     };
 
-    match csg.get_event_handle() {
+    match csg.get().get_event_handle() {
         Ok(handle) => handle.to_raw(),
         Err(_) => INVALID_HANDLE,
     }
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_get_message_event(out: *mut 
         return GENERIC_ERROR;
     };
 
-    match csg.get_event_handle() {
+    match csg.get().get_event_handle() {
         Ok(handle) => {
             // SAFETY: caller guarantees `out` is writable.
             unsafe {
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_receive_message(msg: *mut u3
         return GENERIC_ERROR;
     };
 
-    let result = csg.receive_message();
+    let result = csg.get().receive_message();
     // Drop the borrow before invoking process_message (which re-acquires the
     // read lock to refresh the cache).
     drop(csg);
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_set_operation_mode_changed_n
         return GENERIC_ERROR;
     };
 
-    if let Err(err) = sc.set_operation_mode_changed_notification(enabled) {
+    if let Err(err) = sc.get().set_operation_mode_changed_notification(enabled) {
         return err.to_rc();
     }
 
@@ -278,7 +278,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_set_performance_mode_changed
         return GENERIC_ERROR;
     };
 
-    if let Err(err) = sc.set_performance_mode_changed_notification(enabled) {
+    if let Err(err) = sc.get().set_performance_mode_changed_notification(enabled) {
         return err.to_rc();
     }
 
@@ -312,7 +312,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_acquire_foreground_rights() 
         return GENERIC_ERROR;
     };
 
-    if let Err(err) = wc.acquire_foreground_rights() {
+    if let Err(err) = wc.get().acquire_foreground_rights() {
         return err.to_rc();
     }
 
@@ -334,7 +334,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_create_managed_display_layer
         return GENERIC_ERROR;
     };
 
-    match sc.create_managed_display_layer() {
+    match sc.get().create_managed_display_layer() {
         Ok(layer_id) => {
             if !out.is_null() {
                 unsafe { *out = layer_id };

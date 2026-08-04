@@ -2,13 +2,25 @@
 //!
 //! A [`Domain`] is an IPC session that has been promoted via CMIF control
 //! request 0 and multiplexes multiple server-side objects over a single
-//! kernel handle. Each named object inside the domain is accessed through
-//! a [`DomainObject`], which borrows the parent `Domain` so the borrow
-//! checker prevents using the object after the domain has been dropped.
+//! kernel handle.
 //!
-//! Dropping a `Domain` closes the underlying session (the server cascades
-//! object close on its side). Dropping a `DomainObject` sends a per-object
-//! close request on the parent session without touching the handle.
+//! Both levels of the domain - the session and the objects inside it - come in
+//! an owning form and a borrowed one, and the split is the same at both:
+//!
+//! | Level  | Owns, closes on drop | Borrows, no destructor |
+//! |--------|----------------------|------------------------|
+//! | Domain | [`Domain`]           | [`DomainRef`]          |
+//! | Object | [`DomainObject`]     | [`DomainObjectRef`]    |
+//!
+//! The owning forms are neither `Copy` nor `Clone`, so a second closer needs a
+//! move and the move checker rejects it. The borrowed forms are `Copy`, have no
+//! destructor, and carry the owner's lifetime, so they can neither close nor
+//! outlive what they name.
+//!
+//! Everything that merely *addresses* an object takes [`DomainObjectRef`]. A
+//! [`DomainObject`] is minted only where a close is genuinely owed: the server
+//! emits an object id in a reply, and `DomainDispatch::send` turns each one into
+//! exactly one owner.
 
 use core::{marker::PhantomData, mem::ManuallyDrop};
 
@@ -21,6 +33,9 @@ use super::{
 use crate::cmif::ObjectId;
 
 /// Owned domain root: a session converted via CMIF control request 0.
+///
+/// Dropping closes the underlying session; the server cascades object close on
+/// its side, so the objects opened against it need no individual close first.
 #[derive(Debug)]
 pub struct Domain {
     handle: OwnedSessionHandle,
@@ -41,29 +56,6 @@ impl Domain {
             handle,
             pointer_buffer_size,
         }
-    }
-
-    /// Builds a `Domain`-typed alias of this domain that must not be dropped.
-    ///
-    /// This is the one hole left in the ownership split [`OwnedSessionHandle`] otherwise
-    /// closes: the alias holds a second owner of the same handle, and safe code can reach the
-    /// double close through [`ManuallyDrop::into_inner`]. It exists only for callers that need
-    /// a field of type `Domain` and cannot hold a borrow, which today is `nx-service-applet`'s
-    /// self-referential `Proxy<R>`. Prefer [`as_borrowed`](Self::as_borrowed), which cannot be
-    /// dropped wrongly at all.
-    // TODO: Remove once `nx-service-applet` stores object ids and builds its sub-interface
-    //       views on demand, at which point every caller can hold a `DomainRef` instead.
-    #[inline]
-    pub fn alias(&self) -> ManuallyDrop<Self> {
-        ManuallyDrop::new(Self {
-            // SAFETY: The `ManuallyDrop` suppresses the alias's destructor, so the owner this
-            // borrows from remains the only closer for as long as the caller upholds the
-            // must-not-be-dropped contract above.
-            handle: OwnedSessionHandle::from_handle_unchecked(
-                self.handle.as_borrowed().to_handle(),
-            ),
-            pointer_buffer_size: self.pointer_buffer_size,
-        })
     }
 
     /// Borrows the domain as a non-owning view.
@@ -100,49 +92,13 @@ impl Domain {
         self.pointer_buffer_size
     }
 
-    /// Borrows the domain to address a named object inside it. No IPC is
-    /// issued.
-    ///
-    /// Crate-internal: the only legitimate source of fresh
-    /// [`DomainObject`]s is [`DomainDispatch::send`], which calls this once
-    /// per server-emitted [`ObjectId`]. External callers that need a
-    /// [`DomainObject`] from a raw id must use the `unsafe`
-    /// [`open_object_raw`](Self::open_object_raw) escape hatch.
-    #[inline]
-    pub(crate) fn open_object(&self, object_id: ObjectId) -> DomainObject<'_> {
-        DomainObject {
-            domain: self,
-            object_id,
-        }
-    }
-
-    /// Wraps a raw object id into a [`DomainObject`]. Returns `None` if the
-    /// raw value is the sentinel zero (no object).
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that `raw_object_id` corresponds to a
-    /// server-side object inside this [`Domain`] that **no other live
-    /// `DomainObject<'_>` already references**. Constructing a second
-    /// [`DomainObject`] for the same id would double-close on Drop. Passing
-    /// the id of a previously-dropped `DomainObject` is also unsound — the
-    /// server may have reused the id for a different object.
-    ///
-    /// The safe alternative is to obtain [`DomainObject`]s from
-    /// [`DomainDispatch::send`], which guarantees each server-emitted
-    /// [`ObjectId`] becomes exactly one [`DomainObject`].
-    #[inline]
-    pub unsafe fn open_object_raw(&self, raw_object_id: u32) -> Option<DomainObject<'_>> {
-        ObjectId::new(raw_object_id).map(|object_id| self.open_object(object_id))
-    }
-
     /// Extracts a domain object into a standalone non-domain [`Session`] via
     /// CMIF control request 1.
     ///
-    /// Takes `&DomainObject` (rather than a raw [`ObjectId`]) so the caller
-    /// must hold a live, unique handle to the object — preventing a raw id
-    /// from a dropped or aliased `DomainObject` from being laundered into a
-    /// new [`Session`].
+    /// Takes the owning [`DomainObject`] rather than a [`DomainObjectRef`] or a
+    /// raw [`ObjectId`], so the caller must hold the object's sole closer -
+    /// preventing an id from a dropped or borrowed object from being laundered
+    /// into a new [`Session`].
     pub fn copy_object_to_session(
         &self,
         object: &DomainObject<'_>,
@@ -161,23 +117,17 @@ impl Domain {
 
     /// Starts a [`DomainDispatch`] builder addressing the domain root
     /// itself. Domain-object requests should go through
-    /// [`DomainObject::dispatch`] instead.
+    /// [`DomainObjectRef::dispatch`] instead.
     #[inline]
     pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'_> {
-        DomainDispatch::new(
-            self,
-            self.handle.as_borrowed(),
-            self.pointer_buffer_size,
-            None,
-            request_id,
-        )
+        self.as_borrowed().dispatch(request_id)
     }
 }
 
 /// Borrowed view onto a [`Domain`] that does not own its handle.
 ///
-/// Dispatches like a `Domain` but has no destructor, so aliasing one costs neither an `unsafe`
-/// block nor a `ManuallyDrop` to suppress a close that would otherwise happen twice.
+/// Dispatches like a `Domain` but has no destructor, so it cannot close the
+/// session; the lifetime keeps it from outliving the owner.
 #[derive(Debug, Clone, Copy)]
 pub struct DomainRef<'d> {
     handle: BorrowedSessionHandle<'d>,
@@ -197,20 +147,61 @@ impl<'d> DomainRef<'d> {
     pub fn pointer_buffer_size(&self) -> u16 {
         self.pointer_buffer_size
     }
+
+    /// Addresses a named object inside the domain, taking on the obligation to
+    /// close it. No IPC is issued.
+    ///
+    /// Crate-internal: the only legitimate source of a fresh owner is
+    /// `DomainDispatch::send`, which calls this once per server-emitted
+    /// [`ObjectId`].
+    #[inline]
+    pub(crate) fn open_object(&self, object_id: ObjectId) -> DomainObject<'d> {
+        DomainObject {
+            domain: *self,
+            object_id,
+        }
+    }
+
+    /// Starts a [`DomainDispatch`] builder addressing the domain root itself.
+    #[inline]
+    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
+        DomainDispatch::new(*self, None, request_id)
+    }
 }
 
-/// Borrowed view onto a single object inside a [`Domain`].
+/// Owned view onto a single object inside a [`Domain`]: dropping it sends a
+/// per-object close request on the parent session.
 ///
-/// The `'d` lifetime ties the object to its parent domain so use-after-close
-/// is a compile error. Dropping the object sends a per-object close request
-/// on the parent session.
+/// Neither `Copy` nor `Clone`, so it is the sole closer for its id. The `'d`
+/// lifetime ties the object to its parent domain, making use-after-close a
+/// compile error.
+///
+/// Take [`DomainObjectRef`] in anything that merely addresses the object; this
+/// type is for the one holder that owes the close.
 #[derive(Debug)]
 pub struct DomainObject<'d> {
-    domain: &'d Domain,
+    domain: DomainRef<'d>,
     object_id: ObjectId,
 }
 
 impl<'d> DomainObject<'d> {
+    /// Wraps a raw object id, taking on the obligation to close it. Returns
+    /// `None` if the raw value is the sentinel zero (no object).
+    ///
+    /// Prefer [`DomainObjectRef::from_raw_unchecked`], which closes nothing and
+    /// so carries no such obligation. This form exists for the `Drop` impl of a
+    /// wrapper that stored an id and now owes the server a close.
+    ///
+    /// The caller must ensure `raw_object_id` names a live server-side object
+    /// inside `domain` that no other live `DomainObject` already addresses. A
+    /// second owner sends its close against an id the server may have reused, so
+    /// an unrelated object is torn down; that is a resource error rather than
+    /// undefined behaviour, which is why this is a safe function.
+    #[inline]
+    pub fn from_raw_unchecked(domain: DomainRef<'d>, raw_object_id: u32) -> Option<Self> {
+        ObjectId::new(raw_object_id).map(|object_id| domain.open_object(object_id))
+    }
+
     /// Returns the object id this view addresses.
     #[inline]
     pub fn object_id(&self) -> ObjectId {
@@ -219,25 +210,96 @@ impl<'d> DomainObject<'d> {
 
     /// Returns the parent domain.
     #[inline]
-    pub fn domain(&self) -> &'d Domain {
+    pub fn domain(&self) -> DomainRef<'d> {
         self.domain
     }
 
-    /// Starts a [`DomainDispatch`] builder addressing this domain object.
+    /// Borrows the object as a non-closing view.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
-        DomainDispatch::new(
-            self.domain,
-            self.domain.handle.as_borrowed(),
-            self.domain.pointer_buffer_size,
-            Some(self.object_id),
-            request_id,
-        )
+    pub fn as_borrowed(&self) -> DomainObjectRef<'_> {
+        DomainObjectRef {
+            domain: self.domain,
+            object_id: self.object_id,
+            owner: PhantomData,
+        }
+    }
+
+    /// Gives up the close obligation, returning the raw object id.
+    ///
+    /// The caller becomes responsible for closing the object exactly once, which
+    /// at this level means minting one [`DomainObject`] for the id and dropping
+    /// it.
+    #[inline]
+    pub fn into_raw_object_id(self) -> u32 {
+        // The close is being handed on rather than sent, so the destructor that
+        // would send it is suppressed.
+        let this = ManuallyDrop::new(self);
+        this.object_id.to_raw()
+    }
+
+    /// Starts a [`DomainDispatch`] builder addressing this object.
+    #[inline]
+    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'_> {
+        self.as_borrowed().dispatch(request_id)
     }
 }
 
 impl Drop for DomainObject<'_> {
     fn drop(&mut self) {
-        control::close_object(self.domain.handle.as_borrowed(), self.object_id);
+        control::close_object(self.domain.handle(), self.object_id);
+    }
+}
+
+/// Borrowed view onto a single object inside a [`Domain`].
+///
+/// `Copy` and destructor-free: closing is the owner's job, and the lifetime
+/// keeps the view from outliving either the object or the domain it is
+/// addressed through.
+///
+/// This is the type every function that merely dispatches against an object
+/// should take.
+#[derive(Debug, Clone, Copy)]
+pub struct DomainObjectRef<'d> {
+    domain: DomainRef<'d>,
+    object_id: ObjectId,
+    owner: PhantomData<&'d DomainObject<'d>>,
+}
+
+impl<'d> DomainObjectRef<'d> {
+    /// Addresses a server-side object by its raw id, without checking that the
+    /// id names one. Returns `None` if the raw value is the sentinel zero (no
+    /// object).
+    ///
+    /// The caller must ensure `raw_object_id` was issued by the server for an
+    /// object inside `domain` that is still open. Nothing here can check that,
+    /// since only the server knows which ids are live. A stale or fabricated id
+    /// is answered with an error by the request it reaches rather than faulting,
+    /// and this view closes nothing, so no close can land on an object the id
+    /// was reused for - which is why this is a safe function.
+    #[inline]
+    pub fn from_raw_unchecked(domain: DomainRef<'d>, raw_object_id: u32) -> Option<Self> {
+        ObjectId::new(raw_object_id).map(|object_id| Self {
+            domain,
+            object_id,
+            owner: PhantomData,
+        })
+    }
+
+    /// Returns the object id this view addresses.
+    #[inline]
+    pub fn object_id(&self) -> ObjectId {
+        self.object_id
+    }
+
+    /// Returns the parent domain.
+    #[inline]
+    pub fn domain(&self) -> DomainRef<'d> {
+        self.domain
+    }
+
+    /// Starts a [`DomainDispatch`] builder addressing this object.
+    #[inline]
+    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
+        DomainDispatch::new(self.domain, Some(self.object_id), request_id)
     }
 }

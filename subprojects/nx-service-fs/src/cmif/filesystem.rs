@@ -1,6 +1,6 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{
     dispatch::{dispatch_no_io, dispatch_out},
@@ -13,7 +13,7 @@ fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
 }
 
 pub(crate) fn create_file(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     size: i64,
@@ -36,7 +36,7 @@ pub(crate) fn create_file(
 }
 
 pub(crate) fn cmd_with_path(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     cmd_id: u32,
     path: &[u8; FS_MAX_PATH],
@@ -52,7 +52,7 @@ pub(crate) fn cmd_with_path(
 }
 
 pub(crate) fn cmd_with_two_paths(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     cmd_id: u32,
     cur_path: &[u8; FS_MAX_PATH],
@@ -70,7 +70,7 @@ pub(crate) fn cmd_with_two_paths(
 }
 
 pub(crate) fn get_entry_type(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
@@ -86,7 +86,7 @@ pub(crate) fn get_entry_type(
 }
 
 pub(crate) fn open_file(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     mode: u32,
@@ -101,11 +101,11 @@ pub(crate) fn open_file(
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let obj = result.take_object(0).expect("server returned file object");
-    Ok(ManuallyDrop::new(obj).object_id().to_raw())
+    Ok(obj.into_raw_object_id())
 }
 
 pub(crate) fn open_directory(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     mode: u32,
@@ -122,18 +122,15 @@ pub(crate) fn open_directory(
     let obj = result
         .take_object(0)
         .expect("server returned directory object");
-    Ok(ManuallyDrop::new(obj).object_id().to_raw())
+    Ok(obj.into_raw_object_id())
 }
 
-pub(crate) fn commit(
-    object: &ManuallyDrop<DomainObject<'_>>,
-    ctx: u32,
-) -> Result<(), DispatchError> {
+pub(crate) fn commit(object: DomainObjectRef<'_>, ctx: u32) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::FS_COMMIT, ctx)
 }
 
 pub(crate) fn get_space(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     cmd_id: u32,
     path: &[u8; FS_MAX_PATH],
@@ -150,7 +147,7 @@ pub(crate) fn get_space(
 }
 
 pub(crate) fn get_file_time_stamp_raw(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<TimeStampRaw, DispatchError> {
@@ -166,7 +163,7 @@ pub(crate) fn get_file_time_stamp_raw(
 }
 
 pub(crate) fn query_entry(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
     query_id: u32,
@@ -193,7 +190,7 @@ pub(crate) fn query_entry(
 }
 
 pub(crate) fn get_file_system_attribute(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<FileSystemAttribute, DispatchError> {
     dispatch_out(object, proto::FS_GET_FILE_SYSTEM_ATTRIBUTE, ctx)

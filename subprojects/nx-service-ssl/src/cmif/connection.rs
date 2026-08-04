@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_in_out_u32, dispatch_no_io, dispatch_out_u32},
@@ -15,7 +15,7 @@ use crate::{
 
 /// Sets the socket descriptor on the connection.
 pub(crate) fn set_socket_descriptor(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sockfd: i32,
 ) -> Result<i32, DispatchError> {
     let result = dispatch_in_out_u32(object, proto::CONN_SET_SOCKET_DESCRIPTOR, sockfd)?;
@@ -23,7 +23,7 @@ pub(crate) fn set_socket_descriptor(
 }
 
 /// Sets the host name for TLS verification.
-pub(crate) fn set_host_name(object: &DomainObject<'_>, name: &[u8]) -> Result<(), DispatchError> {
+pub(crate) fn set_host_name(object: DomainObjectRef<'_>, name: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
@@ -35,25 +35,25 @@ pub(crate) fn set_host_name(object: &DomainObject<'_>, name: &[u8]) -> Result<()
 
 /// Sets the verify option bitmask.
 pub(crate) fn set_verify_option(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     verify_option: u32,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::CONN_SET_VERIFY_OPTION, verify_option)
 }
 
 /// Sets the I/O mode.
-pub(crate) fn set_io_mode(object: &DomainObject<'_>, mode: u32) -> Result<(), DispatchError> {
+pub(crate) fn set_io_mode(object: DomainObjectRef<'_>, mode: u32) -> Result<(), DispatchError> {
     dispatch_in(object, proto::CONN_SET_IO_MODE, mode)
 }
 
 /// Gets the socket descriptor.
-pub(crate) fn get_socket_descriptor(object: &DomainObject<'_>) -> Result<i32, DispatchError> {
+pub(crate) fn get_socket_descriptor(object: DomainObjectRef<'_>) -> Result<i32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_SOCKET_DESCRIPTOR).map(|v| v as i32)
 }
 
 /// Gets the host name string.
 pub(crate) fn get_host_name(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     buffer: &mut [u8],
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -72,23 +72,23 @@ pub(crate) fn get_host_name(
 }
 
 /// Gets the verify option bitmask.
-pub(crate) fn get_verify_option(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_verify_option(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_VERIFY_OPTION)
 }
 
 /// Gets the I/O mode.
-pub(crate) fn get_io_mode(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_io_mode(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_IO_MODE)
 }
 
 /// Performs a TLS handshake without requesting server cert.
-pub(crate) fn do_handshake(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn do_handshake(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::CONN_DO_HANDSHAKE)
 }
 
 /// Performs a TLS handshake and retrieves server cert data.
 pub(crate) fn do_handshake_get_server_cert(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     server_certbuf: &mut [u8],
 ) -> Result<HandshakeServerCertOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -103,7 +103,7 @@ pub(crate) fn do_handshake_get_server_cert(
 }
 
 /// Reads data from the TLS connection.
-pub(crate) fn read(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, DispatchError> {
+pub(crate) fn read(object: DomainObjectRef<'_>, buffer: &mut [u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -120,7 +120,7 @@ pub(crate) fn read(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, 
 }
 
 /// Writes data to the TLS connection.
-pub(crate) fn write(object: &DomainObject<'_>, buffer: &[u8]) -> Result<u32, DispatchError> {
+pub(crate) fn write(object: DomainObjectRef<'_>, buffer: &[u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -137,12 +137,12 @@ pub(crate) fn write(object: &DomainObject<'_>, buffer: &[u8]) -> Result<u32, Dis
 }
 
 /// Gets the number of pending bytes.
-pub(crate) fn pending(object: &DomainObject<'_>) -> Result<i32, DispatchError> {
+pub(crate) fn pending(object: DomainObjectRef<'_>) -> Result<i32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_PENDING).map(|v| v as i32)
 }
 
 /// Peeks at data without consuming it.
-pub(crate) fn peek(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, DispatchError> {
+pub(crate) fn peek(object: DomainObjectRef<'_>, buffer: &mut [u8]) -> Result<u32, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -160,7 +160,7 @@ pub(crate) fn peek(object: &DomainObject<'_>, buffer: &mut [u8]) -> Result<u32, 
 
 /// Polls the connection for events.
 pub(crate) fn poll(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     in_pollevent: u32,
     timeout: u32,
 ) -> Result<u32, DispatchError> {
@@ -172,51 +172,51 @@ pub(crate) fn poll(
 }
 
 /// Gets the verify cert error (clears the stored value).
-pub(crate) fn get_verify_cert_error(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn get_verify_cert_error(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::CONN_GET_VERIFY_CERT_ERROR)
 }
 
 /// Gets the needed server cert buffer size.
 pub(crate) fn get_needed_server_cert_buffer_size(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_NEEDED_SERVER_CERT_BUFFER_SIZE)
 }
 
 /// Sets the session cache mode.
 pub(crate) fn set_session_cache_mode(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     mode: u32,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::CONN_SET_SESSION_CACHE_MODE, mode)
 }
 
 /// Gets the session cache mode.
-pub(crate) fn get_session_cache_mode(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_session_cache_mode(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_SESSION_CACHE_MODE)
 }
 
 /// Flushes the connection's session cache.
-pub(crate) fn flush_session_cache(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn flush_session_cache(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     dispatch_no_io(object, proto::CONN_FLUSH_SESSION_CACHE)
 }
 
 /// Sets the renegotiation mode.
 pub(crate) fn set_renegotiation_mode(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     mode: u32,
 ) -> Result<(), DispatchError> {
     dispatch_in(object, proto::CONN_SET_RENEGOTIATION_MODE, mode)
 }
 
 /// Gets the renegotiation mode.
-pub(crate) fn get_renegotiation_mode(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_renegotiation_mode(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_RENEGOTIATION_MODE)
 }
 
 /// Sets a connection option (bool flag + option type).
 pub(crate) fn set_option(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     option: u32,
     flag: bool,
 ) -> Result<(), DispatchError> {
@@ -229,7 +229,7 @@ pub(crate) fn set_option(
 }
 
 /// Gets a connection option.
-pub(crate) fn get_option(object: &DomainObject<'_>, option: u32) -> Result<bool, DispatchError> {
+pub(crate) fn get_option(object: DomainObjectRef<'_>, option: u32) -> Result<bool, DispatchError> {
     // SAFETY: `option` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
@@ -246,7 +246,7 @@ pub(crate) fn get_option(object: &DomainObject<'_>, option: u32) -> Result<bool,
 
 /// Gets verify cert errors into a buffer.
 pub(crate) fn get_verify_cert_errors(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     errors: &mut [u32],
 ) -> Result<(u32, u32), DispatchError> {
     // SAFETY: `errors` is a valid `&mut [u32]` slice; viewing it as bytes for
@@ -281,7 +281,7 @@ pub(crate) fn get_verify_cert_errors(
 
 /// Gets cipher info (4.0.0+).
 pub(crate) fn get_cipher_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     out: &mut CipherInfo,
 ) -> Result<(), DispatchError> {
     let val: u32 = 1;
@@ -309,7 +309,7 @@ pub(crate) fn get_cipher_info(
 
 /// Sets the next ALPN protocol list (9.0.0+).
 pub(crate) fn set_next_alpn_proto(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     proto_list: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -323,7 +323,7 @@ pub(crate) fn set_next_alpn_proto(
 
 /// Gets the next ALPN protocol (9.0.0+).
 pub(crate) fn get_next_alpn_proto(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     buffer: &mut [u8],
 ) -> Result<GetNextAlpnProtoOut, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -339,7 +339,7 @@ pub(crate) fn get_next_alpn_proto(
 
 /// Sets DTLS socket descriptor (16.0.0+).
 pub(crate) fn set_dtls_socket_descriptor(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sockfd: i32,
     sockaddr: &[u8],
 ) -> Result<i32, DispatchError> {
@@ -365,7 +365,9 @@ pub(crate) fn set_dtls_socket_descriptor(
 }
 
 /// Gets DTLS handshake timeout in nanoseconds (16.0.0+).
-pub(crate) fn get_dtls_handshake_timeout(object: &DomainObject<'_>) -> Result<u64, DispatchError> {
+pub(crate) fn get_dtls_handshake_timeout(
+    object: DomainObjectRef<'_>,
+) -> Result<u64, DispatchError> {
     let mut out: u64 = 0;
     // SAFETY: `out` is a valid local u64; viewing its bytes for the OUT buffer
     // is sound, and the slice borrows `out`.
@@ -382,7 +384,7 @@ pub(crate) fn get_dtls_handshake_timeout(object: &DomainObject<'_>) -> Result<u6
 
 /// Sets a private option (pre-17.0.0, bool+option layout).
 pub(crate) fn set_private_option_legacy(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     option: u32,
     value: bool,
 ) -> Result<(), DispatchError> {
@@ -396,7 +398,7 @@ pub(crate) fn set_private_option_legacy(
 
 /// Sets a private option (17.0.0+, option+value layout).
 pub(crate) fn set_private_option(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     option: u32,
     value: u32,
 ) -> Result<(), DispatchError> {
@@ -406,7 +408,7 @@ pub(crate) fn set_private_option(
 
 /// Sets SRTP ciphers (16.0.0+).
 pub(crate) fn set_srtp_ciphers(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     ciphers: &[u16],
 ) -> Result<(), DispatchError> {
     // SAFETY: `ciphers` is a valid `&[u16]` slice; viewing it as bytes for
@@ -427,7 +429,7 @@ pub(crate) fn set_srtp_ciphers(
 }
 
 /// Gets the negotiated SRTP cipher (16.0.0+).
-pub(crate) fn get_srtp_cipher(object: &DomainObject<'_>) -> Result<u16, DispatchError> {
+pub(crate) fn get_srtp_cipher(object: DomainObjectRef<'_>) -> Result<u16, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -439,7 +441,7 @@ pub(crate) fn get_srtp_cipher(object: &DomainObject<'_>) -> Result<u16, Dispatch
 
 /// Exports keying material (16.0.0+).
 pub(crate) fn export_keying_material(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     outbuf: &mut [u8],
     label: &[u8],
     context: &[u8],
@@ -456,11 +458,14 @@ pub(crate) fn export_keying_material(
 }
 
 /// Sets I/O timeout (16.0.0+).
-pub(crate) fn set_io_timeout(object: &DomainObject<'_>, timeout: u32) -> Result<(), DispatchError> {
+pub(crate) fn set_io_timeout(
+    object: DomainObjectRef<'_>,
+    timeout: u32,
+) -> Result<(), DispatchError> {
     dispatch_in(object, proto::CONN_SET_IO_TIMEOUT, timeout)
 }
 
 /// Gets I/O timeout (16.0.0+).
-pub(crate) fn get_io_timeout(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_io_timeout(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CONN_GET_IO_TIMEOUT)
 }

@@ -22,10 +22,6 @@ use super::{
     state::{AppletCache, Slot},
 };
 
-// =====================================================================
-// Per-role helpers
-// =====================================================================
-
 /// Brings up an [`Application`]-role applet.
 ///
 /// Performs the service-layer open via
@@ -121,10 +117,6 @@ pub(super) fn open_overlay_applet(
     Ok(Slot { proxy, cache })
 }
 
-// =====================================================================
-// Shared runtime-policy building blocks
-// =====================================================================
-
 /// Reads the initial operation/performance/focus state and ARUID from a
 /// freshly-opened proxy, packaged for storage in [`AppletCache`].
 fn fetch_initial_cache<R: Role>(proxy: &Proxy<R>) -> Result<AppletCache, ConnectError> {
@@ -155,7 +147,7 @@ fn fetch_initial_cache<R: Role>(proxy: &Proxy<R>) -> Result<AppletCache, Connect
 }
 
 /// Enables operation- and performance-mode change notifications.
-fn enable_mode_notifications(self_controller: &SelfController) -> Result<(), ConnectError> {
+fn enable_mode_notifications(self_controller: SelfController<'_>) -> Result<(), ConnectError> {
     self_controller
         .set_operation_mode_changed_notification(true)
         .map_err(ConnectError::SetOperationModeNotification)?;
@@ -170,7 +162,7 @@ fn enable_mode_notifications(self_controller: &SelfController) -> Result<(), Con
 /// Mirrors libnx `applet.c:272-301`: get the message event, get the current
 /// focus state, then loop waiting on the event and refreshing focus on
 /// `FocusStateChanged` messages. Application / SystemApplication path only.
-fn wait_in_focus(common_state_getter: &CommonStateGetter) -> Result<(), ConnectError> {
+fn wait_in_focus(common_state_getter: CommonStateGetter<'_>) -> Result<(), ConnectError> {
     let event_handle = common_state_getter
         .get_event_handle()
         .map_err(ConnectError::GetEventHandle)?;

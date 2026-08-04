@@ -55,7 +55,7 @@ impl AppletSingleton {
     }
 
     /// Universal core accessor: ICommonStateGetter (proxy cmd 0).
-    pub fn common_state_getter(&self) -> &CommonStateGetter {
+    pub fn common_state_getter(&self) -> CommonStateGetter<'_> {
         match self {
             Self::Application(s) => s.proxy.common_state_getter(),
             Self::LibraryApplet(s) => s.proxy.common_state_getter(),
@@ -66,7 +66,7 @@ impl AppletSingleton {
     }
 
     /// Universal core accessor: ISelfController (proxy cmd 1).
-    pub fn self_controller(&self) -> &SelfController {
+    pub fn self_controller(&self) -> SelfController<'_> {
         match self {
             Self::Application(s) => s.proxy.self_controller(),
             Self::LibraryApplet(s) => s.proxy.self_controller(),
@@ -77,7 +77,7 @@ impl AppletSingleton {
     }
 
     /// Universal core accessor: IWindowController (proxy cmd 2).
-    pub fn window_controller(&self) -> &WindowController {
+    pub fn window_controller(&self) -> WindowController<'_> {
         match self {
             Self::Application(s) => s.proxy.window_controller(),
             Self::LibraryApplet(s) => s.proxy.window_controller(),

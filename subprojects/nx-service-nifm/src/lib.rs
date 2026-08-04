@@ -51,10 +51,10 @@
 
 extern crate nx_panic_handler as _; // Provides `#[panic_handler]`.
 
-use core::{cell::Cell, mem::ManuallyDrop};
+use core::cell::Cell;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, Session};
+use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, DomainObjectRef, Session};
 
 mod cmif;
 mod dispatch;
@@ -83,10 +83,6 @@ pub use crate::{
         SERVICE_NAME_ADMIN, SERVICE_NAME_SYSTEM, SERVICE_NAME_USER,
     },
 };
-
-//
-// NifmService
-//
 
 /// Connected `nifm:u` / `nifm:s` / `nifm:a` static service.
 ///
@@ -126,21 +122,17 @@ impl NifmService {
 
     /// `CreateGeneralServiceOld` (cmd 4, pre-`[3.0.0]`).
     pub fn open_general_service_legacy(&mut self) -> Result<(), CreateGeneralServiceError> {
-        let id = creator::create_general_service_old(&self.creator)?;
+        let id = creator::create_general_service_old(self.creator.as_borrowed())?;
         self.igs_object_id = Some(id);
         Ok(())
     }
 
     /// `CreateGeneralService` (cmd 5, `[3.0.0+]`, `send_pid`).
     pub fn open_general_service(&mut self) -> Result<(), CreateGeneralServiceError> {
-        let id = creator::create_general_service(&self.creator)?;
+        let id = creator::create_general_service(self.creator.as_borrowed())?;
         self.igs_object_id = Some(id);
         Ok(())
     }
-
-    //
-    // IGeneralService surface.
-    //
 
     /// `GetClientId` (cmd 1). Errors if the general service has not been opened.
     pub fn get_client_id(&self) -> Result<NifmClientId, NotOpenedOr<DispatchError>> {
@@ -162,10 +154,11 @@ impl NifmService {
         // close request so we don't leak the sub-object.
         // SAFETY: `raw_object_id` was just returned by `cmif::create_request`
         // on this same creator domain; no other `DomainObject` references it.
-        let object = unsafe { self.creator.open_object_raw(raw_object_id) }
+        let object = DomainObject::from_raw_unchecked(self.creator.as_borrowed(), raw_object_id)
             .ok_or(CreateRequestSurfaceError::MissingObject)?;
-        let (event_request_state, event1) = request::get_system_event_readable_handles(&object)
-            .map_err(CreateRequestSurfaceError::GetEvents)?;
+        let (event_request_state, event1) =
+            request::get_system_event_readable_handles(object.as_borrowed())
+                .map_err(CreateRequestSurfaceError::GetEvents)?;
 
         Ok(NifmRequest {
             object,
@@ -288,34 +281,27 @@ impl NifmService {
         self.dispatch_igs(|svc| general::set_wowl_delayed_wake_time(svc, val))
     }
 
-    //
-    // Internal plumbing.
-    //
-
     /// Runs `f` against the `IGeneralService` sub-object, returning
     /// [`NotOpenedOr::NotOpened`] if [`Self::open_general_service`] (or its
     /// legacy variant) has not been called yet.
     ///
-    /// The transient `DomainObject` is wrapped in [`ManuallyDrop`] so the
-    /// per-object close is suppressed: the IGS is torn down by the server
-    /// when the parent [`Domain`] is dropped.
+    /// The view closes nothing: the IGS is torn down by the server when the
+    /// parent [`Domain`] is dropped.
     #[inline]
     fn dispatch_igs<R, E>(
         &self,
-        f: impl FnOnce(&DomainObject<'_>) -> Result<R, E>,
+        f: impl FnOnce(DomainObjectRef<'_>) -> Result<R, E>,
     ) -> Result<R, NotOpenedOr<E>>
     where
         E: core::fmt::Debug + core::fmt::Display,
     {
         let id = self.igs_object_id.ok_or(NotOpenedOr::NotOpened)?;
         // SAFETY: `id` was returned by `create_general_service*` on this same
-        // creator domain; the `ManuallyDrop` wrapper is the only live
-        // `DomainObject` for this id at a time.
-        let object = ManuallyDrop::new(
-            unsafe { self.creator.open_object_raw(id) }
-                .expect("IGS sub-object id is non-zero once stored"),
-        );
-        f(&object).map_err(NotOpenedOr::Inner)
+        // creator domain and is stored for the service's lifetime, so it names
+        // a live server-side object.
+        let object = DomainObjectRef::from_raw_unchecked(self.creator.as_borrowed(), id)
+            .expect("IGS sub-object id is non-zero once stored");
+        f(object).map_err(NotOpenedOr::Inner)
     }
 }
 
@@ -407,10 +393,6 @@ pub enum CreateRequestSurfaceError {
     GetEvents(#[source] GetSystemEventHandlesError),
 }
 
-//
-// NifmRequest
-//
-
 /// `IRequest` sub-object obtained via [`NifmService::create_request`].
 ///
 /// The lifetime parameter ties the request to its parent service so the
@@ -455,28 +437,28 @@ impl NifmRequest<'_> {
 
     /// `Cancel` (cmd 3).
     pub fn cancel(&self) -> Result<(), DispatchError> {
-        request::cancel(&self.object)
+        request::cancel(self.object.as_borrowed())
     }
 
     /// `Submit` (cmd 4). Raw single-shot variant; see [`Self::submit_libnx`]
     /// for the libnx-style wrapper that gates submission on the current state.
     pub fn submit(&self) -> Result<(), DispatchError> {
-        request::submit(&self.object)
+        request::submit(self.object.as_borrowed())
     }
 
     /// `GetRequestState` (cmd 0). Returns the raw `u32` the server reported.
     pub fn get_request_state_raw(&self) -> Result<u32, DispatchError> {
-        request::get_request_state_raw(&self.object)
+        request::get_request_state_raw(self.object.as_borrowed())
     }
 
     /// `GetResult` (cmd 1). The CMIF result code *is* the Switch-side `Result`.
     pub fn get_result_raw(&self) -> Result<(), DispatchError> {
-        request::get_result(&self.object)
+        request::get_result(self.object.as_borrowed())
     }
 
     /// `SetNetworkProfileId` (cmd 9).
     pub fn set_network_profile_id(&self, uuid: Uuid) -> Result<(), DispatchError> {
-        request::set_network_profile_id(&self.object, uuid)
+        request::set_network_profile_id(self.object.as_borrowed(), uuid)
     }
 
     /// `GetAppletInfo` (cmd 21).
@@ -485,27 +467,23 @@ impl NifmRequest<'_> {
         theme_color: u32,
         buffer: &mut [u8],
     ) -> Result<AppletInfo, DispatchError> {
-        request::get_applet_info(&self.object, theme_color, buffer)
+        request::get_applet_info(self.object.as_borrowed(), theme_color, buffer)
     }
 
     /// `SetKeptInSleep` (cmd 23, `[3.0.0+]`). Caller must guard on hosversion.
     pub fn set_kept_in_sleep(&self, flag: bool) -> Result<(), DispatchError> {
-        request::set_kept_in_sleep(&self.object, flag)
+        request::set_kept_in_sleep(self.object.as_borrowed(), flag)
     }
 
     /// `RegisterSocketDescriptor` (cmd 24, `[3.0.0+]`).
     pub fn register_socket_descriptor(&self, sockfd: i32) -> Result<(), DispatchError> {
-        request::register_socket_descriptor(&self.object, sockfd)
+        request::register_socket_descriptor(self.object.as_borrowed(), sockfd)
     }
 
     /// `UnregisterSocketDescriptor` (cmd 25, `[3.0.0+]`).
     pub fn unregister_socket_descriptor(&self, sockfd: i32) -> Result<(), DispatchError> {
-        request::unregister_socket_descriptor(&self.object, sockfd)
+        request::unregister_socket_descriptor(self.object.as_borrowed(), sockfd)
     }
-
-    //
-    // libnx-parity convenience wrappers.
-    //
 
     /// Mirrors libnx's `nifmGetRequestState`:
     /// - If the `event_request_state` is not yet signaled (server-side
@@ -541,7 +519,7 @@ impl NifmRequest<'_> {
             // libnx returns the cached raw `Result`; without a typed error
             // value to thread through here, surface the most recent dispatch
             // outcome from `GetResult` directly.
-            request::get_result(&self.object)
+            request::get_result(self.object.as_borrowed())
         }
     }
 
@@ -558,7 +536,7 @@ impl NifmRequest<'_> {
                 | NifmRequestState::Available
                 | NifmRequestState::Unknown5
         ) {
-            let _ = request::submit(&self.object);
+            let _ = request::submit(self.object.as_borrowed());
             self.refresh_state();
         }
         Ok(())
@@ -590,13 +568,13 @@ impl NifmRequest<'_> {
     /// Mirrors libnx's `_nifmUpdateState`: refreshes the cached state and
     /// result via cmds 0 and 1.
     fn refresh_state(&self) {
-        match request::get_request_state_raw(&self.object) {
+        match request::get_request_state_raw(self.object.as_borrowed()) {
             Ok(raw) => self.cached_state.set(NifmRequestState::from_raw(raw)),
             // libnx zeroes the cache on dispatch failure.
             Err(_) => self.cached_state.set(NifmRequestState::Invalid),
         }
         self.cached_res_ok
-            .set(request::get_result(&self.object).is_ok());
+            .set(request::get_result(self.object.as_borrowed()).is_ok());
     }
 }
 

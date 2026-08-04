@@ -1,11 +1,11 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{proto, types::SaveDataInfo};
 
 pub(crate) fn read(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     buf: &mut [SaveDataInfo],
 ) -> Result<i64, DispatchError> {

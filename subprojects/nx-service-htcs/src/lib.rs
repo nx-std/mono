@@ -155,11 +155,16 @@ impl HtcsSocket<'_> {
     pub fn socket_close(self) -> Result<SocketResult, DispatchError> {
         let guard = self.service.pool.acquire();
         // SAFETY: `self.object_id` was returned by the server within this
-        // service's domain table; the pool guard makes this slot exclusive,
-        // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        // service's domain table, and this method consumes the socket, so the
+        // close obligation it takes on is discharged exactly once. The pool
+        // guard makes this slot exclusive, so no other live `DomainObject`
+        // addresses the same id concurrently.
+        let object = guard
+            .open_object_for_close_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_close(&object)
+        let result = cmif::socket_close(object.as_borrowed());
+        // Dropping `object` sends the per-object close on the pool session.
+        result
     }
 
     /// Releases the domain sub-object without issuing cmd 0.
@@ -168,8 +173,10 @@ impl HtcsSocket<'_> {
     /// or when cleanup is all that's needed.
     pub fn close_handle(self) {
         let guard = self.service.pool.acquire();
-        // SAFETY: same justification as the other call sites.
-        let _object = unsafe { guard.open_object_raw(self.object_id) }
+        // SAFETY: same justification as `socket_close`; this method consumes
+        // the socket too.
+        let _object = guard
+            .open_object_for_close_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
         // Dropping `_object` sends the per-object close on the pool session.
     }
@@ -180,9 +187,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_cmd_in_address(&object, proto::SOCKET_CONNECT, address)
+        cmif::socket_cmd_in_address(object, proto::SOCKET_CONNECT, address)
     }
 
     /// Binds to an address (cmd 2).
@@ -191,9 +199,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_cmd_in_address(&object, proto::SOCKET_BIND, address)
+        cmif::socket_cmd_in_address(object, proto::SOCKET_BIND, address)
     }
 
     /// Listens for connections (cmd 3).
@@ -202,9 +211,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_cmd_in_i32(&object, proto::SOCKET_LISTEN, backlog)
+        cmif::socket_cmd_in_i32(object, proto::SOCKET_LISTEN, backlog)
     }
 
     /// Shuts down part of a connection (cmd 7).
@@ -213,9 +223,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_cmd_in_i32(&object, proto::SOCKET_SHUTDOWN, how)
+        cmif::socket_cmd_in_i32(object, proto::SOCKET_SHUTDOWN, how)
     }
 
     /// File control (cmd 8).
@@ -224,9 +235,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_fcntl(&object, command, value)
+        cmif::socket_fcntl(object, command, value)
     }
 
     /// Starts an async accept operation (cmd 9).
@@ -237,9 +249,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_accept_start(&object)
+        cmif::socket_accept_start(object)
     }
 
     /// Gets the result of an async accept (cmd 10).
@@ -250,9 +263,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        let (out, socket_object_id) = cmif::socket_accept_results(&object, task_id)?;
+        let (out, socket_object_id) = cmif::socket_accept_results(object, task_id)?;
         Ok(AcceptResultData {
             err: out.err,
             address: out.address,
@@ -271,9 +285,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_recv_start(&object, mem_size, flags)
+        cmif::socket_recv_start(object, mem_size, flags)
     }
 
     /// Gets the result of an async recv (cmd 12).
@@ -289,9 +304,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_recv_results(&object, task_id, buffer)
+        cmif::socket_recv_results(object, task_id, buffer)
     }
 
     /// Gets the result of an async send (cmd 16).
@@ -300,9 +316,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_cmd_in_u32_out_transfer(&object, proto::SOCKET_SEND_RESULTS, task_id)
+        cmif::socket_cmd_in_u32_out_transfer(object, proto::SOCKET_SEND_RESULTS, task_id)
     }
 
     /// Starts a large-buffer send (cmd 17).
@@ -315,9 +332,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        let (out, event_handle) = cmif::socket_start_send(&object, size, flags)?;
+        let (out, event_handle) = cmif::socket_start_send(object, size, flags)?;
         Ok(StartSendResult {
             task_id: out.task_id,
             event_handle,
@@ -331,9 +349,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_cmd_in_u32_out_transfer(&object, proto::SOCKET_END_SEND, task_id)
+        cmif::socket_cmd_in_u32_out_transfer(object, proto::SOCKET_END_SEND, task_id)
     }
 
     /// Starts a large-buffer recv (cmd 20).
@@ -344,9 +363,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_start_recv(&object, size, flags)
+        cmif::socket_start_recv(object, size, flags)
     }
 
     /// Ends a large-buffer recv (cmd 21).
@@ -361,9 +381,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_end_recv(&object, task_id, buffer)
+        cmif::socket_end_recv(object, task_id, buffer)
     }
 
     /// Starts an async send with buffer (cmd 22).
@@ -374,9 +395,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_send_start(&object, buffer, flags)
+        cmif::socket_send_start(object, buffer, flags)
     }
 
     /// Continues a large-buffer send (cmd 23).
@@ -389,9 +411,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        let out = cmif::socket_continue_send(&object, task_id, buffer)?;
+        let out = cmif::socket_continue_send(object, task_id, buffer)?;
         Ok(ContinueSendResult {
             size: out.size,
             wait: out.wait != 0,
@@ -404,9 +427,10 @@ impl HtcsSocket<'_> {
         // SAFETY: `self.object_id` was returned by the server within this
         // service's domain table; the pool guard makes this slot exclusive,
         // so no other live `DomainObject` addresses the same id concurrently.
-        let object = unsafe { guard.open_object_raw(self.object_id) }
+        let object = guard
+            .open_object_unchecked(self.object_id)
             .expect("socket object_id obtained from server");
-        cmif::socket_get_primitive(&object)
+        cmif::socket_get_primitive(object)
     }
 }
 
@@ -434,7 +458,7 @@ pub fn connect_cmif(sm: &SmService, num_sessions: usize) -> Result<HtcsService, 
     let monitor = Session::new(monitor_handle, 0);
 
     // PID init on the domain manager (cmd 100).
-    cmif::manager_pid_init(&manager).map_err(ConnectCmifError::ManagerPidInit)?;
+    cmif::manager_pid_init(manager.as_borrowed()).map_err(ConnectCmifError::ManagerPidInit)?;
 
     // PID init on the non-domain monitor (cmd 101).
     cmif::monitor_pid_init(&monitor).map_err(ConnectCmifError::MonitorPidInit)?;

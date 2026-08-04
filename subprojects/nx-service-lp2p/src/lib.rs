@@ -115,9 +115,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::scan(&object, info, results)
+        cmif::scan(object, info, results)
     }
 
     /// Creates a group (cmd 768).
@@ -125,9 +126,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::create_group(&object, info)
+        cmif::create_group(object, info)
     }
 
     /// Destroys the previously created group (cmd 776).
@@ -135,9 +137,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::destroy_group(&object)
+        cmif::destroy_group(object)
     }
 
     /// Sets the advertise data for the current group (cmd 784).
@@ -145,9 +148,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::set_advertise_data(&object, data)
+        cmif::set_advertise_data(object, data)
     }
 
     /// Sends data to another group (cmd 1536).
@@ -164,9 +168,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::send_to_other_group(&object, data, addr, group_id, frequency, channel, flags)
+        cmif::send_to_other_group(object, data, addr, group_id, frequency, channel, flags)
     }
 
     /// Receives data from another group (cmd 1544).
@@ -178,9 +183,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        let out = cmif::recv_from_other_group(&object, flags, buffer)?;
+        let out = cmif::recv_from_other_group(object, flags, buffer)?;
         Ok(RecvFromOtherGroupResult {
             addr: out.addr,
             unk0: out.unk0,
@@ -195,9 +201,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::add_acceptable_group_id(&object, group_id)
+        cmif::add_acceptable_group_id(object, group_id)
     }
 
     /// Removes the acceptable group ID (cmd 1560).
@@ -205,9 +212,10 @@ impl Lp2pNetworkService<'_> {
         let guard = self.service.pool.acquire();
         // SAFETY: `network_service_object_id` was returned by the server and
         // validated at `connect_cmif`; the pool guard makes this slot exclusive.
-        let object = unsafe { guard.open_object_raw(self.service.network_service_object_id) }
+        let object = guard
+            .open_object_unchecked(self.service.network_service_object_id)
             .expect("network_service object id validated at connect_cmif");
-        cmif::remove_acceptable_group_id(&object)
+        cmif::remove_acceptable_group_id(object)
     }
 }
 
@@ -336,8 +344,8 @@ pub fn connect_cmif(
         .map_err(|(_session, err)| ConnectCmifError::ConvertToDomain(err))?;
 
     // Create INetworkService sub-object (cmd 0, domain child).
-    let network_service_object_id =
-        cmif::create_network_service(&root, 0x1).map_err(ConnectCmifError::CreateNetworkService)?;
+    let network_service_object_id = cmif::create_network_service(root.as_borrowed(), 0x1)
+        .map_err(ConnectCmifError::CreateNetworkService)?;
 
     // Build session pool from cloned domain sessions. The first slot owns the
     // root domain handle; the remaining slots are cloned domain handles that

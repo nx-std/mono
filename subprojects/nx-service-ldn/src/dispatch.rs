@@ -7,13 +7,13 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{DispatchError, DomainObject, Session};
+use nx_sf::service::{DispatchError, DomainObjectRef, Session};
 
 /// Trait abstracting over the dispatch entry points the LCS / ICPM helpers
 /// use. Implemented for `&Session` (non-domain monitor service) and
-/// `&DomainObject<'_>` (domain sub-objects).
+/// `DomainObjectRef<'_>` (domain sub-objects).
 ///
-/// Since `Session::dispatch` and `DomainObject::dispatch` return different
+/// Since `Session::dispatch` and `DomainObjectRef::dispatch` return different
 /// builder types (`Dispatch` vs `DomainDispatch`), the trait exposes
 /// fully-configured CMIF operations rather than the builder itself.
 pub(crate) trait DispatchTarget {
@@ -65,7 +65,7 @@ impl DispatchTarget for Session {
     }
 }
 
-impl DispatchTarget for DomainObject<'_> {
+impl DispatchTarget for DomainObjectRef<'_> {
     #[inline]
     fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
         // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.

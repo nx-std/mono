@@ -10,7 +10,7 @@ use core::mem::size_of;
 
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BufferAttr, DispatchError, DomainObject, OutHandleAttr, OwnedSessionHandle},
+    service::{BufferAttr, DispatchError, DomainObjectRef, OutHandleAttr, OwnedSessionHandle},
 };
 
 use crate::{
@@ -38,10 +38,6 @@ use crate::{
         LdnSecurityParameter, LdnSubnetMask, LdnUserConfig,
     },
 };
-
-//
-// Channel/band encoding helpers (libnx parity).
-//
 
 /// `_ldnChannelToOldBand` — pre-20.0.0 ABI band selector.
 #[inline]
@@ -72,13 +68,11 @@ pub fn channel_band_to_channel(val: u16) -> i16 {
     (val & 0x3FF) as i16
 }
 
-//
 // Initialize / Finalize / SetOperationMode (hosversion-aware variants exposed
 // separately; the caller picks).
-//
 
 /// `Initialize` (cmd 400) — pre-`[7.0.0]` path. `send_pid` + zero payload.
-pub(crate) fn initialize_legacy(object: &DomainObject<'_>) -> Result<(), DispatchError> {
+pub(crate) fn initialize_legacy(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let reserved: u64 = 0;
     // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
     // returns; viewing its bytes as a slice is sound.
@@ -98,7 +92,7 @@ pub(crate) fn initialize_legacy(object: &DomainObject<'_>) -> Result<(), Dispatc
 
 /// `InitializeWithVersion` — cmd 402 on `ldn:u` / cmd 403 on `ldn:s`.
 pub(crate) fn initialize_with_version(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     kind: LdnServiceType,
     version: i32,
 ) -> Result<(), DispatchError> {
@@ -136,7 +130,7 @@ pub(crate) fn initialize_with_version(
 /// `InitializeWithPriority` (cmd 404) — `ldn:s`-only, `[19.0.0+]`. The caller
 /// must guard on hosversion + object kind.
 pub(crate) fn initialize_with_priority(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     version: i32,
     priority: i32,
 ) -> Result<(), DispatchError> {
@@ -168,14 +162,14 @@ pub(crate) fn initialize_with_priority(
 }
 
 /// `Finalize` (cmd 401).
-pub(crate) fn finalize(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_FINALIZE)
+pub(crate) fn finalize(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_FINALIZE)
 }
 
 /// `SetOperationMode` — cmd 402 on `ldn:s` / cmd 403 on `ldn:u`. The cmd id is
 /// the *opposite* of `InitializeWithVersion`'s (libnx parity).
 pub(crate) fn set_operation_mode(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     kind: LdnServiceType,
     mode: LdnOperationMode,
 ) -> Result<(), DispatchError> {
@@ -183,16 +177,12 @@ pub(crate) fn set_operation_mode(
         LdnServiceType::System => CMD_LCS_402,
         LdnServiceType::User => CMD_LCS_403,
     };
-    dispatch_in(object, cmd, mode as u32)
+    dispatch_in(&object, cmd, mode as u32)
 }
 
-//
-// Read commands.
-//
-
 /// `GetState` (cmd 0).
-pub(crate) fn get_state(object: &DomainObject<'_>) -> Result<LdnState, GetStateError> {
-    let raw = dispatch_out::<u32>(object, CMD_LCS_GET_STATE).map_err(GetStateError::Dispatch)?;
+pub(crate) fn get_state(object: DomainObjectRef<'_>) -> Result<LdnState, GetStateError> {
+    let raw = dispatch_out::<u32>(&object, CMD_LCS_GET_STATE).map_err(GetStateError::Dispatch)?;
     LdnState::from_raw(raw).ok_or(GetStateError::InvalidState(raw))
 }
 
@@ -206,7 +196,7 @@ pub enum GetStateError {
 
 /// `GetNetworkInfo` (cmd 1). Writes to a caller-supplied output buffer.
 pub(crate) fn get_network_info(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     out: &mut LdnNetworkInfo,
 ) -> Result<(), DispatchError> {
     // SAFETY: `out` is a valid `&mut LdnNetworkInfo`; viewing it as bytes for
@@ -232,7 +222,7 @@ pub(crate) fn get_network_info(
 
 /// `GetIpv4Address` (cmd 2).
 pub(crate) fn get_ipv4_address(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<(LdnIpv4Address, LdnSubnetMask), DispatchError> {
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -240,15 +230,15 @@ pub(crate) fn get_ipv4_address(
         addr: LdnIpv4Address,
         mask: LdnSubnetMask,
     }
-    let out = dispatch_out::<Out>(object, CMD_LCS_GET_IPV4_ADDRESS)?;
+    let out = dispatch_out::<Out>(&object, CMD_LCS_GET_IPV4_ADDRESS)?;
     Ok((out.addr, out.mask))
 }
 
 /// `GetDisconnectReason` (cmd 3).
 pub(crate) fn get_disconnect_reason(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<LdnDisconnectReason, GetDisconnectReasonError> {
-    let raw = dispatch_out::<i16>(object, CMD_LCS_GET_DISCONNECT_REASON)
+    let raw = dispatch_out::<i16>(&object, CMD_LCS_GET_DISCONNECT_REASON)
         .map_err(GetDisconnectReasonError::Dispatch)?;
     LdnDisconnectReason::from_raw(raw).ok_or(GetDisconnectReasonError::InvalidReason(raw))
 }
@@ -263,22 +253,22 @@ pub enum GetDisconnectReasonError {
 
 /// `GetSecurityParameter` (cmd 4).
 pub(crate) fn get_security_parameter(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<LdnSecurityParameter, DispatchError> {
-    dispatch_out::<LdnSecurityParameter>(object, CMD_LCS_GET_SECURITY_PARAMETER)
+    dispatch_out::<LdnSecurityParameter>(&object, CMD_LCS_GET_SECURITY_PARAMETER)
 }
 
 /// `GetNetworkConfig` (cmd 5).
 pub(crate) fn get_network_config(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<LdnNetworkConfig, DispatchError> {
-    dispatch_out::<LdnNetworkConfig>(object, CMD_LCS_GET_NETWORK_CONFIG)
+    dispatch_out::<LdnNetworkConfig>(&object, CMD_LCS_GET_NETWORK_CONFIG)
 }
 
 /// `GetStateChangeEvent` (cmd 100). Returns the kernel handle of a *copy*
 /// of the autoclear event; caller owns the handle and must close it.
 pub(crate) fn get_state_change_event(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<OwnedSessionHandle, GetStateChangeEventError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
@@ -310,7 +300,7 @@ pub enum GetStateChangeEventError {
 /// `network_info` is fixed-size, `nodes` is variable (always length 8 per
 /// libnx but we pass the caller's slice).
 pub(crate) fn get_network_info_and_history(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     network_info: &mut LdnNetworkInfo,
     nodes: &mut [LdnNodeLatestUpdate],
 ) -> Result<(), DispatchError> {
@@ -342,14 +332,10 @@ pub(crate) fn get_network_info_and_history(
         .map(|_| ())
 }
 
-//
-// Scan / ScanPrivate
-//
-
 /// `Scan` (cmd 102). The flag mask matches libnx's `ldnScan` (`flags & 0x37`).
 /// Returns the number of network entries the server actually wrote.
 pub(crate) fn scan(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     channel: i16,
     filter: &LdnScanFilter,
     out_buf: &mut [LdnNetworkInfo],
@@ -361,7 +347,7 @@ pub(crate) fn scan(
 
 /// `ScanPrivate` (cmd 103). `flags & 0x3F`.
 pub(crate) fn scan_private(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     channel: i16,
     filter: &LdnScanFilter,
     out_buf: &mut [LdnNetworkInfo],
@@ -372,7 +358,7 @@ pub(crate) fn scan_private(
 }
 
 fn scan_inner(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cmd: u32,
     channel: i16,
     filter: &LdnScanFilter,
@@ -420,17 +406,13 @@ fn scan_inner(
     Ok(total as i32)
 }
 
-//
-// Write commands (no buffer).
-//
-
 /// `SetWirelessControllerRestriction` (cmd 104).
 pub(crate) fn set_wireless_controller_restriction(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     restriction: LdnWirelessControllerRestriction,
 ) -> Result<(), DispatchError> {
     dispatch_in(
-        object,
+        &object,
         CMD_LCS_SET_WIRELESS_CONTROLLER_RESTRICTION,
         restriction as u32,
     )
@@ -438,71 +420,74 @@ pub(crate) fn set_wireless_controller_restriction(
 
 /// `SetProtocol` (cmd 106, `[18.0.0+]`).
 pub(crate) fn set_protocol(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     protocol: LdnProtocol,
 ) -> Result<(), DispatchError> {
-    dispatch_in(object, CMD_LCS_SET_PROTOCOL, protocol as u32)
+    dispatch_in(&object, CMD_LCS_SET_PROTOCOL, protocol as u32)
 }
 
 /// `OpenAccessPoint` (cmd 200).
-pub(crate) fn open_access_point(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_OPEN_ACCESS_POINT)
+pub(crate) fn open_access_point(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_OPEN_ACCESS_POINT)
 }
 
 /// `CloseAccessPoint` (cmd 201).
-pub(crate) fn close_access_point(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_CLOSE_ACCESS_POINT)
+pub(crate) fn close_access_point(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_CLOSE_ACCESS_POINT)
 }
 
 /// `DestroyNetwork` (cmd 204).
-pub(crate) fn destroy_network(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_DESTROY_NETWORK)
+pub(crate) fn destroy_network(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_DESTROY_NETWORK)
 }
 
 /// `Reject` (cmd 205).
-pub(crate) fn reject(object: &DomainObject<'_>, addr: LdnIpv4Address) -> Result<(), DispatchError> {
-    dispatch_in(object, CMD_LCS_REJECT, addr)
+pub(crate) fn reject(
+    object: DomainObjectRef<'_>,
+    addr: LdnIpv4Address,
+) -> Result<(), DispatchError> {
+    dispatch_in(&object, CMD_LCS_REJECT, addr)
 }
 
 /// `SetStationAcceptPolicy` (cmd 207).
 pub(crate) fn set_station_accept_policy(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     policy: LdnAcceptPolicy,
 ) -> Result<(), DispatchError> {
-    dispatch_in::<u8>(object, CMD_LCS_SET_STATION_ACCEPT_POLICY, policy as u8)
+    dispatch_in::<u8>(&object, CMD_LCS_SET_STATION_ACCEPT_POLICY, policy as u8)
 }
 
 /// `AddAcceptFilterEntry` (cmd 208).
 pub(crate) fn add_accept_filter_entry(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     addr: LdnMacAddress,
 ) -> Result<(), DispatchError> {
-    dispatch_in(object, CMD_LCS_ADD_ACCEPT_FILTER_ENTRY, addr)
+    dispatch_in(&object, CMD_LCS_ADD_ACCEPT_FILTER_ENTRY, addr)
 }
 
 /// `ClearAcceptFilter` (cmd 209).
-pub(crate) fn clear_accept_filter(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_CLEAR_ACCEPT_FILTER)
+pub(crate) fn clear_accept_filter(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_CLEAR_ACCEPT_FILTER)
 }
 
 /// `OpenStation` (cmd 300).
-pub(crate) fn open_station(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_OPEN_STATION)
+pub(crate) fn open_station(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_OPEN_STATION)
 }
 
 /// `CloseStation` (cmd 301).
-pub(crate) fn close_station(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_CLOSE_STATION)
+pub(crate) fn close_station(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_CLOSE_STATION)
 }
 
 /// `Disconnect` (cmd 304).
-pub(crate) fn disconnect(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_DISCONNECT)
+pub(crate) fn disconnect(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_DISCONNECT)
 }
 
 /// `SetAdvertiseData` (cmd 206). `data == &[]` resets the AdvertiseData.
 pub(crate) fn set_advertise_data(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &[u8],
 ) -> Result<(), DispatchError> {
     // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
@@ -515,9 +500,7 @@ pub(crate) fn set_advertise_data(
         .map(|_| ())
 }
 
-//
 // Network create / connect (the big payloads).
-//
 
 fn sanitize_user_config(src: &LdnUserConfig) -> LdnUserConfig {
     let mut out = LdnUserConfig {
@@ -554,7 +537,7 @@ fn sanitize_network_config(src: &LdnNetworkConfig) -> LdnNetworkConfig {
 
 /// `CreateNetwork` (cmd 202).
 pub(crate) fn create_network(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sec_config: &LdnSecurityConfig,
     user_config: &LdnUserConfig,
     network_config: &LdnNetworkConfig,
@@ -590,7 +573,7 @@ pub(crate) fn create_network(
 /// `CreateNetworkPrivate` (cmd 203). `addrs == &[]` yields a non-private
 /// network (libnx parity).
 pub(crate) fn create_network_private(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sec_config: &LdnSecurityConfig,
     sec_param: &LdnSecurityParameter,
     user_config: &LdnUserConfig,
@@ -635,7 +618,7 @@ pub(crate) fn create_network_private(
 
 /// `Connect` (cmd 302).
 pub(crate) fn connect(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sec_config: &LdnSecurityConfig,
     user_config: &LdnUserConfig,
     version: i32,
@@ -684,7 +667,7 @@ pub(crate) fn connect(
 
 /// `ConnectPrivate` (cmd 303).
 pub(crate) fn connect_private(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     sec_config: &LdnSecurityConfig,
     sec_param: &LdnSecurityParameter,
     user_config: &LdnUserConfig,
@@ -726,27 +709,23 @@ pub(crate) fn connect_private(
         .map(|_| ())
 }
 
-//
-// `[18.0.0+]` ActionFrame family — both `*_legacy` (pre-20) and modern variants.
-//
-
 /// `EnableActionFrame` (cmd 500, `[18.0.0+]`).
 pub(crate) fn enable_action_frame(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     settings: &LdnActionFrameSettings,
 ) -> Result<(), DispatchError> {
-    dispatch_in(object, CMD_LCS_ENABLE_ACTION_FRAME, *settings)
+    dispatch_in(&object, CMD_LCS_ENABLE_ACTION_FRAME, *settings)
 }
 
 /// `DisableActionFrame` (cmd 501, `[18.0.0+]`).
-pub(crate) fn disable_action_frame(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_DISABLE_ACTION_FRAME)
+pub(crate) fn disable_action_frame(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_DISABLE_ACTION_FRAME)
 }
 
 /// `SendActionFrame` (cmd 502, `[18.0.0+]`) — pre-20.0.0 ABI: separate
 /// `band` + `channel` fields.
 pub(crate) fn send_action_frame_legacy(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &[u8],
     destination: LdnMacAddress,
     bssid: LdnMacAddress,
@@ -767,7 +746,7 @@ pub(crate) fn send_action_frame_legacy(
 /// `SendActionFrame` (cmd 502, `[20.0.0+]`) — band packed into the `band` slot
 /// using [`channel_to_band`]; `channel` field is unused.
 pub(crate) fn send_action_frame(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &[u8],
     destination: LdnMacAddress,
     bssid: LdnMacAddress,
@@ -786,7 +765,7 @@ pub(crate) fn send_action_frame(
 }
 
 fn send_action_frame_inner(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &[u8],
     destination: LdnMacAddress,
     bssid: LdnMacAddress,
@@ -838,7 +817,7 @@ pub struct RecvActionFrameOut {
 /// `RecvActionFrame` (cmd 503, `[18.0.0+]`) — pre-20.0.0 ABI: `channel` is
 /// the raw response field, `band` is discarded.
 pub(crate) fn recv_action_frame_legacy(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &mut [u8],
     flags: u32,
 ) -> Result<RecvActionFrameOut, DispatchError> {
@@ -855,7 +834,7 @@ pub(crate) fn recv_action_frame_legacy(
 /// `RecvActionFrame` (cmd 503, `[20.0.0+]`) — `channel` is decoded from the
 /// packed `band` slot via [`channel_band_to_channel`].
 pub(crate) fn recv_action_frame(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &mut [u8],
     flags: u32,
 ) -> Result<RecvActionFrameOut, DispatchError> {
@@ -881,7 +860,7 @@ struct RecvActionFrameRaw {
 }
 
 fn recv_action_frame_inner(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     data: &mut [u8],
     flags: u32,
 ) -> Result<RecvActionFrameRaw, DispatchError> {
@@ -903,14 +882,10 @@ fn recv_action_frame_inner(
     Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<RecvActionFrameRaw>()) })
 }
 
-//
-// SetHomeChannel / SetTxPower / ResetTxPower (`[18.0.0+]`).
-//
-
 /// `SetHomeChannel` (cmd 505, `[18.0.0+]`) — pre-20.0.0 ABI: `{band, channel}`
 /// payload.
 pub(crate) fn set_home_channel_legacy(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     channel: i16,
 ) -> Result<(), DispatchError> {
     #[repr(C)]
@@ -923,23 +898,23 @@ pub(crate) fn set_home_channel_legacy(
         band: channel_to_old_band(channel),
         channel,
     };
-    dispatch_in(object, CMD_LCS_SET_HOME_CHANNEL, input)
+    dispatch_in(&object, CMD_LCS_SET_HOME_CHANNEL, input)
 }
 
 /// `SetHomeChannel` (cmd 505, `[20.0.0+]`) — band-packed `u16` payload.
 pub(crate) fn set_home_channel(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     channel: i16,
 ) -> Result<(), DispatchError> {
-    dispatch_in::<u16>(object, CMD_LCS_SET_HOME_CHANNEL, channel_to_band(channel))
+    dispatch_in::<u16>(&object, CMD_LCS_SET_HOME_CHANNEL, channel_to_band(channel))
 }
 
 /// `SetTxPower` (cmd 600, `[18.0.0+]`).
-pub(crate) fn set_tx_power(object: &DomainObject<'_>, power: i16) -> Result<(), DispatchError> {
-    dispatch_in::<u16>(object, CMD_LCS_SET_TX_POWER, power as u16)
+pub(crate) fn set_tx_power(object: DomainObjectRef<'_>, power: i16) -> Result<(), DispatchError> {
+    dispatch_in::<u16>(&object, CMD_LCS_SET_TX_POWER, power as u16)
 }
 
 /// `ResetTxPower` (cmd 601, `[18.0.0+]`).
-pub(crate) fn reset_tx_power(object: &DomainObject<'_>) -> Result<(), DispatchError> {
-    dispatch_no_io(object, CMD_LCS_RESET_TX_POWER)
+pub(crate) fn reset_tx_power(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
+    dispatch_no_io(&object, CMD_LCS_RESET_TX_POWER)
 }

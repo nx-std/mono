@@ -39,41 +39,54 @@ use crate::{
     },
 };
 
-/// The seven sub-interfaces every AM role exposes (proxy cmds 0–4, 11, 1000).
-pub struct CoreSubInterfaces {
-    pub common_state_getter: CommonStateGetter,
-    pub self_controller: SelfController,
-    pub window_controller: WindowController,
-    pub audio_controller: AudioController,
-    pub display_controller: DisplayController,
-    pub library_applet_creator: LibraryAppletCreator,
-    pub debug_functions: DebugFunctions,
+/// Object ids of the seven sub-interfaces every AM role exposes
+/// (proxy cmds 0–4, 11, 1000).
+///
+/// Ids rather than the sub-interface values themselves: a stored view would
+/// have to borrow the [`AppletService`] sitting beside it in [`Proxy`], which a
+/// struct cannot express. The accessors on [`Proxy`] rebuild each view on
+/// demand from the id and the live domain.
+pub struct CoreObjectIds {
+    pub common_state_getter: u32,
+    pub self_controller: u32,
+    pub window_controller: u32,
+    pub audio_controller: u32,
+    pub display_controller: u32,
+    pub library_applet_creator: u32,
+    pub debug_functions: u32,
 }
 
-impl CoreSubInterfaces {
-    /// Opens all seven core sub-interfaces from `proxy`.
-    fn open(proxy: &AppletProxyService) -> Result<Self, OpenError> {
+impl CoreObjectIds {
+    /// Opens all seven core sub-interfaces from `proxy` and keeps their ids.
+    fn open(proxy: AppletProxyService<'_>) -> Result<Self, OpenError> {
         let common_state_getter = proxy
             .get_common_state_getter()
-            .map_err(OpenError::GetCommonStateGetter)?;
+            .map_err(OpenError::GetCommonStateGetter)?
+            .object_id();
         let self_controller = proxy
             .get_self_controller()
-            .map_err(OpenError::GetSelfController)?;
+            .map_err(OpenError::GetSelfController)?
+            .object_id();
         let window_controller = proxy
             .get_window_controller()
-            .map_err(OpenError::GetWindowController)?;
+            .map_err(OpenError::GetWindowController)?
+            .object_id();
         let audio_controller = proxy
             .get_audio_controller()
-            .map_err(OpenError::GetSubInterface)?;
+            .map_err(OpenError::GetSubInterface)?
+            .object_id();
         let display_controller = proxy
             .get_display_controller()
-            .map_err(OpenError::GetSubInterface)?;
+            .map_err(OpenError::GetSubInterface)?
+            .object_id();
         let library_applet_creator = proxy
             .get_library_applet_creator()
-            .map_err(OpenError::GetSubInterface)?;
+            .map_err(OpenError::GetSubInterface)?
+            .object_id();
         let debug_functions = proxy
             .get_debug_functions()
-            .map_err(OpenError::GetSubInterface)?;
+            .map_err(OpenError::GetSubInterface)?
+            .object_id();
         Ok(Self {
             common_state_getter,
             self_controller,
@@ -86,22 +99,34 @@ impl CoreSubInterfaces {
     }
 }
 
-/// Role-typed proxy bundling every IPC handle AM admits for role `R`.
+/// Role-typed proxy bundling every IPC object AM admits for role `R`.
+///
+/// Owns the root [`AppletService`] and stores the object ids of the proxy and
+/// of every sub-interface. The sub-interface accessors rebuild their views from
+/// those ids on each call, so nothing here borrows a field of `Self` and the
+/// views cannot outlive the session they are addressed through.
 pub struct Proxy<R: Role> {
     service: AppletService,
-    proxy: AppletProxyService,
-    core: CoreSubInterfaces,
-    extras: R::Extras,
+    proxy_id: u32,
+    core: CoreObjectIds,
+    extras: R::ExtraIds,
     _role: PhantomData<R>,
 }
 
 impl<R: Role> Proxy<R> {
-    fn from_session(service: AppletService, proxy: AppletProxyService) -> Result<Self, OpenError> {
-        let core = CoreSubInterfaces::open(&proxy)?;
-        let extras = R::drain_extras(&proxy).map_err(OpenError::DrainExtras)?;
+    /// Takes the root service by value and the proxy's object id, then drains
+    /// every sub-interface id through a view rebuilt from the owned service.
+    ///
+    /// Taking the id rather than an [`AppletProxyService`] is what keeps this
+    /// callable: a view handed in from outside would borrow the very service
+    /// this moves into `Self`.
+    fn from_session(service: AppletService, proxy_id: u32) -> Result<Self, OpenError> {
+        let proxy = AppletProxyService::new(service.object(proxy_id));
+        let core = CoreObjectIds::open(proxy)?;
+        let extras = R::drain_extras(proxy).map_err(OpenError::DrainExtras)?;
         Ok(Self {
             service,
-            proxy,
+            proxy_id,
             core,
             extras,
             _role: PhantomData,
@@ -116,49 +141,49 @@ impl<R: Role> Proxy<R> {
 
     /// Returns the underlying [`AppletProxyService`].
     #[inline]
-    pub fn proxy_service(&self) -> &AppletProxyService {
-        &self.proxy
+    pub fn proxy_service(&self) -> AppletProxyService<'_> {
+        AppletProxyService::new(self.service.object(self.proxy_id))
     }
 
-    /// Returns the role-specific extras (read-only).
+    /// Returns the role-specific sub-interface object ids (read-only).
     #[inline]
-    pub fn extras(&self) -> &R::Extras {
+    pub fn extras(&self) -> &R::ExtraIds {
         &self.extras
     }
 
     #[inline]
-    pub fn common_state_getter(&self) -> &CommonStateGetter {
-        &self.core.common_state_getter
+    pub fn common_state_getter(&self) -> CommonStateGetter<'_> {
+        CommonStateGetter::new(self.service.object(self.core.common_state_getter))
     }
 
     #[inline]
-    pub fn self_controller(&self) -> &SelfController {
-        &self.core.self_controller
+    pub fn self_controller(&self) -> SelfController<'_> {
+        SelfController::new(self.service.object(self.core.self_controller))
     }
 
     #[inline]
-    pub fn window_controller(&self) -> &WindowController {
-        &self.core.window_controller
+    pub fn window_controller(&self) -> WindowController<'_> {
+        WindowController::new(self.service.object(self.core.window_controller))
     }
 
     #[inline]
-    pub fn audio_controller(&self) -> &AudioController {
-        &self.core.audio_controller
+    pub fn audio_controller(&self) -> AudioController<'_> {
+        AudioController::new(self.service.object(self.core.audio_controller))
     }
 
     #[inline]
-    pub fn display_controller(&self) -> &DisplayController {
-        &self.core.display_controller
+    pub fn display_controller(&self) -> DisplayController<'_> {
+        DisplayController::new(self.service.object(self.core.display_controller))
     }
 
     #[inline]
-    pub fn library_applet_creator(&self) -> &LibraryAppletCreator {
-        &self.core.library_applet_creator
+    pub fn library_applet_creator(&self) -> LibraryAppletCreator<'_> {
+        LibraryAppletCreator::new(self.service.object(self.core.library_applet_creator))
     }
 
     #[inline]
-    pub fn debug_functions(&self) -> &DebugFunctions {
-        &self.core.debug_functions
+    pub fn debug_functions(&self) -> DebugFunctions<'_> {
+        DebugFunctions::new(self.service.object(self.core.debug_functions))
     }
 
     /// `IWindowController::AcquireForegroundRights` (cmd 10).
@@ -174,8 +199,8 @@ impl<R: Role> Proxy<R> {
 impl Proxy<Application> {
     /// `IApplicationFunctions` (proxy cmd 20).
     #[inline]
-    pub fn application_functions(&self) -> &crate::ApplicationFunctions {
-        &self.extras.application_functions
+    pub fn application_functions(&self) -> crate::ApplicationFunctions<'_> {
+        crate::ApplicationFunctions::new(self.service.object(self.extras.application_functions))
     }
 
     /// `IApplicationFunctions::NotifyRunning` — Application-only.
@@ -209,7 +234,6 @@ impl Proxy<Application> {
     }
 }
 
-//
 // Shares ApplicationExtras (same `IApplicationProxy` class) but is rejected by
 // AM's runtime gating for SetFocusHandlingMode / SetOutOfFocusSuspendingEnabled.
 // NotifyRunning is allowed.
@@ -217,8 +241,8 @@ impl Proxy<Application> {
 impl Proxy<SystemApplication> {
     /// `IApplicationFunctions` (proxy cmd 20).
     #[inline]
-    pub fn application_functions(&self) -> &crate::ApplicationFunctions {
-        &self.extras.application_functions
+    pub fn application_functions(&self) -> crate::ApplicationFunctions<'_> {
+        crate::ApplicationFunctions::new(self.service.object(self.extras.application_functions))
     }
 
     /// `IApplicationFunctions::NotifyRunning`.
@@ -231,66 +255,82 @@ impl Proxy<SystemApplication> {
 impl Proxy<LibraryApplet> {
     /// `IProcessWindingController` (proxy cmd 10).
     #[inline]
-    pub fn process_winding_controller(&self) -> &crate::ProcessWindingController {
-        &self.extras.process_winding_controller
+    pub fn process_winding_controller(&self) -> crate::ProcessWindingController<'_> {
+        crate::ProcessWindingController::new(
+            self.service.object(self.extras.process_winding_controller),
+        )
     }
 
     /// `ILibraryAppletSelfAccessor` (proxy cmd 20). Absent on HOS 15.0.0+.
     #[inline]
-    pub fn library_applet_self_accessor(&self) -> Option<&crate::LibraryAppletSelfAccessor> {
-        self.extras.library_applet_self_accessor.as_ref()
+    pub fn library_applet_self_accessor(&self) -> Option<crate::LibraryAppletSelfAccessor<'_>> {
+        self.extras
+            .library_applet_self_accessor
+            .map(|id| crate::LibraryAppletSelfAccessor::new(self.service.object(id)))
     }
 
     /// `IHomeMenuFunctions` (proxy cmd 22, HOS 15.0.0+).
     #[inline]
-    pub fn home_menu_functions(&self) -> Option<&crate::HomeMenuFunctions> {
-        self.extras.home_menu_functions.as_ref()
+    pub fn home_menu_functions(&self) -> Option<crate::HomeMenuFunctions<'_>> {
+        self.extras
+            .home_menu_functions
+            .map(|id| crate::HomeMenuFunctions::new(self.service.object(id)))
     }
 
     /// `IAppletCommonFunctions` (proxy cmd 21, HOS 7.0.0+).
     #[inline]
-    pub fn applet_common_functions(&self) -> Option<&crate::AppletCommonFunctions> {
-        self.extras.applet_common_functions.as_ref()
+    pub fn applet_common_functions(&self) -> Option<crate::AppletCommonFunctions<'_>> {
+        self.extras
+            .applet_common_functions
+            .map(|id| crate::AppletCommonFunctions::new(self.service.object(id)))
     }
 
     /// `IGlobalStateController` (proxy cmd 23, HOS 15.0.0+).
     #[inline]
-    pub fn global_state_controller(&self) -> Option<&crate::GlobalStateController> {
-        self.extras.global_state_controller.as_ref()
+    pub fn global_state_controller(&self) -> Option<crate::GlobalStateController<'_>> {
+        self.extras
+            .global_state_controller
+            .map(|id| crate::GlobalStateController::new(self.service.object(id)))
     }
 }
 
 impl Proxy<SystemApplet> {
     /// `IGlobalStateController` (proxy cmd 21).
     #[inline]
-    pub fn global_state_controller(&self) -> &crate::GlobalStateController {
-        &self.extras.global_state_controller
+    pub fn global_state_controller(&self) -> crate::GlobalStateController<'_> {
+        crate::GlobalStateController::new(self.service.object(self.extras.global_state_controller))
     }
 
     /// `IApplicationCreator` (proxy cmd 22).
     #[inline]
-    pub fn application_creator(&self) -> &crate::ApplicationCreator {
-        &self.extras.application_creator
+    pub fn application_creator(&self) -> crate::ApplicationCreator<'_> {
+        crate::ApplicationCreator::new(self.service.object(self.extras.application_creator))
     }
 
     /// `IAppletCommonFunctions` (proxy cmd 23, HOS 7.0.0+).
     #[inline]
-    pub fn applet_common_functions(&self) -> Option<&crate::AppletCommonFunctions> {
-        self.extras.applet_common_functions.as_ref()
+    pub fn applet_common_functions(&self) -> Option<crate::AppletCommonFunctions<'_>> {
+        self.extras
+            .applet_common_functions
+            .map(|id| crate::AppletCommonFunctions::new(self.service.object(id)))
     }
 }
 
 impl Proxy<OverlayApplet> {
     /// `IAppletCommonFunctions` (proxy cmd 21, HOS 7.0.0+).
     #[inline]
-    pub fn applet_common_functions(&self) -> Option<&crate::AppletCommonFunctions> {
-        self.extras.applet_common_functions.as_ref()
+    pub fn applet_common_functions(&self) -> Option<crate::AppletCommonFunctions<'_>> {
+        self.extras
+            .applet_common_functions
+            .map(|id| crate::AppletCommonFunctions::new(self.service.object(id)))
     }
 
     /// `IGlobalStateController` (proxy cmd 23, HOS 15.0.0+).
     #[inline]
-    pub fn global_state_controller(&self) -> Option<&crate::GlobalStateController> {
-        self.extras.global_state_controller.as_ref()
+    pub fn global_state_controller(&self) -> Option<crate::GlobalStateController<'_>> {
+        self.extras
+            .global_state_controller
+            .map(|id| crate::GlobalStateController::new(self.service.object(id)))
     }
 }
 
@@ -352,10 +392,12 @@ fn open<R: Role>(sm: &SmService, process_handle: ProcessHandle) -> Result<Proxy<
         // markers never select.
         None => return Err(OpenError::NoneAppletType),
     };
-    let proxy = service
+    // The view borrows `service`, so only its id survives into the move below.
+    let proxy_id = service
         .open_proxy(R::APPLET_TYPE, process_handle)
-        .map_err(OpenError::OpenProxy)?;
-    Proxy::<R>::from_session(service, proxy)
+        .map_err(OpenError::OpenProxy)?
+        .object_id();
+    Proxy::<R>::from_session(service, proxy_id)
 }
 
 /// Aggregate error returned by the per-role `open_*` functions.

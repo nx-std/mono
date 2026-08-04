@@ -2,7 +2,9 @@
 
 use core::{mem::size_of, ptr};
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr, Session,
+};
 
 use crate::{
     proto,
@@ -12,12 +14,8 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// IHtcsManager commands
-// ---------------------------------------------------------------------------
-
 /// Sends PID initialization on the manager session (cmd 100).
-pub(crate) fn manager_pid_init(domain: &Domain) -> Result<(), DispatchError> {
+pub(crate) fn manager_pid_init(domain: DomainRef<'_>) -> Result<(), DispatchError> {
     let pid_placeholder: u64 = 0;
     // SAFETY: `pid_placeholder` is a `Copy` value on the stack, valid until
     // `.send()` returns; viewing its bytes as a slice is sound.
@@ -53,7 +51,10 @@ pub(crate) fn monitor_pid_init(session: &Session) -> Result<(), DispatchError> {
 }
 
 /// Gets a peer name (shared implementation for cmds 10 and 11).
-pub(crate) fn get_peer_name(domain: &Domain, cmd_id: u32) -> Result<HtcsPeerName, DispatchError> {
+pub(crate) fn get_peer_name(
+    domain: DomainRef<'_>,
+    cmd_id: u32,
+) -> Result<HtcsPeerName, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = domain
@@ -70,7 +71,7 @@ pub(crate) fn get_peer_name(domain: &Domain, cmd_id: u32) -> Result<HtcsPeerName
 ///
 /// Returns `(err, socket_object_id)`.
 pub(crate) fn create_socket(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     enable_disconnection_emulation: bool,
 ) -> Result<(i32, u32), CreateSocketError> {
     let input: u8 = if enable_disconnection_emulation { 1 } else { 0 };
@@ -95,17 +96,17 @@ pub(crate) fn create_socket(
     let object = result
         .take_object(0)
         .ok_or(CreateSocketError::MissingObject)?;
-    // The pool re-opens this id per request via `SessionGuard::open_object_raw`;
-    // wrap in `ManuallyDrop` so the server-side object outlives this call.
-    let raw = core::mem::ManuallyDrop::new(object).object_id().to_raw();
-    Ok((err, raw))
+    // The pool re-addresses this id per request via
+    // `SessionGuard::open_object_unchecked`, so the close obligation is handed
+    // to the `Socket` wrapper rather than discharged here.
+    Ok((err, object.into_raw_object_id()))
 }
 
 /// Starts a select operation (cmd 130).
 ///
 /// Returns `(task_id, event_handle)`.
 pub(crate) fn start_select(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     tv: &HtcsTimeVal,
     read_fds: &[i32],
     write_fds: &[i32],
@@ -161,7 +162,7 @@ pub(crate) fn start_select(
 
 /// Ends a select operation (cmd 131).
 pub(crate) fn end_select(
-    domain: &Domain,
+    domain: DomainRef<'_>,
     task_id: u32,
     read_fds: &mut [i32],
     write_fds: &mut [i32],
@@ -207,12 +208,8 @@ pub(crate) fn end_select(
     Ok(out)
 }
 
-// ---------------------------------------------------------------------------
-// ISocket commands
-// ---------------------------------------------------------------------------
-
 /// Socket close (cmd 0).
-pub(crate) fn socket_close(object: &DomainObject<'_>) -> Result<SocketResult, DispatchError> {
+pub(crate) fn socket_close(object: DomainObjectRef<'_>) -> Result<SocketResult, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -227,7 +224,7 @@ pub(crate) fn socket_close(object: &DomainObject<'_>) -> Result<SocketResult, Di
 
 /// Socket command with HtcsSockAddr input and SocketResult output (cmds 1, 2).
 pub(crate) fn socket_cmd_in_address(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     address: &HtcsSockAddr,
 ) -> Result<SocketResult, DispatchError> {
@@ -254,7 +251,7 @@ pub(crate) fn socket_cmd_in_address(
 
 /// Socket command with i32 input and SocketResult output (cmds 3, 7).
 pub(crate) fn socket_cmd_in_i32(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     value: i32,
 ) -> Result<SocketResult, DispatchError> {
@@ -277,7 +274,7 @@ pub(crate) fn socket_cmd_in_i32(
 
 /// Socket fcntl (cmd 8).
 pub(crate) fn socket_fcntl(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     command: i32,
     value: i32,
 ) -> Result<SocketResult, DispatchError> {
@@ -305,7 +302,7 @@ pub(crate) fn socket_fcntl(
 ///
 /// Returns `(task_id, event_handle)`.
 pub(crate) fn socket_accept_start(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<(u32, u32), AcceptStartError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -330,7 +327,7 @@ pub(crate) fn socket_accept_start(
 ///
 /// Returns `(AcceptResultsOut, socket_object_id)`.
 pub(crate) fn socket_accept_results(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     task_id: u32,
 ) -> Result<(AcceptResultsOut, u32), AcceptResultsError> {
     // SAFETY: `task_id` is a `Copy` value on the stack, valid until `.send()`
@@ -355,7 +352,7 @@ pub(crate) fn socket_accept_results(
         .ok_or(AcceptResultsError::MissingObject)?;
     // Pool re-opens this id per request; keep the server-side object alive
     // beyond this call.
-    let raw = core::mem::ManuallyDrop::new(accepted).object_id().to_raw();
+    let raw = accepted.into_raw_object_id();
     Ok((out, raw))
 }
 
@@ -363,7 +360,7 @@ pub(crate) fn socket_accept_results(
 ///
 /// Returns `(task_id, event_handle)`.
 pub(crate) fn socket_recv_start(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     mem_size: i32,
     flags: i32,
 ) -> Result<(u32, u32), RecvStartError> {
@@ -396,7 +393,7 @@ pub(crate) fn socket_recv_start(
 
 /// Socket recv results (cmd 12).
 pub(crate) fn socket_recv_results(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     task_id: u32,
     buffer: &mut [u8],
 ) -> Result<TransferResult, DispatchError> {
@@ -420,7 +417,7 @@ pub(crate) fn socket_recv_results(
 
 /// Socket command with u32 input and TransferResult output (cmds 16, 19).
 pub(crate) fn socket_cmd_in_u32_out_transfer(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cmd_id: u32,
     value: u32,
 ) -> Result<TransferResult, DispatchError> {
@@ -445,7 +442,7 @@ pub(crate) fn socket_cmd_in_u32_out_transfer(
 ///
 /// Returns `(StartSendOut, event_handle)`.
 pub(crate) fn socket_start_send(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     size: i64,
     flags: i32,
 ) -> Result<(StartSendOut, u32), StartSendError> {
@@ -483,7 +480,7 @@ pub(crate) fn socket_start_send(
 ///
 /// Returns `(task_id, event_handle)`.
 pub(crate) fn socket_start_recv(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     size: i64,
     flags: i32,
 ) -> Result<(u32, u32), StartRecvError> {
@@ -519,7 +516,7 @@ pub(crate) fn socket_start_recv(
 
 /// Socket end_recv (cmd 21).
 pub(crate) fn socket_end_recv(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     task_id: u32,
     buffer: &mut [u8],
 ) -> Result<TransferResult, DispatchError> {
@@ -545,7 +542,7 @@ pub(crate) fn socket_end_recv(
 ///
 /// Returns `(task_id, event_handle)`.
 pub(crate) fn socket_send_start(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     buffer: &[u8],
     flags: i32,
 ) -> Result<(u32, u32), SendStartError> {
@@ -579,7 +576,7 @@ pub(crate) fn socket_send_start(
 
 /// Socket continue_send (cmd 23).
 pub(crate) fn socket_continue_send(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     task_id: u32,
     buffer: &[u8],
 ) -> Result<ContinueSendOut, DispatchError> {
@@ -605,7 +602,7 @@ pub(crate) fn socket_continue_send(
 }
 
 /// Socket get_primitive (cmd 130).
-pub(crate) fn socket_get_primitive(object: &DomainObject<'_>) -> Result<i32, DispatchError> {
+pub(crate) fn socket_get_primitive(object: DomainObjectRef<'_>) -> Result<i32, DispatchError> {
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -617,10 +614,6 @@ pub(crate) fn socket_get_primitive(object: &DomainObject<'_>) -> Result<i32, Dis
     let fd = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
     Ok(fd)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`create_socket`].
 #[derive(Debug, thiserror::Error)]

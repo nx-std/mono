@@ -1,8 +1,8 @@
 //! ISslContext CMIF dispatch implementations.
 
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{
     dispatch::{dispatch_in, dispatch_in_out_u32, dispatch_out_u32},
@@ -12,7 +12,7 @@ use crate::{
 
 /// Sets a context option.
 pub(crate) fn set_option(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     option: u32,
     value: i32,
 ) -> Result<(), DispatchError> {
@@ -21,17 +21,16 @@ pub(crate) fn set_option(
 }
 
 /// Gets a context option.
-pub(crate) fn get_option(object: &DomainObject<'_>, option: u32) -> Result<i32, DispatchError> {
+pub(crate) fn get_option(object: DomainObjectRef<'_>, option: u32) -> Result<i32, DispatchError> {
     let result = dispatch_in_out_u32(object, proto::CTX_GET_OPTION, option)?;
     Ok(result as i32)
 }
 
 /// Creates a connection sub-object. Returns the raw sub-object ID.
 ///
-/// The freshly minted `DomainObject` is wrapped in `ManuallyDrop` so the
-/// server-side object outlives this call; the service wrapper re-opens it
-/// per request.
-pub(crate) fn create_connection(object: &DomainObject<'_>) -> Result<u32, CreateConnectionError> {
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
+pub(crate) fn create_connection(object: DomainObjectRef<'_>) -> Result<u32, CreateConnectionError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = object
@@ -42,16 +41,15 @@ pub(crate) fn create_connection(object: &DomainObject<'_>) -> Result<u32, Create
     let sub = result
         .take_object(0)
         .ok_or(CreateConnectionError::MissingObject)?;
-    Ok(ManuallyDrop::new(sub).object_id().to_raw())
+    Ok(sub.into_raw_object_id())
 }
 
 /// Creates a connection sub-object for system (15.0.0+). Returns the raw sub-object ID.
 ///
-/// The freshly minted `DomainObject` is wrapped in `ManuallyDrop` so the
-/// server-side object outlives this call; the service wrapper re-opens it
-/// per request.
+/// The close obligation is handed on rather than discharged: the caller
+/// re-addresses the id through the long-lived parent domain.
 pub(crate) fn create_connection_for_system(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
 ) -> Result<u32, CreateConnectionError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -63,7 +61,7 @@ pub(crate) fn create_connection_for_system(
     let sub = result
         .take_object(0)
         .ok_or(CreateConnectionError::MissingObject)?;
-    Ok(ManuallyDrop::new(sub).object_id().to_raw())
+    Ok(sub.into_raw_object_id())
 }
 
 /// Error returned by [`create_connection`] and [`create_connection_for_system`].
@@ -78,13 +76,13 @@ pub enum CreateConnectionError {
 }
 
 /// Gets the connection count for this context.
-pub(crate) fn get_connection_count(object: &DomainObject<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_connection_count(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CTX_GET_CONNECTION_COUNT)
 }
 
 /// Imports a server PKI certificate. Returns the assigned ID.
 pub(crate) fn import_server_pki(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cert_data: &[u8],
     format: u32,
 ) -> Result<u64, DispatchError> {
@@ -114,7 +112,7 @@ pub(crate) fn import_server_pki(
 
 /// Imports a client PKI (PKCS#12). Returns the assigned ID.
 pub(crate) fn import_client_pki(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     pkcs12: &[u8],
     password: &[u8],
 ) -> Result<u64, DispatchError> {
@@ -141,7 +139,7 @@ pub(crate) fn import_client_pki(
 /// Removes a PKI or CRL by ID, attempting RemoveServerPki, RemoveClientPki,
 /// and RemoveCrl in order (matching libnx behavior).
 pub(crate) fn remove_pki(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     id: u64,
     include_crl: bool,
 ) -> Result<(), RemovePkiError> {
@@ -195,7 +193,7 @@ pub enum RemovePkiError {
 
 /// Registers an internal PKI. Returns the assigned ID.
 pub(crate) fn register_internal_pki(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     internal_pki: u32,
 ) -> Result<u64, DispatchError> {
     // SAFETY: `internal_pki` is a `Copy` value on the stack, valid until
@@ -223,7 +221,7 @@ pub(crate) fn register_internal_pki(
 }
 
 /// Adds a policy OID string.
-pub(crate) fn add_policy_oid(object: &DomainObject<'_>, oid: &[u8]) -> Result<(), DispatchError> {
+pub(crate) fn add_policy_oid(object: DomainObjectRef<'_>, oid: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
@@ -234,7 +232,10 @@ pub(crate) fn add_policy_oid(object: &DomainObject<'_>, oid: &[u8]) -> Result<()
 }
 
 /// Imports a CRL (3.0.0+). Returns the assigned ID.
-pub(crate) fn import_crl(object: &DomainObject<'_>, crl_data: &[u8]) -> Result<u64, DispatchError> {
+pub(crate) fn import_crl(
+    object: DomainObjectRef<'_>,
+    crl_data: &[u8],
+) -> Result<u64, DispatchError> {
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -256,7 +257,7 @@ pub(crate) fn import_crl(object: &DomainObject<'_>, crl_data: &[u8]) -> Result<u
 
 /// Imports client cert and key PKI (16.0.0+). Returns the assigned ID.
 pub(crate) fn import_client_cert_key_pki(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cert: &[u8],
     key: &[u8],
     format: u32,
@@ -288,7 +289,7 @@ pub(crate) fn import_client_cert_key_pki(
 
 /// Generates a private key and certificate (16.0.0+).
 pub(crate) fn generate_private_key_and_cert(
-    object: &DomainObject<'_>,
+    object: DomainObjectRef<'_>,
     cert_buf: &mut [u8],
     key_buf: &mut [u8],
     val: u32,

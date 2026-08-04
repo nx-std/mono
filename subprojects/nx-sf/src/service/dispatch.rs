@@ -7,25 +7,26 @@
 //!   output domain objects, so there is no `out_objects` builder method and
 //!   [`DispatchResult`] does not carry an `objects` field.
 //! - [`DomainDispatch`] - produced by [`Domain::dispatch`] and
-//!   [`DomainObject::dispatch`]. Domain mode: exposes [`out_objects`] and the
-//!   resulting [`DomainDispatchResult`] hands back ready-to-use
+//!   [`DomainObjectRef::dispatch`]. Domain mode: exposes [`out_objects`] and
+//!   the resulting [`DomainDispatchResult`] hands back ready-to-use
 //!   [`DomainObject`] instances, each constructed exactly once per dispatch
-//!   from the server-emitted [`ObjectId`]s. This is the only safe path to
-//!   obtain a [`DomainObject`] from outside the crate, which makes duplicate
-//!   `DomainObject`s for the same id unrepresentable in safe code.
+//!   from the server-emitted [`ObjectId`]s. Every id the server issues acquires
+//!   its owner here, which is what makes each one closed exactly once.
 //!
 //! [`Session`]: super::Session
 //! [`OverrideService`]: super::OverrideService
 //! [`Session::dispatch`]: super::Session::dispatch
-//! [`Domain::dispatch`]: Domain::dispatch
-//! [`DomainObject::dispatch`]: DomainObject::dispatch
+//! [`Domain`]: super::Domain
+//! [`Domain::dispatch`]: super::Domain::dispatch
+//! [`DomainObjectRef`]: super::DomainObjectRef
+//! [`DomainObjectRef::dispatch`]: super::DomainObjectRef::dispatch
 //! [`OverrideService::dispatch`]: super::OverrideService::dispatch
 //! [`out_objects`]: DomainDispatch::out_objects
 
 use nx_svc::error::{ResultCode, ToResultCode as _};
 use nx_sys_thread_tls::IpcBuffer;
 
-use super::domain::{Domain, DomainObject};
+use super::domain::{DomainObject, DomainRef};
 use crate::{
     cmif::{self, ObjectId},
     error::ToResultCode,
@@ -449,29 +450,31 @@ impl<'a> DispatchResult<'a> {
 
 /// Builder for dispatching a single CMIF request in domain mode.
 ///
-/// Wraps a [`Dispatch`] together with a borrow of the parent [`Domain`].
+/// Wraps a [`Dispatch`] together with a [`DomainRef`] onto the parent domain.
 /// The borrow lets [`send`](Self::send) construct [`DomainObject<'d>`]
 /// instances from the server-emitted object ids in the response, so the
-/// caller never has to launder raw `u32` ids back through an unsafe
+/// caller never has to launder raw `u32` ids back through an unchecked
 /// constructor.
 #[derive(Debug)]
 pub struct DomainDispatch<'d> {
     inner: Dispatch<'d>,
-    domain: &'d Domain,
+    domain: DomainRef<'d>,
 }
 
 impl<'d> DomainDispatch<'d> {
     /// Creates a new domain-dispatch builder. Used by the typed wrappers.
+    ///
+    /// The session handle and pointer-buffer size come from `domain`, which is
+    /// the only thing that can supply a matched pair of them.
     #[inline]
-    pub(crate) fn new(
-        domain: &'d Domain,
-        session: BorrowedSessionHandle<'d>,
-        pointer_buffer_size: u16,
-        object_id: Option<ObjectId>,
-        request_id: u32,
-    ) -> Self {
+    pub(crate) fn new(domain: DomainRef<'d>, object_id: Option<ObjectId>, request_id: u32) -> Self {
         Self {
-            inner: Dispatch::new(session, pointer_buffer_size, object_id, request_id),
+            inner: Dispatch::new(
+                domain.handle(),
+                domain.pointer_buffer_size(),
+                object_id,
+                request_id,
+            ),
             domain,
         }
     }
@@ -574,9 +577,8 @@ impl<'d> DomainDispatch<'d> {
 
     /// Sends the dispatch request and parses the response into a
     /// [`DomainDispatchResult`] holding freshly-constructed
-    /// [`DomainObject<'d>`] instances bound to the originating
-    /// [`Domain`]. Each server-emitted [`ObjectId`] becomes exactly one
-    /// [`DomainObject`].
+    /// [`DomainObject<'d>`] instances bound to the originating domain.
+    /// Each server-emitted [`ObjectId`] becomes exactly one [`DomainObject`].
     ///
     /// # Panics
     ///
@@ -619,7 +621,7 @@ impl<'d> DomainDispatch<'d> {
 /// Result of a successful domain dispatch operation.
 ///
 /// Holds up to [`MAX_OUT_OBJECTS`] freshly-issued [`DomainObject<'d>`]s.
-/// The lifetime `'d` ties each `DomainObject` to the parent [`Domain`].
+/// The lifetime `'d` ties each `DomainObject` to the parent domain.
 /// Use [`take_object`](Self::take_object) to claim a specific slot or
 /// [`into_objects`](Self::into_objects) to consume them in order;
 /// objects left in the result at drop time are closed normally.

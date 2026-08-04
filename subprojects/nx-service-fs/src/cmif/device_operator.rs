@@ -1,6 +1,6 @@
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObject};
+use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
 
 use crate::{
     dispatch::{
@@ -16,21 +16,21 @@ fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
 }
 
 pub(crate) fn is_sd_card_inserted(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<bool, DispatchError> {
     dispatch_out_bool(object, proto::DEVICE_OPERATOR_IS_SD_CARD_INSERTED, ctx)
 }
 
 pub(crate) fn get_sd_card_speed_mode(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<i64, DispatchError> {
     dispatch_out_i64(object, proto::DEVICE_OPERATOR_GET_SD_CARD_SPEED_MODE, ctx)
 }
 
 pub(crate) fn get_sd_card_cid(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     dst: &mut [u8],
     size: i64,
@@ -45,7 +45,7 @@ pub(crate) fn get_sd_card_cid(
 }
 
 pub(crate) fn get_sd_card_user_area_size(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<i64, DispatchError> {
     dispatch_out_i64(
@@ -56,7 +56,7 @@ pub(crate) fn get_sd_card_user_area_size(
 }
 
 pub(crate) fn get_sd_card_protected_area_size(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<i64, DispatchError> {
     dispatch_out_i64(
@@ -67,7 +67,7 @@ pub(crate) fn get_sd_card_protected_area_size(
 }
 
 pub(crate) fn get_and_clear_storage_error_info(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     cmd_id: u32,
     size: i64,
@@ -93,7 +93,7 @@ pub(crate) fn get_and_clear_storage_error_info(
 }
 
 pub(crate) fn get_mmc_cid(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     dst: &mut [u8],
     size: i64,
@@ -102,21 +102,21 @@ pub(crate) fn get_mmc_cid(
 }
 
 pub(crate) fn get_mmc_speed_mode(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<i64, DispatchError> {
     dispatch_out_i64(object, proto::DEVICE_OPERATOR_GET_MMC_SPEED_MODE, ctx)
 }
 
 pub(crate) fn get_mmc_patrol_count(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::DEVICE_OPERATOR_GET_MMC_PATROL_COUNT, ctx)
 }
 
 pub(crate) fn get_mmc_extended_csd(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     dst: &mut [u8],
     size: i64,
@@ -131,21 +131,21 @@ pub(crate) fn get_mmc_extended_csd(
 }
 
 pub(crate) fn is_game_card_inserted(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<bool, DispatchError> {
     dispatch_out_bool(object, proto::DEVICE_OPERATOR_IS_GAME_CARD_INSERTED, ctx)
 }
 
 pub(crate) fn get_game_card_handle(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<GameCardHandle, DispatchError> {
     dispatch_out(object, proto::DEVICE_OPERATOR_GET_GAME_CARD_HANDLE, ctx)
 }
 
 pub(crate) fn get_game_card_update_partition_info(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     handle: &GameCardHandle,
 ) -> Result<GameCardUpdatePartitionInfo, DispatchError> {
@@ -158,7 +158,7 @@ pub(crate) fn get_game_card_update_partition_info(
 }
 
 pub(crate) fn get_game_card_attribute(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     handle: &GameCardHandle,
 ) -> Result<u8, DispatchError> {
@@ -171,7 +171,7 @@ pub(crate) fn get_game_card_attribute(
 }
 
 pub(crate) fn get_game_card_device_certificate_legacy(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     handle: &GameCardHandle,
     size: i64,
@@ -193,7 +193,7 @@ pub(crate) fn get_game_card_device_certificate_legacy(
 }
 
 pub(crate) fn get_game_card_device_certificate(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     handle: &GameCardHandle,
     size: i64,
@@ -216,7 +216,7 @@ pub(crate) fn get_game_card_device_certificate(
 }
 
 pub(crate) fn get_game_card_id_set(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     dst: &mut [u8],
     size: i64,
@@ -231,7 +231,7 @@ pub(crate) fn get_game_card_id_set(
 }
 
 pub(crate) fn get_game_card_error_report_info(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
 ) -> Result<GameCardErrorReportInfo, DispatchError> {
     dispatch_out(
@@ -242,7 +242,7 @@ pub(crate) fn get_game_card_error_report_info(
 }
 
 pub(crate) fn get_game_card_device_id(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     dst: &mut [u8],
     size: i64,
@@ -257,7 +257,7 @@ pub(crate) fn get_game_card_device_id(
 }
 
 pub(crate) fn challenge_card_existence(
-    object: &ManuallyDrop<DomainObject<'_>>,
+    object: DomainObjectRef<'_>,
     ctx: u32,
     handle: &GameCardHandle,
     dst: &mut [u8],
