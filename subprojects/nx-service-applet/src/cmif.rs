@@ -16,11 +16,13 @@ use nx_sf::{
         DispatchError,
         DomainObjectRef,
         DomainRef,
+        OutHandleAttr,
     },
 };
 use nx_svc::{
     error::ResultCode,
     process::Handle as ProcessHandle,
+    sync::EventHandle,
     thread,
 };
 
@@ -66,6 +68,7 @@ use crate::{
         CMD_OPEN_SYSTEM_APPLET_PROXY,
         CMD_OPEN_SYSTEM_APPLICATION_PROXY,
         CMD_SC_CREATE_MANAGED_DISPLAY_LAYER,
+        CMD_SC_GET_LIBRARY_APPLET_LAUNCHABLE_EVENT,
         CMD_SC_SET_FOCUS_HANDLING_MODE,
         CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION,
         CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED,
@@ -439,6 +442,57 @@ pub fn set_focus_handling_mode(
         .map_err(SetFocusHandlingModeError::SetOutOfFocusSuspending)?;
 
     Ok(())
+}
+
+/// Gets the library applet launchable event from ISelfController (cmd 9).
+///
+/// The system signals this event when it is willing to host a library applet.
+/// Creating one before it is signalled races the system, so a launch waits on it
+/// first.
+///
+/// # Autoclear semantics
+///
+/// The kernel event is configured with `autoclear = false`, matching libnx's
+/// `_appletCmdGetEvent(..., autoclear=false, ...)`.
+pub fn get_library_applet_launchable_event(
+    self_controller: DomainObjectRef<'_>,
+) -> Result<EventHandle, GetLibraryAppletLaunchableEventError> {
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+
+    let result = self_controller
+        .dispatch(CMD_SC_GET_LIBRARY_APPLET_LAUNCHABLE_EVENT)
+        .out_handle(0, OutHandleAttr::Copy)
+        .send(&mut buf)
+        .map_err(GetLibraryAppletLaunchableEventError::Dispatch)?;
+
+    if result.copy_handles.is_empty() {
+        return Err(GetLibraryAppletLaunchableEventError::MissingHandle);
+    }
+
+    // SAFETY: Kernel returned a valid event handle in the response.
+    Ok(EventHandle::from_raw_unchecked(result.copy_handles[0]))
+}
+
+/// Error returned by [`get_library_applet_launchable_event`].
+#[derive(Debug, thiserror::Error)]
+pub enum GetLibraryAppletLaunchableEventError {
+    /// Failed to dispatch the request.
+    #[error("failed to dispatch request")]
+    Dispatch(#[source] DispatchError),
+    /// Response did not contain the expected handle.
+    #[error("missing handle in response")]
+    MissingHandle,
+}
+
+impl ToResultCode for GetLibraryAppletLaunchableEventError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::MissingHandle => GENERIC_ERROR,
+        }
+    }
 }
 
 /// Error returned by [`set_focus_handling_mode`].

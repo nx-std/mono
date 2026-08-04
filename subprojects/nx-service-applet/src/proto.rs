@@ -110,6 +110,13 @@ pub const CMD_CSG_GET_BOOT_MODE: u32 = 8;
 pub const CMD_CSG_GET_CURRENT_FOCUS_STATE: u32 = 9;
 
 /// Command ID for SetOperationModeChangedNotification (ISelfController)
+/// Command ID for GetLibraryAppletLaunchableEvent (ISelfController).
+///
+/// The system signals this event when it is willing to launch a library applet.
+/// Creating one before it is signalled races the system, so a launch waits here
+/// first.
+pub const CMD_SC_GET_LIBRARY_APPLET_LAUNCHABLE_EVENT: u32 = 9;
+
 pub const CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION: u32 = 11;
 
 /// Command ID for SetPerformanceModeChangedNotification (ISelfController)
@@ -144,6 +151,42 @@ pub const CMD_GET_APPLICATION_FUNCTIONS: u32 = 20;
 /// - Acquiring foreground rights
 /// - Setting up focus handling mode
 pub const CMD_AF_NOTIFY_RUNNING: u32 = 40;
+
+/// Command ID for CreateLibraryApplet (ILibraryAppletCreator).
+pub const CMD_LAC_CREATE_LIBRARY_APPLET: u32 = 0;
+
+/// Command ID for CreateStorage (ILibraryAppletCreator).
+pub const CMD_LAC_CREATE_STORAGE: u32 = 10;
+
+/// Command ID for GetAppletStateChangedEvent (ILibraryAppletAccessor).
+pub const CMD_LAA_GET_APPLET_STATE_CHANGED_EVENT: u32 = 0;
+
+/// Command ID for Start (ILibraryAppletAccessor).
+pub const CMD_LAA_START: u32 = 10;
+
+/// Command ID for GetResult (ILibraryAppletAccessor).
+///
+/// Carries the applet's own exit status: a plain success reply means the applet
+/// exited normally, and a service error is the applet's result verbatim.
+pub const CMD_LAA_GET_RESULT: u32 = 30;
+
+/// Command ID for PushInData (ILibraryAppletAccessor).
+pub const CMD_LAA_PUSH_IN_DATA: u32 = 100;
+
+/// Command ID for PopOutData (ILibraryAppletAccessor).
+pub const CMD_LAA_POP_OUT_DATA: u32 = 101;
+
+/// Command ID for Open (IStorage).
+pub const CMD_STORAGE_OPEN: u32 = 0;
+
+/// Command ID for GetSize (IStorageAccessor).
+pub const CMD_STORAGE_ACCESSOR_GET_SIZE: u32 = 0;
+
+/// Command ID for Write (IStorageAccessor).
+pub const CMD_STORAGE_ACCESSOR_WRITE: u32 = 10;
+
+/// Command ID for Read (IStorageAccessor).
+pub const CMD_STORAGE_ACCESSOR_READ: u32 = 11;
 
 /// Applet type determining which service and proxy to use.
 ///
@@ -388,5 +431,141 @@ impl Default for AppletAttribute {
     #[inline]
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Identifies which applet `CreateLibraryApplet` launches.
+///
+/// The values below `0x0A` name applets that are not library applets; they are
+/// part of the same system-wide enum and are listed for completeness, but only
+/// the `LibraryApplet*` variants are valid for `CreateLibraryApplet`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum AppletId {
+    /// No applet.
+    None = 0x00,
+    /// Application. Not valid for use with library applets.
+    Application = 0x01,
+    /// `overlayDisp`.
+    OverlayApplet = 0x02,
+    /// `qlaunch`.
+    SystemAppletMenu = 0x03,
+    /// `starter`.
+    SystemApplication = 0x04,
+    /// `auth`.
+    LibraryAppletAuth = 0x0A,
+    /// `cabinet`.
+    LibraryAppletCabinet = 0x0B,
+    /// `controller`.
+    LibraryAppletController = 0x0C,
+    /// `dataErase`.
+    LibraryAppletDataErase = 0x0D,
+    /// `error`, the system error dialog.
+    LibraryAppletError = 0x0E,
+    /// `netConnect`.
+    LibraryAppletNetConnect = 0x0F,
+    /// `playerSelect`.
+    LibraryAppletPlayerSelect = 0x10,
+    /// `swkbd`, the software keyboard.
+    LibraryAppletSwkbd = 0x11,
+    /// `miiEdit`.
+    LibraryAppletMiiEdit = 0x12,
+    /// `LibAppletWeb`.
+    LibraryAppletWeb = 0x13,
+    /// `LibAppletShop`.
+    LibraryAppletShop = 0x14,
+    /// `photoViewer`.
+    LibraryAppletPhotoViewer = 0x15,
+    /// `set`. Not present on retail devices.
+    LibraryAppletSet = 0x16,
+    /// `LibAppletOff`.
+    LibraryAppletOfflineWeb = 0x17,
+    /// `LibAppletLns`.
+    LibraryAppletLoginShare = 0x18,
+    /// `LibAppletAuth`.
+    LibraryAppletWifiWebAuth = 0x19,
+    /// `myPage`.
+    LibraryAppletMyPage = 0x1A,
+}
+
+impl AppletId {
+    /// Returns the raw u32 value of this applet id.
+    #[inline]
+    pub const fn as_raw(self) -> u32 {
+        self as u32
+    }
+}
+
+/// Why a library applet stopped running.
+///
+/// Derived from the result `GetResult` replies with: a success means the applet
+/// ran to completion, and every other value is the applet's own result,
+/// classified the way libnx's `appletHolderJoin` classifies it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryAppletExitReason {
+    /// The applet ran to completion.
+    Normal,
+    /// The user dismissed the applet without completing it.
+    Canceled,
+    /// The applet terminated abnormally.
+    Abnormal,
+    /// The applet failed in a way this mapping does not name.
+    Unexpected,
+}
+
+impl LibraryAppletExitReason {
+    /// Classifies the result code `GetResult` replied with.
+    ///
+    /// Only module 128 carries an exit reason; anything else is a failure the
+    /// applet protocol does not describe, and so reads as
+    /// [`Unexpected`](Self::Unexpected).
+    pub const fn from_result_code(code: u32) -> Self {
+        /// Result module that carries library applet exit reasons.
+        const MODULE_APPLET: u32 = 128;
+        /// Description meaning the user dismissed the applet.
+        const DESC_CANCELED: u32 = 22;
+        /// Descriptions in `[start, end)` mean an abnormal termination.
+        const DESC_ABNORMAL_START: u32 = 0x14;
+        const DESC_ABNORMAL_END: u32 = 0x32;
+
+        let module = code & 0x1FF;
+        let description = (code >> 9) & 0x1FFF;
+
+        if module != MODULE_APPLET {
+            return Self::Unexpected;
+        }
+
+        if description == DESC_CANCELED {
+            Self::Canceled
+        } else if description >= DESC_ABNORMAL_START && description < DESC_ABNORMAL_END {
+            Self::Abnormal
+        } else {
+            Self::Unexpected
+        }
+    }
+}
+
+/// How a library applet is presented once started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u32)]
+pub enum LibraryAppletMode {
+    /// Foreground.
+    #[default]
+    AllForeground = 0,
+    /// Background.
+    Background = 1,
+    /// No UI.
+    NoUi = 2,
+    /// Background with indirect display.
+    BackgroundIndirect = 3,
+    /// Foreground, but initially hidden.
+    AllForegroundInitiallyHidden = 4,
+}
+
+impl LibraryAppletMode {
+    /// Returns the raw u32 value of this mode.
+    #[inline]
+    pub const fn as_raw(self) -> u32 {
+        self as u32
     }
 }

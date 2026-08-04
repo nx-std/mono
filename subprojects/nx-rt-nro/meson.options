@@ -20,6 +20,13 @@ option(
 )
 
 option(
+    'use_nx_service_applet_err',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-applet-err` feature',
+    yield : true
+)
+
+option(
     'use_nx_service_fs',
     type : 'feature', value : 'auto',
     description : 'Enable the nx-rt-nro `service-fs` feature',
