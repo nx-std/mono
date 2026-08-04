@@ -149,6 +149,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-mem",
  "nx-sys-thread-tls",
+ "nx-time",
  "thiserror",
 ]
 

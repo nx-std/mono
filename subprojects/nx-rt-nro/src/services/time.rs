@@ -6,11 +6,13 @@
 use nx_service_time::{
     TimeService,
     TimeServiceType,
+    TimeType,
 };
 use nx_std_sync::{
     once_lock::OnceLock,
     rwlock::RwLock,
 };
+use nx_time::tz::TzSpec;
 
 use crate::services::sm;
 
@@ -41,6 +43,64 @@ pub fn init() -> Result<(), ConnectError> {
     *guard = Some(TimeState { service });
 
     Ok(())
+}
+
+/// Anchors the realtime clock and publishes the device's timezone to the C environment.
+///
+/// This is libnx's `__libnx_init_time`. Horizon exposes no realtime clock a process can read
+/// directly, so the wall clock is read once here, over IPC, and handed to [`nx_time::realtime`],
+/// which derives every later reading from the counter-timer. The device's timezone rule is then
+/// rendered as a POSIX `TZ` specification for newlib.
+///
+/// # Errors
+///
+/// Returns [`InitWallClockError`] if the Time service is not initialized or either query fails.
+/// A failure at the timezone step still leaves the clock anchored.
+// libnx picks the clock from its weak `__nx_time_type` global and retries with the default clock
+// when a caller-selected one fails. That knob is a libnx extension carried by a libnx data
+// symbol, which this port deliberately does not depend on: it always reads the user system
+// clock, so there is nothing to fall back from.
+pub fn init_wall_clock() -> Result<(), InitWallClockError> {
+    let service = get_service().ok_or(InitWallClockError::NotInitialized)?;
+
+    let unix_secs = service
+        .get_current_time(TimeType::UserSystemClock)
+        .map_err(InitWallClockError::GetCurrentTime)?;
+
+    // Anchored before the timezone is resolved so that a timezone failure costs only the `TZ`
+    // variable, not the clock — libnx sequences its two steps the same way.
+    nx_time::realtime::set_anchor(unix_secs);
+
+    let (_calendar, info) = service
+        .to_calendar_time_with_my_rule(unix_secs)
+        .map_err(InitWallClockError::ToCalendarTime)?;
+
+    nx_time::tz::set(&TzSpec::new(&info.timezone_name, info.offset));
+
+    Ok(())
+}
+
+/// Error returned by [`init_wall_clock`].
+#[derive(Debug, thiserror::Error)]
+pub enum InitWallClockError {
+    /// The Time service has not been initialized.
+    ///
+    /// Occurs when the wall clock is anchored before [`init`] has opened the session, leaving no
+    /// clock to read. The realtime clock is left unanchored.
+    #[error("the Time service is not initialized")]
+    NotInitialized,
+    /// Failed to read the current time from the user system clock.
+    ///
+    /// Occurs when the shared-memory read or the IPC call to the user system clock fails. The
+    /// realtime clock is left unanchored.
+    #[error("failed to read the current time")]
+    GetCurrentTime(#[source] nx_service_time::GetCurrentTimeError),
+    /// Failed to resolve the device's timezone rule.
+    ///
+    /// Occurs when the timezone service cannot convert the timestamp to calendar time. The
+    /// realtime clock is already anchored by this point, so only `TZ` is left unset.
+    #[error("failed to resolve the device timezone")]
+    ToCalendarTime(#[source] nx_service_time::ToCalendarTimeError),
 }
 
 /// Gets the Time service.

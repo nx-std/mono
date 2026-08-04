@@ -40,6 +40,22 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_time_initialize() -> u32 {
     }
 }
 
+/// Anchors the realtime clock and publishes the device's timezone to the C environment.
+///
+/// Corresponds to `__libnx_init_time()` in libnx.
+///
+/// # Safety
+///
+/// The Time service must already be initialized; there are no arguments to uphold anything about.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_nro__libnx_init_time() {
+    // The error is dropped because there is nothing to report it to: libnx declares
+    // `__libnx_init_time` as `void` and the C startup path calls it for its side effects alone.
+    // A failure leaves the clock unanchored, which surfaces later as `EIO` from
+    // `clock_gettime(CLOCK_REALTIME)` and `gettimeofday`.
+    let _ = crate::services::time::init_wall_clock();
+}
+
 /// Exits the Time service.
 ///
 /// Corresponds to `timeExit()` in libnx.

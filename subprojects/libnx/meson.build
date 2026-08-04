@@ -36,6 +36,18 @@ use_nx_service_sm = get_option('use_nx_service_sm').enable_auto_if(use_nx.enable
 use_nx_service_nv = get_option('use_nx_service_nv').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_vi = get_option('use_nx_service_vi').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 
+# `use_nx_service_time` implies `use_nx_time`: the Time service anchors the realtime clock, and
+# the newlib syscalls that read that anchor back belong to `nx-time`.
+use_nx_time = use_nx_time.enable_auto_if(use_nx_service_time.enabled())
+
+# `enable_auto_if` only resolves an `auto`, so an explicit `disabled` still contradicts it.
+if use_nx_service_time.enabled() and use_nx_time.disabled()
+    error(
+        'use_nx_service_time requires use_nx_time: the wall-clock anchor and the syscalls '
+        + 'that read it must come from the same implementation.',
+    )
+endif
+
 #---------------------------------------------------------------------------------
 # Dependencies
 #---------------------------------------------------------------------------------
