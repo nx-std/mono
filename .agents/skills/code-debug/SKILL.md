@@ -32,6 +32,17 @@ the complete fatal-code tables. Consult it for anything this skill summarizes.
    cannot auto-discover) — find it under *System Settings → Internet → Connection Status*.
 3. **An unstripped host ELF.** Decoding addresses needs the ELF that produced the NRO (e.g.
    `buildDir/subprojects/tests/nx-tests.elf`). Build it first via `/code-build` if absent.
+4. **An NRO built *without* `cargo-nx.txt`.** `just configure` passes
+   `--cross-file cargo-nx.txt`, which routes the `bundle` step through `cargo nx bundle` and
+   produces an NRO that faults at `module_base` before reaching any of your code. Debugging that
+   build means chasing a crash that is not yours. Reconfigure with the devkitPro bundler first:
+
+   ```bash
+   meson setup --cross-file devkitpro.txt --cross-file cross.txt buildDir <options>
+   ```
+
+   Changing cross-files needs a fresh setup, not `--reconfigure`; move `buildDir/cargo-target`
+   aside and restore it afterwards to keep the Rust rebuild incremental.
 
 ## Run Modes & Error Reporting
 
@@ -75,6 +86,15 @@ Each of these silently wastes a debugging session if missed:
 - **Never use inline multi-word `-ex`.** The `just gdb` recipe expands `*ARGS` unquoted, so the
   shell word-splits `-ex 'set architecture aarch64'`. **Always** drive GDB with a command file
   (`-x cmds.gdb`), one command per line.
+- **Never suppress `SIGTRAP` when hunting an abort.** Rust panics and libnx's
+  `diagAbortWithResult` both terminate via `svcBreak`, which arrives as `SIGTRAP`. A capture with
+  `handle SIGTRAP nostop noprint pass` returns an attach banner and nothing else, which reads
+  exactly like "no fault occurred". Use `handle SIGTRAP stop print nopass`.
+- **An empty capture is not evidence of no crash.** Between a stale PID and a suppressed `SIGTRAP`,
+  the two most common failures both produce a clean, empty, successful-looking log. Confirm the
+  PID is live and `SIGTRAP` is unsuppressed before concluding anything from silence.
+- **Debug the right NRO.** A `cargo-nx.txt`-bundled build crashes at `module_base` regardless of
+  your code (see [Prerequisites](#prerequisites)).
 
 ## Workflow
 
@@ -119,6 +139,11 @@ just gdb --batch -x <workdir>/probe.gdb | grep hbloader
 The matching line gives the current `<pid>`. The `disconnect` releases the single-session stub for
 the real attach.
 
+**Re-probe immediately before every attach.** `hbloader` exits when the NRO crashes and hbmenu
+relaunches it with a fresh PID — a single debugging session routinely walks through several
+(`138 → 144 → 146`). Attaching to a PID probed before the previous crash silently attaches to a
+dead process: GDB reports success and then traps nothing.
+
 ### Step 3 — Write the crash-trap command file
 
 Write `<workdir>/cmds.gdb`, substituting `<ip>`, `<elf>`, `<pid>`, `<workdir>`:
@@ -131,40 +156,118 @@ set logging file <workdir>/session.log
 set logging overwrite on
 set logging redirect on
 set logging enabled on
-handle SIGTRAP nostop noprint pass
+
+# Do NOT use `handle SIGTRAP nostop noprint pass` here — see below.
+handle SIGTRAP stop print nopass
+
 target extended-remote <ip>:22225
 file <elf>
 attach <pid>
+
+# Module load raises traps of its own, so the fault is rarely the first stop.
+# Dump the break arguments at each of several stops and pick the informative one.
 continue
-echo \n--- stop ---\n
-info registers
-bt 40
-thread apply all bt 30
+echo \n=== STOP 1 ===\n
+info registers x0 x1 x2 pc
+printf "break reason=%d msg_len=%d\n", $x0, $x2
+x/s $x1
+bt 25
 monitor get modules
-echo \n--- end ---\n
+
+continue
+echo \n=== STOP 2 ===\n
+info registers x0 x1 x2 pc
+printf "break reason=%d msg_len=%d\n", $x0, $x2
+x/s $x1
+bt 25
+
+continue
+echo \n=== STOP 3 ===\n
+info registers x0 x1 x2 pc
+printf "break reason=%d msg_len=%d\n", $x0, $x2
+x/s $x1
+bt 25
+echo \n=== END ===\n
 ```
 
-`handle SIGTRAP nostop noprint pass` suppresses synthetic entry-point / DLL-load traps. `continue`
-**blocks** until the NRO faults. `monitor get modules` prints runtime module bases — required to
-rebase a crash PC.
+> [!CAUTION]
+> **Never suppress `SIGTRAP` when hunting an abort.** A Rust panic (`nx-panic-handler`) and libnx's
+> `diagAbortWithResult` both terminate through **`svcBreak`**, which reaches GDB as `SIGTRAP`.
+> `handle SIGTRAP nostop noprint pass` tells GDB to ignore exactly the event you are trying to
+> catch: the capture completes, logs nothing but the attach banner, and looks indistinguishable
+> from "the process never faulted". Suppress it only when chasing a genuine memory fault and the
+> load-time traps are drowning the session.
+
+`continue` **blocks** until the next stop. `monitor get modules` prints runtime module bases —
+required to rebase a crash PC.
+
+### Reading a `svcBreak` stop — the fast path
+
+`svcBreak(reason, address, size)` follows the AArch64 C ABI, so at the stop the arguments are still
+in registers:
+
+| Register | Meaning                                                              |
+|----------|----------------------------------------------------------------------|
+| `x0`     | `BreakReason` — **`0` is `BREAK_REASON_PANIC`** (a Rust panic)        |
+| `x1`     | Pointer to the message buffer                                         |
+| `x2`     | Message length in bytes                                               |
+
+So **`x/s $x1` prints the panic message directly**, including the `file:line:col` Rust records:
+
+```
+break reason=0 msg_len=97
+0xc233a73a0: "panicked at subprojects/nx-service-fs/src/cmif/proxy.rs:211:10:
+              server returned filesystem object"
+```
+
+That one line identifies the fault precisely, with no module rebasing and no reliance on a
+backtrace — which is fortunate, because Switch threads carry no unwind info and `bt` past frame
+`#0` is usually junk (see the caveat below).
+
+**A stop with `reason=0` but `x1 == 0` and `x2 == 0` is not the interesting one.** `nx-panic-handler`
+elects a single winner to format the shared message buffer; concurrent or nested panics take the
+loser path and break with a null, zero-length message. Keep issuing `continue` until you find the
+stop that carries a real pointer and length.
+
+**`x0` also discriminates the two abort kinds**, which is often the whole question:
+
+| Observation                          | Meaning                                                                 |
+|--------------------------------------|--------------------------------------------------------------------------|
+| `reason=0`, non-null `x1`            | Rust panic — the message names the `expect`/index and its source location |
+| `reason` ≠ 0, or empty buffer        | libnx `diagAbortWithResult` — an error *return* was propagated, not a fault |
+
+### When the program produces no output at all
+
+If a crash happens during `__libnx_init` / `__appInit` — before `main()` — then **nothing** the
+program prints can help: `stdout` is not wired up yet. Do not spend a cycle on
+`cargo nx link -s` (the nxlink stdio server) expecting a panic message; the panic handler writes to
+`svcBreak`, never to `stdout`. An empty stdio capture is evidence the fault is pre-`main`, nothing
+more.
 
 ### Step 4 — Launch GDB backgrounded, then deploy
 
-GDB must be attached and inside `continue` *before* the NRO loads:
+GDB must be attached and inside `continue` *before* the NRO loads. Backgrounding the shell job is
+not enough on its own — wait until the log shows the attach actually landed, then deploy:
 
 ```bash
 just gdb --batch -x <workdir>/cmds.gdb > <workdir>/stdout.log 2>&1 &
+
+# Block until GDB is attached, so the deploy cannot race ahead of it.
+until grep -q "New Thread" <workdir>/session.log 2>/dev/null; do sleep 2; done
+
 just deploy buildDir/subprojects/tests/nx-tests.nro --address <ip>
 ```
 
-On fault, `continue` returns, the script dumps registers / backtrace / modules to `session.log`,
-prints `--- end ---`, and GDB detaches.
+On each stop `continue` returns, the script dumps that stop, and after the last one GDB detaches.
 
 ### Step 5 — Read `session.log`
 
-Read `<workdir>/session.log` and extract:
+Read `<workdir>/session.log` and extract, in this order:
 
-- The fault line — `Thread N received signal SIGSEGV` (or `SIGBUS`, `SIGILL`, …).
+- **The `svcBreak` arguments at each stop** — `break reason=` and the `x/s $x1` string. For an
+  abort this is usually the whole answer; see
+  [Reading a `svcBreak` stop](#reading-a-svcbreak-stop--the-fast-path).
+- The fault line — `Thread N received signal SIGSEGV` (or `SIGBUS`, `SIGILL`, `SIGTRAP`, …).
 - `info registers` — note `pc` (fault site) and `x30` (link register / caller return address).
 - The `bt` / `thread apply all bt` backtrace — **see the caveat below**.
 - The `Modules:` block — runtime base addresses, needed for the next section.
