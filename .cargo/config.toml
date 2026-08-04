@@ -13,6 +13,13 @@ target = ["aarch64-nintendo-switch-freestanding"]
 # This serves as a fallback when cargo is invoked directly (not through just tasks).
 target-dir = "buildDir/cargo-target"
 
+# Default build-time Application Manager identity for `nx-rt-nso`.
+# The crate has one `APPLET_TYPE` arm per identity and rejects an unset or
+# unknown value with a `compile_error!`, so a bare `cargo` invocation needs a
+# value to build at all. Meson builds set `RUSTFLAGS` from the `nso_applet_type`
+# option, which replaces this default; nothing else reads the cfg.
+rustflags = ["--cfg", 'nso_applet_type="application"']
+
 [unstable]
 # This section enables unstable Cargo features.
 

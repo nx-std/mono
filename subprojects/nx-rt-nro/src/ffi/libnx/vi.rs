@@ -1121,7 +1121,7 @@ fn set_vi_ffi_sessions() {
 
     // IApplicationDisplayService
     let app_display = Service {
-        session: service_ref.application_display_session(),
+        session: service_ref.application_display_session().to_handle(),
         own_handle: 0,
         object_id: 0,
         pointer_buffer_size: 0,
@@ -1137,7 +1137,7 @@ fn set_vi_ffi_sessions() {
     // IHOSBinderDriverRelay
     let binder_relay_session = service_ref.binder_relay();
     let binder_relay = Service {
-        session: binder_relay_session.handle(),
+        session: binder_relay_session.handle().to_handle(),
         own_handle: 0,
         object_id: 0,
         pointer_buffer_size: binder_relay_session.pointer_buffer_size(),
@@ -1153,7 +1153,7 @@ fn set_vi_ffi_sessions() {
     // ISystemDisplayService (optional)
     if let Some(session) = service_ref.system_display_session() {
         let sys_display = Service {
-            session,
+            session: session.to_handle(),
             own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,
@@ -1170,7 +1170,7 @@ fn set_vi_ffi_sessions() {
     // IManagerDisplayService (optional)
     if let Some(session) = service_ref.manager_display_session() {
         let mgr_display = Service {
-            session,
+            session: session.to_handle(),
             own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,
@@ -1187,7 +1187,7 @@ fn set_vi_ffi_sessions() {
     // IHOSBinderDriverIndirect (optional)
     if let Some(session) = service_ref.binder_indirect_session() {
         let binder_indirect = Service {
-            session,
+            session: session.to_handle(),
             own_handle: 0,
             object_id: 0,
             pointer_buffer_size: 0,

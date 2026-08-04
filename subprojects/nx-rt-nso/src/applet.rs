@@ -13,8 +13,9 @@
 //!
 //! ## Applet-type coverage
 //!
-//! Each `nso_applet_type` Meson value selects exactly one `applet-*` Cargo
-//! feature, which fixes [`APPLET_TYPE`]. [`applet_init`] hands that value to
+//! Each `nso_applet_type` Meson value reaches the crate as the
+//! `nso_applet_type` cfg value, which fixes [`APPLET_TYPE`]. [`applet_init`]
+//! hands that value to
 //! [`nx_rt_core::services::applet::init`], which dispatches to the matching
 //! per-role `open_*` helper and brings up the Application Manager proxy
 //! command shown below:
@@ -43,21 +44,26 @@ use nx_svc::process::Handle as ProcessHandle;
 /// Unlike a homebrew NRO — which the loader hands an applet type at runtime —
 /// an NSO has no loader block, so the identity is fixed in the process image.
 ///
-/// The value is selected at build time by the active `applet-*` Cargo feature,
-/// driven by the `nso_applet_type` Meson option. Exactly one
-/// `applet-*` feature must be enabled; the crate root ([`crate`]) enforces this
-/// with a `compile_error!` guard.
-#[cfg(feature = "applet-application")]
+/// The value is selected at build time by the `nso_applet_type` cfg value,
+/// which the Meson option of the same name sets. A cfg value carries one
+/// identity by construction, so no two selections can collide.
+///
+/// Every arm names its own value, so a cfg left unset or carrying a value
+/// outside the six matches none of them; the crate root ([`crate`]) turns that
+/// into a `compile_error!` rather than letting the process silently register as
+/// something it is not. The workspace `.cargo/config.toml` supplies the
+/// `application` default, which is what keeps a bare `cargo check` building.
+#[cfg(nso_applet_type = "application")]
 pub const APPLET_TYPE: AppletType = AppletType::Application;
-#[cfg(feature = "applet-library-applet")]
+#[cfg(nso_applet_type = "library-applet")]
 pub const APPLET_TYPE: AppletType = AppletType::LibraryApplet;
-#[cfg(feature = "applet-none")]
+#[cfg(nso_applet_type = "none")]
 pub const APPLET_TYPE: AppletType = AppletType::None;
-#[cfg(feature = "applet-overlay-applet")]
+#[cfg(nso_applet_type = "overlay-applet")]
 pub const APPLET_TYPE: AppletType = AppletType::OverlayApplet;
-#[cfg(feature = "applet-system-applet")]
+#[cfg(nso_applet_type = "system-applet")]
 pub const APPLET_TYPE: AppletType = AppletType::SystemApplet;
-#[cfg(feature = "applet-system-application")]
+#[cfg(nso_applet_type = "system-application")]
 pub const APPLET_TYPE: AppletType = AppletType::SystemApplication;
 
 /// Brings up the Application Manager handshake for this NSO's build-time

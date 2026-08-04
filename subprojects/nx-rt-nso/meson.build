@@ -5,20 +5,19 @@ cargo = find_program('cargo', required : true)
 #---------------------------------------------------------------------------------
 # Options
 #---------------------------------------------------------------------------------
-# Build-time Application Manager identity: the `nso_applet_type`
-# combo maps 1:1 to a mutually-exclusive `applet-*` Cargo feature. Exactly one is
-# always selected — `combo` resolves to a single choice — so the entry crate's
-# `APPLET_TYPE` const is unambiguous. The `none` choice selects the background-
-# sysmodule profile: no Application Manager identity, the AM handshake skipped.
-applet_feature_by_type = {
-    'application' : 'applet-application',
-    'system-applet' : 'applet-system-applet',
-    'library-applet' : 'applet-library-applet',
-    'overlay-applet' : 'applet-overlay-applet',
-    'system-application' : 'applet-system-application',
-    'none' : 'applet-none',
+# Build-time Application Manager identity: the `nso_applet_type` combo reaches
+# the crate as the rustc cfg value of the same name, which fixes the entry
+# crate's `APPLET_TYPE` const. It is a cfg value rather than a Cargo feature
+# because the six identities are mutually exclusive and Cargo features are
+# additive: `cargo <cmd> --all-features` would select all six at once. `combo`
+# resolves to a single choice, so the value is always unambiguous. The `none`
+# choice selects the background-sysmodule profile: no Application Manager
+# identity, the AM handshake skipped.
+cargo_env = {
+    'RUSTFLAGS' : '--cfg nso_applet_type="' + get_option('nso_applet_type') + '"',
 }
-cargo_features = [applet_feature_by_type[get_option('nso_applet_type')]]
+
+cargo_features = []
 
 # rt-link — the rustc-link pipeline's per-kind `pm`-launch `.crt0`.
 # On the rustc pipeline this crate supplies its own `_start`; on the GCC
@@ -97,6 +96,7 @@ endif
 nx_rt_nso_tgt = custom_target(
     'nx-rt-nso',
     command : cargo_cmd,
+    env : cargo_env,
     output : ['libnx_rt_nso.rlib'],
     console : true,
     build_by_default : true,

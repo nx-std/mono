@@ -3,8 +3,8 @@
 //! Redirects the `libnx` `applet*` startup entry points to `nx-rt-nso`. Unlike
 //! the homebrew-NRO surface — which sources the applet type at runtime from
 //! the loader configuration block — the NSO surface reports the build-time
-//! [`APPLET_TYPE`](crate::applet::APPLET_TYPE) selected by the active
-//! `applet-*` Cargo feature.
+//! [`APPLET_TYPE`](crate::applet::APPLET_TYPE) selected by the
+//! `nso_applet_type` cfg value.
 //!
 //! Only the applet-type-sourcing entry points (`appletInitialize`,
 //! `appletGetAppletType`, `__nx_applet_type`) are exposed here. The
