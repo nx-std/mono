@@ -14,6 +14,8 @@ mod env;
 mod apm;
 #[cfg(feature = "service-applet")]
 mod applet;
+#[cfg(feature = "service-applet-err")]
+mod applet_err;
 #[cfg(feature = "service-fs")]
 mod fs;
 #[cfg(feature = "service-hid")]

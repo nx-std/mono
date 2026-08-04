@@ -135,6 +135,16 @@ option(
 )
 
 option(
+    'use_nx_service_applet_err',
+    # Disable by default, WIP: only the application error variant is ported; the
+    # rest of the surface is aliased to panicking stubs. Implies
+    # use_nx_service_applet.
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-applet-err (error library applet)',
+    yield : true
+)
+
+option(
     'use_nx_service_fs',
     # Disabled by default: the override is partial. Rust owns the fsp-srv session,
     # so libnx's `g_fsSrv` stays zeroed, and the `fs*` commands that are not

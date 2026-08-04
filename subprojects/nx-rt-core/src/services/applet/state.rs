@@ -14,6 +14,7 @@ use core::sync::atomic::{
 
 use nx_service_applet::{
     CommonStateGetter,
+    LibraryAppletCreator,
     SelfController,
     WindowController,
     aruid::Aruid,
@@ -99,8 +100,19 @@ impl AppletSingleton {
         }
     }
 
-    // NOTE: AudioController / DisplayController / LibraryAppletCreator /
-    // DebugFunctions projections are not yet exposed at the runtime layer —
-    // no top-level accessor or FFI shim consumes them. Add them here when a
-    // consumer materialises rather than carrying dead infrastructure.
+    /// Universal core accessor: ILibraryAppletCreator (proxy cmd 11).
+    pub fn library_applet_creator(&self) -> LibraryAppletCreator<'_> {
+        match self {
+            Self::Application(s) => s.proxy.library_applet_creator(),
+            Self::LibraryApplet(s) => s.proxy.library_applet_creator(),
+            Self::SystemApplet(s) => s.proxy.library_applet_creator(),
+            Self::OverlayApplet(s) => s.proxy.library_applet_creator(),
+            Self::SystemApplication(s) => s.proxy.library_applet_creator(),
+        }
+    }
+
+    // NOTE: AudioController / DisplayController / DebugFunctions projections
+    // are not yet exposed at the runtime layer — no top-level accessor or FFI
+    // shim consumes them. Add them here when a consumer materialises rather
+    // than carrying dead infrastructure.
 }

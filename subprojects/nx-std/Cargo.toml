@@ -51,6 +51,9 @@ rt-nro = ["dep:nx-rt-nro", "rt"]
 rt-nso = ["dep:nx-rt-nso", "rt"]
 service-apm = ["dep:nx-service-apm", "nx-rt-nro?/service-apm"]
 service-applet = ["dep:nx-service-applet", "nx-rt-nro?/service-applet"]
+# No `dep:` entry: the error applet's FFI surface lives in `nx-rt-nro`, so the
+# umbrella only forwards the feature rather than linking the crate itself.
+service-applet-err = ["nx-rt-nro?/service-applet-err"]
 service-fs = ["dep:nx-service-fs", "nx-rt-nro?/service-fs"]
 service-hid = ["dep:nx-service-hid", "nx-rt-nro?/service-hid"]
 service-nv = ["dep:nx-service-nv", "nx-rt-nro?/service-nv"]

@@ -136,6 +136,7 @@ dependencies = [
  "nx-rt-core",
  "nx-service-apm",
  "nx-service-applet",
+ "nx-service-applet-err",
  "nx-service-fs",
  "nx-service-hid",
  "nx-service-nv",

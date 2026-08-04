@@ -61,6 +61,15 @@ impl ApplicationError {
         }
     }
 
+    /// Wraps an argument struct built elsewhere.
+    ///
+    /// Exists for the C boundary, where the caller fills the arg struct through
+    /// one entry point and shows it through another, so the two halves cannot
+    /// share an [`ApplicationError`].
+    pub fn from_arg(arg: ErrorApplicationArg) -> Self {
+        Self { arg }
+    }
+
     /// Sets the decimal number the dialog displays as its error code.
     pub fn with_error_number(mut self, error_number: u32) -> Self {
         self.arg.error_number = error_number;

@@ -23,6 +23,7 @@ use nx_service_applet::{
     AppletPerformanceMode,
     AppletType,
     CommonStateGetter,
+    LibraryAppletCreator,
     SelfController,
     WindowController,
     aruid::Aruid,
@@ -270,6 +271,16 @@ pub fn get_self_controller() -> Option<SelfControllerRef> {
     }
 }
 
+/// Gets the [`LibraryAppletCreator`] sub-interface.
+pub fn get_library_applet_creator() -> Option<LibraryAppletCreatorRef> {
+    let guard = state().read();
+    if guard.is_some() {
+        Some(LibraryAppletCreatorRef(guard))
+    } else {
+        None
+    }
+}
+
 /// Gets the [`WindowController`] sub-interface.
 pub fn get_window_controller() -> Option<WindowControllerRef> {
     let guard = state().read();
@@ -358,4 +369,9 @@ macro_rules! define_core_ref {
 
 define_core_ref!(CommonStateGetterRef, CommonStateGetter, common_state_getter);
 define_core_ref!(SelfControllerRef, SelfController, self_controller);
+define_core_ref!(
+    LibraryAppletCreatorRef,
+    LibraryAppletCreator,
+    library_applet_creator
+);
 define_core_ref!(WindowControllerRef, WindowController, window_controller);
