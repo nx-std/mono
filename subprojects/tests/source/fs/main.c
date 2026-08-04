@@ -1,0 +1,78 @@
+// Filesystem (`fsp-srv` + fsdev) end-to-end tests.
+//
+// Separate from `nx-tests` because these touch the SD card. Every test builds
+// its own fixture under one directory and removes it again, so a run leaves the
+// card as it found it, but a card that is missing, full or write-protected
+// fails the whole suite for reasons that have nothing to do with the code.
+// Keeping them apart means that cannot take the unattended suite down with it.
+//
+// What is exercised is the whole stack rather than the `fsp-srv` commands
+// alone: newlib's stdio calls libsysbase, which dispatches through the
+// descriptor table to fsdev, which issues the commands. The same binary links
+// with or without `use_nx_service_fs` — with the option off the commands
+// resolve to libnx and show what the stock implementation does, with it on they
+// resolve to `__nx_rt_nro__libnx_fs_*` and Rust owns the session. Running both
+// is the comparison worth making.
+
+#include <inttypes.h>
+#include <stdio.h>
+
+#include <switch.h>
+
+#include "../harness.h"
+#include "sdmc/suite.h"
+
+/**
+ * Test suites
+ */
+static TestSuiteFn test_suites[] = {
+    // fs
+    fs_sdmc_suite,
+};
+
+int main()
+{
+    consoleInit(NULL);
+
+    // Configure our supported input layout: a single player with standard controller styles
+    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+
+    // Initialize the default gamepad (which reads handheld mode inputs as well as the first connected controller)
+    PadState pad;
+    padInitializeDefault(&pad);
+
+    // Print the test header
+    printf("NX-TESTS-FS (%s)\n", VERSION);
+    u32 ver = hosversionGet();
+    printf("HOS %d.%d.%d%s\n",
+        HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
+        hosversionIsAtmosphere() ? " (AMS)" : "");
+    printf("Press + to exit\n");
+
+    const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
+    uint64_t curr_test_suite = 0;
+
+    // Main loop:
+    // - Display the test results
+    // - Wait for the user to press + to exit
+    while(appletMainLoop())
+    {
+        // Check if the user has pressed the + button to exit
+        padUpdate(&pad);
+        const uint32_t key_down = padGetButtonsDown(&pad);
+        if (key_down & HidNpadButton_Plus) {
+            break;
+        }
+
+        // Run the next test suite
+        if (curr_test_suite < test_suites_count) {
+            test_suites[curr_test_suite]();
+            curr_test_suite++;
+        }
+
+        consoleUpdate(NULL);
+    }
+
+    consoleExit(NULL);
+    return 0;
+}

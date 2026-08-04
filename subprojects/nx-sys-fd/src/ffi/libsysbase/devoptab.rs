@@ -3,15 +3,29 @@
 //! Devices exist on both sides of the boundary, so this module carries each across:
 //!
 //! - **Rust device, C caller.** The C entry points left in place dispatch through `devoptab_list`
-//!   themselves, so a Rust device needs a table for them to find. [`SHIM_TABLES`] is that table:
-//!   one set of shims shared by every slot, which recover the descriptor from the state pointer
-//!   they are handed and forward into [`crate::table`].
+//!   themselves, so a Rust device needs a table for them to find. [`SHIM_TABLE`] is that table:
+//!   one set of shims shared by every slot, which recover what they were called for and forward
+//!   into the Rust API.
 //! - **C device, Rust caller.** A device registered through `AddDevice` arrives as a `devoptab_t`.
 //!   [`CDevice`] wraps one so the registry holds a [`Device`] like any other, and `devoptab_list`
 //!   keeps pointing at the original table so C-to-C dispatch is untouched.
 //!
 //! Neither direction is visible to a device author: a Rust device implements [`Device`], and a C
 //! device keeps working unchanged.
+//!
+//! ## How a shim knows what it was called for
+//!
+//! C dispatches with `devoptab_list[dev]->op(...)`, and relies on the function pointer itself being
+//! device-specific. Every Rust device shares one set of shims, so that identity has to come from
+//! the arguments instead, and it arrives differently for each of the three kinds of operation:
+//!
+//! - **Per-descriptor** operations are handed the descriptor's state pointer, which for a Rust
+//!   device addresses that descriptor's entry in the tag array, so the descriptor number is
+//!   recovered from the address. See [`super::handle`].
+//! - **Per-path** operations are handed only the path, which is where the device name came from in
+//!   the first place, so the shim resolves it again. See [`super::path`].
+//! - **Per-directory** operations are handed the iterator, which carries the open directory in the
+//!   private state the C caller allocated behind it. See [`dir_state`].
 
 use core::{
     cell::UnsafeCell,
@@ -25,57 +39,40 @@ use core::{
 };
 
 use super::{
-    errno::ToErrno as _,
+    ctypes::{
+        DirIter,
+        ModeT,
+        OffT,
+        SsizeT,
+        Stat,
+        StatVfs,
+        TimeVal,
+        decode_open_flags,
+    },
+    dir_state,
+    errno::{
+        self,
+        EBADF,
+        EINVAL,
+        ENODEV,
+        ENOENT,
+        ToErrno as _,
+    },
     handle,
+    path,
     reent::Reent,
 };
 use crate::{
     device::{
         Device,
+        DeviceError,
         DeviceId,
         MAX_DEVICES,
+        SeekFrom,
     },
     registry,
     table,
 };
-
-/// File offset, matching the C library's `off_t`.
-pub type OffT = c_long;
-
-/// File mode, matching the C library's `mode_t`.
-pub type ModeT = u32;
-
-/// Signed byte count, matching the C library's `ssize_t`.
-pub type SsizeT = c_long;
-
-/// Opaque `struct stat`.
-#[repr(C)]
-pub struct Stat {
-    _opaque: [u8; 0],
-}
-
-/// Opaque `struct statvfs`.
-#[repr(C)]
-pub struct StatVfs {
-    _opaque: [u8; 0],
-}
-
-/// Opaque `struct timeval`.
-#[repr(C)]
-pub struct TimeVal {
-    _opaque: [u8; 0],
-}
-
-/// Directory iteration state carried between `dir*` calls.
-///
-/// Mirrors `DIR_ITER` from `sys/iosupport.h`.
-#[repr(C)]
-pub struct DirIter {
-    /// Registry slot of the device backing this iterator.
-    pub device: c_int,
-    /// The device's private directory state.
-    pub dir_struct: *mut c_void,
-}
 
 /// Operations implementing one device, as C declares them.
 ///
@@ -166,12 +163,35 @@ static C_DEVICES: [CDevice; MAX_DEVICES] = [const { CDevice::vacant() }; MAX_DEV
 
 /// The shim table a Rust device's slot points at.
 ///
-/// Every slot shares it: the shims recover the descriptor from the state pointer they are handed,
-/// so they need no per-slot identity of their own.
+/// Every slot shares it: the shims recover what they were called for from their arguments, so they
+/// need no per-slot identity of their own.
+///
+/// Every operation a [`Device`], [`crate::device::File`] or [`crate::device::Dir`] can implement is
+/// listed here, because the table is shared: leaving one out would deny it to every Rust device at
+/// once, and an operation an individual device does not offer already reports that for itself.
 static SHIM_TABLE: DevOpTab = DevOpTab {
+    open_r: Some(shim_open),
     close_r: Some(shim_close),
     write_r: Some(shim_write),
     read_r: Some(shim_read),
+    seek_r: Some(shim_seek),
+    fstat_r: Some(shim_fstat),
+    stat_r: Some(shim_stat),
+    unlink_r: Some(shim_unlink),
+    chdir_r: Some(shim_chdir),
+    rename_r: Some(shim_rename),
+    mkdir_r: Some(shim_mkdir),
+    dir_state_size: dir_state::SIZE,
+    diropen_r: Some(shim_diropen),
+    dirreset_r: Some(shim_dirreset),
+    dirnext_r: Some(shim_dirnext),
+    dirclose_r: Some(shim_dirclose),
+    statvfs_r: Some(shim_statvfs),
+    ftruncate_r: Some(shim_ftruncate),
+    fsync_r: Some(shim_fsync),
+    rmdir_r: Some(shim_rmdir),
+    // Horizon has no symbolic links, so there is nothing for `lstat` to do differently.
+    lstat_r: Some(shim_stat),
     ..empty_table()
 };
 
@@ -228,9 +248,9 @@ pub fn table_at(index: usize) -> *const DevOpTab {
 
 /// A device registered from C, seen as a [`Device`].
 ///
-/// Reports the device's name so paths resolve, and leaves the transfer operations unsupported: a C
-/// device's bytes move through its own table, which its descriptors keep pointing at, and its
-/// per-descriptor state is not something the Rust interface can produce.
+/// Reports the device's name so paths resolve, and leaves every operation unsupported: a C device's
+/// work goes through its own table, which its descriptors keep pointing at, and its per-descriptor
+/// state is not something the Rust interface can produce.
 pub struct CDevice {
     table: UnsafeCell<*const DevOpTab>,
 }
@@ -372,6 +392,52 @@ unsafe fn bind_shim(index: usize) {
     };
 }
 
+/// Opens a path on behalf of a descriptor the C caller has already allocated.
+///
+/// The descriptor exists before this runs, so the file produced here is attached to it rather than
+/// returned. A failure to attach means the descriptor went away underneath, which the C caller
+/// reports as a bad descriptor.
+unsafe extern "C" fn shim_open(
+    r: *mut Reent,
+    state: *mut c_void,
+    path: *const c_char,
+    flags: c_int,
+    _mode: c_int,
+) -> c_int {
+    let Some(fd) = handle::fd_from_state(state) else {
+        return errno::fail(r, EBADF);
+    };
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    let Some(full_path) = (unsafe { borrow_path(path) }) else {
+        return errno::fail(r, EINVAL);
+    };
+
+    let Some(device) = table::device_of(fd).and_then(registry::get) else {
+        return errno::fail(r, ENODEV);
+    };
+
+    let file = match device.open(
+        path::strip_device_prefix(full_path),
+        decode_open_flags(flags),
+    ) {
+        Ok(file) => file,
+        Err(err) => return errno::fail(r, err.to_errno()),
+    };
+
+    match table::attach(fd, file) {
+        Ok(()) => 0,
+        Err(err) => errno::fail(r, err.to_errno()),
+    }
+}
+
+/// Forwards a C close to the Rust device behind the descriptor.
+///
+/// The descriptor was already released by `_close_r`, which is what calls this, so there is nothing
+/// left to do here beyond reporting.
+unsafe extern "C" fn shim_close(_r: *mut Reent, _state: *mut c_void) -> c_int {
+    0
+}
+
 /// Forwards a C write to the Rust device behind the descriptor.
 unsafe extern "C" fn shim_write(
     r: *mut Reent,
@@ -380,10 +446,10 @@ unsafe extern "C" fn shim_write(
     len: usize,
 ) -> SsizeT {
     let Some(fd) = handle::fd_from_state(state) else {
-        return super::errno::fail_ssize(r, super::errno::EBADF);
+        return errno::fail_ssize(r, EBADF);
     };
     if buf.is_null() {
-        return super::errno::fail_ssize(r, super::errno::EINVAL);
+        return errno::fail_ssize(r, EINVAL);
     }
 
     // SAFETY: C guarantees `buf` addresses `len` readable bytes for the duration of the call.
@@ -391,7 +457,7 @@ unsafe extern "C" fn shim_write(
 
     match table::write(fd, bytes) {
         Ok(written) => written as SsizeT,
-        Err(err) => super::errno::fail_ssize(r, err.to_errno()),
+        Err(err) => errno::fail_ssize(r, err.to_errno()),
     }
 }
 
@@ -403,10 +469,10 @@ unsafe extern "C" fn shim_read(
     len: usize,
 ) -> SsizeT {
     let Some(fd) = handle::fd_from_state(state) else {
-        return super::errno::fail_ssize(r, super::errno::EBADF);
+        return errno::fail_ssize(r, EBADF);
     };
     if buf.is_null() {
-        return super::errno::fail_ssize(r, super::errno::EINVAL);
+        return errno::fail_ssize(r, EINVAL);
     }
 
     // SAFETY: C guarantees `buf` addresses `len` writable bytes for the duration of the call.
@@ -414,14 +480,340 @@ unsafe extern "C" fn shim_read(
 
     match table::read(fd, bytes) {
         Ok(read) => read as SsizeT,
-        Err(err) => super::errno::fail_ssize(r, err.to_errno()),
+        Err(err) => errno::fail_ssize(r, err.to_errno()),
     }
 }
 
-/// Forwards a C close to the Rust device behind the descriptor.
+/// Moves the position of the file behind the descriptor.
+unsafe extern "C" fn shim_seek(
+    r: *mut Reent,
+    state: *mut c_void,
+    offset: OffT,
+    whence: c_int,
+) -> OffT {
+    /// Measure from the start of the file.
+    const SEEK_SET: c_int = 0;
+    /// Measure from the current position.
+    const SEEK_CUR: c_int = 1;
+    /// Measure from the end of the file.
+    const SEEK_END: c_int = 2;
+
+    // `fail` reports C's integer failure value, which is -1 and so fits every width it is widened
+    // to here. The seek entry point returns `off_t` rather than `int`, which is the only reason a
+    // cast is involved at all.
+    let failed = |errno| OffT::from(errno::fail(r, errno));
+
+    let Some(fd) = handle::fd_from_state(state) else {
+        return failed(EBADF);
+    };
+
+    let pos = match whence {
+        SEEK_SET if offset < 0 => return failed(EINVAL),
+        // Guarded by the arm above, so the offset is non-negative and the cast is exact.
+        SEEK_SET => SeekFrom::Start(offset as u64),
+        SEEK_CUR => SeekFrom::Current(offset),
+        SEEK_END => SeekFrom::End(offset),
+        _ => return failed(EINVAL),
+    };
+
+    match table::seek(fd, pos) {
+        // A lossy cast the C signature forces: `off_t` is signed and 64 bits wide, so a position
+        // beyond 2^63 has nowhere to go. No Horizon filesystem produces one.
+        Ok(position) => position as OffT,
+        Err(err) => failed(err.to_errno()),
+    }
+}
+
+/// Reports on the file behind the descriptor.
+unsafe extern "C" fn shim_fstat(r: *mut Reent, state: *mut c_void, out: *mut Stat) -> c_int {
+    let Some(fd) = handle::fd_from_state(state) else {
+        return errno::fail(r, EBADF);
+    };
+    if out.is_null() {
+        return errno::fail(r, EINVAL);
+    }
+
+    match table::metadata(fd) {
+        // SAFETY: `out` is non-null and C guarantees it addresses a writable `struct stat`.
+        Ok(metadata) => unsafe {
+            out.write(metadata.into());
+            0
+        },
+        Err(err) => errno::fail(r, err.to_errno()),
+    }
+}
+
+/// Resizes the file behind the descriptor.
+unsafe extern "C" fn shim_ftruncate(r: *mut Reent, state: *mut c_void, len: OffT) -> c_int {
+    let Some(fd) = handle::fd_from_state(state) else {
+        return errno::fail(r, EBADF);
+    };
+    let Ok(len) = u64::try_from(len) else {
+        return errno::fail(r, EINVAL);
+    };
+
+    match table::set_len(fd, len) {
+        Ok(()) => 0,
+        Err(err) => errno::fail(r, err.to_errno()),
+    }
+}
+
+/// Commits what has been written to the file behind the descriptor.
+unsafe extern "C" fn shim_fsync(r: *mut Reent, state: *mut c_void) -> c_int {
+    let Some(fd) = handle::fd_from_state(state) else {
+        return errno::fail(r, EBADF);
+    };
+
+    match table::sync(fd) {
+        Ok(()) => 0,
+        Err(err) => errno::fail(r, err.to_errno()),
+    }
+}
+
+/// Reports on the entry a path names.
 ///
-/// The descriptor was already released by `_close_r`, which is what calls this, so there is nothing
-/// left to do here beyond reporting.
-unsafe extern "C" fn shim_close(_r: *mut Reent, _state: *mut c_void) -> c_int {
+/// Also serves `lstat`: Horizon has no symbolic links, so there is no distinction to draw.
+unsafe extern "C" fn shim_stat(r: *mut Reent, path: *const c_char, out: *mut Stat) -> c_int {
+    if out.is_null() {
+        return errno::fail(r, EINVAL);
+    }
+
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    let result = unsafe { with_device(path, |device, path| device.metadata(path)) };
+
+    match result {
+        Ok(metadata) => {
+            // SAFETY: `out` is non-null and C guarantees it addresses a writable `struct stat`.
+            unsafe { out.write(metadata.into()) };
+            0
+        }
+        Err(errno) => errno::fail(r, errno),
+    }
+}
+
+/// Removes the file a path names.
+unsafe extern "C" fn shim_unlink(r: *mut Reent, path: *const c_char) -> c_int {
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    report(r, unsafe {
+        with_device(path, |device, path| device.remove_file(path))
+    })
+}
+
+/// Makes a path the working directory of the device that serves it.
+unsafe extern "C" fn shim_chdir(r: *mut Reent, path: *const c_char) -> c_int {
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    report(r, unsafe {
+        with_device(path, |device, path| device.set_current_dir(path))
+    })
+}
+
+/// Creates a directory at a path.
+unsafe extern "C" fn shim_mkdir(r: *mut Reent, path: *const c_char, _mode: c_int) -> c_int {
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    report(r, unsafe {
+        with_device(path, |device, path| device.create_dir(path))
+    })
+}
+
+/// Removes the directory a path names.
+unsafe extern "C" fn shim_rmdir(r: *mut Reent, path: *const c_char) -> c_int {
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    report(r, unsafe {
+        with_device(path, |device, path| device.remove_dir(path))
+    })
+}
+
+/// Moves an entry from one path to another.
+///
+/// Both paths must name the same device: the C standard library refuses a rename that crosses
+/// devices, and this refuses it again rather than trusting that.
+unsafe extern "C" fn shim_rename(r: *mut Reent, from: *const c_char, to: *const c_char) -> c_int {
+    // SAFETY: C guarantees both are live nul-terminated strings for the duration of the call.
+    let (Some(from), Some(to)) = (unsafe { borrow_path(from) }, unsafe { borrow_path(to) }) else {
+        return errno::fail(r, EINVAL);
+    };
+
+    let (Some(from_device), Some(to_device)) =
+        (path::device_for_path(from), path::device_for_path(to))
+    else {
+        return errno::fail(r, ENODEV);
+    };
+    if from_device != to_device {
+        return errno::fail(r, EINVAL);
+    }
+
+    let Some(device) = registry::get(from_device) else {
+        return errno::fail(r, ENODEV);
+    };
+
+    match device.rename(
+        path::strip_device_prefix(from),
+        path::strip_device_prefix(to),
+    ) {
+        Ok(()) => 0,
+        Err(err) => errno::fail(r, err.to_errno()),
+    }
+}
+
+/// Reports how much space the filesystem holding a path has.
+unsafe extern "C" fn shim_statvfs(r: *mut Reent, path: *const c_char, out: *mut StatVfs) -> c_int {
+    if out.is_null() {
+        return errno::fail(r, EINVAL);
+    }
+
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    let result = unsafe { with_device(path, |device, path| device.space_info(path)) };
+
+    match result {
+        Ok(info) => {
+            // SAFETY: `out` is non-null and C guarantees it addresses a writable `struct statvfs`.
+            unsafe { out.write(info.into()) };
+            0
+        }
+        Err(errno) => errno::fail(r, errno),
+    }
+}
+
+/// Opens a directory, storing the walk in the state the C caller allocated behind the iterator.
+///
+/// Returns the iterator it was given on success and null on failure, which is the contract
+/// `__diropen` expects: on null it frees the iterator without calling anything else.
+unsafe extern "C" fn shim_diropen(
+    r: *mut Reent,
+    iter: *mut DirIter,
+    path: *const c_char,
+) -> *mut DirIter {
+    if iter.is_null() {
+        errno::fail(r, EINVAL);
+        return core::ptr::null_mut();
+    }
+
+    // SAFETY: C guarantees `path` is a live nul-terminated string for the duration of the call.
+    let result = unsafe { with_device(path, |device, path| device.open_dir(path)) };
+
+    let dir = match result {
+        Ok(dir) => dir,
+        Err(errno) => {
+            errno::fail(r, errno);
+            return core::ptr::null_mut();
+        }
+    };
+
+    // SAFETY: `iter` is non-null and C allocated `SIZE` bytes of state behind it, which is what
+    // `dir_state_size` in the shim table asked for.
+    unsafe { dir_state::store(iter, dir) };
+    iter
+}
+
+/// Restarts a directory walk from its first entry.
+unsafe extern "C" fn shim_dirreset(r: *mut Reent, iter: *mut DirIter) -> c_int {
+    // SAFETY: `iter` was produced by `shim_diropen`, so its state holds a live walk.
+    let Some(dir) = (unsafe { dir_state::borrow(iter) }) else {
+        return errno::fail(r, EBADF);
+    };
+
+    match dir.reset() {
+        Ok(()) => 0,
+        Err(err) => errno::fail(r, err.to_errno()),
+    }
+}
+
+/// Produces the next entry of a directory walk.
+///
+/// The end of the directory is reported the way `readdir` expects to hear it: a failure whose error
+/// number is `ENOENT`, which it translates back into a clean end rather than an error.
+unsafe extern "C" fn shim_dirnext(
+    r: *mut Reent,
+    iter: *mut DirIter,
+    name_out: *mut c_char,
+    stat_out: *mut Stat,
+) -> c_int {
+    // SAFETY: `iter` was produced by `shim_diropen`, so its state holds a live walk.
+    let Some(dir) = (unsafe { dir_state::borrow(iter) }) else {
+        return errno::fail(r, EBADF);
+    };
+    if name_out.is_null() {
+        return errno::fail(r, EINVAL);
+    }
+
+    let entry = match dir.next() {
+        Ok(Some(entry)) => entry,
+        Ok(None) => return errno::fail(r, ENOENT),
+        Err(err) => return errno::fail(r, err.to_errno()),
+    };
+
+    let name = entry.name.as_bytes();
+    // SAFETY: C provides a buffer of `NAME_MAX + 1` bytes, and an `EntryName` is at most `NAME_MAX`
+    // long, so the name and its terminator fit.
+    unsafe {
+        core::ptr::copy_nonoverlapping(name.as_ptr().cast::<c_char>(), name_out, name.len());
+        name_out.add(name.len()).write(0);
+    }
+
+    // `seekdir` walks a directory for position alone and passes no place to put the metadata.
+    if !stat_out.is_null() {
+        // SAFETY: `stat_out` is non-null and C guarantees it addresses a writable `struct stat`.
+        unsafe { stat_out.write(entry.metadata.into()) };
+    }
+
     0
+}
+
+/// Ends a directory walk, releasing what it held.
+unsafe extern "C" fn shim_dirclose(r: *mut Reent, iter: *mut DirIter) -> c_int {
+    // SAFETY: `iter` was produced by `shim_diropen` and is closed exactly once, so the walk stored
+    // behind it is live and unreachable afterwards.
+    let Some(dir) = (unsafe { dir_state::take(iter) }) else {
+        return errno::fail(r, EBADF);
+    };
+
+    drop(dir);
+    0
+}
+
+/// Runs `operation` against the device a path resolves to.
+///
+/// Every per-path shim starts the same way, because the path is the only thing it is handed: parse
+/// it, resolve the device, strip the device name, and hand the remainder over. The failures before
+/// `operation` runs are the boundary's own, so they arrive as error numbers rather than as a
+/// [`crate::device::DeviceError`] that no device produced.
+///
+/// # Safety
+///
+/// `path` must be null or point to a live nul-terminated string.
+unsafe fn with_device<T>(
+    path: *const c_char,
+    operation: impl FnOnce(&'static dyn Device, &CStr) -> Result<T, DeviceError>,
+) -> Result<T, c_int> {
+    // SAFETY: the caller guarantees `path` is null or a live nul-terminated string.
+    let Some(full_path) = (unsafe { borrow_path(path) }) else {
+        return Err(EINVAL);
+    };
+
+    let device = path::device_for_path(full_path)
+        .and_then(registry::get)
+        .ok_or(ENODEV)?;
+
+    operation(device, path::strip_device_prefix(full_path)).map_err(|err| err.to_errno())
+}
+
+/// Reports the outcome of a per-path shim the way C expects it.
+fn report(r: *mut Reent, result: Result<(), c_int>) -> c_int {
+    match result {
+        Ok(()) => 0,
+        Err(errno) => errno::fail(r, errno),
+    }
+}
+
+/// Borrows a path handed in by C, refusing a null pointer.
+///
+/// # Safety
+///
+/// `path` must be null or point to a live nul-terminated string that outlives the returned borrow.
+unsafe fn borrow_path<'a>(path: *const c_char) -> Option<&'a CStr> {
+    if path.is_null() {
+        return None;
+    }
+    // SAFETY: the caller guarantees `path` is a live nul-terminated string.
+    Some(unsafe { CStr::from_ptr(path) })
 }

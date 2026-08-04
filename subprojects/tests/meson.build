@@ -154,6 +154,39 @@ custom_target(name + '.nro',
               input : elf, output : name + '.nro',
               build_by_default : true, depends : elf)
 
+# ── nx-tests-fs ───────────────────────────────────────────────────────────
+# Runs unattended like `nx-tests`, but kept in its own binary because it touches
+# the SD card: a card that is missing, full or write-protected fails this whole
+# suite for reasons that have nothing to do with the code, and that must not be
+# able to take the main suite down with it. It links either way — with
+# `use_nx_service_fs` off the `fs*` commands resolve to libnx, which is the
+# baseline to compare our implementation against.
+name = 'nx-tests-fs'
+src = files(
+    'source/fs/sdmc/fixture.h',
+    'source/fs/sdmc/suite.h',
+    'source/fs/sdmc/test_0001_write_then_read_returns_same_bytes.c',
+    'source/fs/sdmc/test_0002_stat_reports_size_and_type.c',
+    'source/fs/sdmc/test_0003_seek_moves_the_read_position.c',
+    'source/fs/sdmc/test_0004_opendir_lists_every_entry_once.c',
+    'source/fs/sdmc/test_0005_rename_moves_the_entry.c',
+    'source/fs/sdmc/test_0006_unlink_and_rmdir_remove_entries.c',
+    'source/fs/sdmc/test_0007_opening_a_missing_file_reports_enoent.c',
+    'source/fs/main.c',
+)
+elf = executable(name + '.elf', src,
+                 dependencies : [nx_dep, nx_std_sync_dep],
+                 c_args : c_opts, cpp_args : cpp_opts,
+                 link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
+                 pie : true)
+custom_target(name + '.lst',
+              input : elf, output : name + '.lst',
+              command : [nm, '-CSn', '@INPUT@'], capture : true)
+custom_target(name + '.nro',
+              command : bundle_base + ['--name', name],
+              input : elf, output : name + '.nro',
+              build_by_default : true, depends : elf)
+
 # ── nx-tests-applet-err ───────────────────────────────────────────────────
 # Interactive: the error applet blocks until a person dismisses the dialog, so
 # this cannot join the unattended suite. It links either way — with

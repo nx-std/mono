@@ -25,9 +25,12 @@ use core::{
 
 use nx_sys_sync::Mutex;
 
+mod ctypes;
 mod devoptab;
+mod dir_state;
 mod errno;
 mod handle;
+mod path;
 mod reent;
 
 use self::{
@@ -54,7 +57,7 @@ use crate::{
     },
 };
 
-/// Orders access to the per-descriptor C state pointers and the default device.
+/// Orders access to the per-descriptor C state pointers.
 static STATE_LOCK: Mutex = Mutex::new();
 
 /// Per-descriptor state belonging to devices registered from C.
@@ -63,9 +66,6 @@ static STATE_LOCK: Mutex = Mutex::new();
 /// `file_struct` pointer in the descriptor header. Rust devices keep nothing here, so their entries
 /// stay null and nothing is allocated for them.
 static C_STATES: CStates = CStates(UnsafeCell::new([core::ptr::null_mut(); MAX_FD]));
-
-/// The device paths without a `"name:"` prefix resolve to.
-static DEFAULT_DEVICE: DefaultDevice = DefaultDevice(UnsafeCell::new(None));
 
 /// Registers a device and returns its registry slot, or -1 when the registry is full.
 ///
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_FindDevice(name: *const c_char)
     // SAFETY: the caller guarantees `name` is a live nul-terminated string.
     let path = unsafe { CStr::from_ptr(name) };
 
-    let Some(id) = device_for_path(path) else {
+    let Some(id) = path::device_for_path(path) else {
         return -1;
     };
     devoptab::ensure_bound(id.index());
@@ -149,7 +149,7 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_setDefaultDevice(device: c_int)
         return;
     }
 
-    set_default_device(Some(slot));
+    path::set_default_device(slot);
 }
 
 /// Opens a descriptor on `device`, returning it or -1 with the error number set.
@@ -310,19 +310,6 @@ fn close_c_descriptor(r: *mut Reent, fd: Fd, device: DeviceId) -> c_int {
     ret
 }
 
-/// Resolves a path to the device that should serve it.
-///
-/// A `"name:"` prefix names the device; a path without one goes to the default device.
-fn device_for_path(path: &CStr) -> Option<DeviceId> {
-    let bytes = path.to_bytes();
-
-    match bytes.iter().position(|&byte| byte == b':') {
-        Some(end) => registry::find_by_name_bytes(&bytes[..end]),
-        // SAFETY: the default device slot was bounds-checked when it was set.
-        None => default_device().map(DeviceId::from_index_unchecked),
-    }
-}
-
 /// Allocates `size` zeroed bytes of C device state, or null when the device declares none.
 fn allocate_c_state(size: usize) -> Result<*mut u8, c_int> {
     if size == 0 {
@@ -373,31 +360,8 @@ fn set_c_state(fd: usize, state: *mut u8) -> *mut u8 {
     previous
 }
 
-/// Returns the default device slot.
-fn default_device() -> Option<usize> {
-    STATE_LOCK.lock();
-    // SAFETY: the lock is held.
-    let slot = unsafe { *DEFAULT_DEVICE.0.get() };
-    STATE_LOCK.unlock();
-    slot
-}
-
-/// Sets the default device slot.
-fn set_default_device(slot: Option<usize>) {
-    STATE_LOCK.lock();
-    // SAFETY: the lock is held.
-    unsafe { *DEFAULT_DEVICE.0.get() = slot };
-    STATE_LOCK.unlock();
-}
-
 /// Storage for the per-descriptor C state pointers.
 struct CStates(UnsafeCell<[*mut u8; MAX_FD]>);
 
 // SAFETY: entries are only touched while `STATE_LOCK` is held.
 unsafe impl Sync for CStates {}
-
-/// Storage for the default device slot.
-struct DefaultDevice(UnsafeCell<Option<usize>>);
-
-// SAFETY: only touched while `STATE_LOCK` is held.
-unsafe impl Sync for DefaultDevice {}
