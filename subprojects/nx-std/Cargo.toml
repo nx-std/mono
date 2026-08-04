@@ -24,6 +24,7 @@ ffi = [
     "nx-rand?/ffi",
     "nx-rt-core?/ffi",
     "nx-rt-nro?/ffi",
+    "nx-rt-nso?/ffi",
     "nx-service-sm?/ffi",
     "nx-sf?/ffi",
     "nx-std-sync?/ffi",
@@ -45,7 +46,9 @@ alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 display = ["dep:nx-display", "service-vi"]
 pm = ["dep:nx-pm"]
 rand = ["dep:nx-rand"]
-rt = ["dep:nx-rt-core", "dep:nx-rt-nro"]
+rt = ["dep:nx-rt-core"]
+rt-nro = ["dep:nx-rt-nro", "rt"]
+rt-nso = ["dep:nx-rt-nso", "rt"]
 service-apm = ["dep:nx-service-apm", "nx-rt-nro?/service-apm"]
 service-applet = ["dep:nx-service-applet", "nx-rt-nro?/service-applet"]
 service-hid = ["dep:nx-service-hid", "nx-rt-nro?/service-hid"]
@@ -73,6 +76,7 @@ nx-pm = { version = "0.1.0", path = "../nx-pm", optional = true }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", optional = true }
 nx-rt-nro = { version = "0.1.0", path = "../nx-rt-nro", optional = true }
+nx-rt-nso = { version = "0.1.0", path = "../nx-rt-nso", optional = true }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }

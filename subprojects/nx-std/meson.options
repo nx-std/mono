@@ -20,6 +20,13 @@ option(
 )
 
 option(
+    'nx_rt_kind',
+    type : 'combo', choices : ['nro', 'nso'], value : 'nro',
+    description : 'Select the nx-rt entry crate: nro builds the homebrew-loader runtime, nso the pm-launched process runtime',
+    yield : true
+)
+
+option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
     description : 'Enable the `sync` feature',

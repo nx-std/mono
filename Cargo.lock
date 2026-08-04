@@ -1312,6 +1312,7 @@ dependencies = [
  "nx-rand",
  "nx-rt-core",
  "nx-rt-nro",
+ "nx-rt-nso",
  "nx-service-apm",
  "nx-service-applet",
  "nx-service-hid",
