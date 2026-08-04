@@ -5,5 +5,8 @@ pub mod lifo;
 pub mod types;
 
 pub use layout::HidSharedMemory;
-pub use lifo::{HidCommonLifoHeader, get_states};
+pub use lifo::{
+    HidCommonLifoHeader,
+    get_states,
+};
 pub use types::*;

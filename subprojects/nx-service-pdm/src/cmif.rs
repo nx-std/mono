@@ -2,17 +2,41 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in_out, dispatch_out},
+    dispatch::{
+        dispatch_in_out,
+        dispatch_out,
+    },
     proto,
     types::{
-        AccountEvent, AccountEventV3, AccountEventV10, AccountPlayEvent, AccountUid, AppletEvent,
-        AppletEventV1, LastPlayTime, PlayEvent, PlayEventRange, PlayEventRangeOut, PlayStatistics,
-        PlayStatisticsV1, QueryAccountPlayEventIn, QueryAppletEventIn, QueryAppletEventLegacyIn,
-        QueryLastPlayTimeIn, QueryPlayStatsByAppIdAndUserIn, QueryPlayStatsByAppIdAndUserLegacyIn,
-        QueryPlayStatsByAppIdIn, QueryPlayStatsByAppIdLegacyIn, QueryRecentlyPlayedAppIn,
+        AccountEvent,
+        AccountEventV3,
+        AccountEventV10,
+        AccountPlayEvent,
+        AccountUid,
+        AppletEvent,
+        AppletEventV1,
+        LastPlayTime,
+        PlayEvent,
+        PlayEventRange,
+        PlayEventRangeOut,
+        PlayStatistics,
+        PlayStatisticsV1,
+        QueryAccountPlayEventIn,
+        QueryAppletEventIn,
+        QueryAppletEventLegacyIn,
+        QueryLastPlayTimeIn,
+        QueryPlayStatsByAppIdAndUserIn,
+        QueryPlayStatsByAppIdAndUserLegacyIn,
+        QueryPlayStatsByAppIdIn,
+        QueryPlayStatsByAppIdLegacyIn,
+        QueryRecentlyPlayedAppIn,
         QueryRecentlyPlayedAppLegacyIn,
     },
 };

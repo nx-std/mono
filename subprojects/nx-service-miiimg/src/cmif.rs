@@ -2,11 +2,17 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, OutputBuffer},
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
-use crate::{proto, types::MiiimgImageAttribute};
+use crate::{
+    proto,
+    types::MiiimgImageAttribute,
+};
 
 /// Initializes the image database.
 ///

@@ -155,17 +155,39 @@ mod wire;
 
 pub(crate) use self::request::HipcRequestBuilder;
 pub use self::{
-    buffer::{InOutBuffer, InPointer, InputBuffer, OutPointer, OutputBuffer},
-    request::{
-        HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload, HipcRequest, SendError, WriteError,
+    buffer::{
+        InOutBuffer,
+        InPointer,
+        InputBuffer,
+        OutPointer,
+        OutputBuffer,
     },
-    response::{Envelope, Response, ResponseParseError, parse_response, parse_response_envelope},
+    request::{
+        HIPC_MAX_DESCRIPTORS,
+        HIPC_MAX_RECV_LIST,
+        HipcPayload,
+        HipcRequest,
+        SendError,
+        WriteError,
+    },
+    response::{
+        Envelope,
+        Response,
+        ResponseParseError,
+        parse_response,
+        parse_response_envelope,
+    },
     // Wire descriptor types stay readable (their accessors document the
     // format), but their constructors are `pub(crate)`: descriptors erase
     // loans into raw addresses, so only the loan-collecting builders (CMIF,
     // TIPC) may produce them.
     wire::{
-        BufferDescriptor, BufferMode, Header, MessageType, RecvListEntry, SpecialHeader,
+        BufferDescriptor,
+        BufferMode,
+        Header,
+        MessageType,
+        RecvListEntry,
+        SpecialHeader,
         StaticDescriptor,
     },
 };

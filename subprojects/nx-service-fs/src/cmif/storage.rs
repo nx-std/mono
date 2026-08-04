@@ -1,9 +1,18 @@
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out_i64},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+        dispatch_out_i64,
+    },
     proto,
     types::*,
 };

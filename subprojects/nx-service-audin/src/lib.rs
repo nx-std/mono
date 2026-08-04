@@ -32,7 +32,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -42,11 +47,21 @@ mod types;
 
 pub use self::{
     cmif::{
-        AppendBufferError, ContainsBufferError, GetReleasedBufferError, ListAudioInsError,
+        AppendBufferError,
+        ContainsBufferError,
+        GetReleasedBufferError,
+        ListAudioInsError,
         OpenAudioInError,
     },
-    proto::{DEVICE_NAME_LENGTH, SERVICE_NAME},
-    types::{AudioInBuffer, AudioInState, OpenAudioInOut},
+    proto::{
+        DEVICE_NAME_LENGTH,
+        SERVICE_NAME,
+    },
+    types::{
+        AudioInBuffer,
+        AudioInState,
+        OpenAudioInOut,
+    },
 };
 
 /// Audio input (`audin:u`) root session wrapper.

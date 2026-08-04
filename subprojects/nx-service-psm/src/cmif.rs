@@ -3,12 +3,18 @@
 use nx_sf::{
     cmif,
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 
 use crate::{
     proto,
-    types::{BatteryChargeInfoFields, BatteryChargeInfoFieldsLegacy},
+    types::{
+        BatteryChargeInfoFields,
+        BatteryChargeInfoFieldsLegacy,
+    },
 };
 
 fn dispatch_no_io(

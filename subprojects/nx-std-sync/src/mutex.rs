@@ -3,12 +3,18 @@
 use core::{
     cell::UnsafeCell,
     fmt,
-    ops::{Deref, DerefMut},
+    ops::{
+        Deref,
+        DerefMut,
+    },
 };
 
 use nx_sys_sync as sys;
 
-pub use crate::result::{TryLockError, TryLockResult};
+pub use crate::result::{
+    TryLockError,
+    TryLockResult,
+};
 
 /// A mutual exclusion primitive useful for protecting shared data
 ///

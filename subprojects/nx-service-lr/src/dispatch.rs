@@ -2,7 +2,11 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::types::LR_MAX_PATH;
 

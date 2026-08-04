@@ -2,16 +2,39 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 use static_assertions::const_assert_eq;
 
 use super::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
-    pm_bm::{BootMode, proto as bm_proto},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+        dispatch_out,
+    },
+    pm_bm::{
+        BootMode,
+        proto as bm_proto,
+    },
     pm_dmnt::proto as dmnt_proto,
-    pm_info::{ResourceLimitValues, proto as info_proto},
-    pm_shell::{NcmProgramLocation, ProcessEventInfo, proto as shell_proto},
-    types::{ProcessId, ProgramId},
+    pm_info::{
+        ResourceLimitValues,
+        proto as info_proto,
+    },
+    pm_shell::{
+        NcmProgramLocation,
+        ProcessEventInfo,
+        proto as shell_proto,
+    },
+    types::{
+        ProcessId,
+        ProgramId,
+    },
 };
 
 /// Input for `pm:shell` `LaunchProgram`.

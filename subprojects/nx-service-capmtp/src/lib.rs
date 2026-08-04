@@ -20,7 +20,13 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, DomainObject, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    DomainObject,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -30,7 +36,10 @@ mod types;
 pub use nx_sf::service::DispatchError as CapmtpDispatchError;
 
 pub use self::{
-    cmif::{OpenSessionError, SessionOpenError},
+    cmif::{
+        OpenSessionError,
+        SessionOpenError,
+    },
     proto::SERVICE_NAME,
 };
 

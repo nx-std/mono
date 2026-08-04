@@ -1,20 +1,44 @@
 //! CMIF protocol operations for the album control service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_service_caps::{AlbumEntry, AlbumFileId, ApplicationAlbumEntry, ScreenShotAttribute};
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_service_caps::{
+    AlbumEntry,
+    AlbumFileId,
+    ApplicationAlbumEntry,
+    ScreenShotAttribute,
+};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
     dispatch::{
-        dispatch_in_no_out, dispatch_in_out, dispatch_in_pid_no_out, dispatch_in_u64_no_out,
+        dispatch_in_no_out,
+        dispatch_in_out,
+        dispatch_in_pid_no_out,
+        dispatch_in_u64_no_out,
         dispatch_in_u64_out_u64,
     },
     proto,
     types::{
-        CapsApplicationId, GenerateAppAlbumEntryIn, GenerateFileIdIn, GenerateFileIdLegacyIn,
-        OpenControlSessionIn, RegisterAruidIn, RegisterAruidLegacyIn, SaveScreenShotFileExIn,
-        SetShimVersionIn, SetStreamDataSizeIn, StreamReadDataIn, StreamWriteDataIn,
+        CapsApplicationId,
+        GenerateAppAlbumEntryIn,
+        GenerateFileIdIn,
+        GenerateFileIdLegacyIn,
+        OpenControlSessionIn,
+        RegisterAruidIn,
+        RegisterAruidLegacyIn,
+        SaveScreenShotFileExIn,
+        SetShimVersionIn,
+        SetStreamDataSizeIn,
+        StreamReadDataIn,
+        StreamWriteDataIn,
     },
 };
 

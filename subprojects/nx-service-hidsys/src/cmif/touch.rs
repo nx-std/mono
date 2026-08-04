@@ -2,12 +2,19 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 use crate::{
     dispatch::dispatch_out,
     proto,
-    types::{HidTouchScreenConfigurationForNx, IsFirmwareUpdateNeededIn, UniquePadId},
+    types::{
+        HidTouchScreenConfigurationForNx,
+        IsFirmwareUpdateNeededIn,
+        UniquePadId,
+    },
 };
 
 /// GetTouchScreenDefaultConfiguration (cmd 1153, 9.0.0+).

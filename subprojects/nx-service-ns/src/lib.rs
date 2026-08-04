@@ -38,7 +38,12 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    DispatchError,
+    OwnedSessionHandle,
+    Session,
+};
 use nx_svc::ipc::Handle;
 
 mod cmif;
@@ -48,25 +53,57 @@ pub mod types;
 
 pub use self::{
     cmif::{
-        app_manager::{AcquireEventError, AsyncCommandError, AsyncOut, GetSubObjectError},
+        app_manager::{
+            AcquireEventError,
+            AsyncCommandError,
+            AsyncOut,
+            GetSubObjectError,
+        },
         getter::GetInterfaceError,
         nsdev::AcquireEventError as NsdevAcquireEventError,
-        nssu::{AcquireEventError as NssuAcquireEventError, OpenSystemUpdateControlError},
+        nssu::{
+            AcquireEventError as NssuAcquireEventError,
+            OpenSystemUpdateControlError,
+        },
         sub_objects::AcquireEventError as SubObjectAcquireEventError,
     },
     proto::{
-        NS_AM_SERVICE_NAME, NS_AM2_SERVICE_NAME, NS_EC_SERVICE_NAME, NS_RID_SERVICE_NAME,
-        NS_RO_SERVICE_NAME, NS_RT_SERVICE_NAME, NS_WEB_SERVICE_NAME, NSDEV_SERVICE_NAME,
-        NSSU_SERVICE_NAME, NSVM_SERVICE_NAME,
+        NS_AM_SERVICE_NAME,
+        NS_AM2_SERVICE_NAME,
+        NS_EC_SERVICE_NAME,
+        NS_RID_SERVICE_NAME,
+        NS_RO_SERVICE_NAME,
+        NS_RT_SERVICE_NAME,
+        NS_WEB_SERVICE_NAME,
+        NSDEV_SERVICE_NAME,
+        NSSU_SERVICE_NAME,
+        NSVM_SERVICE_NAME,
     },
     types::{
-        AccountUid, ApplicationContentMetaStatus, ApplicationControlData, ApplicationControlSource,
-        ApplicationDeliveryInfo, ApplicationOccupiedSize, ApplicationRecord,
-        ApplicationRightsOnClient, ApplicationView, ApplicationViewDeprecated,
-        ApplicationViewWithPromotionInfo, BackgroundNetworkUpdateState, DownloadTaskStatus,
-        EulaDataPath, LatestSystemUpdate, LaunchProperties, NcmContentMetaKey,
-        ProgressForDeleteUserSaveDataAll, PromotionInfo, ReceiveApplicationProgress,
-        SendApplicationProgress, ShellEvent, ShellEventInfo, SystemDeliveryInfo,
+        AccountUid,
+        ApplicationContentMetaStatus,
+        ApplicationControlData,
+        ApplicationControlSource,
+        ApplicationDeliveryInfo,
+        ApplicationOccupiedSize,
+        ApplicationRecord,
+        ApplicationRightsOnClient,
+        ApplicationView,
+        ApplicationViewDeprecated,
+        ApplicationViewWithPromotionInfo,
+        BackgroundNetworkUpdateState,
+        DownloadTaskStatus,
+        EulaDataPath,
+        LatestSystemUpdate,
+        LaunchProperties,
+        NcmContentMetaKey,
+        ProgressForDeleteUserSaveDataAll,
+        PromotionInfo,
+        ReceiveApplicationProgress,
+        SendApplicationProgress,
+        ShellEvent,
+        ShellEventInfo,
+        SystemDeliveryInfo,
         SystemUpdateProgress,
     },
 };

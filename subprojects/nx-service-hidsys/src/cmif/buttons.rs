@@ -4,7 +4,11 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use super::AcquireEventError;
 use crate::proto;

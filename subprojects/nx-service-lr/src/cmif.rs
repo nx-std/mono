@@ -2,9 +2,16 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
-use crate::{dispatch, proto, types::LR_MAX_PATH};
+use crate::{
+    dispatch,
+    proto,
+    types::LR_MAX_PATH,
+};
 
 /// Opens a location resolver sub-object for the given storage.
 ///

@@ -2,14 +2,28 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out_u32, dispatch_no_io, dispatch_out_u32},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out_u32,
+        dispatch_no_io,
+        dispatch_out_u32,
+    },
     proto,
     types::{
-        CipherInfo, ConnSetOptionIn, GetNextAlpnProtoOut, HandshakeServerCertOut, PollIn,
-        SetPrivateOptionIn, SetPrivateOptionLegacyIn,
+        CipherInfo,
+        ConnSetOptionIn,
+        GetNextAlpnProtoOut,
+        HandshakeServerCertOut,
+        PollIn,
+        SetPrivateOptionIn,
+        SetPrivateOptionLegacyIn,
     },
 };
 

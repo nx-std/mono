@@ -3,13 +3,23 @@
 //! This module implements SM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
-    ServiceName, cmif,
-    error::{GENERIC_ERROR, ToResultCode},
+    ServiceName,
+    cmif,
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 use nx_svc::error::ResultCode;
 

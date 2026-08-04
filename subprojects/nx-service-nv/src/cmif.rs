@@ -6,18 +6,34 @@
 use nx_service_applet::aruid::Aruid;
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
+    hipc::{
+        BufferMode,
+        InOutBuffer,
+        InputBuffer,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 use nx_svc::{
-    mem::tmem::Handle as TmemHandle, process::Handle as ProcessHandle, raw::Handle as RawHandle,
+    mem::tmem::Handle as TmemHandle,
+    process::Handle as ProcessHandle,
+    raw::Handle as RawHandle,
 };
 
 use crate::{
     fd::Fd,
     proto::nv_cmds,
-    types::{CloseNvError, IoctlNvError, OpenNvError, QueryEventNvError},
+    types::{
+        CloseNvError,
+        IoctlNvError,
+        OpenNvError,
+        QueryEventNvError,
+    },
 };
 
 /// Opens a device by path.

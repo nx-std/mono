@@ -17,22 +17,35 @@
 
 use alloc::boxed::Box;
 use core::{
-    ffi::{c_int, c_long, c_void},
+    ffi::{
+        c_int,
+        c_long,
+        c_void,
+    },
     mem::offset_of,
-    ptr::{NonNull, null_mut},
+    ptr::{
+        NonNull,
+        null_mut,
+    },
     time::Duration,
 };
 
 use static_assertions::const_assert_eq;
 
 use super::{
-    libnx::{Destructor, LibnxThread},
+    libnx::{
+        Destructor,
+        LibnxThread,
+    },
     reent,
     registry::SideRegistry,
 };
 use crate::{
     pthread,
-    thread::{self, StackSpec},
+    thread::{
+        self,
+        StackSpec,
+    },
     tsd,
 };
 

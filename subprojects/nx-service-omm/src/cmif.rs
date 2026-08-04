@@ -1,6 +1,9 @@
 //! CMIF protocol operations for the operation mode manager service.
 
-use nx_sf::{cmif, service::BorrowedSessionHandle};
+use nx_sf::{
+    cmif,
+    service::BorrowedSessionHandle,
+};
 
 use crate::proto;
 

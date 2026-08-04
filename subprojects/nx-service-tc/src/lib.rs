@@ -23,14 +23,19 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
 
 pub use self::{
     cmif::{
-        DisableFanControlError, EnableFanControlError, GetSkinTemperatureMilliCError,
+        DisableFanControlError,
+        EnableFanControlError,
+        GetSkinTemperatureMilliCError,
         IsFanControlEnabledError,
     },
     proto::SERVICE_NAME,

@@ -17,7 +17,10 @@
 //! Session-close has no in-band data and reuses the default `()` payload.
 
 use core::{
-    mem::{size_of, size_of_val},
+    mem::{
+        size_of,
+        size_of_val,
+    },
     ptr,
 };
 
@@ -27,16 +30,32 @@ use nx_sys_thread_tls::IpcBuffer;
 use super::{
     object_id::ObjectId,
     wire::{
-        CMIF_HEADER_ALIGN, CMIF_MAX_OBJECTS, CommandType, DomainInHeader, DomainRequestType,
+        CMIF_HEADER_ALIGN,
+        CMIF_MAX_OBJECTS,
+        CommandType,
+        DomainInHeader,
+        DomainRequestType,
         InHeader,
     },
 };
 use crate::{
     array_vec::ArrayVec,
     hipc::{
-        self, BufferDescriptor, BufferMode, HIPC_MAX_DESCRIPTORS, HIPC_MAX_RECV_LIST, HipcPayload,
-        HipcRequest, HipcRequestBuilder, InOutBuffer, InPointer, InputBuffer, OutPointer,
-        OutputBuffer, RecvListEntry, StaticDescriptor,
+        self,
+        BufferDescriptor,
+        BufferMode,
+        HIPC_MAX_DESCRIPTORS,
+        HIPC_MAX_RECV_LIST,
+        HipcPayload,
+        HipcRequest,
+        HipcRequestBuilder,
+        InOutBuffer,
+        InPointer,
+        InputBuffer,
+        OutPointer,
+        OutputBuffer,
+        RecvListEntry,
+        StaticDescriptor,
     },
     service::handle::BorrowedSessionHandle,
 };

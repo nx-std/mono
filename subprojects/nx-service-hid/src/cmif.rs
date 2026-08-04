@@ -3,17 +3,30 @@
 //! This module implements HID commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use nx_service_applet::aruid::{Aruid, NO_ARUID};
+use nx_service_applet::aruid::{
+    Aruid,
+    NO_ARUID,
+};
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     hipc::InPointer,
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 use nx_svc::mem::shmem::Handle as ShmemHandle;
 
-use crate::proto::{applet_resource_cmds, cmds};
+use crate::proto::{
+    applet_resource_cmds,
+    cmds,
+};
 
 /// Creates an IAppletResource sub-interface.
 ///

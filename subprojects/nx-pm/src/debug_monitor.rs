@@ -1,10 +1,17 @@
 //! `pm:dmnt` (debug/monitor) service.
 
-use nx_service_pm::{PmDmntService, ProcessId, ProgramId};
+use nx_service_pm::{
+    PmDmntService,
+    ProcessId,
+    ProgramId,
+};
 use nx_sf::service::DispatchError;
 use nx_svc::raw::Handle;
 
-use crate::event::{HookId, ProcessHook};
+use crate::event::{
+    HookId,
+    ProcessHook,
+};
 
 /// Connected `pm:dmnt` (debug/monitor) service.
 ///

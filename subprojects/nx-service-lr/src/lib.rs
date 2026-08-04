@@ -32,7 +32,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -41,9 +46,15 @@ mod proto;
 mod types;
 
 pub use self::{
-    cmif::{OpenLocationResolverError, OpenRegisteredLocationResolverError},
+    cmif::{
+        OpenLocationResolverError,
+        OpenRegisteredLocationResolverError,
+    },
     proto::SERVICE_NAME,
-    types::{LR_MAX_PATH, StorageId},
+    types::{
+        LR_MAX_PATH,
+        StorageId,
+    },
 };
 
 /// Location resolver manager (`lr`) root session wrapper.

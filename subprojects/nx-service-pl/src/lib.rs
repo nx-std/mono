@@ -18,7 +18,10 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -26,11 +29,22 @@ mod types;
 
 pub use self::{
     cmif::{
-        GetLoadStateError, GetSharedFontError, GetSharedMemoryAddressOffsetError,
-        GetSharedMemoryNativeHandleError, GetSizeError, RequestLoadError,
+        GetLoadStateError,
+        GetSharedFontError,
+        GetSharedMemoryAddressOffsetError,
+        GetSharedMemoryNativeHandleError,
+        GetSizeError,
+        RequestLoadError,
     },
-    proto::{PLS_SERVICE_NAME, PLU_SERVICE_NAME},
-    types::{GetSharedFontOut, PlServiceType, SharedFontType},
+    proto::{
+        PLS_SERVICE_NAME,
+        PLU_SERVICE_NAME,
+    },
+    types::{
+        GetSharedFontOut,
+        PlServiceType,
+        SharedFontType,
+    },
 };
 
 /// PL (shared font / platform) session wrapper.

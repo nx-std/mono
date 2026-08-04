@@ -30,7 +30,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -40,10 +43,20 @@ mod types;
 pub use self::{
     cmif::GetSecurityEngineEventError,
     proto::{
-        CRYPTO_SERVICE_NAME, ES_SERVICE_NAME, FS_SERVICE_NAME, GENERAL_SERVICE_NAME,
-        MANU_SERVICE_NAME, SSL_SERVICE_NAME,
+        CRYPTO_SERVICE_NAME,
+        ES_SERVICE_NAME,
+        FS_SERVICE_NAME,
+        GENERAL_SERVICE_NAME,
+        MANU_SERVICE_NAME,
+        SSL_SERVICE_NAME,
     },
-    types::{RSA_BUFFER_SIZE, RsaKeyVersion, SHA256_HASH_SIZE, SplConfigItem, SplKey},
+    types::{
+        RSA_BUFFER_SIZE,
+        RsaKeyVersion,
+        SHA256_HASH_SIZE,
+        SplConfigItem,
+        SplKey,
+    },
 };
 
 // ---------------------------------------------------------------------------

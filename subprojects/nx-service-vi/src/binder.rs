@@ -4,14 +4,22 @@
 //! via parcel-based transactions.
 
 use nx_sf::{
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     service::Session,
 };
 use nx_svc::raw::Handle as RawHandle;
 
 use crate::{
     cmif,
-    parcel::{PARCEL_MAX_PAYLOAD, Parcel, ParcelHeader},
+    parcel::{
+        PARCEL_MAX_PAYLOAD,
+        Parcel,
+        ParcelHeader,
+    },
     types::BinderObjectId,
 };
 

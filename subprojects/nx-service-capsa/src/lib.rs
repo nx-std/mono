@@ -27,14 +27,26 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_caps::{
-    AlbumCache, AlbumEntry, AlbumFileId, AlbumUsage2, AlbumUsage3, AlbumUsage16,
-    ApplicationAlbumEntry, LoadAlbumScreenShotImageOutput, ScreenShotAttribute,
+    AlbumCache,
+    AlbumEntry,
+    AlbumFileId,
+    AlbumUsage2,
+    AlbumUsage3,
+    AlbumUsage16,
+    ApplicationAlbumEntry,
+    LoadAlbumScreenShotImageOutput,
+    ScreenShotAttribute,
     ScreenShotDecodeOption,
 };
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -44,13 +56,20 @@ mod types;
 
 pub use self::{
     cmif::{
-        GetAlbumFileListError, GetAlbumUsage16Error, GetMinMaxAppletIdError,
-        GetOverlayThumbnailError, LoadAlbumFileError, LoadScreenShotError,
-        OpenAccessorSessionError, ReadStreamDataError,
+        GetAlbumFileListError,
+        GetAlbumUsage16Error,
+        GetMinMaxAppletIdError,
+        GetOverlayThumbnailError,
+        LoadAlbumFileError,
+        LoadScreenShotError,
+        OpenAccessorSessionError,
+        ReadStreamDataError,
     },
     proto::SERVICE_NAME,
     types::{
-        MinMaxAppletIdResult, OverlayThumbnailResult, ScreenShotDimensions,
+        MinMaxAppletIdResult,
+        OverlayThumbnailResult,
+        ScreenShotDimensions,
         ScreenShotImageEx0Result,
     },
 };

@@ -15,7 +15,11 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, DispatchError, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    DispatchError,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -24,7 +28,12 @@ mod types;
 
 pub use self::{
     proto::SERVICE_NAME,
-    types::{PcvClockRatesListType, PcvModule, PcvModuleId, PossibleClockRates},
+    types::{
+        PcvClockRatesListType,
+        PcvModule,
+        PcvModuleId,
+        PossibleClockRates,
+    },
 };
 
 /// PCV service session wrapper.

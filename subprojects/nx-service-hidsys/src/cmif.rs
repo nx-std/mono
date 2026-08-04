@@ -8,7 +8,12 @@ mod touch;
 mod unique_pad;
 
 pub(crate) use self::{
-    button_config::*, buttons::*, custom_button_config::*, system::*, touch::*, unique_pad::*,
+    button_config::*,
+    buttons::*,
+    custom_button_config::*,
+    system::*,
+    touch::*,
+    unique_pad::*,
 };
 
 /// Error returned by event acquisition commands.

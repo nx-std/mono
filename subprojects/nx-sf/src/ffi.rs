@@ -18,15 +18,24 @@
 //! FFI exports follow the pattern `__nx_sf__<fn_name>` (see
 //! `docs/libnx_overrides.md`).
 
-use core::mem::{self, size_of};
+use core::mem::{
+    self,
+    size_of,
+};
 
-use nx_svc::{ipc::Handle as SessionHandle, raw::INVALID_HANDLE};
+use nx_svc::{
+    ipc::Handle as SessionHandle,
+    raw::INVALID_HANDLE,
+};
 use static_assertions::const_assert_eq;
 
 use crate::{
     cmif::ObjectId,
     error::ToResultCode as _,
-    service::{self, handle::BorrowedSessionHandle},
+    service::{
+        self,
+        handle::BorrowedSessionHandle,
+    },
 };
 
 /// libnx-compatible `Service` struct.

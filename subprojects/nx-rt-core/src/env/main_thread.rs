@@ -22,9 +22,16 @@
 //! - C implementation: `libnx/nx/source/runtime/newlib.c::newlibSetup()`
 //! - [`nx_sys_thread_tls`] - TLS types and utilities
 
-use core::{ffi::c_void, ptr};
+use core::{
+    ffi::c_void,
+    ptr,
+};
 
-use nx_sys_thread_tls::{ReentPtr, ThreadInfoPtr, ThreadPointer};
+use nx_sys_thread_tls::{
+    ReentPtr,
+    ThreadInfoPtr,
+    ThreadPointer,
+};
 
 // Linker symbols for TLS block management
 unsafe extern "C" {

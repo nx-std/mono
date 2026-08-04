@@ -24,7 +24,12 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObjectRef, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    Domain,
+    DomainObjectRef,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -35,16 +40,43 @@ pub use nx_sf::service::DispatchError;
 
 pub use self::{
     proto::{
-        NFC_MF_SERVICE_NAME, NFC_SYS_SERVICE_NAME, NFC_USER_SERVICE_NAME, NFP_DBG_SERVICE_NAME,
-        NFP_SYS_SERVICE_NAME, NFP_USER_SERVICE_NAME,
+        NFC_MF_SERVICE_NAME,
+        NFC_SYS_SERVICE_NAME,
+        NFC_USER_SERVICE_NAME,
+        NFP_DBG_SERVICE_NAME,
+        NFP_SYS_SERVICE_NAME,
+        NFP_USER_SERVICE_NAME,
     },
     types::{
-        NfcDeviceHandle, NfcDeviceState, NfcMifareCommand, NfcMifareDeviceState,
-        NfcMifareReadBlockData, NfcMifareReadBlockParameter, NfcMifareWriteBlockParameter,
-        NfcProtocol, NfcRequiredMcuVersionData, NfcSectorKey, NfcServiceType, NfcState, NfcTagInfo,
-        NfcTagType, NfpAdminInfo, NfpAmiiboFlag, NfpApplicationAreaVersion, NfpBreakType,
-        NfpCommonInfo, NfpData, NfpDate, NfpDeviceState, NfpDeviceType, NfpModelInfo,
-        NfpMountTarget, NfpRegisterInfo, NfpRegisterInfoPrivate, NfpServiceType, NfpTagInfo,
+        NfcDeviceHandle,
+        NfcDeviceState,
+        NfcMifareCommand,
+        NfcMifareDeviceState,
+        NfcMifareReadBlockData,
+        NfcMifareReadBlockParameter,
+        NfcMifareWriteBlockParameter,
+        NfcProtocol,
+        NfcRequiredMcuVersionData,
+        NfcSectorKey,
+        NfcServiceType,
+        NfcState,
+        NfcTagInfo,
+        NfcTagType,
+        NfpAdminInfo,
+        NfpAmiiboFlag,
+        NfpApplicationAreaVersion,
+        NfpBreakType,
+        NfpCommonInfo,
+        NfpData,
+        NfpDate,
+        NfpDeviceState,
+        NfpDeviceType,
+        NfpModelInfo,
+        NfpMountTarget,
+        NfpRegisterInfo,
+        NfpRegisterInfoPrivate,
+        NfpServiceType,
+        NfpTagInfo,
     },
 };
 

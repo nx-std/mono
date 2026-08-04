@@ -26,7 +26,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -34,13 +37,26 @@ mod types;
 
 pub use self::{
     cmif::{
-        DispatchEventError, DispatchInBoolError, DispatchInF32Error, DispatchInStructError,
-        DispatchInU32Error, DispatchInU32OutBoolError, DispatchInU32OutI32Error,
-        DispatchInU32OutU32Error, DispatchNoIoError, DispatchOutF32Error, DispatchOutI32Error,
+        DispatchEventError,
+        DispatchInBoolError,
+        DispatchInF32Error,
+        DispatchInStructError,
+        DispatchInU32Error,
+        DispatchInU32OutBoolError,
+        DispatchInU32OutI32Error,
+        DispatchInU32OutU32Error,
+        DispatchNoIoError,
+        DispatchOutF32Error,
+        DispatchOutI32Error,
         DispatchOutU32Error,
     },
     proto::SERVICE_NAME,
-    types::{AudioForceMutePolicy, AudioHeadphoneOutputLevelMode, AudioOutputMode, AudioTarget},
+    types::{
+        AudioForceMutePolicy,
+        AudioHeadphoneOutputLevelMode,
+        AudioOutputMode,
+        AudioTarget,
+    },
 };
 
 /// Audio control service (`audctl`) session wrapper.

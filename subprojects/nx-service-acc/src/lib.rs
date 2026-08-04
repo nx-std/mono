@@ -34,7 +34,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -44,9 +49,16 @@ mod types;
 
 pub use self::{
     cmif::GetProfileError,
-    proto::{SERVICE_NAME_ADMINISTRATOR, SERVICE_NAME_APPLICATION, SERVICE_NAME_SYSTEM},
+    proto::{
+        SERVICE_NAME_ADMINISTRATOR,
+        SERVICE_NAME_APPLICATION,
+        SERVICE_NAME_SYSTEM,
+    },
     types::{
-        AccountNetworkServiceAccountId, AccountProfileBase, AccountUid, AccountUserData,
+        AccountNetworkServiceAccountId,
+        AccountProfileBase,
+        AccountUid,
+        AccountUserData,
         USER_LIST_SIZE,
     },
 };

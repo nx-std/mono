@@ -2,10 +2,19 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject, OutHandleAttr};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Domain,
+    DomainObject,
+    OutHandleAttr,
+};
 
 use crate::{
-    dispatch::{dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
     types::SessionOpenIn,
 };

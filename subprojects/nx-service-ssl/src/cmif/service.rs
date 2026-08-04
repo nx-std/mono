@@ -2,9 +2,16 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainRef,
+};
 
-use crate::{proto, types::CreateContextIn};
+use crate::{
+    proto,
+    types::CreateContextIn,
+};
 
 /// Creates an SSL context. Returns the raw sub-object ID.
 ///

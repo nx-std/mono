@@ -15,8 +15,14 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    service::{BorrowedSessionHandle, Session},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        BorrowedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -24,10 +30,15 @@ mod proto;
 
 pub use self::{
     cmif::{
-        GetPerformanceConfigurationError, GetPerformanceModeError, OpenSessionError,
+        GetPerformanceConfigurationError,
+        GetPerformanceModeError,
+        OpenSessionError,
         SetPerformanceConfigurationError,
     },
-    proto::{PerformanceMode, SERVICE_NAME},
+    proto::{
+        PerformanceMode,
+        SERVICE_NAME,
+    },
 };
 
 /// APM Manager service (IManager) session wrapper.

@@ -1,21 +1,56 @@
 //! CMIF protocol operations for the Bluetooth Manager service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
     types::{
-        AddrBoolIn, BlePairDeviceIn, BleUnpairDeviceIn, BtdrvAddress,
-        BtdrvBleAdvertisePacketParameter, BtdrvBleConnectionInfo, BtdrvBleScanResult,
-        BtdrvGattAttributeUuid, BtmBleDataPath, BtmConnectedDeviceV13, BtmDeviceConditionV100,
-        BtmDeviceConditionV510, BtmDeviceConditionV800, BtmDeviceConditionV900, BtmDeviceInfoList,
-        BtmDeviceInfoV1, BtmDeviceInfoV13, BtmDeviceSlotModeList, BtmGattCharacteristic,
-        BtmGattClientConditionList, BtmGattDescriptor, BtmGattService, BtmHostDevicePropertyV1,
-        BtmHostDevicePropertyV13, BtmZeroRetransmissionList, ConfigureBleMtuIn, GetGattServiceIn,
-        HandleConnectionIn, LlrNotifyIn, RegisterAruidIn,
+        AddrBoolIn,
+        BlePairDeviceIn,
+        BleUnpairDeviceIn,
+        BtdrvAddress,
+        BtdrvBleAdvertisePacketParameter,
+        BtdrvBleConnectionInfo,
+        BtdrvBleScanResult,
+        BtdrvGattAttributeUuid,
+        BtmBleDataPath,
+        BtmConnectedDeviceV13,
+        BtmDeviceConditionV100,
+        BtmDeviceConditionV510,
+        BtmDeviceConditionV800,
+        BtmDeviceConditionV900,
+        BtmDeviceInfoList,
+        BtmDeviceInfoV1,
+        BtmDeviceInfoV13,
+        BtmDeviceSlotModeList,
+        BtmGattCharacteristic,
+        BtmGattClientConditionList,
+        BtmGattDescriptor,
+        BtmGattService,
+        BtmHostDevicePropertyV1,
+        BtmHostDevicePropertyV13,
+        BtmZeroRetransmissionList,
+        ConfigureBleMtuIn,
+        GetGattServiceIn,
+        HandleConnectionIn,
+        LlrNotifyIn,
+        RegisterAruidIn,
     },
 };
 

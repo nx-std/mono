@@ -2,17 +2,40 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
     types::{
-        CreatePlaceHolderIn, CreatePlaceHolderLegacyIn, FS_MAX_PATH, FsContentAttributes,
-        GetProgramIdIn, GetRightsIdFromContentIdIn, GetRightsIdFromPlaceHolderIdIn,
-        GetRightsIdWithCacheIn, GetRightsIdWithCacheLegacyIn, NcmContentId, NcmPlaceHolderId,
-        NcmRightsId, ReadContentIdFileIn, RegisterIn, RegisterLegacyIn, RevertToPlaceHolderIn,
-        RevertToPlaceHolderLegacyIn, SetPlaceHolderSizeIn, WriteContentForDebugIn,
+        CreatePlaceHolderIn,
+        CreatePlaceHolderLegacyIn,
+        FS_MAX_PATH,
+        FsContentAttributes,
+        GetProgramIdIn,
+        GetRightsIdFromContentIdIn,
+        GetRightsIdFromPlaceHolderIdIn,
+        GetRightsIdWithCacheIn,
+        GetRightsIdWithCacheLegacyIn,
+        NcmContentId,
+        NcmPlaceHolderId,
+        NcmRightsId,
+        ReadContentIdFileIn,
+        RegisterIn,
+        RegisterLegacyIn,
+        RevertToPlaceHolderIn,
+        RevertToPlaceHolderLegacyIn,
+        SetPlaceHolderSizeIn,
+        WriteContentForDebugIn,
         WritePlaceHolderIn,
     },
 };

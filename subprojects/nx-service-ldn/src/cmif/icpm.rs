@@ -8,7 +8,10 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
+};
 
 use crate::proto::CMD_ICPM_REGISTER_CLIENT;
 

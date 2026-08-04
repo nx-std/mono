@@ -8,12 +8,20 @@
 //! libnx-compatible `Service` shadow buffer returned by
 //! `wlaninfGetServiceSession`.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit};
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+};
 
 use nx_service_sm::SmService;
 use nx_service_wlaninf::WlaninfService;
 use nx_sf::{
-    error::{GENERIC_ERROR, LibnxError, ToResultCode as _, libnx_error},
+    error::{
+        GENERIC_ERROR,
+        LibnxError,
+        ToResultCode as _,
+        libnx_error,
+    },
     ffi::Service,
 };
 use nx_std_sync::rwlock::RwLock;

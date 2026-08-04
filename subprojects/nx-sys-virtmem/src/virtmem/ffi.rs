@@ -3,11 +3,19 @@
 //! This module provides `#[no_mangle]` C functions that export the
 //! `__nx_sys_virtmem__virtmem_*` symbols backing the libnx `virtmem*` ABI.
 
-use core::{cell::UnsafeCell, ffi::c_void, mem::size_of, ptr};
+use core::{
+    cell::UnsafeCell,
+    ffi::c_void,
+    mem::size_of,
+    ptr,
+};
 
 use nx_sys_sync::data::MutexGuard;
 
-use super::{reservation::Reservation, sys};
+use super::{
+    reservation::Reservation,
+    sys,
+};
 
 /// Number of concurrently-live FFI reservation handles the descriptor pool can
 /// hand out.

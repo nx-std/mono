@@ -14,11 +14,18 @@
 //! attempt to lock an already locked mutex, they will be suspended by the kernel until
 //! the mutex becomes available.
 
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{
+    AtomicU32,
+    Ordering,
+};
 
 use nx_svc::{
     raw::INVALID_HANDLE,
-    sync::{HANDLE_WAIT_MASK, arbitrate_lock, arbitrate_unlock},
+    sync::{
+        HANDLE_WAIT_MASK,
+        arbitrate_lock,
+        arbitrate_unlock,
+    },
 };
 use static_assertions::const_assert_eq;
 

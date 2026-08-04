@@ -16,7 +16,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -24,18 +27,33 @@ mod types;
 
 pub use self::{
     cmif::{
-        DispatchError, EnableJoyPollingError, GetSendCommandAsyncResultError, GetSharedMemoryError,
+        DispatchError,
+        EnableJoyPollingError,
+        GetSendCommandAsyncResultError,
+        GetSharedMemoryError,
         SetEventError,
     },
     proto::SERVICE_NAME,
     types::{
-        BusHandle, BusType, DataAccessorHeader, JoyButtonOnlyPollingDataAccessor,
-        JoyButtonOnlyPollingEntry, JoyButtonOnlyPollingEntryData,
-        JoyDisableSixAxisPollingDataAccessor, JoyDisableSixAxisPollingEntry,
-        JoyDisableSixAxisPollingEntryData, JoyEnableSixAxisPollingDataAccessor,
-        JoyEnableSixAxisPollingEntry, JoyEnableSixAxisPollingEntryData, JoyPollingMode,
-        JoyPollingReceivedData, StatusManager, StatusManagerEntry, StatusManagerEntryCommon,
-        StatusManagerEntryV5, StatusManagerV5,
+        BusHandle,
+        BusType,
+        DataAccessorHeader,
+        JoyButtonOnlyPollingDataAccessor,
+        JoyButtonOnlyPollingEntry,
+        JoyButtonOnlyPollingEntryData,
+        JoyDisableSixAxisPollingDataAccessor,
+        JoyDisableSixAxisPollingEntry,
+        JoyDisableSixAxisPollingEntryData,
+        JoyEnableSixAxisPollingDataAccessor,
+        JoyEnableSixAxisPollingEntry,
+        JoyEnableSixAxisPollingEntryData,
+        JoyPollingMode,
+        JoyPollingReceivedData,
+        StatusManager,
+        StatusManagerEntry,
+        StatusManagerEntryCommon,
+        StatusManagerEntryV5,
+        StatusManagerV5,
     },
 };
 

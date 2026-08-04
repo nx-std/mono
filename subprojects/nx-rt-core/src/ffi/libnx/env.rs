@@ -12,12 +12,20 @@
 //! per-function `# Safety` sections document only the additional caller
 //! obligations beyond upholding that ABI.
 
-use core::ffi::{c_char, c_uint, c_void};
+use core::ffi::{
+    c_char,
+    c_uint,
+    c_void,
+};
 
 use nx_svc::raw::INVALID_HANDLE;
 
 use crate::{
-    env::{self, AccountUid, LoaderReturnFn},
+    env::{
+        self,
+        AccountUid,
+        LoaderReturnFn,
+    },
     init,
 };
 

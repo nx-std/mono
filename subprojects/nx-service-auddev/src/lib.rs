@@ -36,7 +36,10 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -44,7 +47,9 @@ mod types;
 
 pub use self::{
     cmif::{
-        GetActiveAudioDeviceNameError, GetAudioDeviceOutputVolumeError, ListAudioDeviceNameError,
+        GetActiveAudioDeviceNameError,
+        GetAudioDeviceOutputVolumeError,
+        ListAudioDeviceNameError,
         SetAudioDeviceOutputVolumeError,
     },
     proto::SERVICE_NAME,

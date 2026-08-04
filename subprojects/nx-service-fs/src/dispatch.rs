@@ -1,6 +1,10 @@
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+};
 
 #[inline]
 pub(crate) fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {

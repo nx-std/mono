@@ -3,16 +3,26 @@
 //! This module implements set:sys commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{mem::size_of, slice};
+use core::{
+    mem::size_of,
+    slice,
+};
 
 use nx_sf::{
     cmif,
-    error::{ResultCode, ToResultCode},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
     hipc::OutPointer,
     service::BorrowedSessionHandle,
 };
 
-use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, FirmwareVersion};
+use crate::proto::{
+    CMD_GET_FIRMWARE_VERSION,
+    CMD_GET_FIRMWARE_VERSION_2,
+    FirmwareVersion,
+};
 
 /// Gets the system firmware version using CMIF protocol.
 ///

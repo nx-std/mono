@@ -35,7 +35,12 @@ use alloc::vec::Vec;
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
-    ConvertToDomainError, DispatchError, Domain, DomainObject, Session, clone_current_object,
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    DomainObject,
+    Session,
+    clone_current_object,
 };
 
 mod cmif;
@@ -46,15 +51,42 @@ pub mod types;
 
 pub use nx_sf::service::DispatchError as IpcDispatchError;
 
-use self::session::{SSL_POOL_SIZE, SessionPool};
+use self::session::{
+    SSL_POOL_SIZE,
+    SessionPool,
+};
 pub use self::{
-    cmif::{CreateConnectionError, CreateContextError, GenerateKeyAndCertError, RemovePkiError},
-    proto::{SERVICE_NAME, SERVICE_NAME_SYSTEM},
+    cmif::{
+        CreateConnectionError,
+        CreateContextError,
+        GenerateKeyAndCertError,
+        RemovePkiError,
+    },
+    proto::{
+        SERVICE_NAME,
+        SERVICE_NAME_SYSTEM,
+    },
     types::{
-        AlpnProtoState, CaCertificateId, CertificateFormat, CipherInfo, ContextOption,
-        DebugOptionType, FlushSessionCacheOptionType, InternalPki, IoMode, KeyAndCertParams,
-        OptionType, PollEvent, PrivateOptionType, RenegotiationMode, ServerCertDetailEntry,
-        ServerCertDetailHeader, SessionCacheMode, SslServiceType, SslVersion, TrustedCertStatus,
+        AlpnProtoState,
+        CaCertificateId,
+        CertificateFormat,
+        CipherInfo,
+        ContextOption,
+        DebugOptionType,
+        FlushSessionCacheOptionType,
+        InternalPki,
+        IoMode,
+        KeyAndCertParams,
+        OptionType,
+        PollEvent,
+        PrivateOptionType,
+        RenegotiationMode,
+        ServerCertDetailEntry,
+        ServerCertDetailHeader,
+        SessionCacheMode,
+        SslServiceType,
+        SslVersion,
+        TrustedCertStatus,
         VerifyOption,
     },
 };

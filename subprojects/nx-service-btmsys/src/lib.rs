@@ -15,7 +15,11 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, OwnedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    OwnedSessionHandle,
+    Session,
+};
 use nx_svc::ipc::Handle;
 
 mod cmif;
@@ -24,9 +28,15 @@ mod proto;
 mod types;
 
 pub use self::{
-    cmif::{AcquireEventError, AcquireEventWithFlagError},
+    cmif::{
+        AcquireEventError,
+        AcquireEventWithFlagError,
+    },
     proto::SERVICE_NAME,
-    types::{BtdrvAddress, BtmAudioDevice},
+    types::{
+        BtdrvAddress,
+        BtmAudioDevice,
+    },
 };
 
 /// Bluetooth Manager System service wrapper (IBtmSystemCore).

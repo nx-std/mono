@@ -10,7 +10,11 @@
 //! poisoning semantics – if the initialiser panics the entire program aborts
 //! in typical `no_std` fashion.
 
-use core::{cell::UnsafeCell, fmt, mem::MaybeUninit};
+use core::{
+    cell::UnsafeCell,
+    fmt,
+    mem::MaybeUninit,
+};
 
 use nx_sys_sync::Once;
 

@@ -50,8 +50,16 @@ mod service_name;
 pub mod tipc;
 
 pub use self::{
-    cursor::{Cursor, ResponsePayload},
-    service::{Domain, DomainObject, OverrideService, Session},
+    cursor::{
+        Cursor,
+        ResponsePayload,
+    },
+    service::{
+        Domain,
+        DomainObject,
+        OverrideService,
+        Session,
+    },
     service_name::ServiceName,
 };
 

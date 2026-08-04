@@ -2,13 +2,21 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
     proto,
-    types::{DecodeJpegIn, ScreenShotDecodeOption, ShrinkJpegExIn},
+    types::{
+        DecodeJpegIn,
+        ScreenShotDecodeOption,
+        ShrinkJpegExIn,
+    },
 };
 
 /// Decodes a JPEG buffer into RGBA8.

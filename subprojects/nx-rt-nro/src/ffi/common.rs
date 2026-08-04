@@ -10,7 +10,10 @@
 //! `.to_rc()` rather than a function that took another crate's error apart.
 
 #[cfg(feature = "service-vi")]
-pub use nx_rt_core::error::{LibnxError, libnx_error};
+pub use nx_rt_core::error::{
+    LibnxError,
+    libnx_error,
+};
 pub use nx_rt_core::ffi::common::GENERIC_ERROR;
 #[cfg(any(
     feature = "service-apm",

@@ -2,11 +2,19 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, DomainRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+    DomainRef,
+};
 
 use crate::{
     proto,
-    types::{AccountUid, FriendsUserSetting},
+    types::{
+        AccountUid,
+        FriendsUserSetting,
+    },
 };
 
 /// Creates an IFriendService sub-object via domain dispatch (cmd 0).

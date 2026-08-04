@@ -1,4 +1,8 @@
-use nx_sf::service::{DispatchError, DomainObjectRef, OutHandleAttr};
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
+    OutHandleAttr,
+};
 
 use crate::proto;
 

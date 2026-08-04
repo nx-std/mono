@@ -1,16 +1,33 @@
 //! CMIF protocol operations for the GRC game recording service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_service_caps::ApplicationAlbumEntry;
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in_u64, dispatch_in_u64_out_u32, dispatch_no_io},
+    dispatch::{
+        dispatch_in_u64,
+        dispatch_in_u64_out_u32,
+        dispatch_no_io,
+    },
     proto,
     types::{
-        BeginTrimIn, CompleteFinishIn, GameMovieId, OffscreenRecordingParameter, SetThumbnailIn,
-        StartRecordingIn, TransferResult,
+        BeginTrimIn,
+        CompleteFinishIn,
+        GameMovieId,
+        OffscreenRecordingParameter,
+        SetThumbnailIn,
+        StartRecordingIn,
+        TransferResult,
     },
 };
 

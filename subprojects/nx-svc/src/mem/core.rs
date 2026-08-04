@@ -1,11 +1,23 @@
-use core::{ffi::c_void, ptr, ptr::NonNull};
+use core::{
+    ffi::c_void,
+    ptr,
+    ptr::NonNull,
+};
 
 use bitflags::bitflags;
 
 use crate::{
-    error::{_sealed, KernelError as KError, ResultCode, ToResultCode},
+    error::{
+        _sealed,
+        KernelError as KError,
+        ResultCode,
+        ToResultCode,
+    },
     raw,
-    result::{Error, raw::Result as RawResult},
+    result::{
+        Error,
+        raw::Result as RawResult,
+    },
 };
 
 /// The page-information word [`query_memory`] reports alongside a [`MemoryInfo`].

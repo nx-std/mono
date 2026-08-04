@@ -2,15 +2,26 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
     dispatch::{
-        dispatch_domain_in_no_out, dispatch_domain_in_out, dispatch_domain_no_io,
+        dispatch_domain_in_no_out,
+        dispatch_domain_in_out,
+        dispatch_domain_no_io,
         dispatch_domain_out,
     },
     proto,
-    types::{AppendConfigDataLegacyIn, PostBufferIn, UsbDsReportData, UsbStringDescriptor},
+    types::{
+        AppendConfigDataLegacyIn,
+        PostBufferIn,
+        UsbDsReportData,
+        UsbStringDescriptor,
+    },
 };
 
 // ---------------------------------------------------------------------------

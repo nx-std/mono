@@ -1,15 +1,24 @@
 //! NVIDIA Driver (NV) service FFI
 
 use core::{
-    ffi::{c_char, c_void},
+    ffi::{
+        c_char,
+        c_void,
+    },
     mem::MaybeUninit,
 };
 
 use nx_rt_core::error::ToResultCode as _;
 use nx_service_nv::fd::Fd;
-use nx_sf::{error::ToResultCode, ffi::Service};
+use nx_sf::{
+    error::ToResultCode,
+    ffi::Service,
+};
 
-use crate::ffi::common::{GENERIC_ERROR, SyncUnsafeCell};
+use crate::ffi::common::{
+    GENERIC_ERROR,
+    SyncUnsafeCell,
+};
 
 /// Static buffer for NV FFI session access. Updated on `nv_initialize()` and `nv_exit()`.
 static NV_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =

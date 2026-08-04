@@ -6,7 +6,10 @@ use core::cell::UnsafeCell;
 
 use static_assertions::const_assert_eq;
 
-use super::{Condvar, Mutex};
+use super::{
+    Condvar,
+    Mutex,
+};
 use crate::tag::ThreadTag;
 
 /// Read/write lock structure that allows multiple readers or a single writer.

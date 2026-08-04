@@ -1,13 +1,25 @@
 //! CMIF protocol operations for the RO service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
     dispatch::dispatch_in_pid,
     proto,
-    types::{LoadNroIn, LoadNrrIn, LoaderModuleInfo, UnloadIn},
+    types::{
+        LoadNroIn,
+        LoadNrrIn,
+        LoaderModuleInfo,
+        UnloadIn,
+    },
 };
 
 /// Initializes the RO service session by registering the current process.

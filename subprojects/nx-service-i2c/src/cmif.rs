@@ -5,10 +5,18 @@ use core::mem::size_of;
 use nx_sf::{
     cmif,
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, BufferAttr, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        BufferAttr,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
-use crate::{proto, types::I2cTransactionOption};
+use crate::{
+    proto,
+    types::I2cTransactionOption,
+};
 
 /// Opens an I2C session for the specified device.
 ///

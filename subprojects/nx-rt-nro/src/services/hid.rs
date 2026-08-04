@@ -3,12 +3,21 @@
 //! This module manages the HID service session and provides a singleton interface
 //! for accessing HID functionality throughout the application lifecycle.
 
-use nx_rt_core::error::{ResultCode, ToResultCode};
+use nx_rt_core::error::{
+    ResultCode,
+    ToResultCode,
+};
 use nx_service_hid::HidService;
 use nx_sf::error::ToResultCode as _;
-use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
+use nx_std_sync::{
+    once_lock::OnceLock,
+    rwlock::RwLock,
+};
 
-use crate::services::{applet, sm};
+use crate::services::{
+    applet,
+    sm,
+};
 
 /// Global HID state, lazily initialized.
 static HID_STATE: OnceLock<RwLock<Option<HidState>>> = OnceLock::new();

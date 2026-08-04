@@ -30,8 +30,18 @@ mod cmif;
 mod proto;
 
 pub use self::{
-    cmif::{DispatchError, GetRssiError, GetStateError},
-    proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, SERVICE_NAME, WlanInfState},
+    cmif::{
+        DispatchError,
+        GetRssiError,
+        GetStateError,
+    },
+    proto::{
+        CMD_GET_RSSI,
+        CMD_GET_STATE,
+        Rssi,
+        SERVICE_NAME,
+        WlanInfState,
+    },
 };
 
 /// Connects to the `wlan:inf` (WLAN InfraManager) service using CMIF.

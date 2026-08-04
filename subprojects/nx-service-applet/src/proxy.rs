@@ -22,19 +22,44 @@
 use core::marker::PhantomData;
 
 use nx_service_sm::SmService;
-use nx_sf::error::{GENERIC_ERROR, ToResultCode};
-use nx_svc::{error::ResultCode, process::Handle as ProcessHandle};
+use nx_sf::error::{
+    GENERIC_ERROR,
+    ToResultCode,
+};
+use nx_svc::{
+    error::ResultCode,
+    process::Handle as ProcessHandle,
+};
 
 use crate::{
-    AcquireForegroundRightsError, AppletFocusHandlingMode, AppletProxyService, AppletService,
-    AudioController, CommonStateGetter, ConnectError, DebugFunctions, DisplayController,
-    GetCommonStateGetterError, GetSelfControllerError, GetSubInterfaceError,
-    GetWindowControllerError, LibraryAppletCreator, NotifyRunningError, OpenProxyError,
-    SelfController, SetFocusHandlingModeError, SetOutOfFocusSuspendingEnabledError,
+    AcquireForegroundRightsError,
+    AppletFocusHandlingMode,
+    AppletProxyService,
+    AppletService,
+    AudioController,
+    CommonStateGetter,
+    ConnectError,
+    DebugFunctions,
+    DisplayController,
+    GetCommonStateGetterError,
+    GetSelfControllerError,
+    GetSubInterfaceError,
+    GetWindowControllerError,
+    LibraryAppletCreator,
+    NotifyRunningError,
+    OpenProxyError,
+    SelfController,
+    SetFocusHandlingModeError,
+    SetOutOfFocusSuspendingEnabledError,
     WindowController,
     aruid::Aruid,
     role::{
-        Application, DrainExtrasError, LibraryApplet, OverlayApplet, Role, SystemApplet,
+        Application,
+        DrainExtrasError,
+        LibraryApplet,
+        OverlayApplet,
+        Role,
+        SystemApplet,
         SystemApplication,
     },
 };

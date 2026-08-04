@@ -3,7 +3,10 @@
 //!
 //! See the [`data`](super) module docs for the wider rationale.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit};
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+};
 
 use crate::once::Once;
 

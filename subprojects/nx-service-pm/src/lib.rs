@@ -36,12 +36,35 @@ mod pm_shell;
 mod types;
 
 pub use self::{
-    pm_bm::{BootMode, ConnectBmCmifError, PmBmService, connect_bm_cmif},
-    pm_dmnt::{ConnectDmntCmifError, PmDmntService, connect_dmnt_cmif},
-    pm_info::{ConnectInfoCmifError, PmInfoService, ResourceLimitValues, connect_info_cmif},
-    pm_shell::{
-        ConnectShellCmifError, LaunchFlag, LaunchFlagOld, NcmProgramLocation, PmShellService,
-        ProcessEvent, ProcessEventInfo, connect_shell_cmif,
+    pm_bm::{
+        BootMode,
+        ConnectBmCmifError,
+        PmBmService,
+        connect_bm_cmif,
     },
-    types::{ProcessId, ProgramId},
+    pm_dmnt::{
+        ConnectDmntCmifError,
+        PmDmntService,
+        connect_dmnt_cmif,
+    },
+    pm_info::{
+        ConnectInfoCmifError,
+        PmInfoService,
+        ResourceLimitValues,
+        connect_info_cmif,
+    },
+    pm_shell::{
+        ConnectShellCmifError,
+        LaunchFlag,
+        LaunchFlagOld,
+        NcmProgramLocation,
+        PmShellService,
+        ProcessEvent,
+        ProcessEventInfo,
+        connect_shell_cmif,
+    },
+    types::{
+        ProcessId,
+        ProgramId,
+    },
 };

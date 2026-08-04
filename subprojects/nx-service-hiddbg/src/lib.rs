@@ -26,7 +26,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -37,12 +40,31 @@ pub use self::{
     cmif::AcquireEventError,
     proto::SERVICE_NAME,
     types::{
-        AbstractedPadHandle, AbstractedPadState, DebugPadAutoPilotState, HdlsDeviceInfo,
-        HdlsDeviceInfoV7, HdlsHandle, HdlsNpadAssignment, HdlsNpadAssignmentEntry, HdlsSessionId,
-        HdlsState, HdlsStateList, HdlsStateListEntry, HdlsStateListEntryV7, HdlsStateListEntryV9,
-        HdlsStateListV7, HdlsStateListV9, HdlsStateV7, HdlsStateV9, HidAnalogStickState,
-        HidTouchState, HidVector, KeyboardAutoPilotState, MouseAutoPilotState,
-        SleepButtonAutoPilotState, UniquePadId,
+        AbstractedPadHandle,
+        AbstractedPadState,
+        DebugPadAutoPilotState,
+        HdlsDeviceInfo,
+        HdlsDeviceInfoV7,
+        HdlsHandle,
+        HdlsNpadAssignment,
+        HdlsNpadAssignmentEntry,
+        HdlsSessionId,
+        HdlsState,
+        HdlsStateList,
+        HdlsStateListEntry,
+        HdlsStateListEntryV7,
+        HdlsStateListEntryV9,
+        HdlsStateListV7,
+        HdlsStateListV9,
+        HdlsStateV7,
+        HdlsStateV9,
+        HidAnalogStickState,
+        HidTouchState,
+        HidVector,
+        KeyboardAutoPilotState,
+        MouseAutoPilotState,
+        SleepButtonAutoPilotState,
+        UniquePadId,
     },
 };
 

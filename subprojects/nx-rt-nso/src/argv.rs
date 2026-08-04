@@ -9,9 +9,15 @@
 //! scanner, the parsed-argument store, and the [`Args`] iterator are shared
 //! from [`nx_rt_core::argv`].
 
-use core::{ptr, slice};
+use core::{
+    ptr,
+    slice,
+};
 
-pub use nx_rt_core::argv::{Args, args};
+pub use nx_rt_core::argv::{
+    Args,
+    args,
+};
 use nx_svc::mem::query_memory;
 
 /// Byte offset of the argument string within the `__argdata__` region.

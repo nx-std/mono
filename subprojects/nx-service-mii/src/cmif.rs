@@ -2,12 +2,23 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in_out, dispatch_out},
+    dispatch::{
+        dispatch_in_out,
+        dispatch_out,
+    },
     proto,
-    types::{BuildRandomIn, MiiCharInfo, MiiSourceFlag},
+    types::{
+        BuildRandomIn,
+        MiiCharInfo,
+        MiiSourceFlag,
+    },
 };
 
 /// Opens a Mii database sub-object on the root service.

@@ -9,7 +9,10 @@
 
 use core::ffi::c_int;
 
-use crate::sys::{clock::aarch64::NSEC_PER_TICK, timespec::ClockId};
+use crate::sys::{
+    clock::aarch64::NSEC_PER_TICK,
+    timespec::ClockId,
+};
 
 /// C struct timespec
 #[repr(C)]

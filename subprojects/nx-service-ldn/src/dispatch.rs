@@ -5,9 +5,16 @@
 //! buffer attrs, `send_pid`, or out-handles live inline in the sub-service
 //! modules.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{DispatchError, DomainObjectRef, Session};
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
+    Session,
+};
 
 /// Trait abstracting over the dispatch entry points the LCS / ICPM helpers
 /// use. Implemented for `&Session` (non-domain monitor service) and

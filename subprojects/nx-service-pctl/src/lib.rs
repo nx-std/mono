@@ -27,7 +27,13 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, DomainObjectRef, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    DomainObjectRef,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -37,8 +43,16 @@ mod types;
 pub use nx_sf::service::DispatchError as IpcDispatchError;
 
 pub use self::{
-    cmif::{CreateServiceError, GetEventError},
-    proto::{SERVICE_NAME, SERVICE_NAME_A, SERVICE_NAME_R, SERVICE_NAME_S},
+    cmif::{
+        CreateServiceError,
+        GetEventError,
+    },
+    proto::{
+        SERVICE_NAME,
+        SERVICE_NAME_A,
+        SERVICE_NAME_R,
+        SERVICE_NAME_S,
+    },
     types::PctlRestrictionSettings,
 };
 

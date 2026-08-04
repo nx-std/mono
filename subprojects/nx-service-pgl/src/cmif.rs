@@ -2,19 +2,33 @@
 //!
 //! Used on HOS 10.0.0–11.x (pre-12.0.0).
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 use crate::{
     proto,
     types::{
-        ContentMetaInfo, LaunchProgramCmifIn, NcmProgramLocation, PglLaunchFlag, ProcessEventInfo,
+        ContentMetaInfo,
+        LaunchProgramCmifIn,
+        NcmProgramLocation,
+        PglLaunchFlag,
+        ProcessEventInfo,
         SnapShotDumpType,
     },
 };

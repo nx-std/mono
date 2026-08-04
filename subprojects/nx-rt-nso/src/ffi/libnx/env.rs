@@ -9,7 +9,10 @@ use core::ffi::c_void;
 
 use nx_svc::thread::Handle as ThreadHandle;
 
-use crate::env::{self, LoaderReturnFn};
+use crate::env::{
+    self,
+    LoaderReturnFn,
+};
 
 /// Brings up the NSO runtime environment state.
 ///

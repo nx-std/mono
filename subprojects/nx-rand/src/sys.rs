@@ -33,10 +33,16 @@
 
 use core::{
     mem::MaybeUninit,
-    sync::atomic::{AtomicU8, Ordering},
+    sync::atomic::{
+        AtomicU8,
+        Ordering,
+    },
 };
 
-use rand::{RngCore, SeedableRng};
+use rand::{
+    RngCore,
+    SeedableRng,
+};
 use rand_chacha::ChaCha20Rng;
 
 /// Global RNG instance, initialized on first use.

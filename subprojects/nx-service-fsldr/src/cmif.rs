@@ -2,14 +2,23 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Domain,
+    DomainObject,
+};
 
 use crate::{
     dispatch::dispatch_in_out,
     proto,
     types::{
-        FS_MAX_PATH, FsCodeInfo, OpenCodeFileSystemAttrIn, OpenCodeFileSystemTidIn,
-        OpenCodeFileSystemV20In, SetCurrentProcessIn,
+        FS_MAX_PATH,
+        FsCodeInfo,
+        OpenCodeFileSystemAttrIn,
+        OpenCodeFileSystemTidIn,
+        OpenCodeFileSystemV20In,
+        SetCurrentProcessIn,
     },
 };
 

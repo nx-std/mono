@@ -19,6 +19,10 @@ imports_granularity = "Crate"
 # See: https://rust-lang.github.io/rustfmt/?version=v1&search=#group_imports
 group_imports = "StdExternalCrate"
 
+# Controls the layout of the imports to make diffs more obvious
+# See: https://rust-lang.github.io/rustfmt/?version=v1&search=#imports_layout
+imports_layout = "Vertical"
+
 # Enables reordering of module declarations alphabetically
 # See: https://rust-lang.github.io/rustfmt/?version=v1&search=#reorder_modules
 reorder_modules = true

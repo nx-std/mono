@@ -8,7 +8,12 @@
 
 use core::mem::MaybeUninit;
 
-use nx_service_pm::{PmBmService, PmDmntService, PmInfoService, PmShellService};
+use nx_service_pm::{
+    PmBmService,
+    PmDmntService,
+    PmInfoService,
+    PmShellService,
+};
 use nx_service_sm::SmService;
 use nx_sf::ffi::Service;
 use nx_std_sync::rwlock::RwLock;

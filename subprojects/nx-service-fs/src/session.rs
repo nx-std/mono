@@ -1,7 +1,15 @@
 use alloc::boxed::Box;
 
-use nx_sf::service::{Domain, DomainObject, DomainObjectRef, DomainRef};
-use nx_std_sync::{condvar::Condvar, mutex::Mutex};
+use nx_sf::service::{
+    Domain,
+    DomainObject,
+    DomainObjectRef,
+    DomainRef,
+};
+use nx_std_sync::{
+    condvar::Condvar,
+    mutex::Mutex,
+};
 
 pub(crate) const MAX_SESSIONS: usize = 32;
 

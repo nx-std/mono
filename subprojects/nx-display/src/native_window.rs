@@ -10,12 +10,24 @@
 use core::cell::UnsafeCell;
 
 use nx_service_vi::{
-    Binder, BinderObjectId,
-    binder::{InitSessionError, TransactError},
+    Binder,
+    BinderObjectId,
+    binder::{
+        InitSessionError,
+        TransactError,
+    },
     igbp::{
-        self, BqBufferInput, BqBufferOutput, BqMultiFence, BqRect,
-        ConnectError as IgbpConnectError, DequeueBufferError, DequeueBufferOutput,
-        DisconnectError as IgbpDisconnectError, QueueBufferError, RequestBufferError,
+        self,
+        BqBufferInput,
+        BqBufferOutput,
+        BqMultiFence,
+        BqRect,
+        ConnectError as IgbpConnectError,
+        DequeueBufferError,
+        DequeueBufferOutput,
+        DisconnectError as IgbpDisconnectError,
+        QueueBufferError,
+        RequestBufferError,
         SetPreallocatedBufferError,
     },
 };

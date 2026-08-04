@@ -1,13 +1,24 @@
 //! CMIF protocol operations for the audio renderer service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
     dispatch::dispatch_no_io,
     proto,
-    types::{AudioRendererParameter, OpenAudioRendererIn},
+    types::{
+        AudioRendererParameter,
+        OpenAudioRendererIn,
+    },
 };
 
 // ---------------------------------------------------------------------------

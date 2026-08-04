@@ -1,15 +1,32 @@
 //! CMIF protocol operations for the loader service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_no_io},
+    dispatch::{
+        dispatch_in,
+        dispatch_no_io,
+    },
     proto,
     types::{
-        CreateProcessIn, CreateProcessLegacyIn, GetProgramInfoIn, LoaderModuleInfo,
-        LoaderProgramAttributes, LoaderProgramInfo, LoaderProgramInfoV1, NcmProgramLocation,
+        CreateProcessIn,
+        CreateProcessLegacyIn,
+        GetProgramInfoIn,
+        LoaderModuleInfo,
+        LoaderProgramAttributes,
+        LoaderProgramInfo,
+        LoaderProgramInfoV1,
+        NcmProgramLocation,
         SetProgramArgumentsLegacyIn,
     },
 };

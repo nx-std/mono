@@ -26,7 +26,10 @@
 use alloc::boxed::Box;
 use core::ptr;
 
-use crate::tcb::{Dtv, Tcb};
+use crate::tcb::{
+    Dtv,
+    Tcb,
+};
 
 // Linker-emitted symbols delimiting the ELF TLS segment.
 //

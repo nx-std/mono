@@ -15,12 +15,27 @@ mod wire;
 pub use self::{
     object_id::ObjectId,
     request::{
-        CmifCloseRequest, CmifControlRequestBuilder, CmifRequest, CmifRequestBuilder,
-        RequestLayoutError, SendError,
+        CmifCloseRequest,
+        CmifControlRequestBuilder,
+        CmifRequest,
+        CmifRequestBuilder,
+        RequestLayoutError,
+        SendError,
     },
     response::{
-        ParseError, Response, parse_response, parse_response_bytes, parse_response_domain,
+        ParseError,
+        Response,
+        parse_response,
+        parse_response_bytes,
+        parse_response_domain,
         parse_response_domain_bytes,
     },
-    wire::{CommandType, DomainInHeader, DomainOutHeader, DomainRequestType, InHeader, OutHeader},
+    wire::{
+        CommandType,
+        DomainInHeader,
+        DomainOutHeader,
+        DomainRequestType,
+        InHeader,
+        OutHeader,
+    },
 };

@@ -1,8 +1,14 @@
 //! A blocking, single-producer, single-consumer one-shot channel.
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{
+    AtomicBool,
+    Ordering,
+};
 
-use crate::{condvar::Condvar, mutex::Mutex};
+use crate::{
+    condvar::Condvar,
+    mutex::Mutex,
+};
 
 /// Creates a new one-shot channel for sending single values.
 ///

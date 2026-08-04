@@ -54,7 +54,13 @@ extern crate nx_panic_handler as _; // Provides `#[panic_handler]`.
 use core::cell::Cell;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, Domain, DomainObject, DomainObjectRef, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    Domain,
+    DomainObject,
+    DomainObjectRef,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -65,22 +71,42 @@ pub use nx_sf::service::DispatchError;
 pub use nx_svc::sync::EventHandle;
 
 use crate::{
-    cmif::{creator, general, request},
+    cmif::{
+        creator,
+        general,
+        request,
+    },
     types::{
-        AppletInfo, InternetConnection, IpConfigInfo, NifmClientId, NifmIpV4Address,
-        NifmNetworkProfileBasicInfo, NifmNetworkProfileData, Uuid,
+        AppletInfo,
+        InternetConnection,
+        IpConfigInfo,
+        NifmClientId,
+        NifmIpV4Address,
+        NifmNetworkProfileBasicInfo,
+        NifmNetworkProfileData,
+        Uuid,
     },
 };
 pub use crate::{
     cmif::{
         creator::CreateGeneralServiceError,
-        general::{CreateRequestError, GetInternetConnectionStatusError},
+        general::{
+            CreateRequestError,
+            GetInternetConnectionStatusError,
+        },
         request::GetSystemEventHandlesError,
     },
     proto::{
-        NifmAuthentication, NifmEncryption, NifmInternetConnectionStatus,
-        NifmInternetConnectionType, NifmNetworkProfileType, NifmRequestState, NifmServiceType,
-        SERVICE_NAME_ADMIN, SERVICE_NAME_SYSTEM, SERVICE_NAME_USER,
+        NifmAuthentication,
+        NifmEncryption,
+        NifmInternetConnectionStatus,
+        NifmInternetConnectionType,
+        NifmNetworkProfileType,
+        NifmRequestState,
+        NifmServiceType,
+        SERVICE_NAME_ADMIN,
+        SERVICE_NAME_SYSTEM,
+        SERVICE_NAME_USER,
     },
 };
 

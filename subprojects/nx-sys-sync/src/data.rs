@@ -20,7 +20,14 @@ mod rwlock;
 
 #[doc(inline)]
 pub use self::{
-    mutex::{Mutex, MutexGuard},
+    mutex::{
+        Mutex,
+        MutexGuard,
+    },
     oncelock::OnceLock,
-    rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    rwlock::{
+        RwLock,
+        RwLockReadGuard,
+        RwLockWriteGuard,
+    },
 };

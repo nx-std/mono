@@ -5,16 +5,29 @@
 
 use core::{
     ffi::c_void,
-    ptr::{self, NonNull},
+    ptr::{
+        self,
+        NonNull,
+    },
 };
 
 use nx_svc::{
-    error::{KernelError, ToResultCode},
+    error::{
+        KernelError,
+        ToResultCode,
+    },
     mem::shmem::Handle,
-    raw::{Handle as RawHandle, INVALID_HANDLE},
+    raw::{
+        Handle as RawHandle,
+        INVALID_HANDLE,
+    },
 };
 
-use super::sys::{self, Mapped, Unmapped};
+use super::sys::{
+    self,
+    Mapped,
+    Unmapped,
+};
 
 /// Shared memory object (C-compatible wrapper)
 #[repr(C)]

@@ -18,7 +18,10 @@
 //! closing a session twice from there would mean calling an SVC directly rather than dropping a
 //! value.
 
-use core::{marker::PhantomData, mem::ManuallyDrop};
+use core::{
+    marker::PhantomData,
+    mem::ManuallyDrop,
+};
 
 use nx_svc::ipc::Handle as SessionHandle;
 

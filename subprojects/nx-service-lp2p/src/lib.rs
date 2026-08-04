@@ -28,11 +28,19 @@
 extern crate alloc;
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
-    ConvertToDomainError, DispatchError, Domain, OwnedSessionHandle, Session, clone_current_object,
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    OwnedSessionHandle,
+    Session,
+    clone_current_object,
 };
 use nx_svc::ipc::Handle as SessionHandle;
 
@@ -46,10 +54,19 @@ pub use nx_sf::service::DispatchError as IpcDispatchError;
 use crate::session::SessionPool;
 pub use crate::{
     cmif::AttachEventError,
-    proto::{SERVICE_NAME_APP, SERVICE_NAME_SYS},
+    proto::{
+        SERVICE_NAME_APP,
+        SERVICE_NAME_SYS,
+    },
     types::{
-        AdvertiseDataResult, Lp2pGroupId, Lp2pGroupInfo, Lp2pIpConfig, Lp2pMacAddress,
-        Lp2pNodeInfo, Lp2pScanResult, RecvFromOtherGroupResult,
+        AdvertiseDataResult,
+        Lp2pGroupId,
+        Lp2pGroupInfo,
+        Lp2pIpConfig,
+        Lp2pMacAddress,
+        Lp2pNodeInfo,
+        Lp2pScanResult,
+        RecvFromOtherGroupResult,
     },
 };
 

@@ -35,21 +35,42 @@
 //! Dropping the [`PthreadJoinHandle`] without joining or detaching *detaches*
 //! it — so an unjoined handle is reclaimed once its thread exits, not leaked.
 
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{
+    boxed::Box,
+    sync::Arc,
+};
 use core::{
     cell::UnsafeCell,
     ffi::c_void,
-    fmt::{self, Debug},
+    fmt::{
+        self,
+        Debug,
+    },
     mem::offset_of,
-    ptr::{self, NonNull},
+    ptr::{
+        self,
+        NonNull,
+    },
     sync::atomic::AtomicU8,
 };
 
 use crate::{
-    detach::{self, DetachState, Detachable},
+    detach::{
+        self,
+        DetachState,
+        Detachable,
+    },
     thread::{
-        self, Builder, CloseError, CoreId, CreateError, Priority, StackSpec, StartError,
-        ThreadControl, WaitError,
+        self,
+        Builder,
+        CloseError,
+        CoreId,
+        CreateError,
+        Priority,
+        StackSpec,
+        StartError,
+        ThreadControl,
+        WaitError,
     },
 };
 

@@ -12,21 +12,36 @@
 
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
-use nx_service_applet::{AppletType, aruid::Aruid};
+use nx_service_applet::{
+    AppletType,
+    aruid::Aruid,
+};
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    service::{BorrowedSessionHandle, Session},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        BorrowedSessionHandle,
+        Session,
+    },
 };
 use nx_svc::{
     error::ToResultCode as _,
-    mem::tmem::{Handle as TmemHandle, MemoryPermission},
+    mem::tmem::{
+        Handle as TmemHandle,
+        MemoryPermission,
+    },
     process::Handle as ProcessHandle,
     raw::Handle as RawHandle,
 };
 use nx_sys_mem::{
     error::ToResultCode as _,
-    tmem::{self, TransferMemoryBacking},
+    tmem::{
+        self,
+        TransferMemoryBacking,
+    },
 };
 
 mod cmif;
@@ -38,15 +53,34 @@ use fd::Fd;
 
 pub use self::{
     cmif::{
-        CloseError, InitializeError, Ioctl2Error, Ioctl3Error, IoctlError, OpenError,
-        QueryEventError, SetClientPidError,
+        CloseError,
+        InitializeError,
+        Ioctl2Error,
+        Ioctl3Error,
+        IoctlError,
+        OpenError,
+        QueryEventError,
+        SetClientPidError,
     },
     proto::{
-        SERVICE_NAME_APPLET, SERVICE_NAME_APPLICATION, SERVICE_NAME_FACTORY, SERVICE_NAME_SYSTEM,
+        SERVICE_NAME_APPLET,
+        SERVICE_NAME_APPLICATION,
+        SERVICE_NAME_FACTORY,
+        SERVICE_NAME_SYSTEM,
     },
     types::{
-        CloseNvError, IoctlNvError, NV_IOC_NONE, NV_IOC_READ, NV_IOC_WRITE, NvConfig, NvEventId,
-        NvServiceType, OpenNvError, QueryEventNvError, nv_event_id_ctrl_syncpt, nv_ioc_dir,
+        CloseNvError,
+        IoctlNvError,
+        NV_IOC_NONE,
+        NV_IOC_READ,
+        NV_IOC_WRITE,
+        NvConfig,
+        NvEventId,
+        NvServiceType,
+        OpenNvError,
+        QueryEventNvError,
+        nv_event_id_ctrl_syncpt,
+        nv_ioc_dir,
         nv_ioc_size,
     },
 };

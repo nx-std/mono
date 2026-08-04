@@ -12,7 +12,10 @@
 
 use core::ffi::CStr;
 
-pub use nx_rt_core::argv::{Args, args};
+pub use nx_rt_core::argv::{
+    Args,
+    args,
+};
 
 use crate::env;
 

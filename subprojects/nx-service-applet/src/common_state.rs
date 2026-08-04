@@ -4,18 +4,37 @@
 //! which provides access to applet state information like focus, operation mode,
 //! and message events.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
-    error::{GENERIC_ERROR, ToResultCode},
-    service::{DispatchError, DomainObjectRef, OutHandleAttr},
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
+    service::{
+        DispatchError,
+        DomainObjectRef,
+        OutHandleAttr,
+    },
 };
-use nx_svc::{error::ResultCode, sync::EventHandle};
+use nx_svc::{
+    error::ResultCode,
+    sync::EventHandle,
+};
 
 use crate::proto::{
-    AppletFocusState, AppletMessage, AppletOperationMode, AppletPerformanceMode,
-    CMD_CSG_GET_CURRENT_FOCUS_STATE, CMD_CSG_GET_EVENT_HANDLE, CMD_CSG_GET_OPERATION_MODE,
-    CMD_CSG_GET_PERFORMANCE_MODE, CMD_CSG_RECEIVE_MESSAGE,
+    AppletFocusState,
+    AppletMessage,
+    AppletOperationMode,
+    AppletPerformanceMode,
+    CMD_CSG_GET_CURRENT_FOCUS_STATE,
+    CMD_CSG_GET_EVENT_HANDLE,
+    CMD_CSG_GET_OPERATION_MODE,
+    CMD_CSG_GET_PERFORMANCE_MODE,
+    CMD_CSG_RECEIVE_MESSAGE,
 };
 
 /// Gets the message event handle from ICommonStateGetter.

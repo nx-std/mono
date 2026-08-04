@@ -1,10 +1,20 @@
 //! CMIF dispatch operations for IAsyncValue and IAsyncResult sub-objects.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
-use crate::{proto, types::ErrorContext};
+use crate::{
+    proto,
+    types::ErrorContext,
+};
 
 // ---------------------------------------------------------------------------
 // IAsyncValue commands

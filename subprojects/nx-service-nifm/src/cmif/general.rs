@@ -7,26 +7,54 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto::{
-        CMD_IGS_CREATE_REQUEST, CMD_IGS_ENUMERATE_NETWORK_PROFILES, CMD_IGS_GET_CLIENT_ID,
-        CMD_IGS_GET_CURRENT_IP_ADDRESS, CMD_IGS_GET_CURRENT_IP_CONFIG_INFO,
-        CMD_IGS_GET_CURRENT_NETWORK_PROFILE, CMD_IGS_GET_INTERNET_CONNECTION_STATUS,
-        CMD_IGS_GET_NETWORK_PROFILE, CMD_IGS_IS_ANY_FOREGROUND_REQUEST_ACCEPTED,
-        CMD_IGS_IS_ANY_INTERNET_REQUEST_ACCEPTED, CMD_IGS_IS_ETHERNET_COMMUNICATION_ENABLED,
-        CMD_IGS_IS_WIRELESS_COMMUNICATION_ENABLED, CMD_IGS_PUT_TO_SLEEP,
-        CMD_IGS_SET_NETWORK_PROFILE, CMD_IGS_SET_WIRELESS_COMMUNICATION_ENABLED,
-        CMD_IGS_SET_WOWL_DELAYED_WAKE_TIME, CMD_IGS_WAKE_UP, NifmInternetConnectionStatus,
-        NifmInternetConnectionType, NifmNetworkProfileType,
+        CMD_IGS_CREATE_REQUEST,
+        CMD_IGS_ENUMERATE_NETWORK_PROFILES,
+        CMD_IGS_GET_CLIENT_ID,
+        CMD_IGS_GET_CURRENT_IP_ADDRESS,
+        CMD_IGS_GET_CURRENT_IP_CONFIG_INFO,
+        CMD_IGS_GET_CURRENT_NETWORK_PROFILE,
+        CMD_IGS_GET_INTERNET_CONNECTION_STATUS,
+        CMD_IGS_GET_NETWORK_PROFILE,
+        CMD_IGS_IS_ANY_FOREGROUND_REQUEST_ACCEPTED,
+        CMD_IGS_IS_ANY_INTERNET_REQUEST_ACCEPTED,
+        CMD_IGS_IS_ETHERNET_COMMUNICATION_ENABLED,
+        CMD_IGS_IS_WIRELESS_COMMUNICATION_ENABLED,
+        CMD_IGS_PUT_TO_SLEEP,
+        CMD_IGS_SET_NETWORK_PROFILE,
+        CMD_IGS_SET_WIRELESS_COMMUNICATION_ENABLED,
+        CMD_IGS_SET_WOWL_DELAYED_WAKE_TIME,
+        CMD_IGS_WAKE_UP,
+        NifmInternetConnectionStatus,
+        NifmInternetConnectionType,
+        NifmNetworkProfileType,
     },
     types::{
-        InternetConnection, IpConfigInfo, NifmClientId, NifmIpAddressSetting, NifmIpV4Address,
-        NifmNetworkProfileBasicInfo, NifmNetworkProfileData, NifmSfNetworkProfileBasicInfo,
-        NifmSfNetworkProfileData, Uuid, sf_from_network_profile_data,
-        sf_to_network_profile_basic_info, sf_to_network_profile_data,
+        InternetConnection,
+        IpConfigInfo,
+        NifmClientId,
+        NifmIpAddressSetting,
+        NifmIpV4Address,
+        NifmNetworkProfileBasicInfo,
+        NifmNetworkProfileData,
+        NifmSfNetworkProfileBasicInfo,
+        NifmSfNetworkProfileData,
+        Uuid,
+        sf_from_network_profile_data,
+        sf_to_network_profile_basic_info,
+        sf_to_network_profile_data,
     },
 };
 

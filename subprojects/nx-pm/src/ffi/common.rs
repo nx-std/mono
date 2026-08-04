@@ -1,10 +1,16 @@
 //! Shared helpers for the pm FFI surface.
 
-use core::{cell::UnsafeCell, mem::size_of};
+use core::{
+    cell::UnsafeCell,
+    mem::size_of,
+};
 
 /// Generic fallback used when no specific result code is available.
 pub(super) use nx_sf::error::GENERIC_ERROR;
-use nx_sf::error::{LibnxError, libnx_error};
+use nx_sf::error::{
+    LibnxError,
+    libnx_error,
+};
 use static_assertions::const_assert_eq;
 
 /// `MAKERESULT(Module_Libnx, LibnxError_IncompatSysVer)` — returned by libnx

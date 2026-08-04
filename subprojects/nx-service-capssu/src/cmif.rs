@@ -4,15 +4,22 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
     proto,
     types::{
-        ApplicationAlbumEntry, ApplicationData, SaveScreenShotIn, ScreenShotAttribute,
-        SetShimVersionIn, UserIdList,
+        ApplicationAlbumEntry,
+        ApplicationData,
+        SaveScreenShotIn,
+        ScreenShotAttribute,
+        SetShimVersionIn,
+        UserIdList,
     },
 };
 

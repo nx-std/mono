@@ -7,15 +7,33 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer, OutputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::proto::{
-    CMD_CANCEL, CMD_GET_ADDR_INFO, CMD_GET_CANCEL_HANDLE, CMD_GET_GAI_STRING_ERROR,
-    CMD_GET_HOST_BY_ADDR, CMD_GET_HOST_BY_NAME, CMD_GET_HOST_STRING_ERROR, CMD_GET_NAME_INFO,
-    CancelHandle, CancelIn, GetAddrInfoIn, GetAddrInfoOut, GetHostByAddrIn, GetHostByAddrOut,
-    GetHostByNameIn, GetHostByNameOut, GetNameInfoIn, GetNameInfoOut,
+    CMD_CANCEL,
+    CMD_GET_ADDR_INFO,
+    CMD_GET_CANCEL_HANDLE,
+    CMD_GET_GAI_STRING_ERROR,
+    CMD_GET_HOST_BY_ADDR,
+    CMD_GET_HOST_BY_NAME,
+    CMD_GET_HOST_STRING_ERROR,
+    CMD_GET_NAME_INFO,
+    CancelHandle,
+    CancelIn,
+    GetAddrInfoIn,
+    GetAddrInfoOut,
+    GetHostByAddrIn,
+    GetHostByAddrOut,
+    GetHostByNameIn,
+    GetHostByNameOut,
+    GetNameInfoIn,
+    GetNameInfoOut,
 };
 
 /// Encoded `0` for "no cancel token".

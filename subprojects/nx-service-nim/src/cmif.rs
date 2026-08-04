@@ -2,11 +2,17 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, OutputBuffer},
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
-use crate::{proto, types::SystemUpdateTaskId};
+use crate::{
+    proto,
+    types::SystemUpdateTaskId,
+};
 
 /// Destroys a system update task.
 pub fn destroy_system_update_task(

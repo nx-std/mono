@@ -24,7 +24,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -34,10 +39,21 @@ mod types;
 
 pub use self::{
     cmif::OpenDatabaseError,
-    proto::{SERVICE_NAME_SYSTEM, SERVICE_NAME_USER},
+    proto::{
+        SERVICE_NAME_SYSTEM,
+        SERVICE_NAME_USER,
+    },
     types::{
-        MiiAge, MiiCharInfo, MiiCreateId, MiiFaceColor, MiiGender, MiiNfpStoreDataExtension,
-        MiiSourceFlag, MiiSpecialKeyCode, MiiStoreData, MiiVer3StoreData,
+        MiiAge,
+        MiiCharInfo,
+        MiiCreateId,
+        MiiFaceColor,
+        MiiGender,
+        MiiNfpStoreDataExtension,
+        MiiSourceFlag,
+        MiiSpecialKeyCode,
+        MiiStoreData,
+        MiiVer3StoreData,
     },
 };
 

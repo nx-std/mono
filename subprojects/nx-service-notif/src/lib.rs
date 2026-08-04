@@ -31,7 +31,12 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -41,9 +46,17 @@ mod types;
 pub use nx_sf::service::DispatchError as IpcDispatchError;
 
 pub use self::{
-    proto::{SERVICE_NAME_A, SERVICE_NAME_S},
+    proto::{
+        SERVICE_NAME_A,
+        SERVICE_NAME_S,
+    },
     types::{
-        AccountUid, AlarmSetting, AlarmTime, DayOfWeekError, MAX_ALARMS, WeeklyScheduleAlarmSetting,
+        AccountUid,
+        AlarmSetting,
+        AlarmTime,
+        DayOfWeekError,
+        MAX_ALARMS,
+        WeeklyScheduleAlarmSetting,
     },
 };
 

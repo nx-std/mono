@@ -23,14 +23,30 @@
 //! [`OverrideService::dispatch`]: super::OverrideService::dispatch
 //! [`out_objects`]: DomainDispatch::out_objects
 
-use nx_svc::error::{ResultCode, ToResultCode as _};
+use nx_svc::error::{
+    ResultCode,
+    ToResultCode as _,
+};
 use nx_sys_thread_tls::IpcBuffer;
 
-use super::domain::{DomainObject, DomainRef};
+use super::domain::{
+    DomainObject,
+    DomainRef,
+};
 use crate::{
-    cmif::{self, ObjectId},
+    cmif::{
+        self,
+        ObjectId,
+    },
     error::ToResultCode,
-    hipc::{self, InOutBuffer, InPointer, InputBuffer, OutPointer, OutputBuffer},
+    hipc::{
+        self,
+        InOutBuffer,
+        InPointer,
+        InputBuffer,
+        OutPointer,
+        OutputBuffer,
+    },
     service::handle::BorrowedSessionHandle,
 };
 

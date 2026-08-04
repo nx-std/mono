@@ -3,14 +3,25 @@
 //! Provides safe wrappers around the low-level SVCs involved in creating and
 //! managing transfer memory kernel objects.
 
-use core::{ffi::c_void, ptr::NonNull};
+use core::{
+    ffi::c_void,
+    ptr::NonNull,
+};
 
 use bitflags::bitflags;
 
 use crate::{
-    error::{_sealed, KernelError as KError, ToResultCode},
+    error::{
+        _sealed,
+        KernelError as KError,
+        ToResultCode,
+    },
     raw,
-    result::{Error, ResultCode, raw::Result as RawResult},
+    result::{
+        Error,
+        ResultCode,
+        raw::Result as RawResult,
+    },
 };
 
 define_handle_type! {

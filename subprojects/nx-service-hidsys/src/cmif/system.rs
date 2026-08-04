@@ -2,12 +2,25 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
-    types::{EnableAppletToGetInputIn, LeftRightU8Out, UniquePadId},
+    types::{
+        EnableAppletToGetInputIn,
+        LeftRightU8Out,
+        UniquePadId,
+    },
 };
 
 // ---------------------------------------------------------------------------

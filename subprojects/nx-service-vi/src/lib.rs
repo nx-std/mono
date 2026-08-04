@@ -13,8 +13,15 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    service::{BorrowedSessionHandle, Session},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        BorrowedSessionHandle,
+        Session,
+    },
 };
 
 pub mod binder;
@@ -25,36 +32,84 @@ mod proto;
 pub mod types;
 
 pub use self::{
-    binder::{Binder, BinderError, GetNativeHandleError, InitSessionError, TransactError},
+    binder::{
+        Binder,
+        BinderError,
+        GetNativeHandleError,
+        InitSessionError,
+        TransactError,
+    },
     cmif::{
         application::{
-            CloseDisplayError, CloseLayerError, CreateStrayLayerError, CreateStrayLayerOutput,
-            DestroyStrayLayerError, DisplayResolution, GetDisplayResolutionError,
-            GetDisplayVsyncEventError, GetIndirectLayerImageMapError,
-            GetIndirectLayerImageRequiredMemoryInfoError, GetSubServiceError,
-            IndirectLayerImageInfo, IndirectLayerMemoryInfo, NATIVE_WINDOW_SIZE, OpenDisplayError,
-            OpenLayerError, OpenLayerOutput, SetLayerScalingModeError,
+            CloseDisplayError,
+            CloseLayerError,
+            CreateStrayLayerError,
+            CreateStrayLayerOutput,
+            DestroyStrayLayerError,
+            DisplayResolution,
+            GetDisplayResolutionError,
+            GetDisplayVsyncEventError,
+            GetIndirectLayerImageMapError,
+            GetIndirectLayerImageRequiredMemoryInfoError,
+            GetSubServiceError,
+            IndirectLayerImageInfo,
+            IndirectLayerMemoryInfo,
+            NATIVE_WINDOW_SIZE,
+            OpenDisplayError,
+            OpenLayerError,
+            OpenLayerOutput,
+            SetLayerScalingModeError,
         },
         manager::{
-            AddToLayerStackError, CreateManagedLayerError, DestroyManagedLayerError,
-            SetContentVisibilityError, SetDisplayAlphaError, SetDisplayLayerStackError,
+            AddToLayerStackError,
+            CreateManagedLayerError,
+            DestroyManagedLayerError,
+            SetContentVisibilityError,
+            SetDisplayAlphaError,
+            SetDisplayLayerStackError,
             SetDisplayPowerStateError,
         },
         root::{
-            DrawFatalRectangleError, DrawFatalText32Error, GetDisplayServiceError,
-            PrepareFatalError, ShowFatalError,
+            DrawFatalRectangleError,
+            DrawFatalText32Error,
+            GetDisplayServiceError,
+            PrepareFatalError,
+            ShowFatalError,
         },
         system::{
-            GetDisplayLogicalResolutionError, GetZOrderCountError, LogicalResolution,
-            SetDisplayMagnificationError, SetLayerPositionError, SetLayerSizeError,
-            SetLayerVisibilityError, SetLayerZError,
+            GetDisplayLogicalResolutionError,
+            GetZOrderCountError,
+            LogicalResolution,
+            SetDisplayMagnificationError,
+            SetLayerPositionError,
+            SetLayerSizeError,
+            SetLayerVisibilityError,
+            SetLayerZError,
         },
     },
-    parcel::{PARCEL_MAX_PAYLOAD, Parcel, ParcelHeader},
-    proto::{SERVICE_NAME_APPLICATION, SERVICE_NAME_MANAGER, SERVICE_NAME_SYSTEM},
+    parcel::{
+        PARCEL_MAX_PAYLOAD,
+        Parcel,
+        ParcelHeader,
+    },
+    proto::{
+        SERVICE_NAME_APPLICATION,
+        SERVICE_NAME_MANAGER,
+        SERVICE_NAME_SYSTEM,
+    },
     types::{
-        BinderObjectId, DEFAULT_DISPLAY, DisplayId, DisplayName, LayerId, ViColorRgba4444,
-        ViColorRgba8888, ViLayerFlags, ViLayerStack, ViPowerState, ViScalingMode, ViServiceType,
+        BinderObjectId,
+        DEFAULT_DISPLAY,
+        DisplayId,
+        DisplayName,
+        LayerId,
+        ViColorRgba4444,
+        ViColorRgba8888,
+        ViLayerFlags,
+        ViLayerStack,
+        ViPowerState,
+        ViScalingMode,
+        ViServiceType,
     },
 };
 

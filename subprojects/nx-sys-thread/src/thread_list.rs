@@ -30,7 +30,10 @@
 //! atomic ordering, supplies all happens-before, so every access below uses
 //! [`Ordering::Relaxed`].
 
-use core::{ptr::null_mut, sync::atomic::Ordering};
+use core::{
+    ptr::null_mut,
+    sync::atomic::Ordering,
+};
 
 use nx_sys_sync::Mutex;
 

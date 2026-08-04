@@ -1,8 +1,14 @@
 //! CMIF protocol operations for the multimedia service.
 
-use nx_sf::{cmif, service::BorrowedSessionHandle};
+use nx_sf::{
+    cmif,
+    service::BorrowedSessionHandle,
+};
 
-use crate::{proto, types::MmuModuleId};
+use crate::{
+    proto,
+    types::MmuModuleId,
+};
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]

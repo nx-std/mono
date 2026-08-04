@@ -3,14 +3,29 @@
 //! This module provides C-compatible virtual memory management functions
 //! that match the original libnx virtmem API.
 
-use core::{ffi::c_void, ptr::NonNull};
+use core::{
+    ffi::c_void,
+    ptr::NonNull,
+};
 
 use nx_rand::sys::next_u64;
-use nx_svc::mem::{self, MemoryType, UnmapMemoryError};
-use nx_sys_sync::data::{Mutex, MutexGuard};
+use nx_svc::mem::{
+    self,
+    MemoryType,
+    UnmapMemoryError,
+};
+use nx_sys_sync::data::{
+    Mutex,
+    MutexGuard,
+};
 
 use super::reservation::{
-    MANAGED_PAGES, RADIX, RadixBacking, RadixReservationMap, Reservation, ReservationMap,
+    MANAGED_PAGES,
+    RADIX,
+    RadixBacking,
+    RadixReservationMap,
+    Reservation,
+    ReservationMap,
 };
 
 /// Global virtual memory manager

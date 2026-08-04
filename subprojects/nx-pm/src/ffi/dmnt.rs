@@ -2,16 +2,32 @@
 
 use core::slice;
 
-use nx_service_pm::{ProcessId, ProgramId};
-use nx_sf::{error::ToResultCode as _, ffi::Service};
+use nx_service_pm::{
+    ProcessId,
+    ProgramId,
+};
+use nx_sf::{
+    error::ToResultCode as _,
+    ffi::Service,
+};
 use nx_svc::raw::INVALID_HANDLE;
 
 use super::{
     common::{
-        GENERIC_ERROR, LibnxEvent, RC_INCOMPAT_SYSVER, hosversion_at_least, hosversion_before,
+        GENERIC_ERROR,
+        LibnxEvent,
+        RC_INCOMPAT_SYSVER,
+        hosversion_at_least,
+        hosversion_before,
         hosversionIsAtmosphere,
     },
-    state::{DMNT, DMNT_SRV, clear_shadow, ensure_sm, write_shadow},
+    state::{
+        DMNT,
+        DMNT_SRV,
+        clear_shadow,
+        ensure_sm,
+        write_shadow,
+    },
 };
 
 /// `pmdmntInitialize()`.

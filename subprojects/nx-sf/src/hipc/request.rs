@@ -33,22 +33,37 @@
 //! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage - no heap, no dynamic
 //! allocation.
 
-use core::mem::{size_of, size_of_val};
+use core::mem::{
+    size_of,
+    size_of_val,
+};
 
 use nx_svc::{
-    error::{ResultCode, ToResultCode as _},
+    error::{
+        ResultCode,
+        ToResultCode as _,
+    },
     ipc::SendSyncError,
     raw::Handle as RawHandle,
 };
 use nx_sys_thread_tls::IpcBuffer;
 
 use super::wire::{
-    BufferDescriptor, Header, MessageType, RECV_LIST_WIRE_NONE, RECV_LIST_WIRE_SINGLE_BUFFER,
-    RecvListEntry, SpecialHeader, StaticDescriptor,
+    BufferDescriptor,
+    Header,
+    MessageType,
+    RECV_LIST_WIRE_NONE,
+    RECV_LIST_WIRE_SINGLE_BUFFER,
+    RecvListEntry,
+    SpecialHeader,
+    StaticDescriptor,
 };
 use crate::{
     array_vec::ArrayVec,
-    error::{GENERIC_ERROR, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ToResultCode,
+    },
     service::handle::BorrowedSessionHandle,
 };
 

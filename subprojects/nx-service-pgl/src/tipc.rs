@@ -2,19 +2,33 @@
 //!
 //! Used on HOS 12.0.0+.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
-    hipc::{BufferMode, InputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+        Session,
+    },
     tipc,
 };
 
 use crate::{
     proto,
     types::{
-        ContentMetaInfo, LaunchProgramTipcIn, NcmProgramLocation, PglLaunchFlag, ProcessEventInfo,
+        ContentMetaInfo,
+        LaunchProgramTipcIn,
+        NcmProgramLocation,
+        PglLaunchFlag,
+        ProcessEventInfo,
     },
 };
 

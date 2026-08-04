@@ -1,10 +1,18 @@
 //! CMIF protocol operations for the audio control service.
 
-use nx_sf::{cmif, service::BorrowedSessionHandle};
+use nx_sf::{
+    cmif,
+    service::BorrowedSessionHandle,
+};
 
 use crate::{
     proto,
-    types::{SetDefaultTargetIn, SetTargetMuteIn, SetTargetVolumeIn, TargetModeIn},
+    types::{
+        SetDefaultTargetIn,
+        SetTargetMuteIn,
+        SetTargetVolumeIn,
+        TargetModeIn,
+    },
 };
 
 fn dispatch_no_io(

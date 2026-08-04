@@ -31,6 +31,12 @@ extern crate nx_panic_handler; // provides #[panic_handler]
 pub mod native_window;
 
 pub use self::native_window::{
-    NATIVE_WINDOW_API_CAMERA, NATIVE_WINDOW_API_CPU, NATIVE_WINDOW_API_EGL,
-    NATIVE_WINDOW_API_MEDIA, NativeWindow, NativeWindowApi, NativeWindowError, Transform,
+    NATIVE_WINDOW_API_CAMERA,
+    NATIVE_WINDOW_API_CPU,
+    NATIVE_WINDOW_API_EGL,
+    NATIVE_WINDOW_API_MEDIA,
+    NativeWindow,
+    NativeWindowApi,
+    NativeWindowError,
+    Transform,
 };

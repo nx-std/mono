@@ -1,7 +1,10 @@
 //! Application album wire-layout types.
 
 use nx_service_caps::{
-    AccountUid, AlbumFileDateTime, ApplicationAlbumFileEntry, ScreenShotDecodeOption,
+    AccountUid,
+    AlbumFileDateTime,
+    ApplicationAlbumFileEntry,
+    ScreenShotDecodeOption,
 };
 use static_assertions::const_assert_eq;
 

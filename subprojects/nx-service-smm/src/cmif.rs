@@ -4,11 +4,17 @@
 //! Interface Format) protocol, which is the standard IPC protocol on
 //! HOS < 12.0.0 (non-Atmosphere).
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, InputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 

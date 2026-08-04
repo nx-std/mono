@@ -41,7 +41,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -51,7 +56,12 @@ mod types;
 pub use self::{
     cmif::OpenDecoderError,
     proto::SERVICE_NAME,
-    types::{DecodeResult, DecodeResultWithPerf, HwopusHeader, HwopusMultistreamState},
+    types::{
+        DecodeResult,
+        DecodeResultWithPerf,
+        HwopusHeader,
+        HwopusMultistreamState,
+    },
 };
 
 /// Hardware Opus decoder manager (`hwopus`) session wrapper.

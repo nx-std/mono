@@ -5,14 +5,24 @@
 
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 
 use crate::proto::{
-    CMD_GET_PERFORMANCE_CONFIGURATION, CMD_GET_PERFORMANCE_MODE, CMD_OPEN_SESSION,
-    CMD_SET_PERFORMANCE_CONFIGURATION, PerformanceMode,
+    CMD_GET_PERFORMANCE_CONFIGURATION,
+    CMD_GET_PERFORMANCE_MODE,
+    CMD_OPEN_SESSION,
+    CMD_SET_PERFORMANCE_CONFIGURATION,
+    PerformanceMode,
 };
 
 /// Opens an APM session for performance configuration.

@@ -1,9 +1,17 @@
 //! IContentManager root service commands.
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 use crate::{
-    dispatch::{OpenSubObjectError, dispatch_in, dispatch_in_u8_out_object, dispatch_no_io},
+    dispatch::{
+        OpenSubObjectError,
+        dispatch_in,
+        dispatch_in_u8_out_object,
+        dispatch_no_io,
+    },
     proto,
     types::NcmStorageId,
 };

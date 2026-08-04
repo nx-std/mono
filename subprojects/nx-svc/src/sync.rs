@@ -1,10 +1,25 @@
 //! Synchronization primitives
 
 use crate::{
-    error::{_sealed, KernelError as KError, ResultCode, ToResultCode},
-    handle::{Reset, Waitable},
-    raw::{self, Handle},
-    result::{Error, Result, raw::Result as RawResult},
+    error::{
+        _sealed,
+        KernelError as KError,
+        ResultCode,
+        ToResultCode,
+    },
+    handle::{
+        Reset,
+        Waitable,
+    },
+    raw::{
+        self,
+        Handle,
+    },
+    result::{
+        Error,
+        Result,
+        raw::Result as RawResult,
+    },
 };
 
 /// Bitmask for the _waiters bitflag_ in mutex raw tag values.

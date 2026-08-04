@@ -3,13 +3,20 @@
 use nx_service_vi::ViLayerStack;
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, OutputBuffer},
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 
 use crate::{
     proto,
-    types::{CaptureRawImageIn, LayerStackTimeoutIn, OpenReadStreamOut},
+    types::{
+        CaptureRawImageIn,
+        LayerStackTimeoutIn,
+        OpenReadStreamOut,
+    },
 };
 
 /// Captures a raw RGBA8 screenshot with a timeout.

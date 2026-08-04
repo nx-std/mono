@@ -1,12 +1,24 @@
 //! CMIF protocol operations for the hardware Opus service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
     proto,
-    types::{DecodeResult, DecodeResultWithPerf, HwopusMultistreamState, OpenDecoderIn},
+    types::{
+        DecodeResult,
+        DecodeResultWithPerf,
+        HwopusMultistreamState,
+        OpenDecoderIn,
+    },
 };
 
 // ---------------------------------------------------------------------------

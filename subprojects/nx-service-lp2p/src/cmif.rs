@@ -1,16 +1,32 @@
 //! CMIF protocol operations for the LP2P service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::service::{
-    BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr, Session,
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+    DomainRef,
+    OutHandleAttr,
+    Session,
 };
 
 use crate::{
     proto,
     types::{
-        CreateNetworkServiceIn, GetAdvertiseDataOut, Lp2pGroupId, Lp2pGroupInfo, Lp2pIpConfig,
-        Lp2pMacAddress, Lp2pNodeInfo, Lp2pScanResult, RecvFromOtherGroupOut, SendToOtherGroupIn,
+        CreateNetworkServiceIn,
+        GetAdvertiseDataOut,
+        Lp2pGroupId,
+        Lp2pGroupInfo,
+        Lp2pIpConfig,
+        Lp2pMacAddress,
+        Lp2pNodeInfo,
+        Lp2pScanResult,
+        RecvFromOtherGroupOut,
+        SendToOtherGroupIn,
     },
 };
 

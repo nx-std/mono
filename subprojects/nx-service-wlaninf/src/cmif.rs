@@ -2,11 +2,20 @@
 
 use nx_sf::{
     cmif,
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
     service::BorrowedSessionHandle,
 };
 
-use crate::proto::{CMD_GET_RSSI, CMD_GET_STATE, Rssi, WlanInfState};
+use crate::proto::{
+    CMD_GET_RSSI,
+    CMD_GET_STATE,
+    Rssi,
+    WlanInfState,
+};
 
 /// Reads the current [`WlanInfState`] (cmd 10).
 pub fn get_state(session: BorrowedSessionHandle<'_>) -> Result<WlanInfState, GetStateError> {

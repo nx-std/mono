@@ -34,7 +34,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -42,7 +45,11 @@ mod proto;
 mod types;
 
 pub use self::{
-    proto::{LDR_RO_SERVICE_NAME, RO_DMNT_SERVICE_NAME, RO1_SERVICE_NAME},
+    proto::{
+        LDR_RO_SERVICE_NAME,
+        RO_DMNT_SERVICE_NAME,
+        RO1_SERVICE_NAME,
+    },
     types::LoaderModuleInfo,
 };
 

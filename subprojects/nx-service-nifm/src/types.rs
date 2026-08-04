@@ -4,7 +4,10 @@
 //! `nx/include/switch/services/nifm.h` so that IPC buffers can be cast in
 //! place. Sizes and offsets are pinned with `static_assertions::const_assert_eq!`.
 
-use core::mem::{offset_of, size_of};
+use core::mem::{
+    offset_of,
+    size_of,
+};
 
 use static_assertions::const_assert_eq;
 

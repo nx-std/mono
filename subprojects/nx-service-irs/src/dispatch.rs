@@ -1,8 +1,14 @@
 //! CMIF dispatch helpers shared across the `cmif` module.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 /// CMIF request with a raw input payload + PID, no output.
 #[inline]

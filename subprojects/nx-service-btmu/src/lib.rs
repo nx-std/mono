@@ -15,7 +15,11 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, OwnedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    OwnedSessionHandle,
+    Session,
+};
 use nx_svc::ipc::Handle;
 
 mod cmif;
@@ -27,8 +31,14 @@ pub use self::{
     cmif::AcquireEventWithFlagError,
     proto::SERVICE_NAME,
     types::{
-        BtdrvAddress, BtdrvBleAdvertisePacketParameter, BtdrvBleConnectionInfo, BtdrvBleScanResult,
-        BtdrvGattAttributeUuid, BtmBleDataPath, BtmGattCharacteristic, BtmGattDescriptor,
+        BtdrvAddress,
+        BtdrvBleAdvertisePacketParameter,
+        BtdrvBleConnectionInfo,
+        BtdrvBleScanResult,
+        BtdrvGattAttributeUuid,
+        BtmBleDataPath,
+        BtmGattCharacteristic,
+        BtmGattDescriptor,
         BtmGattService,
     },
 };

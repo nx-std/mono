@@ -19,7 +19,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -27,11 +30,20 @@ mod types;
 
 pub use self::{
     cmif::{
-        GetAttributeError, GetCountError, InitializeError, IsEmptyError, IsFullError,
-        LoadImageError, ReloadError,
+        GetAttributeError,
+        GetCountError,
+        InitializeError,
+        IsEmptyError,
+        IsFullError,
+        LoadImageError,
+        ReloadError,
     },
     proto::SERVICE_NAME,
-    types::{MiiCreateId, MiiimgImageAttribute, MiiimgImageId},
+    types::{
+        MiiCreateId,
+        MiiimgImageAttribute,
+        MiiimgImageId,
+    },
 };
 
 /// Mii image database service wrapper.

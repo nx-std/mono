@@ -21,12 +21,23 @@ use core::ptr::NonNull;
 use nx_service_applet::aruid::Aruid;
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{GENERIC_ERROR, ResultCode, ToResultCode},
-    service::{BorrowedSessionHandle, Session},
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        BorrowedSessionHandle,
+        Session,
+    },
 };
 use nx_sys_mem::{
     error::ToResultCode as _,
-    shmem::{self as sys_shmem, Mapped, Permissions},
+    shmem::{
+        self as sys_shmem,
+        Mapped,
+        Permissions,
+    },
 };
 
 mod cmif;
@@ -36,9 +47,15 @@ pub mod shmem;
 use self::shmem::HidSharedMemory;
 pub use self::{
     cmif::{
-        ActivateGestureError, ActivateKeyboardError, ActivateMouseError, ActivateNpadError,
-        ActivateTouchScreenError, CreateAppletResourceError, GetSharedMemoryHandleError,
-        SetSupportedNpadIdTypeError, SetSupportedNpadStyleSetError,
+        ActivateGestureError,
+        ActivateKeyboardError,
+        ActivateMouseError,
+        ActivateNpadError,
+        ActivateTouchScreenError,
+        CreateAppletResourceError,
+        GetSharedMemoryHandleError,
+        SetSupportedNpadIdTypeError,
+        SetSupportedNpadStyleSetError,
     },
     proto::SERVICE_NAME,
 };

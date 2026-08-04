@@ -29,7 +29,13 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{ConvertToDomainError, DispatchError, Domain, DomainObject, Session};
+use nx_sf::service::{
+    ConvertToDomainError,
+    DispatchError,
+    Domain,
+    DomainObject,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -37,9 +43,15 @@ mod proto;
 mod types;
 
 pub use self::{
-    cmif::{GetPmModuleError, ModuleInitializeError},
+    cmif::{
+        GetPmModuleError,
+        ModuleInitializeError,
+    },
     proto::SERVICE_NAME,
-    types::{PmModuleId, PmState},
+    types::{
+        PmModuleId,
+        PmState,
+    },
 };
 
 /// Connected PSC service wrapper (`psc:m`).

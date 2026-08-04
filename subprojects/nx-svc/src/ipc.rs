@@ -15,9 +15,17 @@
 use core::ffi::CStr;
 
 use crate::{
-    error::{_sealed, KernelError as KError, ToResultCode},
+    error::{
+        _sealed,
+        KernelError as KError,
+        ToResultCode,
+    },
     raw,
-    result::{Error, ResultCode, raw::Result as RawResult},
+    result::{
+        Error,
+        ResultCode,
+        raw::Result as RawResult,
+    },
 };
 
 define_waitable_handle_type! {

@@ -2,7 +2,10 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{DispatchError, Session};
+use nx_sf::service::{
+    DispatchError,
+    Session,
+};
 
 /// CMIF request with a single `Copy` input payload, PID, and no output.
 #[inline]

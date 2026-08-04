@@ -2,10 +2,17 @@
 
 use core::{
     ptr,
-    sync::atomic::{AtomicU32, Ordering, compiler_fence},
+    sync::atomic::{
+        AtomicU32,
+        Ordering,
+        compiler_fence,
+    },
 };
 
-use crate::types::{TimeStandardSteadyClockTimePointType, TimeSystemClockContext};
+use crate::types::{
+    TimeStandardSteadyClockTimePointType,
+    TimeSystemClockContext,
+};
 
 /// Offsets in shared memory for time data structures.
 pub mod offsets {

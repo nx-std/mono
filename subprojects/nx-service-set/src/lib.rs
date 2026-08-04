@@ -18,8 +18,14 @@ extern crate nx_panic_handler; // Provide #![panic_handler]
 
 use nx_service_sm::SmService;
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    service::{BorrowedSessionHandle, Session},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    service::{
+        BorrowedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -28,7 +34,10 @@ mod tipc;
 
 pub use self::{
     cmif::GetFirmwareVersionError as GetFirmwareVersionCmifError,
-    proto::{FirmwareVersion, SERVICE_NAME},
+    proto::{
+        FirmwareVersion,
+        SERVICE_NAME,
+    },
     tipc::GetFirmwareVersionError as GetFirmwareVersionTipcError,
 };
 

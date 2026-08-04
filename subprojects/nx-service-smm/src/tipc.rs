@@ -3,10 +3,16 @@
 //! This module implements `sm:m` commands using the TIPC (Tiny IPC)
 //! protocol, which is used on HOS 12.0.0+ and Atmosphere.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_sf::{
-    hipc::{BufferMode, InputBuffer},
+    hipc::{
+        BufferMode,
+        InputBuffer,
+    },
     service::BorrowedSessionHandle,
     tipc,
 };

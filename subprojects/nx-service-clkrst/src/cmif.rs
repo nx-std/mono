@@ -2,15 +2,24 @@
 
 use nx_sf::{
     cmif,
-    hipc::{BufferMode, OutputBuffer},
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, OwnedSessionHandle},
+    service::{
+        BorrowedSessionHandle,
+        OwnedSessionHandle,
+    },
 };
 use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
-    types::{ClockRatesListType, PcvModuleId},
+    types::{
+        ClockRatesListType,
+        PcvModuleId,
+    },
 };
 
 #[repr(C, packed)]

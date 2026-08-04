@@ -1,7 +1,12 @@
 //! NFC/NFP/Mifare wire-layout types.
 
 use bitflags::bitflags;
-pub use nx_service_mii::{MiiCharInfo, MiiNfpStoreDataExtension, MiiStoreData, MiiVer3StoreData};
+pub use nx_service_mii::{
+    MiiCharInfo,
+    MiiNfpStoreDataExtension,
+    MiiStoreData,
+    MiiVer3StoreData,
+};
 use static_assertions::const_assert_eq;
 
 // ---------------------------------------------------------------------------

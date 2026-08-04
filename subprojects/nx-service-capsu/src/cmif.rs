@@ -1,20 +1,37 @@
 //! CMIF protocol operations for the application album service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
 use nx_service_caps::LoadAlbumScreenShotImageOutputForApplication;
-use nx_sf::service::{BufferAttr, DispatchError, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Session,
+};
 
 use crate::{
     dispatch::{
-        dispatch_in_pid_no_out, dispatch_in_pid_out_u64, dispatch_in_u64_no_out,
+        dispatch_in_pid_no_out,
+        dispatch_in_pid_out_u64,
+        dispatch_in_u64_no_out,
         dispatch_in_u64_out_u64,
     },
     proto,
     types::{
-        DeleteAlbumFileIn, GetAlbumFileListAaeIn, GetAlbumFileListAaeUidIn,
-        GetAlbumFileListDeprecated0In, GetAlbumFileSizeIn, LoadScreenShotIn, OpenAccessorSessionIn,
-        OpenMovieStreamIn, PrecheckToCreateContentsIn, ReadMovieDataIn, SetShimVersionIn,
+        DeleteAlbumFileIn,
+        GetAlbumFileListAaeIn,
+        GetAlbumFileListAaeUidIn,
+        GetAlbumFileListDeprecated0In,
+        GetAlbumFileSizeIn,
+        LoadScreenShotIn,
+        OpenAccessorSessionIn,
+        OpenMovieStreamIn,
+        PrecheckToCreateContentsIn,
+        ReadMovieDataIn,
+        SetShimVersionIn,
     },
 };
 

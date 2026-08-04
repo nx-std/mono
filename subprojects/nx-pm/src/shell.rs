@@ -1,7 +1,15 @@
 //! `pm:shell` service.
 
-use nx_service_pm::{NcmProgramLocation, PmShellService, ProcessEventInfo as RawProcessEventInfo};
-pub use nx_service_pm::{ProcessEvent as ProcessEventKind, ProcessId, ProgramId};
+use nx_service_pm::{
+    NcmProgramLocation,
+    PmShellService,
+    ProcessEventInfo as RawProcessEventInfo,
+};
+pub use nx_service_pm::{
+    ProcessEvent as ProcessEventKind,
+    ProcessId,
+    ProgramId,
+};
 use nx_sf::service::DispatchError;
 use nx_svc::raw::Handle;
 

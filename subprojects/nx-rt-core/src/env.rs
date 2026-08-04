@@ -18,16 +18,30 @@ mod syscall_hint;
 
 use core::{
     cell::UnsafeCell,
-    ffi::{c_char, c_void},
-    ptr::{self, NonNull},
-    sync::atomic::{AtomicPtr, Ordering},
+    ffi::{
+        c_char,
+        c_void,
+    },
+    ptr::{
+        self,
+        NonNull,
+    },
+    sync::atomic::{
+        AtomicPtr,
+        Ordering,
+    },
 };
 
 pub use nx_sf::ServiceName;
 use nx_svc::{
-    ipc::Handle as ServiceHandle, process::Handle as ProcessHandle, thread::Handle as ThreadHandle,
+    ipc::Handle as ServiceHandle,
+    process::Handle as ProcessHandle,
+    thread::Handle as ThreadHandle,
 };
-use nx_sys_sync::{Mutex, Once};
+use nx_sys_sync::{
+    Mutex,
+    Once,
+};
 
 pub use self::syscall_hint::SyscallHints;
 

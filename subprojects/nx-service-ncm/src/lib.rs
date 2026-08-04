@@ -34,7 +34,12 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -48,13 +53,29 @@ pub use crate::{
     dispatch::OpenSubObjectError,
     proto::SERVICE_NAME,
     types::{
-        FS_MAX_PATH, FsContentAttributes, NcmAddOnContentMetaExtendedHeader,
-        NcmApplicationContentMetaKey, NcmApplicationMetaExtendedHeader, NcmContentId,
-        NcmContentInfo, NcmContentInstallType, NcmContentMetaHeader, NcmContentMetaInfo,
-        NcmContentMetaKey, NcmContentMetaPlatform, NcmContentMetaType, NcmContentType,
-        NcmDataPatchMetaExtendedHeader, NcmLegacyAddOnContentMetaExtendedHeader,
-        NcmPackagedContentInfo, NcmPatchMetaExtendedHeader, NcmPlaceHolderId, NcmProgramLocation,
-        NcmRightsId, NcmStorageId, NcmSystemUpdateMetaExtendedHeader,
+        FS_MAX_PATH,
+        FsContentAttributes,
+        NcmAddOnContentMetaExtendedHeader,
+        NcmApplicationContentMetaKey,
+        NcmApplicationMetaExtendedHeader,
+        NcmContentId,
+        NcmContentInfo,
+        NcmContentInstallType,
+        NcmContentMetaHeader,
+        NcmContentMetaInfo,
+        NcmContentMetaKey,
+        NcmContentMetaPlatform,
+        NcmContentMetaType,
+        NcmContentType,
+        NcmDataPatchMetaExtendedHeader,
+        NcmLegacyAddOnContentMetaExtendedHeader,
+        NcmPackagedContentInfo,
+        NcmPatchMetaExtendedHeader,
+        NcmPlaceHolderId,
+        NcmProgramLocation,
+        NcmRightsId,
+        NcmStorageId,
+        NcmSystemUpdateMetaExtendedHeader,
     },
 };
 

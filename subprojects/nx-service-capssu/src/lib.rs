@@ -27,7 +27,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -35,12 +38,21 @@ mod types;
 
 pub use self::{
     cmif::{
-        SaveScreenShotEx0Error, SaveScreenShotEx1Error, SaveScreenShotEx2Error, SetShimVersionError,
+        SaveScreenShotEx0Error,
+        SaveScreenShotEx1Error,
+        SaveScreenShotEx2Error,
+        SetShimVersionError,
     },
     proto::SERVICE_NAME,
     types::{
-        AccountUid, AlbumImageOrientation, AlbumReportOption, ApplicationAlbumEntry,
-        ApplicationData, ScreenShotAttribute, USER_LIST_SIZE, UserIdList,
+        AccountUid,
+        AlbumImageOrientation,
+        AlbumReportOption,
+        ApplicationAlbumEntry,
+        ApplicationData,
+        ScreenShotAttribute,
+        USER_LIST_SIZE,
+        UserIdList,
     },
 };
 

@@ -1,18 +1,46 @@
 //! CMIF protocol operations for the HID Debug service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_no_io},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_no_io,
+    },
     proto,
     types::{
-        AbstractedPadHandle, AbstractedPadState, ApplyHdlsNpadAssignmentIn, DebugPadAutoPilotState,
-        HdlsDeviceInfo, HdlsDeviceInfoV7, HdlsHandle, HdlsSessionId, HidTouchState,
-        KeyboardAutoPilotState, MouseAutoPilotState, ReadSerialFlashIn, SetAutoPilotVirtualPadIn,
-        SetHdlsStateIn, SetHdlsStateV7In, SetHdlsStateV9In, SleepButtonAutoPilotState, UniquePadId,
-        UpdateControllerColorIn, UpdateDesignInfoIn, WriteSerialFlashIn,
+        AbstractedPadHandle,
+        AbstractedPadState,
+        ApplyHdlsNpadAssignmentIn,
+        DebugPadAutoPilotState,
+        HdlsDeviceInfo,
+        HdlsDeviceInfoV7,
+        HdlsHandle,
+        HdlsSessionId,
+        HidTouchState,
+        KeyboardAutoPilotState,
+        MouseAutoPilotState,
+        ReadSerialFlashIn,
+        SetAutoPilotVirtualPadIn,
+        SetHdlsStateIn,
+        SetHdlsStateV7In,
+        SetHdlsStateV9In,
+        SleepButtonAutoPilotState,
+        UniquePadId,
+        UpdateControllerColorIn,
+        UpdateDesignInfoIn,
+        WriteSerialFlashIn,
     },
 };
 

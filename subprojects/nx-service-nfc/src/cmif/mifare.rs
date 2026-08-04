@@ -2,14 +2,29 @@
 
 use core::mem::size_of;
 
-use nx_sf::service::{BufferAttr, DispatchError, DomainObjectRef, DomainRef, OutHandleAttr};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    DomainObjectRef,
+    DomainRef,
+    OutHandleAttr,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_in_out, dispatch_out},
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out,
+        dispatch_out,
+    },
     proto,
     types::{
-        InitializeIn, NfcDeviceHandle, NfcMifareReadBlockData, NfcMifareReadBlockParameter,
-        NfcMifareWriteBlockParameter, NfcRequiredMcuVersionData, NfcTagInfo,
+        InitializeIn,
+        NfcDeviceHandle,
+        NfcMifareReadBlockData,
+        NfcMifareReadBlockParameter,
+        NfcMifareWriteBlockParameter,
+        NfcRequiredMcuVersionData,
+        NfcTagInfo,
     },
 };
 

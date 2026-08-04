@@ -2,7 +2,10 @@
 
 use core::fmt;
 
-use crate::{condvar::Condvar, mutex::Mutex};
+use crate::{
+    condvar::Condvar,
+    mutex::Mutex,
+};
 
 /// A barrier enables multiple threads to synchronize the beginning
 /// of some computation.

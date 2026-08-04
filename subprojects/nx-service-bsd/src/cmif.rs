@@ -10,8 +10,16 @@
 //! the per-command error enum - no thread-local `errno` is maintained.
 
 use nx_sf::{
-    cmif::{self, ParseError},
-    hipc::{BufferMode, InOutBuffer, InputBuffer, OutputBuffer},
+    cmif::{
+        self,
+        ParseError,
+    },
+    hipc::{
+        BufferMode,
+        InOutBuffer,
+        InputBuffer,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
 };
 use nx_svc::mem::tmem::Handle as TmemHandle;
@@ -20,9 +28,22 @@ use nx_sys_thread_tls::IpcBuffer;
 use crate::{
     fd::BsdSockFd,
     proto::{
-        BsdServiceConfigWire, CallResponse, CallResponseExtraU32, FcntlIn, IoctlIn, ListenIn,
-        PollIn, RegisterClientIn, SelectIn, SelectTimeval, ShutdownIn, SockOptIn, SocketIn,
-        SockfdFlagsIn, Timeval, cmds,
+        BsdServiceConfigWire,
+        CallResponse,
+        CallResponseExtraU32,
+        FcntlIn,
+        IoctlIn,
+        ListenIn,
+        PollIn,
+        RegisterClientIn,
+        SelectIn,
+        SelectTimeval,
+        ShutdownIn,
+        SockOptIn,
+        SocketIn,
+        SockfdFlagsIn,
+        Timeval,
+        cmds,
     },
     types::BsdConfig,
 };

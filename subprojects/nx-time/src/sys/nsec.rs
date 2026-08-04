@@ -6,7 +6,10 @@
 use core::{
     cmp::Ordering,
     fmt,
-    hash::{Hash, Hasher},
+    hash::{
+        Hash,
+        Hasher,
+    },
 };
 
 use static_assertions::const_assert_eq;

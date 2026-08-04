@@ -1,13 +1,29 @@
 //! CMIF protocol operations for the AVM service.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{BufferAttr, DispatchError, Domain, DomainObject};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    Domain,
+    DomainObject,
+};
 
 use crate::{
-    dispatch::{dispatch_in, dispatch_no_io},
+    dispatch::{
+        dispatch_in,
+        dispatch_no_io,
+    },
     proto,
-    types::{AvmRequiredVersionEntry, AvmVersionListEntry, GetVersionIn, PushVersionIn},
+    types::{
+        AvmRequiredVersionEntry,
+        AvmVersionListEntry,
+        GetVersionIn,
+        PushVersionIn,
+    },
 };
 
 /// Gets the highest available version for a title pair.

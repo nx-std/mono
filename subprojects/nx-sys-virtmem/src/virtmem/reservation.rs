@@ -879,7 +879,12 @@ mod tests {
 
     /// Unit tests for the sparse two-level [`RadixReservationMap`].
     mod radix {
-        use super::{super::*, BASE, PAGE_SIZE, rsv};
+        use super::{
+            super::*,
+            BASE,
+            PAGE_SIZE,
+            rsv,
+        };
 
         /// Builds a radix map over `pages` pages with freshly zeroed backing.
         fn fresh_radix(pages: usize) -> RadixReservationMap {

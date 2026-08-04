@@ -3,10 +3,18 @@
 //! - IProgressMonitorForDeleteUserSaveDataAll
 //! - IProgressAsyncResult
 
-use nx_sf::service::{BufferAttr, DispatchError, OutHandleAttr, Session};
+use nx_sf::service::{
+    BufferAttr,
+    DispatchError,
+    OutHandleAttr,
+    Session,
+};
 
 use crate::{
-    dispatch::{dispatch_no_io, dispatch_out},
+    dispatch::{
+        dispatch_no_io,
+        dispatch_out,
+    },
     proto,
     types::ProgressForDeleteUserSaveDataAll,
 };

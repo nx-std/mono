@@ -9,7 +9,10 @@ use nx_svc::result::ResultCode;
 use crate::{
     condvar::Condvar,
     mutex::Mutex,
-    wait::{Timeout, WakeCount},
+    wait::{
+        Timeout,
+        WakeCount,
+    },
 };
 
 /// Initializes a condition variable.

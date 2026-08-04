@@ -1,8 +1,14 @@
 //! CMIF dispatch helpers shared across the `cmif` module.
 
-use core::{mem::size_of, ptr};
+use core::{
+    mem::size_of,
+    ptr,
+};
 
-use nx_sf::service::{DispatchError, DomainObject};
+use nx_sf::service::{
+    DispatchError,
+    DomainObject,
+};
 
 /// CMIF request with no input payload and no output payload.
 #[inline]

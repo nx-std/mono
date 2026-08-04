@@ -17,7 +17,10 @@
 //! The stack memory includes a guard region (16 KiB) to protect against stack overflow.
 //! All memory must be page-aligned (4 KiB boundaries) as required by the Horizon OS kernel.
 
-use core::{ffi::c_void, ptr::NonNull};
+use core::{
+    ffi::c_void,
+    ptr::NonNull,
+};
 
 use nx_svc::mem::core as svc;
 use nx_sys_virtmem::virtmem;

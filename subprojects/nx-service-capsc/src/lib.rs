@@ -29,11 +29,21 @@
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use nx_service_caps::{AlbumEntry, AlbumFileId, ApplicationAlbumEntry, ScreenShotAttribute};
+use nx_service_caps::{
+    AlbumEntry,
+    AlbumFileId,
+    ApplicationAlbumEntry,
+    ScreenShotAttribute,
+};
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{BorrowedSessionHandle, DispatchError, OwnedSessionHandle, Session},
+    service::{
+        BorrowedSessionHandle,
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -43,8 +53,11 @@ mod types;
 
 pub use self::{
     cmif::{
-        OpenControlSessionError, ReadStreamDataError, SaveScreenShotError,
-        SetOverlayThumbnailError, WriteStreamDataError,
+        OpenControlSessionError,
+        ReadStreamDataError,
+        SaveScreenShotError,
+        SetOverlayThumbnailError,
+        WriteStreamDataError,
     },
     proto::SERVICE_NAME,
     types::CapsApplicationId,

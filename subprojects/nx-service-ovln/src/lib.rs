@@ -19,7 +19,10 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
@@ -27,13 +30,24 @@ mod types;
 
 pub use self::{
     cmif::{
-        DispatchInError, DispatchOutError, GetReceiveEventHandleError, OpenReceiverError,
+        DispatchInError,
+        DispatchOutError,
+        GetReceiveEventHandleError,
+        OpenReceiverError,
         OpenSenderError,
     },
-    proto::{SERVICE_NAME_RCV, SERVICE_NAME_SND},
+    proto::{
+        SERVICE_NAME_RCV,
+        SERVICE_NAME_SND,
+    },
     types::{
-        OvlnEnqueuePosition, OvlnOverflowOption, OvlnQueueAttribute, OvlnRawMessage,
-        OvlnSendOption, OvlnSourceName, ReceiveWithTickOut,
+        OvlnEnqueuePosition,
+        OvlnOverflowOption,
+        OvlnQueueAttribute,
+        OvlnRawMessage,
+        OvlnSendOption,
+        OvlnSourceName,
+        ReceiveWithTickOut,
     },
 };
 

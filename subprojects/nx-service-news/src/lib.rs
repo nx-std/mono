@@ -30,7 +30,11 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 use nx_service_sm::SmService;
 use nx_sf::{
     ipc::Handle as RawSessionHandle,
-    service::{DispatchError, OwnedSessionHandle, Session},
+    service::{
+        DispatchError,
+        OwnedSessionHandle,
+        Session,
+    },
 };
 
 mod cmif;
@@ -39,12 +43,22 @@ mod proto;
 mod types;
 
 pub use self::{
-    cmif::{CreateSubObjectError, EventHolderGetError},
+    cmif::{
+        CreateSubObjectError,
+        EventHolderGetError,
+    },
     proto::{
-        SERVICE_NAME_ADMIN, SERVICE_NAME_CONFIG, SERVICE_NAME_MANAGER, SERVICE_NAME_POST,
+        SERVICE_NAME_ADMIN,
+        SERVICE_NAME_CONFIG,
+        SERVICE_NAME_MANAGER,
+        SERVICE_NAME_POST,
         SERVICE_NAME_VIEWER,
     },
-    types::{NewsRecord, NewsRecordV1, NewsTopicName},
+    types::{
+        NewsRecord,
+        NewsRecordV1,
+        NewsTopicName,
+    },
 };
 
 /// News service type selector.

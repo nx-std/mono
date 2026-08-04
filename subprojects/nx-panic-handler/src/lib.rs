@@ -22,7 +22,10 @@ use core::{
     fmt::Write as _,
     panic::PanicInfo,
     ptr,
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::{
+        AtomicPtr,
+        Ordering,
+    },
 };
 
 /// Maximum size for the panic message buffer.

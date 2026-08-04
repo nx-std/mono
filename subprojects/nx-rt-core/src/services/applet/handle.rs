@@ -13,7 +13,13 @@ use core::ops::Deref;
 
 use nx_service_applet::{
     proxy::Proxy,
-    role::{Application, LibraryApplet, OverlayApplet, SystemApplet, SystemApplication},
+    role::{
+        Application,
+        LibraryApplet,
+        OverlayApplet,
+        SystemApplet,
+        SystemApplication,
+    },
 };
 use nx_std_sync::rwlock::RwLockReadGuard;
 

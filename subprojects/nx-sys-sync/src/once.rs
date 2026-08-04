@@ -40,11 +40,18 @@ use core::{
     convert::Infallible,
     sync::atomic::{
         AtomicUsize,
-        Ordering::{Acquire, Relaxed, Release},
+        Ordering::{
+            Acquire,
+            Relaxed,
+            Release,
+        },
     },
 };
 
-use super::{Condvar, Mutex};
+use super::{
+    Condvar,
+    Mutex,
+};
 
 /// The progress of a [`Once`]'s initialization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,6 +1,9 @@
 //! CMIF protocol operations for the spsm service.
 
-use nx_sf::{cmif, service::BorrowedSessionHandle};
+use nx_sf::{
+    cmif,
+    service::BorrowedSessionHandle,
+};
 
 use crate::proto;
 

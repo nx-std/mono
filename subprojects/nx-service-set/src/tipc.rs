@@ -3,16 +3,29 @@
 //! This module implements set:sys commands using the TIPC (Trivial IPC) protocol,
 //! which is used on HOS 12.0.0+ and by Atmosphere.
 
-use core::{mem::size_of, slice};
+use core::{
+    mem::size_of,
+    slice,
+};
 
 use nx_sf::{
-    error::{ResultCode, ToResultCode},
-    hipc::{BufferMode, OutputBuffer},
+    error::{
+        ResultCode,
+        ToResultCode,
+    },
+    hipc::{
+        BufferMode,
+        OutputBuffer,
+    },
     service::BorrowedSessionHandle,
     tipc,
 };
 
-use crate::proto::{CMD_GET_FIRMWARE_VERSION, CMD_GET_FIRMWARE_VERSION_2, FirmwareVersion};
+use crate::proto::{
+    CMD_GET_FIRMWARE_VERSION,
+    CMD_GET_FIRMWARE_VERSION_2,
+    FirmwareVersion,
+};
 
 /// Gets the system firmware version using TIPC protocol.
 ///

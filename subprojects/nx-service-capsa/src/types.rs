@@ -1,7 +1,10 @@
 //! Album accessor wire-layout types.
 
 use nx_service_caps::{
-    AlbumFileId, ApplicationAlbumEntry, ScreenShotAttribute, ScreenShotDecodeOption,
+    AlbumFileId,
+    ApplicationAlbumEntry,
+    ScreenShotAttribute,
+    ScreenShotDecodeOption,
 };
 use static_assertions::const_assert_eq;
 

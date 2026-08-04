@@ -16,13 +16,23 @@
 use core::sync::atomic::Ordering;
 
 use nx_service_applet::{
-    AppletFocusHandlingMode, AppletFocusState, AppletMessage, AppletOperationMode,
-    AppletPerformanceMode, AppletType, CommonStateGetter, SelfController, WindowController,
+    AppletFocusHandlingMode,
+    AppletFocusState,
+    AppletMessage,
+    AppletOperationMode,
+    AppletPerformanceMode,
+    AppletType,
+    CommonStateGetter,
+    SelfController,
+    WindowController,
     aruid::Aruid,
 };
 use nx_std_sync::{
     once_lock::OnceLock,
-    rwlock::{RwLock, RwLockReadGuard},
+    rwlock::{
+        RwLock,
+        RwLockReadGuard,
+    },
 };
 use nx_svc::process::Handle as ProcessHandle;
 
@@ -35,7 +45,10 @@ use self::state::AppletSingleton;
 pub use self::{
     error::ConnectError,
     handle::{
-        ApplicationHandle, LibraryAppletHandle, OverlayAppletHandle, SystemAppletHandle,
+        ApplicationHandle,
+        LibraryAppletHandle,
+        OverlayAppletHandle,
+        SystemAppletHandle,
         SystemApplicationHandle,
     },
 };

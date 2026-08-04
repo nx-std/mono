@@ -3,10 +3,23 @@
 use nx_svc::error::ResultCode;
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
 
-use super::wire::{CMIF_HEADER_ALIGN, DomainOutHeader, OUT_HEADER_MAGIC, OutHeader};
+use super::wire::{
+    CMIF_HEADER_ALIGN,
+    DomainOutHeader,
+    OUT_HEADER_MAGIC,
+    OutHeader,
+};
 use crate::{
-    cursor::{Cursor, ResponsePayload},
-    error::{GENERIC_ERROR, LibnxError, ToResultCode, libnx_error},
+    cursor::{
+        Cursor,
+        ResponsePayload,
+    },
+    error::{
+        GENERIC_ERROR,
+        LibnxError,
+        ToResultCode,
+        libnx_error,
+    },
     hipc,
 };
 

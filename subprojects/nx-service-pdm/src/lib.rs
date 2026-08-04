@@ -38,7 +38,11 @@
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, DispatchError, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    DispatchError,
+    Session,
+};
 
 mod cmif;
 mod dispatch;
@@ -49,9 +53,22 @@ pub use self::{
     cmif::GetUpdateEventError,
     proto::SERVICE_NAME,
     types::{
-        AccountEvent, AccountEventV3, AccountEventV10, AccountPlayEvent, AccountUid, AppletEvent,
-        AppletEventType, AppletEventV1, ApplicationPlayStatistics, LastPlayTime, PlayEvent,
-        PlayEventRange, PlayEventType, PlayLogPolicy, PlayStatistics, PlayStatisticsV1,
+        AccountEvent,
+        AccountEventV3,
+        AccountEventV10,
+        AccountPlayEvent,
+        AccountUid,
+        AppletEvent,
+        AppletEventType,
+        AppletEventV1,
+        ApplicationPlayStatistics,
+        LastPlayTime,
+        PlayEvent,
+        PlayEventRange,
+        PlayEventType,
+        PlayLogPolicy,
+        PlayStatistics,
+        PlayStatisticsV1,
         play_timestamp_to_posix,
     },
 };

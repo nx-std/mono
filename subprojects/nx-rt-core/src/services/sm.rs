@@ -10,15 +10,28 @@ use nx_service_sm::SmService;
 use nx_sf::error::ToResultCode as _;
 #[cfg(feature = "ffi")]
 use nx_sf::ffi::Service;
-use nx_sf::{ServiceName, service::OwnedSessionHandle};
-use nx_std_sync::{once_lock::OnceLock, rwlock::RwLock};
+use nx_sf::{
+    ServiceName,
+    service::OwnedSessionHandle,
+};
+use nx_std_sync::{
+    once_lock::OnceLock,
+    rwlock::RwLock,
+};
 #[cfg(feature = "ffi")]
 use nx_svc::error::ResultCode;
 use nx_svc::ipc::Handle as SessionHandle;
 
-use crate::env::hos_version::{self, HosVersion};
+use crate::env::hos_version::{
+    self,
+    HosVersion,
+};
 #[cfg(feature = "ffi")]
-use crate::error::{LibnxError, ToResultCode, libnx_error};
+use crate::error::{
+    LibnxError,
+    ToResultCode,
+    libnx_error,
+};
 
 /// Maximum number of service overrides.
 pub const MAX_OVERRIDES: usize = 32;

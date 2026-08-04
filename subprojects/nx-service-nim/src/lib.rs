@@ -16,14 +16,20 @@
 extern crate nx_panic_handler;
 
 use nx_service_sm::SmService;
-use nx_sf::service::{BorrowedSessionHandle, Session};
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    Session,
+};
 
 mod cmif;
 mod proto;
 pub mod types;
 
 pub use self::{
-    cmif::{DestroySystemUpdateTaskError, ListSystemUpdateTaskError},
+    cmif::{
+        DestroySystemUpdateTaskError,
+        ListSystemUpdateTaskError,
+    },
     proto::SERVICE_NAME,
     types::SystemUpdateTaskId,
 };

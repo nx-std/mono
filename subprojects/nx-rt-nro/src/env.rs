@@ -19,18 +19,48 @@ mod config;
 use core::ptr::NonNull;
 
 pub use nx_rt_core::env::{
-    AccountUid, AppletType, LoaderReturnFn, MAX_SERVICE_OVERRIDES, ServiceName, ServiceOverride,
-    SyscallHints, applet_type, applet_workaround, argv, exit_func_ptr, has_next_load,
-    heap_override, hos_version, is_nso, last_load_result, loader_info, main_thread,
-    main_thread_handle, own_process_handle, random_seed, service_overrides, set_exit_func_ptr,
-    set_next_load, syscall_hints, user_id_storage,
+    AccountUid,
+    AppletType,
+    LoaderReturnFn,
+    MAX_SERVICE_OVERRIDES,
+    ServiceName,
+    ServiceOverride,
+    SyscallHints,
+    applet_type,
+    applet_workaround,
+    argv,
+    exit_func_ptr,
+    has_next_load,
+    heap_override,
+    hos_version,
+    is_nso,
+    last_load_result,
+    loader_info,
+    main_thread,
+    main_thread_handle,
+    own_process_handle,
+    random_seed,
+    service_overrides,
+    set_exit_func_ptr,
+    set_next_load,
+    syscall_hints,
+    user_id_storage,
 };
-use nx_rt_core::{env::init_once, services::sm};
+use nx_rt_core::{
+    env::init_once,
+    services::sm,
+};
 use nx_svc::{
-    ipc::Handle as ServiceHandle, process::Handle as ProcessHandle, thread::Handle as ThreadHandle,
+    ipc::Handle as ServiceHandle,
+    process::Handle as ProcessHandle,
+    thread::Handle as ThreadHandle,
 };
 
-pub use self::config::{ConfigEntries, ConfigEntry, Entry};
+pub use self::config::{
+    ConfigEntries,
+    ConfigEntry,
+    Entry,
+};
 
 /// Atmosphere flag bit, OR-ed into the HOS version when Atmosphere is detected.
 const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;

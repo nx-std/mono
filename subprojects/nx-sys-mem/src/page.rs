@@ -7,7 +7,10 @@
 //! unrelated literals and a checked address became indistinguishable from any other pointer
 //! one line later.
 
-use core::{ffi::c_void, ptr::NonNull};
+use core::{
+    ffi::c_void,
+    ptr::NonNull,
+};
 
 /// The Horizon OS page size, in bytes.
 pub const PAGE_SIZE: usize = 0x1000;
