@@ -119,16 +119,34 @@ fn parse_response_domain_with<'a, P>(
         .read::<OutHeader>()
         .ok_or(ParseError::TruncatedOutHeader)?;
     let (payload, cursor) = read_payload(cursor).ok_or(ParseError::TruncatedPayload)?;
-    let (objects, _) = cursor
-        .read_slice::<u32>(domain_hdr.num_out_objects as usize)
-        .ok_or(ParseError::TruncatedDomainObjects)?;
 
+    // Validated before the objects are read, matching libnx's `cmifParseResponse`:
+    // an error reply need not carry the object area at all, and reading it first
+    // reports a truncation where the server actually named a result.
     if out_hdr.magic != OUT_HEADER_MAGIC {
         return Err(ParseError::InvalidMagic);
     }
     if out_hdr.result != 0 {
         return Err(ParseError::ServiceError(out_hdr.result));
     }
+
+    // A reply carrying no objects has no object area to read, and asking for a
+    // zero-length `&[u32]` would still demand 4-byte alignment the payload need
+    // not leave behind: libnx puts the objects at `header + payload size` with no
+    // padding, so a one-byte payload lands them at an odd offset. Skipping the
+    // read is what keeps every command whose payload is not word-sized parseable.
+    //
+    // TODO: a command returning objects *and* a non-word-sized payload still
+    //  fails here. Supporting it means reading the ids byte-wise, the way libnx
+    //  does, rather than borrowing them as an aligned slice.
+    let objects: &[u32] = if domain_hdr.num_out_objects == 0 {
+        &[]
+    } else {
+        let (objects, _) = cursor
+            .read_slice::<u32>(domain_hdr.num_out_objects as usize)
+            .ok_or(ParseError::TruncatedDomainObjects)?;
+        objects
+    };
 
     Ok(Response {
         payload,
