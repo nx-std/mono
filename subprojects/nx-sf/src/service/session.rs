@@ -106,14 +106,16 @@ impl Session {
     /// the caller can drop it normally instead of leaking the handle.
     pub fn convert_to_domain(self) -> Result<Domain, (Session, ConvertToDomainError)> {
         match control::convert_current_object_to_domain(self.handle.as_borrowed()) {
-            Ok(_object_id) => {
+            Ok(object_id) => {
                 let pointer_buffer_size = self.pointer_buffer_size;
                 // SAFETY: The control request above returned success, which is the server
                 // confirming it converted this session to a domain; `pointer_buffer_size` is
-                // carried over from the `Session`, where the server itself reported it.
+                // carried over from the `Session`, where the server itself reported it, and
+                // `object_id` is the id that same reply assigned this interface.
                 Ok(Domain::new_unchecked(
                     self.into_handle(),
                     pointer_buffer_size,
+                    object_id,
                 ))
             }
             Err(err) => Err((self, err)),

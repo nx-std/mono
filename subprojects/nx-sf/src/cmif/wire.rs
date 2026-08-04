@@ -4,6 +4,8 @@
 //! layouts used by CMIF. Higher-level request/response logic lives in the
 //! sibling `request` and `response` modules.
 
+use core::mem::offset_of;
+
 use static_assertions::const_assert_eq;
 use zerocopy::{
     IntoBytes,
@@ -130,23 +132,27 @@ pub struct DomainInHeader {
 const_assert_eq!(size_of::<DomainInHeader>(), 16);
 
 /// Domain output header (16 bytes).
+///
+/// **Not a mirror of [`DomainInHeader`].** The request header packs a type
+/// byte, an object count byte, a size half-word and an object id; the reply
+/// header is just a whole-word object count followed by three reserved words.
+/// Modelling it as a mirror puts `num_out_objects` at byte 1, where a reply
+/// carrying one object (`01 00 00 00`) reads back as zero — and because both
+/// shapes are 16 bytes, the `OutHeader` after it still lands correctly, so the
+/// magic and result validate and the response merely appears to carry no
+/// object.
 #[derive(
     Debug, Clone, Copy, Default, zerocopy::FromBytes, IntoBytes, zerocopy::Immutable, KnownLayout,
 )]
 #[repr(C)]
 pub struct DomainOutHeader {
-    /// Request type (SendMessage or Close).
-    pub request_type: u8,
-    /// Number of object IDs in response.
-    pub num_out_objects: u8,
+    /// Number of object IDs in the response.
+    pub num_out_objects: u32,
     /// Reserved padding.
-    pub _padding: u16,
-    /// Echo of the request's data size.
-    pub data_size: u32,
-    /// Echo of the request's object ID.
-    pub object_id: u32,
-    /// Context token.
-    pub token: u32,
+    pub _padding: [u32; 3],
 }
 
 const_assert_eq!(size_of::<DomainOutHeader>(), 16);
+// The count is the first word: reading it from any other offset is the bug
+// described above, which no size check can catch.
+const_assert_eq!(offset_of!(DomainOutHeader, num_out_objects), 0);

@@ -505,8 +505,10 @@ pub fn connect_cmif(sm: &SmService, num_sessions: usize) -> Result<HtcsService, 
         let cloned_handle =
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
         // SAFETY: Cloning a domain session yields another kernel handle addressing the same
-        // domain object table on the server side.
-        let cloned_domain = Domain::new_unchecked(cloned_handle, pointer_buffer_size);
+        // domain object table on the server side, so the original interface keeps the id the
+        // conversion assigned it.
+        let cloned_domain =
+            Domain::new_unchecked(cloned_handle, pointer_buffer_size, sessions[0].object_id());
         sessions.push(cloned_domain);
     }
 
