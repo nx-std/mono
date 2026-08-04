@@ -8,6 +8,10 @@ cargo = find_program('cargo', required : true)
 deps = []
 deps_override_link_args = []
 deps_cargo_features = []
+# Environment for this crate's cargo invocation. A dependency whose build needs
+# more than features (today only `nx-rt-nso`, which takes its applet identity as
+# a cfg value) contributes its own entries below.
+deps_cargo_env = {}
 
 # nx-panic-handler (always required)
 nx_panic_handler_proj = subproject('nx-panic-handler')
@@ -116,30 +120,59 @@ if get_option('use_nx_time').enabled()
     deps_cargo_features += ['time']
 endif
 
-# nx-rt-core + nx-rt-nro
+# nx-rt-core + the nx_rt_kind entry crate
 #
-# The homebrew NRO runtime is split across two crates: the kind-agnostic
-# `nx-rt-core` (heap init, env state, HOS version, Service Manager) and the
-# homebrew-NRO entry crate `nx-rt-nro` (loader-config parser, argv, applet
-# dispatch). `nx-rt-core`'s `rt_core_libnx_core.ld` owns the shared `libnx` symbols and
-# is linked first so the foundation overrides precede the kind-specific ones.
+# The runtime is split across two crates: the kind-agnostic `nx-rt-core` (heap
+# init, env state, HOS version, Service Manager) and one entry crate for the
+# output kind being built. `nx_rt_kind` picks that entry crate: `nro` builds
+# the homebrew-loader runtime (`nx-rt-nro`: loader-config parser, argv, applet
+# dispatch), `nso` the `pm`-launched process runtime (`nx-rt-nso`: no loader
+# block, `__argdata__` argv, build-time applet identity). Only one may be
+# linked, since both bind the same `libnx` entry points (`envSetup`,
+# `argvSetup`, `appletInitialize`); the `combo` resolves to a single choice,
+# so the selection cannot be ambiguous. `nx-rt-core`'s `rt_core_libnx_core.ld`
+# owns the shared `libnx` symbols and is linked first so the foundation
+# overrides precede the kind-specific ones.
 if get_option('use_nx_rt').enabled()
     nx_rt_core_proj = subproject('nx-rt-core')
-    nx_rt_nro_proj = subproject('nx-rt-nro')
 
     deps += nx_rt_core_proj.get_variable('nx_rt_core_dep')
-    deps += nx_rt_nro_proj.get_variable('nx_rt_nro_dep')
 
     # `nx-rt-core`'s fragments are linked first so the foundation overrides
-    # precede the NRO-specific ones. The applet-accessor fragment is included
+    # precede the kind-specific ones. The applet-accessor fragment is included
     # in `nx_rt_core_ld_overrides` only when `use_nx_service_applet` is enabled
-    # (mirroring the `rt_nro_libnx_service_applet.ld` fragment in the NRO list).
+    # (mirroring the `rt_<kind>_libnx_service_applet.ld` fragment in the entry
+    # crate's list).
     foreach script : nx_rt_core_proj.get_variable('nx_rt_core_ld_overrides')
         deps_override_link_args += ['-T', script]
     endforeach
-    foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
-        deps_override_link_args += ['-T', script]
-    endforeach
+
+    if get_option('nx_rt_kind') == 'nso'
+        nx_rt_nso_proj = subproject('nx-rt-nso')
+
+        deps += nx_rt_nso_proj.get_variable('nx_rt_nso_dep')
+        foreach script : nx_rt_nso_proj.get_variable('nx_rt_nso_ld_overrides')
+            deps_override_link_args += ['-T', script]
+        endforeach
+
+        # The applet identity reaches `nx-rt-nso` as a cfg value, so this
+        # crate's own cargo invocation has to carry it too; features alone do
+        # not select it.
+        deps_cargo_env += nx_rt_nso_proj.get_variable('nx_rt_nso_cargo_env')
+
+        debug('rt-nso feature: enabled')
+        deps_cargo_features += ['rt-nso']
+    else
+        nx_rt_nro_proj = subproject('nx-rt-nro')
+
+        deps += nx_rt_nro_proj.get_variable('nx_rt_nro_dep')
+        foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
+            deps_override_link_args += ['-T', script]
+        endforeach
+
+        debug('rt-nro feature: enabled')
+        deps_cargo_features += ['rt-nro']
+    endif
 
     debug('rt feature: enabled')
     deps_cargo_features += ['rt']
@@ -320,6 +353,7 @@ nx_std_tgt = custom_target(
         '--no-default-features',
         '--features', ','.join(['ffi'] + deps_cargo_features),
     ],
+    env : deps_cargo_env,
     output : ['libnx_std.a', 'libnx_std.rlib'],
     console : true,
     build_by_default : true,

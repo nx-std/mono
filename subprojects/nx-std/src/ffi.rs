@@ -14,8 +14,13 @@ pub use nx_pm::ffi as pm;
 pub use nx_rand::ffi as rand;
 #[cfg(feature = "rt")]
 pub use nx_rt_core::ffi as rt_core;
-#[cfg(feature = "rt")]
-pub use nx_rt_nro::ffi as rt;
+// The entry-crate surfaces are alternatives, one per output kind: a link takes
+// `rt_nro` or `rt_nso`, never both, since their libnx override fragments bind
+// the same entry points. The Meson `nx_rt_kind` combo is what enforces that.
+#[cfg(feature = "rt-nro")]
+pub use nx_rt_nro::ffi as rt_nro;
+#[cfg(feature = "rt-nso")]
+pub use nx_rt_nso::ffi as rt_nso;
 #[cfg(feature = "sf")]
 pub use nx_sf::ffi as sf;
 #[cfg(feature = "sync")]

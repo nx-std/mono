@@ -111,6 +111,14 @@ nx_rt_nso_tgt = custom_target(
 # `nx_rt_nso_proj.get_variable('nx_rt_nso_ld_overrides')`.
 nx_rt_nso_ld_overrides = ld_overrides
 
+# Cargo environment carrying the `nso_applet_type` cfg. A consumer that compiles
+# this crate through its own cargo invocation (`nx-std`, which links it into the
+# umbrella staticlib) must pass the same environment, or its copy falls back to
+# the `application` default in `.cargo/config.toml` and registers the process as
+# an identity the build did not ask for. Read via
+# `nx_rt_nso_proj.get_variable('nx_rt_nso_cargo_env')`.
+nx_rt_nso_cargo_env = cargo_env
+
 nx_rt_nso_dep = declare_dependency(
     sources : nx_rt_nso_tgt,
     dependencies : deps,

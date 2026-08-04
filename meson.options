@@ -93,7 +93,23 @@ option(
 option(
     'use_nx_rt',
     type : 'feature', value : 'auto',
-    description : 'Override libnx runtime functions with the nx-rt runtime (nx-rt-core + nx-rt-nro)',
+    description : 'Override libnx runtime functions with the nx-rt runtime (nx-rt-core + the nx_rt_kind entry crate)',
+    yield : true
+)
+
+option(
+    'nx_rt_kind',
+    type : 'combo', choices : ['nro', 'nso'], value : 'nro',
+    description : 'Select the nx-rt entry crate: nro builds the homebrew-loader runtime, nso the pm-launched process runtime',
+    yield : true
+)
+
+option(
+    'nso_applet_type',
+    type : 'combo',
+    choices : ['application', 'system-applet', 'library-applet', 'overlay-applet', 'system-application', 'none'],
+    value : 'application',
+    description : 'Application Manager identity the nx-rt-nso NSO process registers as',
     yield : true
 )
 
