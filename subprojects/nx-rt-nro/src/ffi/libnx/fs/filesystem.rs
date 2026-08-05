@@ -11,16 +11,10 @@ use core::ffi::{
     c_void,
 };
 
-use nx_sf::{
-    error::ToResultCode as _,
-    ffi::Service,
-};
+use nx_sf::ffi::Service;
 
-use super::support::sub_object_view;
-use crate::{
-    ffi::common::GENERIC_ERROR,
-    services::fs,
-};
+use super::support::open_filesystem;
+use crate::ffi::common::GENERIC_ERROR;
 
 /// Stands in for libnx's `fsOpenBisFileSystem`.
 ///
@@ -249,23 +243,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_image_directory_file_system(
 /// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_sd_card_file_system(out: *mut Service) -> u32 {
-    if out.is_null() {
-        return GENERIC_ERROR;
-    }
-
-    let Some(service) = fs::get_service() else {
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
         return GENERIC_ERROR;
     };
-    let session = service.session_handle().to_handle();
 
-    match service.open_sd_card_file_system() {
-        Ok(filesystem) => {
-            let object_id = filesystem.into_raw_object_id();
-            // SAFETY: `out` was null-checked above and the caller guarantees it
-            // is writable.
-            unsafe { *out = sub_object_view(session, object_id) };
-            0
-        }
-        Err(err) => err.to_rc(),
-    }
+    open_filesystem(out, |service| service.open_sd_card_file_system())
 }

@@ -118,6 +118,8 @@ static int test_case_thread_func(void* arg) {
                     printf(CONSOLE_GREEN "OK" CONSOLE_RESET "\n"); \
                 } else if (test_res == TEST_TODO) { \
                     printf(CONSOLE_MAGENTA "TODO" CONSOLE_RESET "\n"); \
+                } else if (test_res == TEST_SKIPPED) { \
+                    printf(CONSOLE_YELLOW "SKIPPED" CONSOLE_RESET "\n"); \
                 } else if (test_res == TEST_SETUP_FAILED) { \
                     printf(CONSOLE_YELLOW "SETUP FAILED" CONSOLE_RESET "\n"); \
                 } else { \

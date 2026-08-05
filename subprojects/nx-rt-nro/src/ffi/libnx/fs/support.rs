@@ -10,10 +10,12 @@ use nx_service_fs::{
     FsDir,
     FsFile,
     FsFileSystem,
+    FsService,
 };
 use nx_sf::{
     error::ToResultCode as _,
     ffi::Service,
+    service::DispatchError,
 };
 
 use crate::{
@@ -69,6 +71,29 @@ pub(super) fn sub_object_view(session: nx_svc::ipc::Handle, object_id: u32) -> S
         own_handle: 0,
         object_id,
         pointer_buffer_size: 0,
+    }
+}
+
+/// Runs an opener and writes the filesystem it returned into `out`.
+///
+/// The close obligation goes straight back to C, which discharges it with
+/// `fsFsClose`; see the parent module.
+pub(super) fn open_filesystem(
+    out: &mut Service,
+    open: impl FnOnce(&FsService) -> Result<FsFileSystem<'_>, DispatchError>,
+) -> u32 {
+    let Some(service) = fs::get_service() else {
+        return GENERIC_ERROR;
+    };
+    let session = service.session_handle().to_handle();
+
+    match open(&service) {
+        Ok(filesystem) => {
+            let object_id = filesystem.into_raw_object_id();
+            *out = sub_object_view(session, object_id);
+            0
+        }
+        Err(err) => err.to_rc(),
     }
 }
 

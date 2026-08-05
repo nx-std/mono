@@ -3,14 +3,43 @@
 //! Commands without an implementation are aliased to panicking stubs: one
 //! left to libnx hangs rather than failing. See the parent module.
 //!
-//! Struct parameters are typed as opaque pointers. Every one is a pointer, so
-//! the ABI is exact, and restating the layouts would be a claim this crate
-//! cannot check. [`AccountUid`] is the exception: it is passed by value, so
-//! its size decides how the arguments after it land.
+//! Struct parameters are typed as opaque pointers, except where
+//! [`nx_service_fs`] declares the layout and pins its size: `FsSaveDataAttribute`
+//! is that case, so it is named rather than stood in for. Every other one is a
+//! pointer, so the ABI is exact either way. [`AccountUid`] is the exception in
+//! the other direction: it is passed by value, so its size decides how the
+//! arguments after it land.
+//!
+//! # Firmware gates
+//!
+//! libnx refuses some of these outright on firmware that predates the command
+//! or the save-data kind they name, rather than letting the server answer. The
+//! gates are reproduced here so a caller branching on
+//! `LibnxError_IncompatSysVer` sees what it saw before. A shaped opener carries
+//! the gate of the command it wraps, since the wrapper is what a C caller
+//! reaches.
 
 use core::ffi::c_void;
 
+use nx_service_fs::{
+    AccountUid as FsAccountUid,
+    SaveDataAttribute,
+    SaveDataSpaceId,
+};
 use nx_sf::ffi::Service;
+
+use super::support::open_filesystem;
+use crate::{
+    env::hos_version::{
+        self,
+        HosVersion,
+    },
+    ffi::common::{
+        GENERIC_ERROR,
+        LibnxError,
+        libnx_error,
+    },
+};
 
 /// Account user id, passed by value.
 ///
@@ -23,199 +52,319 @@ pub struct AccountUid {
     pub uid: [u64; 2],
 }
 
-/// Stands in for libnx's `fsOpen_SaveData`.
+impl From<AccountUid> for FsAccountUid {
+    fn from(uid: AccountUid) -> Self {
+        Self { uid: uid.uid }
+    }
+}
+
+/// Opens an application's account savedata.
+///
+/// Corresponds to `fsOpen_SaveData()` in libnx.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_save_data(
-    _out: *mut Service,
-    _application_id: u64,
-    _uid: AccountUid,
+    out: *mut Service,
+    application_id: u64,
+    uid: AccountUid,
 ) -> u32 {
-    todo!("fsOpen_SaveData")
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_account_save_data(application_id, uid.into())
+    })
 }
 
-/// Stands in for libnx's `fsOpen_SaveDataReadOnly`.
+/// Opens an application's account savedata for reading only.
+///
+/// Corresponds to `fsOpen_SaveDataReadOnly()` in libnx, which reaches the caller
+/// through `fsOpenReadOnlySaveDataFileSystem` and so inherits its HOS 2.0.0
+/// floor.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_save_data_read_only(
-    _out: *mut Service,
-    _application_id: u64,
-    _uid: AccountUid,
+    out: *mut Service,
+    application_id: u64,
+    uid: AccountUid,
 ) -> u32 {
-    todo!("fsOpen_SaveDataReadOnly")
+    if hos_version::get() < HosVersion::new(2, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_account_save_data_read_only(application_id, uid.into())
+    })
 }
 
-/// Stands in for libnx's `fsOpen_BcatSaveData`.
+/// Opens an application's BCAT savedata.
+///
+/// Corresponds to `fsOpen_BcatSaveData()` in libnx.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_bcat_save_data(
-    _out: *mut Service,
-    _application_id: u64,
+    out: *mut Service,
+    application_id: u64,
 ) -> u32 {
-    todo!("fsOpen_BcatSaveData")
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| service.open_bcat_save_data(application_id))
 }
 
-/// Stands in for libnx's `fsOpen_DeviceSaveData`.
+/// Opens an application's device savedata.
+///
+/// Corresponds to `fsOpen_DeviceSaveData()` in libnx.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_save_data(
-    _out: *mut Service,
-    _application_id: u64,
+    out: *mut Service,
+    application_id: u64,
 ) -> u32 {
-    todo!("fsOpen_DeviceSaveData")
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| service.open_device_save_data(application_id))
 }
 
-/// Stands in for libnx's `fsOpen_TemporaryStorage`.
+/// Opens the temporary storage.
+///
+/// Corresponds to `fsOpen_TemporaryStorage()` in libnx, which refuses the call
+/// before HOS 3.0.0, where the storage does not exist.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_temporary_storage(_out: *mut Service) -> u32 {
-    todo!("fsOpen_TemporaryStorage")
+pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_temporary_storage(out: *mut Service) -> u32 {
+    if hos_version::get() < HosVersion::new(3, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| service.open_temporary_storage())
 }
 
-/// Stands in for libnx's `fsOpen_CacheStorage`.
+/// Opens one of an application's cache storages.
+///
+/// Corresponds to `fsOpen_CacheStorage()` in libnx, which refuses the call
+/// before HOS 3.0.0, where the storage does not exist.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_cache_storage(
-    _out: *mut Service,
-    _application_id: u64,
-    _save_data_index: u16,
+    out: *mut Service,
+    application_id: u64,
+    save_data_index: u16,
 ) -> u32 {
-    todo!("fsOpen_CacheStorage")
+    if hos_version::get() < HosVersion::new(3, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_cache_storage(application_id, save_data_index)
+    })
 }
 
-/// Stands in for libnx's `fsOpen_SystemSaveData`.
+/// Opens a system savedata.
+///
+/// Corresponds to `fsOpen_SystemSaveData()` in libnx.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_system_save_data(
-    _out: *mut Service,
-    _save_data_space_id: i32,
-    _system_save_data_id: u64,
-    _uid: AccountUid,
+    out: *mut Service,
+    save_data_space_id: i32,
+    system_save_data_id: u64,
+    uid: AccountUid,
 ) -> u32 {
-    todo!("fsOpen_SystemSaveData")
+    let Ok(space_id) = SaveDataSpaceId::try_from(save_data_space_id) else {
+        return GENERIC_ERROR;
+    };
+
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_system_save_data(space_id, system_save_data_id, uid.into())
+    })
 }
 
-/// Stands in for libnx's `fsOpen_SystemBcatSaveData`.
+/// Opens a system BCAT savedata.
+///
+/// Corresponds to `fsOpen_SystemBcatSaveData()` in libnx, which refuses the call
+/// before HOS 4.0.0, where the savedata kind does not exist.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_system_bcat_save_data(
-    _out: *mut Service,
-    _system_save_data_id: u64,
+    out: *mut Service,
+    system_save_data_id: u64,
 ) -> u32 {
-    todo!("fsOpen_SystemBcatSaveData")
+    if hos_version::get() < HosVersion::new(4, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_system_bcat_save_data(system_save_data_id)
+    })
 }
 
-/// Stands in for libnx's `fsOpenSaveDataFileSystem`.
+/// Opens the savedata an attribute names.
+///
+/// Corresponds to `fsOpenSaveDataFileSystem()` in libnx.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`, and `attr` to a readable
-/// `FsSaveDataAttribute`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable, and `attr` must be null or point to a
+/// readable `FsSaveDataAttribute`. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_save_data_file_system(
-    _out: *mut Service,
-    _save_data_space_id: i32,
-    _attr: *const c_void,
+    out: *mut Service,
+    save_data_space_id: i32,
+    attr: *const SaveDataAttribute,
 ) -> u32 {
-    todo!("fsOpenSaveDataFileSystem")
+    let Ok(space_id) = SaveDataSpaceId::try_from(save_data_space_id) else {
+        return GENERIC_ERROR;
+    };
+    // SAFETY: the caller guarantees `attr` is null or points to a readable
+    // attribute.
+    let Some(attr) = (unsafe { attr.as_ref() }) else {
+        return GENERIC_ERROR;
+    };
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_save_data_file_system(space_id, attr)
+    })
 }
 
-/// Stands in for libnx's `fsOpenSaveDataFileSystemBySystemSaveDataId`.
+/// Opens the system savedata an attribute names.
+///
+/// Corresponds to `fsOpenSaveDataFileSystemBySystemSaveDataId()` in libnx.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`, and `attr` to a readable
-/// `FsSaveDataAttribute`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable, and `attr` must be null or point to a
+/// readable `FsSaveDataAttribute`. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_save_data_file_system_by_system_save_data_id(
-    _out: *mut Service,
-    _save_data_space_id: i32,
-    _attr: *const c_void,
+    out: *mut Service,
+    save_data_space_id: i32,
+    attr: *const SaveDataAttribute,
 ) -> u32 {
-    todo!("fsOpenSaveDataFileSystemBySystemSaveDataId")
+    let Ok(space_id) = SaveDataSpaceId::try_from(save_data_space_id) else {
+        return GENERIC_ERROR;
+    };
+    // SAFETY: the caller guarantees `attr` is null or points to a readable
+    // attribute.
+    let Some(attr) = (unsafe { attr.as_ref() }) else {
+        return GENERIC_ERROR;
+    };
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_save_data_file_system_by_system_save_data_id(space_id, attr)
+    })
 }
 
-/// Stands in for libnx's `fsOpenReadOnlySaveDataFileSystem`.
+/// Opens the savedata an attribute names, for reading only.
+///
+/// Corresponds to `fsOpenReadOnlySaveDataFileSystem()` in libnx, which refuses
+/// the call before HOS 2.0.0, where the command does not exist.
 ///
 /// # Safety
 ///
-/// `out` must point to a writable `Service`, and `attr` to a readable
-/// `FsSaveDataAttribute`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
+/// `out` must be null or writable, and `attr` must be null or point to a
+/// readable `FsSaveDataAttribute`. On success the caller owes the returned
+/// filesystem a `fsFsClose`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_read_only_save_data_file_system(
-    _out: *mut Service,
-    _save_data_space_id: i32,
-    _attr: *const c_void,
+    out: *mut Service,
+    save_data_space_id: i32,
+    attr: *const SaveDataAttribute,
 ) -> u32 {
-    todo!("fsOpenReadOnlySaveDataFileSystem")
+    if hos_version::get() < HosVersion::new(2, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
+    let Ok(space_id) = SaveDataSpaceId::try_from(save_data_space_id) else {
+        return GENERIC_ERROR;
+    };
+    // SAFETY: the caller guarantees `attr` is null or points to a readable
+    // attribute.
+    let Some(attr) = (unsafe { attr.as_ref() }) else {
+        return GENERIC_ERROR;
+    };
+    // SAFETY: the caller guarantees `out` is null or writable.
+    let Some(out) = (unsafe { out.as_mut() }) else {
+        return GENERIC_ERROR;
+    };
+
+    open_filesystem(out, |service| {
+        service.open_read_only_save_data_file_system(space_id, attr)
+    })
 }
 
 /// Stands in for libnx's `fsCreateSaveDataFileSystem`.

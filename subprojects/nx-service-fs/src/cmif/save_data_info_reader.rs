@@ -8,7 +8,7 @@ use nx_sf::service::{
 
 use crate::{
     proto,
-    types::SaveDataInfo,
+    savedata::SaveDataInfo,
 };
 
 pub(crate) fn read(

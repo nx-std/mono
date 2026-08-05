@@ -21,8 +21,11 @@ use core::{
 };
 
 use nx_service_fs::{
+    AccountUid as FsAccountUid,
     CreateOption,
     FsFileSystem,
+    FsService,
+    SaveDataSpaceId,
 };
 use nx_sf::{
     error::ToResultCode as _,
@@ -57,6 +60,12 @@ use crate::{
 pub struct AccountUid {
     /// The two halves of the id, in the order the C structure holds them.
     pub uid: [u64; 2],
+}
+
+impl From<AccountUid> for FsAccountUid {
+    fn from(uid: AccountUid) -> Self {
+        Self { uid: uid.uid }
+    }
 }
 
 /// Storage for the filesystem views [`__nx_fsdev__libnx_fsdev_get_device_file_system`] hands back.
@@ -371,151 +380,216 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_set_concatenation_file_attribut
     todo!("fsdevSetConcatenationFileAttribute")
 }
 
-/// Stands in for libnx's `fsdevMountSaveData`.
+/// Mounts an application's account savedata under `name`.
+///
+/// Corresponds to `fsdevMountSaveData()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_save_data(
-    _name: *const c_char,
-    _application_id: u64,
-    _uid: AccountUid,
+    name: *const c_char,
+    application_id: u64,
+    uid: AccountUid,
 ) -> u32 {
-    todo!("fsdevMountSaveData")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_account_save_data(application_id, uid.into())
+    })
 }
 
-/// Stands in for libnx's `fsdevMountSaveDataReadOnly`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts an application's account savedata under `name`, for reading only.
+///
+/// Corresponds to `fsdevMountSaveDataReadOnly()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_save_data_read_only(
-    _name: *const c_char,
-    _application_id: u64,
-    _uid: AccountUid,
+    name: *const c_char,
+    application_id: u64,
+    uid: AccountUid,
 ) -> u32 {
-    todo!("fsdevMountSaveDataReadOnly")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_account_save_data_read_only(application_id, uid.into())
+    })
 }
 
-/// Stands in for libnx's `fsdevMountBcatSaveData`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts an application's BCAT savedata under `name`.
+///
+/// Corresponds to `fsdevMountBcatSaveData()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_bcat_save_data(
-    _name: *const c_char,
-    _application_id: u64,
+    name: *const c_char,
+    application_id: u64,
 ) -> u32 {
-    todo!("fsdevMountBcatSaveData")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_bcat_save_data(application_id)
+    })
 }
 
-/// Stands in for libnx's `fsdevMountDeviceSaveData`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts an application's device savedata under `name`.
+///
+/// Corresponds to `fsdevMountDeviceSaveData()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_device_save_data(
-    _name: *const c_char,
-    _application_id: u64,
+    name: *const c_char,
+    application_id: u64,
 ) -> u32 {
-    todo!("fsdevMountDeviceSaveData")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_device_save_data(application_id)
+    })
 }
 
-/// Stands in for libnx's `fsdevMountTemporaryStorage`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts the temporary storage under `name`.
+///
+/// Corresponds to `fsdevMountTemporaryStorage()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_temporary_storage(
-    _name: *const c_char,
+    name: *const c_char,
 ) -> u32 {
-    todo!("fsdevMountTemporaryStorage")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| fs_service.open_temporary_storage())
 }
 
-/// Stands in for libnx's `fsdevMountCacheStorage`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts one of an application's cache storages under `name`.
+///
+/// Corresponds to `fsdevMountCacheStorage()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_cache_storage(
-    _name: *const c_char,
-    _application_id: u64,
-    _save_data_index: u16,
+    name: *const c_char,
+    application_id: u64,
+    save_data_index: u16,
 ) -> u32 {
-    todo!("fsdevMountCacheStorage")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_cache_storage(application_id, save_data_index)
+    })
 }
 
-/// Stands in for libnx's `fsdevMountSystemSaveData`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts a system savedata under `name`.
+///
+/// Corresponds to `fsdevMountSystemSaveData()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_system_save_data(
-    _name: *const c_char,
-    _save_data_space_id: u32,
-    _system_save_data_id: u64,
-    _uid: AccountUid,
+    name: *const c_char,
+    save_data_space_id: i32,
+    system_save_data_id: u64,
+    uid: AccountUid,
 ) -> u32 {
-    todo!("fsdevMountSystemSaveData")
+    let Ok(space_id) = SaveDataSpaceId::try_from(save_data_space_id) else {
+        return BAD_INPUT;
+    };
+
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_system_save_data(space_id, system_save_data_id, uid.into())
+    })
 }
 
-/// Stands in for libnx's `fsdevMountSystemBcatSaveData`. See
-/// [`__nx_fsdev__libnx_fsdev_mount_save_data`].
+/// Mounts a system BCAT savedata under `name`.
+///
+/// Corresponds to `fsdevMountSystemBcatSaveData()` in libnx.
 ///
 /// # Safety
 ///
 /// `name` must be a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: this crate does not implement the save-data mounts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_system_bcat_save_data(
-    _name: *const c_char,
-    _system_save_data_id: u64,
+    name: *const c_char,
+    system_save_data_id: u64,
 ) -> u32 {
-    todo!("fsdevMountSystemBcatSaveData")
+    // SAFETY: the caller guarantees a NUL-terminated string.
+    let Some(name) = (unsafe { as_cstr(name) }) else {
+        return BAD_INPUT;
+    };
+
+    mount_save_data(name, |fs_service| {
+        fs_service.open_system_bcat_save_data(system_save_data_id)
+    })
+}
+
+/// Shared body of the savedata mounts, which differ only in which savedata they
+/// open.
+///
+/// Unlike libnx, no firmware gate is applied: the gates live on libnx's
+/// `fsOpen_*` wrappers, which this crate does not go through, and a crate below
+/// the runtime may not ask which firmware it is on. A command the firmware does
+/// not have is answered by the server instead, so the difference is which result
+/// code comes back rather than whether the call is refused.
+fn mount_save_data(
+    name: &CStr,
+    open: impl FnOnce(&FsService) -> Result<FsFileSystem<'_>, DispatchError>,
+) -> u32 {
+    let Some(fs_service) = service::get() else {
+        return NOT_FOUND;
+    };
+
+    let filesystem = match open(&fs_service) {
+        Ok(filesystem) => filesystem,
+        Err(err) => return to_rc(err),
+    };
+
+    match mount::mount(name, filesystem) {
+        Ok(id) => {
+            mount::set_default_device_if_first(id.index());
+            0
+        }
+        Err(err) => mount_error_to_rc(err),
+    }
 }
 
 /// Turns a failed mount into the result code the C caller expects.

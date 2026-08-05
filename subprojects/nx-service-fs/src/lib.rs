@@ -28,13 +28,43 @@ use nx_sf::{
 mod cmif;
 mod dispatch;
 mod proto;
+pub mod savedata;
 mod session;
 pub mod types;
 
-use self::session::SessionPool;
 pub use self::{
     proto::SERVICE_NAME,
+    savedata::{
+        AccountUid,
+        FS_SAVEDATA_CURRENT_APPLICATIONID,
+        SaveDataAttribute,
+        SaveDataCreationInfo,
+        SaveDataExtraData,
+        SaveDataFilter,
+        SaveDataFlags,
+        SaveDataInfo,
+        SaveDataMetaInfo,
+        SaveDataMetaType,
+        SaveDataRank,
+        SaveDataSpaceId,
+        SaveDataType,
+        UnknownSaveDataSpaceId,
+    },
     types::*,
+};
+use self::{
+    savedata::{
+        CreateSaveDataBySystemIdIn,
+        CreateSaveDataIn,
+        DeleteSaveDataByAttributeIn,
+        DeleteSaveDataBySpaceIdIn,
+        ExtendSaveDataIn,
+        OpenSaveDataIn,
+        OpenSaveDataInfoReaderWithFilterIn,
+        ReadExtraDataBySpaceIdIn,
+        WriteExtraDataIn,
+    },
+    session::SessionPool,
 };
 
 struct FsContext {
@@ -432,6 +462,162 @@ impl FsService {
             object_id: raw,
             ctx: &self.inner,
         })
+    }
+
+    /// Opens an application's account save data.
+    ///
+    /// The save data is named by the fields its kind is keyed by; the openers
+    /// below differ only in which fields those are and which of the three
+    /// commands above carries them. Filling the attribute here rather than at
+    /// each call site keeps that keying one fact.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when the application has no account save data for that user.
+    pub fn open_account_save_data(
+        &self,
+        application_id: u64,
+        uid: AccountUid,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            application_id,
+            uid,
+            save_data_type: SaveDataType::Account as u8,
+            ..Default::default()
+        };
+        self.open_save_data_file_system(SaveDataSpaceId::User, &attr)
+    }
+
+    /// Opens an application's account save data for reading only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, including on
+    /// firmware that does not have the read-only command.
+    pub fn open_account_save_data_read_only(
+        &self,
+        application_id: u64,
+        uid: AccountUid,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            application_id,
+            uid,
+            save_data_type: SaveDataType::Account as u8,
+            ..Default::default()
+        };
+        self.open_read_only_save_data_file_system(SaveDataSpaceId::User, &attr)
+    }
+
+    /// Opens an application's BCAT save data.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when the application has no BCAT save data.
+    pub fn open_bcat_save_data(
+        &self,
+        application_id: u64,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            application_id,
+            save_data_type: SaveDataType::Bcat as u8,
+            ..Default::default()
+        };
+        self.open_save_data_file_system(SaveDataSpaceId::User, &attr)
+    }
+
+    /// Opens an application's device save data, which is not keyed by a user.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when the application has no device save data.
+    pub fn open_device_save_data(
+        &self,
+        application_id: u64,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            application_id,
+            save_data_type: SaveDataType::Device as u8,
+            ..Default::default()
+        };
+        self.open_save_data_file_system(SaveDataSpaceId::User, &attr)
+    }
+
+    /// Opens the temporary storage, which lives in a space of its own and is
+    /// keyed by nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when no temporary storage exists.
+    pub fn open_temporary_storage(&self) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            save_data_type: SaveDataType::Temporary as u8,
+            ..Default::default()
+        };
+        self.open_save_data_file_system(SaveDataSpaceId::Temporary, &attr)
+    }
+
+    /// Opens one of an application's cache storages, told apart by their index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when the application has no cache storage at that index.
+    pub fn open_cache_storage(
+        &self,
+        application_id: u64,
+        save_data_index: u16,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            application_id,
+            save_data_type: SaveDataType::Cache as u8,
+            save_data_index,
+            ..Default::default()
+        };
+        self.open_save_data_file_system(SaveDataSpaceId::User, &attr)
+    }
+
+    /// Opens a system save data, which is keyed by its own id rather than an
+    /// application's and so goes through the by-system-id command.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when the id names no save data, or the process may not reach it.
+    pub fn open_system_save_data(
+        &self,
+        space_id: SaveDataSpaceId,
+        system_save_data_id: u64,
+        uid: AccountUid,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            uid,
+            system_save_data_id,
+            save_data_type: SaveDataType::System as u8,
+            ..Default::default()
+        };
+        self.open_save_data_file_system_by_system_save_data_id(space_id, &attr)
+    }
+
+    /// Opens a system BCAT save data.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError`] when the server refuses the request, which is what
+    /// it does when the id names no system BCAT save data.
+    pub fn open_system_bcat_save_data(
+        &self,
+        system_save_data_id: u64,
+    ) -> Result<FsFileSystem<'_>, DispatchError> {
+        let attr = SaveDataAttribute {
+            system_save_data_id,
+            save_data_type: SaveDataType::SystemBcat as u8,
+            ..Default::default()
+        };
+        self.open_save_data_file_system_by_system_save_data_id(SaveDataSpaceId::System, &attr)
     }
 
     pub fn read_save_data_file_system_extra_data_by_save_data_space_id(

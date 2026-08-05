@@ -9,7 +9,7 @@
 //! itself through its own family's `ToResultCode`, so an adapter calls
 //! `.to_rc()` rather than a function that took another crate's error apart.
 
-#[cfg(feature = "service-vi")]
+#[cfg(any(feature = "service-fs", feature = "service-vi"))]
 pub use nx_rt_core::error::{
     LibnxError,
     libnx_error,

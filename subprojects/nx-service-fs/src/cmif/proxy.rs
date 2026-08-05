@@ -9,6 +9,17 @@ use nx_sf::service::{
 use crate::{
     dispatch::as_in_bytes,
     proto,
+    savedata::{
+        CreateSaveDataBySystemIdIn,
+        CreateSaveDataIn,
+        DeleteSaveDataByAttributeIn,
+        DeleteSaveDataBySpaceIdIn,
+        ExtendSaveDataIn,
+        OpenSaveDataIn,
+        OpenSaveDataInfoReaderWithFilterIn,
+        ReadExtraDataBySpaceIdIn,
+        WriteExtraDataIn,
+    },
     types::*,
 };
 
