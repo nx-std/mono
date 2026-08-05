@@ -65,6 +65,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-fsdev"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-service-fs",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
+ "nx-sys-fd",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-panic-handler"
 version = "0.1.0"
 
@@ -132,6 +146,7 @@ name = "nx-rt-nro"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
+ "nx-fsdev",
  "nx-panic-handler",
  "nx-rt-core",
  "nx-service-apm",
@@ -1325,6 +1340,7 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-display",
+ "nx-fsdev",
  "nx-panic-handler",
  "nx-pm",
  "nx-rand",

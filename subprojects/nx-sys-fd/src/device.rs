@@ -260,7 +260,10 @@ impl DeviceId {
     }
 
     /// Returns the registry slot this names.
-    pub(crate) const fn index(self) -> usize {
+    ///
+    /// A device implementation needs the number to hand back to the C standard library, which
+    /// addresses a registered device by its slot.
+    pub const fn index(self) -> usize {
         self.0 as usize
     }
 

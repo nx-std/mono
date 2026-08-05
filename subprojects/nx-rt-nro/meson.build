@@ -82,6 +82,9 @@ endif
 if get_option('use_nx_service_fs').enabled()
     nx_service_fs_proj = subproject('nx-service-fs')
     deps += nx_service_fs_proj.get_variable('nx_service_fs_dep')
+
+    nx_fsdev_proj = subproject('nx-fsdev')
+    deps += nx_fsdev_proj.get_variable('nx_fsdev_dep')
     cargo_features += 'service-fs'
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_fs.ld'
 endif

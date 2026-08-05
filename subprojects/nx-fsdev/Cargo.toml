@@ -1,0 +1,26 @@
+[package]
+name = "nx-fsdev"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_fsdev"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_fsdev FFI
+# Pulls `nx-sf/ffi`: the C surface hands back the `Service` view libnx stores for a filesystem.
+ffi = ["nx-sf/ffi"]
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-fs = { version = "0.1.0", path = "../nx-service-fs" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd" }
+thiserror = { version = "2.0.12", default-features = false }

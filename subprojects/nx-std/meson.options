@@ -6,6 +6,13 @@ option(
 )
 
 option(
+    'use_nx_fsdev',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `fsdev` feature',
+    yield : true
+)
+
+option(
     'use_nx_rand',
     type : 'feature', value : 'auto',
     description : 'Enable the `rand` feature',

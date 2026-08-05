@@ -28,6 +28,26 @@ if get_option('use_nx_alloc').enabled()
     deps_cargo_features += ['alloc']
 endif
 
+# nx-fsdev
+# The filesystem device sits on the descriptor table and the fsp-srv client, so both must be on
+# for its overrides to have anything to dispatch through.
+if get_option('use_nx_fsdev').enabled()
+    if not get_option('use_nx_sys_fd').enabled()
+        error('use_nx_fsdev requires -Duse_nx_sys_fd=enabled')
+    endif
+    if not get_option('use_nx_service_fs').enabled()
+        error('use_nx_fsdev requires -Duse_nx_service_fs=enabled')
+    endif
+
+    nx_fsdev_proj = subproject('nx-fsdev')
+
+    deps += nx_fsdev_proj.get_variable('nx_fsdev_dep')
+    deps_override_link_args += ['-T', nx_fsdev_proj.get_variable('nx_fsdev_ld_override')]
+
+    debug('fsdev feature: enabled')
+    deps_cargo_features += ['fsdev']
+endif
+
 # nx-rand
 if get_option('use_nx_rand').enabled()
     nx_rand_proj = subproject('nx-rand')

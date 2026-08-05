@@ -35,6 +35,13 @@ option(
 )
 
 option(
+    'use_nx_fsdev',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx fsdev functions with nx-fsdev functions',
+    yield : true
+)
+
+option(
     'use_nx_rand',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-rand functions',

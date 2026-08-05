@@ -9,26 +9,27 @@
 
 //<editor-fold desc="Test 0004: opendir lists every entry once">
 
-#define NESTED_DIR SDMC_PATH("nested")
+#define TEST_DIR SDMC_TEST_DIR("0004-opendir-lists-every-entry-once")
+#define NESTED_DIR TEST_DIR "/nested"
 
 test_rc_t test_0004_opendir_lists_every_entry_once(void)
 {
     //* Given
     // A directory holding two files and one subdirectory, so the walk has to
     // report both kinds and get the count right.
-    if (!sdmc_fixture_reset()
-        || !sdmc_write_file(SDMC_PATH("alpha.txt"), "alpha")
-        || !sdmc_write_file(SDMC_PATH("beta.txt"), "beta")
+    if (!sdmc_fixture_open(TEST_DIR)
+        || !sdmc_write_file(TEST_DIR "/alpha.txt", "alpha")
+        || !sdmc_write_file(TEST_DIR "/beta.txt", "beta")
         || mkdir(NESTED_DIR, 0777) != 0) {
-        sdmc_remove_tree(SDMC_ROOT);
-        return TEST_ASSERTION_FAILED;
+        sdmc_fixture_close(TEST_DIR);
+        return TEST_SETUP_FAILED;
     }
 
     //* When
     // The directory is walked to exhaustion through `opendir`/`readdir`.
-    DIR* dir = opendir(SDMC_ROOT);
+    DIR* dir = opendir(TEST_DIR);
     if (dir == NULL) {
-        sdmc_remove_tree(SDMC_ROOT);
+        sdmc_fixture_close(TEST_DIR);
         return TEST_ASSERTION_FAILED;
     }
 
@@ -60,7 +61,7 @@ test_rc_t test_0004_opendir_lists_every_entry_once(void)
         && nested_seen == 1
         && total == 3;
 
-    sdmc_remove_tree(SDMC_ROOT);
+    sdmc_fixture_close(TEST_DIR);
     return correct ? TEST_SUCCESS : TEST_ASSERTION_FAILED;
 }
 

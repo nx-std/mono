@@ -219,14 +219,19 @@ const O_WRONLY: c_int = 0o1;
 /// Access mode requesting both.
 const O_RDWR: c_int = 0o2;
 
-/// Create the entry when it does not exist.
-const O_CREAT: c_int = 0o100;
-/// Fail when the entry already exists.
-const O_EXCL: c_int = 0o200;
-/// Discard the existing contents on open.
-const O_TRUNC: c_int = 0o1000;
+// These are newlib's values, which are the BSD ones rather than Linux's. Only the access mode
+// agrees between the two, so a Linux-valued table decodes `fopen(path, "w")` as "truncate and
+// append, do not create": the create is skipped and the open that follows reports a path that
+// names nothing. Take them from the toolchain's own `sys/_default_fcntl.h`, never from memory.
+
 /// Every write goes to the end of the file.
-const O_APPEND: c_int = 0o2000;
+const O_APPEND: c_int = 0x0008;
+/// Create the entry when it does not exist.
+const O_CREAT: c_int = 0x0200;
+/// Discard the existing contents on open.
+const O_TRUNC: c_int = 0x0400;
+/// Fail when the entry already exists.
+const O_EXCL: c_int = 0x0800;
 
 /// Decodes an `open(2)` flag word into what the caller asked for.
 ///
@@ -243,5 +248,114 @@ pub fn decode_open_flags(flags: c_int) -> OpenFlags {
         create: flags & O_CREAT != 0,
         exclusive: flags & O_EXCL != 0,
         truncate: flags & O_TRUNC != 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What newlib's `fopen(path, "r")` passes down.
+    const FOPEN_READ: c_int = O_RDONLY;
+    /// What newlib's `fopen(path, "w")` passes down.
+    const FOPEN_WRITE: c_int = O_WRONLY | O_CREAT | O_TRUNC;
+    /// What newlib's `fopen(path, "a")` passes down.
+    const FOPEN_APPEND: c_int = O_WRONLY | O_CREAT | O_APPEND;
+    /// What newlib's `fopen(path, "r+")` passes down.
+    const FOPEN_UPDATE: c_int = O_RDWR;
+
+    #[test]
+    fn read_mode_asks_only_to_read() {
+        //* Given / When
+        let flags = decode_open_flags(FOPEN_READ);
+
+        //* Then
+        assert!(flags.read, "a read-only open must ask to read");
+        assert!(!flags.write, "a read-only open must not ask to write");
+        assert!(!flags.create, "a read-only open must not create the entry");
+    }
+
+    #[test]
+    fn write_mode_asks_to_create_and_truncate() {
+        //* Given / When
+        let flags = decode_open_flags(FOPEN_WRITE);
+
+        //* Then
+        // The create is the one that matters: without it the open that follows reports a path
+        // that names nothing, and every `fopen(path, "w")` in the C library fails.
+        assert!(flags.create, "a write open must create the entry");
+        assert!(flags.truncate, "a write open must discard the old contents");
+        assert!(flags.write, "a write open must ask to write");
+        assert!(
+            !flags.append,
+            "a write open must not position writes at the end"
+        );
+        assert!(!flags.read, "a write-only open must not ask to read");
+    }
+
+    #[test]
+    fn append_mode_asks_to_create_and_append() {
+        //* Given / When
+        let flags = decode_open_flags(FOPEN_APPEND);
+
+        //* Then
+        assert!(
+            flags.append,
+            "an append open must position writes at the end"
+        );
+        assert!(flags.create, "an append open must create the entry");
+        assert!(!flags.truncate, "an append open must keep the old contents");
+    }
+
+    #[test]
+    fn update_mode_asks_for_both_directions() {
+        //* Given / When
+        let flags = decode_open_flags(FOPEN_UPDATE);
+
+        //* Then
+        assert!(
+            flags.read && flags.write,
+            "an update open must ask for both"
+        );
+        assert!(!flags.create, "an update open must not create the entry");
+        assert!(!flags.truncate, "an update open must keep the old contents");
+    }
+
+    #[test]
+    fn exclusive_create_is_distinguished_from_a_plain_create() {
+        //* Given / When
+        let plain = decode_open_flags(O_WRONLY | O_CREAT);
+        let exclusive = decode_open_flags(O_WRONLY | O_CREAT | O_EXCL);
+
+        //* Then
+        assert!(
+            !plain.exclusive,
+            "a plain create must tolerate an existing entry"
+        );
+        assert!(exclusive.exclusive, "an exclusive create must refuse one");
+    }
+
+    #[test]
+    fn each_flag_occupies_a_bit_of_its_own() {
+        //* Given
+        // A shared bit is what makes one flag read as another, which is how a Linux-valued table
+        // turned `fopen(path, "w")` into an appending open that never created anything.
+        let flags = [O_APPEND, O_CREAT, O_TRUNC, O_EXCL];
+
+        //* When / Then
+        for (i, left) in flags.iter().enumerate() {
+            for right in &flags[i + 1..] {
+                assert_eq!(
+                    left & right,
+                    0,
+                    "{left:#x} and {right:#x} must not share a bit"
+                );
+            }
+            assert_eq!(
+                left & O_ACCMODE,
+                0,
+                "{left:#x} must not overlap the access mode"
+            );
+        }
     }
 }
