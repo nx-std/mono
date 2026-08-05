@@ -11,8 +11,13 @@ use crate::{
         dispatch_no_io,
         dispatch_out,
     },
+    file::{
+        CreateFileIn,
+        TimeStampRaw,
+    },
+    filesystem::FileSystemAttribute,
+    path::FS_MAX_PATH,
     proto,
-    types::*,
 };
 
 fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
@@ -26,7 +31,7 @@ pub(crate) fn create_file(
     size: i64,
     option: u32,
 ) -> Result<(), DispatchError> {
-    let input = FsCreateFileIn {
+    let input = CreateFileIn {
         option,
         _pad: 0,
         size,

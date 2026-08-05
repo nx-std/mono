@@ -7,8 +7,24 @@ use nx_sf::service::{
 };
 
 use crate::{
+    access_log::ProgramIndexForAccessLogOut,
+    diagnostics::{
+        FileSystemProxyErrorInfo,
+        MemoryReportInfo,
+    },
     dispatch::as_in_bytes,
+    filesystem::{
+        OpenFileSystemWithIdIn,
+        OpenFileSystemWithIdV16In,
+        OpenFileSystemWithPatchIn,
+    },
+    gamecard::OpenGameCardFileSystemIn,
+    path::FS_MAX_PATH,
     proto,
+    rights::{
+        GetRightsIdAndKeyGenOut,
+        RightsId,
+    },
     savedata::{
         CreateSaveDataBySystemIdIn,
         CreateSaveDataIn,
@@ -20,7 +36,7 @@ use crate::{
         ReadExtraDataBySpaceIdIn,
         WriteExtraDataIn,
     },
-    types::*,
+    storage::OpenDataStorageByDataIdIn,
 };
 
 pub(crate) fn set_current_process(domain: DomainRef<'_>, ctx: u32) -> Result<(), DispatchError> {

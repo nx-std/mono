@@ -1,10 +1,10 @@
-//! Save-data types: the kinds a save is keyed by, the attribute that names one,
-//! and the request payloads the save-data commands send.
+//! Save data: the kinds one is keyed by, the attribute that names one, and the
+//! request payloads the save-data commands send.
 //!
 //! [`AccountUid`] lives here rather than beside the other identity types because
 //! save data is the only thing in this crate keyed by a user: keeping it here is
-//! what lets this module stand alone, with no reference back to [`crate::types`]
-//! and none from it.
+//! what lets this module stand alone, referring to no sibling and referred to by
+//! none.
 
 use static_assertions::const_assert_eq;
 
