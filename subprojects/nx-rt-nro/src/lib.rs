@@ -39,7 +39,11 @@
 //!
 //! ## Always compiled
 //!
-//! - **Runtime core:** `argv`, `cwd`, `env`
+//! - **Runtime core:** `app`, `argv`, `cwd`, `env`
+//! - **Startup sequence:** `app`, holding the order libnx's `__appInit` and
+//!   `__appExit` open and close the default services in. Every step but the Service
+//!   Manager is behind a `service-*` feature, and a step whose feature is off
+//!   calls libnx's own entry point instead of skipping.
 //! - **Service Manager:** `services::sm` — a thin re-export of
 //!   [`nx_rt_core::services::sm`]; the SM bootstrap is kind-agnostic and
 //!   owned by `nx-rt-core`, along with its FFI surface and overrides.
@@ -49,7 +53,8 @@
 //! - `ffi` — gates the entire `pub mod ffi` surface. Without it, no
 //!   `__nx_rt_nro__libnx_*` symbols are emitted and the linker overrides have
 //!   nothing to bind to. Enabling `ffi` alone yields the `rt_nro_libnx_core.ld`
-//!   entry surface (`env_setup`, `argv`, `init_cwd`, `nxlink`).
+//!   entry surface (`env_setup`, `argv`, `app_init`, `app_exit`, `init_cwd`,
+//!   `nxlink`).
 //! - `rt-link` — emits this crate's hbloader `.crt0` (the homebrew-NRO
 //!   `_start`) for the opt-in `rustc`-driven link pipeline. It is off on the
 //!   default GCC pipeline, where `_start` is supplied by libnx's
@@ -77,6 +82,10 @@
 //! when their option is explicitly enabled.
 
 #![no_std]
+// `app` calls the four startup hooks a program may define, each declared weak
+// and undefined so an absent one reads back as null instead of failing the
+// link. `extern_weak` linkage is the only way to say that in Rust.
+#![feature(linkage)]
 
 extern crate alloc;
 extern crate nx_alloc as _; // provides #[global_allocator]
@@ -92,6 +101,7 @@ core::arch::global_asm!(include_str!("crt0.s"));
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
+pub mod app;
 pub mod argv;
 pub mod cwd;
 pub mod env;

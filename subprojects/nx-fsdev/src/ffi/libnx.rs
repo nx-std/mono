@@ -47,9 +47,6 @@ use crate::{
     service,
 };
 
-/// Name the SD card is mounted under.
-const SDMC: &CStr = c"sdmc";
-
 /// The user id the save-data mounts are addressed with.
 ///
 /// Declared here rather than borrowed from a service crate because the only thing this boundary
@@ -70,11 +67,6 @@ pub struct AccountUid {
 static FILESYSTEM_VIEWS: [SyncUnsafeCell<MaybeUninit<Service>>; MAX_DEVICES] =
     [const { SyncUnsafeCell::new(MaybeUninit::zeroed()) }; MAX_DEVICES];
 
-unsafe extern "C" {
-    /// libsysbase's `setDefaultDevice`, naming the device a path without a prefix resolves to.
-    fn setDefaultDevice(device: c_int);
-}
-
 /// Mounts the SD card as `sdmc:`.
 ///
 /// Corresponds to `fsdevMountSdmc()` in libnx.
@@ -84,16 +76,12 @@ unsafe extern "C" {
 /// The `fsp-srv` session must have been installed by the runtime.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_sdmc() -> u32 {
-    let Some(fs_service) = service::get() else {
-        return NOT_FOUND;
-    };
-
-    let filesystem = match fs_service.open_sd_card_file_system() {
-        Ok(filesystem) => filesystem,
-        Err(err) => return to_rc(err),
-    };
-
-    mount_and_register(SDMC, filesystem)
+    match mount::mount_sdmc() {
+        Ok(()) => 0,
+        Err(mount::MountSdmcError::NoSession) => NOT_FOUND,
+        Err(mount::MountSdmcError::Open(err)) => to_rc(err),
+        Err(mount::MountSdmcError::Mount(err)) => mount_error_to_rc(err),
+    }
 }
 
 /// Mounts `fs` under `name`.
@@ -129,7 +117,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_device(
     match mount::mount(name, filesystem) {
         Ok(id) => {
             // The registry hands out slots below `MAX_DEVICES`, which is well inside `c_int`.
-            set_default_device_if_first(id.index());
+            mount::set_default_device_if_first(id.index());
             id.index() as c_int
         }
         // The C prototype carries one failure value, so the reason cannot travel with it. A caller
@@ -530,33 +518,12 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_system_bcat_save_data(
     todo!("fsdevMountSystemBcatSaveData")
 }
 
-/// Mounts `filesystem` under `name` and points the default device at it when it is the first.
-///
-/// Returns the result code the C caller expects.
-fn mount_and_register(name: &CStr, filesystem: FsFileSystem<'_>) -> u32 {
-    match mount::mount(name, filesystem) {
-        Ok(id) => {
-            set_default_device_if_first(id.index());
-            0
-        }
-        Err(mount::MountError::AlreadyMounted) => NOT_FOUND,
-        Err(mount::MountError::RegistryFull(_)) => OUT_OF_MEMORY,
+/// Turns a failed mount into the result code the C caller expects.
+fn mount_error_to_rc(err: mount::MountError) -> u32 {
+    match err {
+        mount::MountError::AlreadyMounted => NOT_FOUND,
+        mount::MountError::RegistryFull(_) => OUT_OF_MEMORY,
     }
-}
-
-/// Points the default device at `slot` when nothing else is mounted.
-///
-/// A path without a `"name:"` prefix resolves to the default device, which starts out as the null
-/// device that discards everything. libnx claims it for the first filesystem mounted, and a
-/// program that opens `"/file"` before mounting anything explicit relies on that.
-fn set_default_device_if_first(slot: usize) {
-    if mount::mounted_count() > 1 {
-        return;
-    }
-
-    // SAFETY: the slot came from the registry, which is what this entry point indexes. It is below
-    // `MAX_DEVICES` and so well inside `c_int`.
-    unsafe { setDefaultDevice(slot as c_int) };
 }
 
 /// Borrows `ptr` as a string, or reports that it is null.

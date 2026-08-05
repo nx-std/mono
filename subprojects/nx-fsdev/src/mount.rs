@@ -15,9 +15,13 @@ use alloc::{
     ffi::CString,
     vec::Vec,
 };
-use core::ffi::CStr;
+use core::ffi::{
+    CStr,
+    c_int,
+};
 
 use nx_service_fs::FsFileSystem;
+use nx_sf::service::DispatchError;
 use nx_std_sync::mutex::Mutex;
 use nx_sys_fd::{
     device::{
@@ -27,10 +31,21 @@ use nx_sys_fd::{
     registry,
 };
 
-use crate::device::FsDevice;
+use crate::{
+    device::FsDevice,
+    service,
+};
 
 /// Every device this process has ever mounted, mounted or not.
 static DEVICES: Mutex<Vec<&'static FsDevice>> = Mutex::new(Vec::new());
+
+/// The name the SD card is mounted under.
+pub(crate) const SDMC: &CStr = c"sdmc";
+
+unsafe extern "C" {
+    /// libsysbase's `setDefaultDevice`, naming the device a path without a prefix resolves to.
+    fn setDefaultDevice(device: c_int);
+}
 
 /// Mounts `filesystem` under `name`, registering it so paths can reach it.
 ///
@@ -44,7 +59,7 @@ static DEVICES: Mutex<Vec<&'static FsDevice>> = Mutex::new(Vec::new());
 /// Returns [`MountError::AlreadyMounted`] when the name is taken, and
 /// [`MountError::RegistryFull`] when the descriptor table has no slot left. The filesystem is
 /// closed either way, since nothing else holds it.
-pub fn mount(name: &CStr, filesystem: FsFileSystem<'_>) -> Result<DeviceId, MountError> {
+pub(crate) fn mount(name: &CStr, filesystem: FsFileSystem<'_>) -> Result<DeviceId, MountError> {
     let device = device_for(name);
     if device.is_mounted() {
         return Err(MountError::AlreadyMounted);
@@ -79,6 +94,55 @@ pub enum MountError {
     RegistryFull(#[source] registry::RegisterError),
 }
 
+/// Mounts the SD card as `sdmc:`, which is where a homebrew program's own files are.
+///
+/// This is the whole of libnx's `fsdevMountSdmc`: ask the session for the SD card's filesystem,
+/// mount it under [`SDMC`], and claim the default device if nothing else has. It is public because
+/// the runtime performs this during startup and must reach it as a Rust call rather than through
+/// the `fsdev*` C name the linker aliases to this crate.
+///
+/// # Errors
+///
+/// Returns [`MountSdmcError::NoSession`] when the runtime has not installed the `fsp-srv`
+/// session, [`MountSdmcError::Open`] when the server refused to open the SD card, and
+/// [`MountSdmcError::Mount`] when it opened but could not be mounted.
+pub fn mount_sdmc() -> Result<(), MountSdmcError> {
+    let service = service::get().ok_or(MountSdmcError::NoSession)?;
+
+    let filesystem = service
+        .open_sd_card_file_system()
+        .map_err(MountSdmcError::Open)?;
+
+    let id = mount(SDMC, filesystem).map_err(MountSdmcError::Mount)?;
+    set_default_device_if_first(id.index());
+
+    Ok(())
+}
+
+/// Errors returned by [`mount_sdmc`].
+#[derive(Debug, thiserror::Error)]
+pub enum MountSdmcError {
+    /// The `fsp-srv` session has not been installed
+    ///
+    /// Occurs when the SD card is mounted before the runtime has connected. Nothing was opened.
+    #[error("no fsp-srv session is installed")]
+    NoSession,
+
+    /// The SD card's filesystem could not be opened
+    ///
+    /// Occurs when the server refused the command, which is what a console with no card inserted
+    /// answers. Nothing was mounted.
+    #[error("failed to open the SD card filesystem")]
+    Open(#[source] DispatchError),
+
+    /// The filesystem opened but could not be mounted
+    ///
+    /// Occurs when `sdmc` is already mounted or the descriptor table is full. The filesystem was
+    /// closed.
+    #[error("failed to mount the SD card")]
+    Mount(#[source] MountError),
+}
+
 /// Unmounts whatever is mounted under `name`, closing its filesystem.
 ///
 /// Unmounting is deliberately not idempotent: a second call reports that nothing was mounted,
@@ -87,7 +151,7 @@ pub enum MountError {
 /// # Errors
 ///
 /// Returns [`NotMounted`] when nothing is mounted under that name.
-pub fn unmount(name: &CStr) -> Result<(), NotMounted> {
+pub(crate) fn unmount(name: &CStr) -> Result<(), NotMounted> {
     let Some(device) = find(name) else {
         return Err(NotMounted);
     };
@@ -105,7 +169,7 @@ pub fn unmount(name: &CStr) -> Result<(), NotMounted> {
 /// Nothing is mounted under the name, so there was nothing to act on.
 #[derive(Debug, thiserror::Error)]
 #[error("No filesystem is mounted under that name")]
-pub struct NotMounted;
+pub(crate) struct NotMounted;
 
 /// Unmounts every mounted device.
 ///
@@ -124,7 +188,7 @@ pub fn unmount_all() {
 }
 
 /// Returns the device mounted under `name`.
-pub fn find(name: &CStr) -> Option<&'static FsDevice> {
+pub(crate) fn find(name: &CStr) -> Option<&'static FsDevice> {
     find_by_bytes(name.to_bytes())
 }
 
@@ -132,7 +196,7 @@ pub fn find(name: &CStr) -> Option<&'static FsDevice> {
 ///
 /// The C boundary splits the `"name:"` prefix off a path, which leaves a slice of the path rather
 /// than a string of its own.
-pub fn find_by_bytes(name: &[u8]) -> Option<&'static FsDevice> {
+pub(crate) fn find_by_bytes(name: &[u8]) -> Option<&'static FsDevice> {
     DEVICES
         .lock()
         .iter()
@@ -141,12 +205,27 @@ pub fn find_by_bytes(name: &[u8]) -> Option<&'static FsDevice> {
 }
 
 /// Returns how many devices are currently mounted.
-pub fn mounted_count() -> usize {
+pub(crate) fn mounted_count() -> usize {
     DEVICES
         .lock()
         .iter()
         .filter(|device| device.is_mounted())
         .count()
+}
+
+/// Points the default device at `slot` when nothing else is mounted.
+///
+/// A path without a `"name:"` prefix resolves to the default device, which starts out as the null
+/// device that discards everything. libnx claims it for the first filesystem mounted, and a
+/// program that opens `"/file"` before mounting anything explicit relies on that.
+pub(crate) fn set_default_device_if_first(slot: usize) {
+    if mounted_count() > 1 {
+        return;
+    }
+
+    // SAFETY: the slot came from the registry, which is what this entry point indexes. It is below
+    // `MAX_DEVICES` and so well inside `c_int`.
+    unsafe { setDefaultDevice(slot as c_int) };
 }
 
 /// Returns the device for `name`, creating it the first time that name is seen.
