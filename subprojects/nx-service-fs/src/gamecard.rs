@@ -23,14 +23,22 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct GameCardHandle {
     pub value: u32,
 }
 const_assert_eq!(core::mem::size_of::<GameCardHandle>(), 0x4);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct GameCardUpdatePartitionInfo {
     pub version: u32,
@@ -39,7 +47,7 @@ pub struct GameCardUpdatePartitionInfo {
 }
 const_assert_eq!(core::mem::size_of::<GameCardUpdatePartitionInfo>(), 0x10);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct GameCardErrorReportInfo {
     pub game_card_crc_error_num: u16,
@@ -68,7 +76,7 @@ pub struct GameCardErrorReportInfo {
 }
 const_assert_eq!(core::mem::size_of::<GameCardErrorReportInfo>(), 0x40);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenGameCardFileSystemIn {
     pub handle: GameCardHandle,
@@ -76,10 +84,11 @@ pub(crate) struct OpenGameCardFileSystemIn {
 }
 const_assert_eq!(core::mem::size_of::<OpenGameCardFileSystemIn>(), 0x8);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetDeviceCertIn {
     pub handle: GameCardHandle,
+    pub _pad: u32,
     pub buffer_size: i64,
 }
 const_assert_eq!(core::mem::size_of::<GetDeviceCertIn>(), 0x10);

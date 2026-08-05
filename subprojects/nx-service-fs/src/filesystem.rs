@@ -39,7 +39,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FileSystemAttribute {
     pub directory_name_length_max_has_value: u8,
@@ -73,23 +73,25 @@ pub struct FileSystemAttribute {
 }
 const_assert_eq!(core::mem::size_of::<FileSystemAttribute>(), 0xC0);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenFileSystemWithPatchIn {
     pub fs_type: u32,
+    pub _pad: u32,
     pub id: u64,
 }
 const_assert_eq!(core::mem::size_of::<OpenFileSystemWithPatchIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenFileSystemWithIdIn {
     pub fs_type: u32,
+    pub _pad: u32,
     pub id: u64,
 }
 const_assert_eq!(core::mem::size_of::<OpenFileSystemWithIdIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenFileSystemWithIdV16In {
     pub attr: u8,

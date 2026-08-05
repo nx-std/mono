@@ -88,7 +88,18 @@ bitflags::bitflags! {
 }
 
 /// Account user id. All-zero names the common save data rather than a user's.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
@@ -100,7 +111,7 @@ const_assert_eq!(core::mem::size_of::<AccountUid>(), 0x10);
 /// Only the fields a given save-data kind is keyed by are filled; the rest stay
 /// zero, which is what the server expects and what the shaped openers on
 /// [`crate::FsService`] rely on `Default` for.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct SaveDataAttribute {
     pub application_id: u64,
@@ -131,7 +142,7 @@ pub struct SaveDataExtraData {
 }
 const_assert_eq!(core::mem::size_of::<SaveDataExtraData>(), 0x200);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct SaveDataMetaInfo {
     pub size: u32,
@@ -140,7 +151,7 @@ pub struct SaveDataMetaInfo {
 }
 const_assert_eq!(core::mem::size_of::<SaveDataMetaInfo>(), 0x10);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct SaveDataCreationInfo {
     pub save_data_size: i64,
@@ -154,7 +165,15 @@ pub struct SaveDataCreationInfo {
 }
 const_assert_eq!(core::mem::size_of::<SaveDataCreationInfo>(), 0x40);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct SaveDataInfo {
     pub save_data_id: u64,
@@ -171,7 +190,7 @@ pub struct SaveDataInfo {
 }
 const_assert_eq!(core::mem::size_of::<SaveDataInfo>(), 0x60);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct SaveDataFilter {
     pub filter_by_application_id: u8,
@@ -185,7 +204,7 @@ pub struct SaveDataFilter {
 }
 const_assert_eq!(core::mem::size_of::<SaveDataFilter>(), 0x48);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DeleteSaveDataBySpaceIdIn {
     pub save_data_space_id: u8,
@@ -194,7 +213,7 @@ pub(crate) struct DeleteSaveDataBySpaceIdIn {
 }
 const_assert_eq!(core::mem::size_of::<DeleteSaveDataBySpaceIdIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DeleteSaveDataByAttributeIn {
     pub save_data_space_id: u8,
@@ -203,7 +222,7 @@ pub(crate) struct DeleteSaveDataByAttributeIn {
 }
 const_assert_eq!(core::mem::size_of::<DeleteSaveDataByAttributeIn>(), 0x48);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CreateSaveDataIn {
     pub attr: SaveDataAttribute,
@@ -212,7 +231,7 @@ pub(crate) struct CreateSaveDataIn {
 }
 const_assert_eq!(core::mem::size_of::<CreateSaveDataIn>(), 0x90);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CreateSaveDataBySystemIdIn {
     pub attr: SaveDataAttribute,
@@ -220,7 +239,7 @@ pub(crate) struct CreateSaveDataBySystemIdIn {
 }
 const_assert_eq!(core::mem::size_of::<CreateSaveDataBySystemIdIn>(), 0x80);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ExtendSaveDataIn {
     pub save_data_space_id: u8,
@@ -231,7 +250,7 @@ pub(crate) struct ExtendSaveDataIn {
 }
 const_assert_eq!(core::mem::size_of::<ExtendSaveDataIn>(), 0x20);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenSaveDataIn {
     pub save_data_space_id: u8,
@@ -240,7 +259,7 @@ pub(crate) struct OpenSaveDataIn {
 }
 const_assert_eq!(core::mem::size_of::<OpenSaveDataIn>(), 0x48);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ReadExtraDataBySpaceIdIn {
     pub save_data_space_id: u8,
@@ -249,7 +268,7 @@ pub(crate) struct ReadExtraDataBySpaceIdIn {
 }
 const_assert_eq!(core::mem::size_of::<ReadExtraDataBySpaceIdIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct WriteExtraDataIn {
     pub save_data_space_id: u8,
@@ -258,7 +277,7 @@ pub(crate) struct WriteExtraDataIn {
 }
 const_assert_eq!(core::mem::size_of::<WriteExtraDataIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenSaveDataInfoReaderWithFilterIn {
     pub save_data_space_id: u8,

@@ -2,7 +2,7 @@
 
 use static_assertions::const_assert_eq;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct ProgramIndexForAccessLogOut {
     pub index: u32,

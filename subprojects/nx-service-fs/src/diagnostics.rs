@@ -6,7 +6,7 @@
 
 use static_assertions::const_assert_eq;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct StorageErrorInfo {
     pub num_activation_failures: u32,
@@ -16,7 +16,7 @@ pub struct StorageErrorInfo {
 }
 const_assert_eq!(core::mem::size_of::<StorageErrorInfo>(), 0x10);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FatFatError {
     pub error: i32,
@@ -27,7 +27,7 @@ pub struct FatFatError {
 }
 const_assert_eq!(core::mem::size_of::<FatFatError>(), 0x20);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FatFatReportInfo1 {
     pub open_file_peak_count: u16,
@@ -35,7 +35,7 @@ pub struct FatFatReportInfo1 {
 }
 const_assert_eq!(core::mem::size_of::<FatFatReportInfo1>(), 0x4);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FatFatReportInfo2 {
     pub open_unique_file_entry_peak_count: u16,
@@ -43,7 +43,7 @@ pub struct FatFatReportInfo2 {
 }
 const_assert_eq!(core::mem::size_of::<FatFatReportInfo2>(), 0x4);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FatFatSafeInfo {
     pub result: u32,
@@ -52,7 +52,7 @@ pub struct FatFatSafeInfo {
 }
 const_assert_eq!(core::mem::size_of::<FatFatSafeInfo>(), 0xC);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FileSystemProxyErrorInfo {
     pub rom_fs_remount_for_data_corruption_count: u32,
@@ -74,7 +74,7 @@ pub struct FileSystemProxyErrorInfo {
 }
 const_assert_eq!(core::mem::size_of::<FileSystemProxyErrorInfo>(), 0x80);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct MemoryReportInfo {
     pub pooled_buffer_peak_free_size: u64,
@@ -93,7 +93,7 @@ pub struct MemoryReportInfo {
 }
 const_assert_eq!(core::mem::size_of::<MemoryReportInfo>(), 0x80);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetAndClearStorageErrorInfoOut {
     pub error_info: StorageErrorInfo,

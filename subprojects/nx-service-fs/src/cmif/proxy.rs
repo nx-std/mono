@@ -5,6 +5,7 @@ use nx_sf::service::{
     DispatchError,
     DomainRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     access_log::ProgramIndexForAccessLogOut,
@@ -12,7 +13,6 @@ use crate::{
         FileSystemProxyErrorInfo,
         MemoryReportInfo,
     },
-    dispatch::as_in_bytes,
     filesystem::{
         OpenFileSystemWithIdIn,
         OpenFileSystemWithIdV16In,
@@ -46,7 +46,7 @@ pub(crate) fn set_current_process(domain: DomainRef<'_>, ctx: u32) -> Result<(),
     domain
         .dispatch(proto::PROXY_SET_CURRENT_PROCESS)
         .context(ctx)
-        .in_raw(as_in_bytes(&pid_placeholder))
+        .in_raw(pid_placeholder.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -63,7 +63,7 @@ pub(crate) fn open_file_system_legacy(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(&fs_type))
+        .in_raw(fs_type.as_bytes())
         .in_buffer(content_path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -96,13 +96,17 @@ pub(crate) fn open_file_system_with_patch(
     id: u64,
     fs_type: u32,
 ) -> Result<u32, DispatchError> {
-    let input = OpenFileSystemWithPatchIn { fs_type, id };
+    let input = OpenFileSystemWithPatchIn {
+        fs_type,
+        _pad: 0,
+        id,
+    };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM_WITH_PATCH)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -118,13 +122,17 @@ pub(crate) fn open_file_system_with_id(
     fs_type: u32,
     content_path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
-    let input = OpenFileSystemWithIdIn { fs_type, id };
+    let input = OpenFileSystemWithIdIn {
+        fs_type,
+        _pad: 0,
+        id,
+    };
     let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM_WITH_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .in_buffer(content_path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -153,7 +161,7 @@ pub(crate) fn open_file_system_with_id_v16(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_FILE_SYSTEM_WITH_ID_V16)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .in_buffer(content_path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -173,7 +181,7 @@ pub(crate) fn open_data_file_system_by_program_id(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_FILE_SYSTEM_BY_PROGRAM_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(&program_id))
+        .in_raw(program_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -193,7 +201,7 @@ pub(crate) fn open_bis_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_BIS_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(&partition_id))
+        .in_raw(partition_id.as_bytes())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -213,7 +221,7 @@ pub(crate) fn open_bis_storage(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_BIS_STORAGE)
         .context(ctx)
-        .in_raw(as_in_bytes(&partition_id))
+        .in_raw(partition_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -269,7 +277,7 @@ pub(crate) fn open_host_file_system_with_option(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_HOST_FILE_SYSTEM_WITH_OPTION)
         .context(ctx)
-        .in_raw(as_in_bytes(&flags))
+        .in_raw(flags.as_bytes())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -289,7 +297,7 @@ pub(crate) fn delete_save_data_file_system(
     domain
         .dispatch(proto::PROXY_DELETE_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(&application_id))
+        .in_raw(application_id.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -304,7 +312,7 @@ pub(crate) fn create_save_data_file_system_raw(
     domain
         .dispatch(proto::PROXY_CREATE_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -319,7 +327,7 @@ pub(crate) fn create_save_data_file_system_by_system_save_data_id(
     domain
         .dispatch(proto::PROXY_CREATE_SAVE_DATA_FILE_SYSTEM_BY_SYSTEM_SAVE_DATA_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -334,7 +342,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_space_id(
     domain
         .dispatch(proto::PROXY_DELETE_SAVE_DATA_FILE_SYSTEM_BY_SAVE_DATA_SPACE_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -349,7 +357,7 @@ pub(crate) fn delete_save_data_file_system_by_save_data_attribute(
     domain
         .dispatch(proto::PROXY_DELETE_SAVE_DATA_FILE_SYSTEM_BY_SAVE_DATA_ATTRIBUTE)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -375,7 +383,7 @@ pub(crate) fn open_game_card_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_GAME_CARD_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -394,7 +402,7 @@ pub(crate) fn extend_save_data_file_system(
     domain
         .dispatch(proto::PROXY_EXTEND_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -409,7 +417,7 @@ pub(crate) fn open_save_data_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -428,7 +436,7 @@ pub(crate) fn open_save_data_file_system_by_system_save_data_id(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_FILE_SYSTEM_BY_SYSTEM_SAVE_DATA_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -447,7 +455,7 @@ pub(crate) fn open_read_only_save_data_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_READ_ONLY_SAVE_DATA_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -467,7 +475,7 @@ pub(crate) fn read_save_data_file_system_extra_data_by_save_data_space_id(
     domain
         .dispatch(proto::PROXY_READ_SAVE_DATA_FILE_SYSTEM_EXTRA_DATA_BY_SAVE_DATA_SPACE_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -484,7 +492,7 @@ pub(crate) fn read_save_data_file_system_extra_data(
     domain
         .dispatch(proto::PROXY_READ_SAVE_DATA_FILE_SYSTEM_EXTRA_DATA)
         .context(ctx)
-        .in_raw(as_in_bytes(&save_id))
+        .in_raw(save_id.as_bytes())
         .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -501,7 +509,7 @@ pub(crate) fn write_save_data_file_system_extra_data(
     domain
         .dispatch(proto::PROXY_WRITE_SAVE_DATA_FILE_SYSTEM_EXTRA_DATA)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .in_buffer(buf, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -534,7 +542,7 @@ pub(crate) fn open_save_data_info_reader_by_save_data_space_id(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_INFO_READER_BY_SAVE_DATA_SPACE_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(&space_id))
+        .in_raw(space_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -553,7 +561,7 @@ pub(crate) fn open_save_data_info_reader_with_filter(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_SAVE_DATA_INFO_READER_WITH_FILTER)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -572,7 +580,7 @@ pub(crate) fn open_image_directory_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_IMAGE_DIRECTORY_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(&image_directory_id))
+        .in_raw(image_directory_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -591,7 +599,7 @@ pub(crate) fn open_content_storage_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_CONTENT_STORAGE_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(&content_storage_id))
+        .in_raw(content_storage_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -610,7 +618,7 @@ pub(crate) fn open_custom_storage_file_system(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_CUSTOM_STORAGE_FILE_SYSTEM)
         .context(ctx)
-        .in_raw(as_in_bytes(&custom_storage_id))
+        .in_raw(custom_storage_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -646,7 +654,7 @@ pub(crate) fn open_data_storage_by_program_id(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_STORAGE_BY_PROGRAM_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(&program_id))
+        .in_raw(program_id.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -665,7 +673,7 @@ pub(crate) fn open_data_storage_by_data_id(
     let mut result = domain
         .dispatch(proto::PROXY_OPEN_DATA_STORAGE_BY_DATA_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(input))
+        .in_raw(input.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)?;
     let object = result
@@ -735,7 +743,7 @@ pub(crate) fn get_rights_id_by_path(
         .out_size(size_of::<RightsId>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<RightsId>()) })
+    Ok(*result.value::<RightsId>())
 }
 
 pub(crate) fn get_rights_id_and_key_generation_by_path(
@@ -751,13 +759,11 @@ pub(crate) fn get_rights_id_and_key_generation_by_path(
         let result = domain
             .dispatch(proto::PROXY_GET_RIGHTS_ID_AND_KEY_GENERATION_BY_PATH)
             .context(ctx)
-            .in_raw(as_in_bytes(&attr))
+            .in_raw(attr.as_bytes())
             .out_size(size_of::<GetRightsIdAndKeyGenOut>())
             .in_buffer(path, BufferAttr::HIPC_POINTER)
             .send(&mut ipc_buf)?;
-        Ok(unsafe {
-            core::ptr::read_unaligned(result.data.as_ptr().cast::<GetRightsIdAndKeyGenOut>())
-        })
+        Ok(*result.value::<GetRightsIdAndKeyGenOut>())
     } else {
         let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
@@ -767,9 +773,7 @@ pub(crate) fn get_rights_id_and_key_generation_by_path(
             .out_size(size_of::<GetRightsIdAndKeyGenOut>())
             .in_buffer(path, BufferAttr::HIPC_POINTER)
             .send(&mut ipc_buf)?;
-        Ok(unsafe {
-            core::ptr::read_unaligned(result.data.as_ptr().cast::<GetRightsIdAndKeyGenOut>())
-        })
+        Ok(*result.value::<GetRightsIdAndKeyGenOut>())
     }
 }
 
@@ -784,11 +788,11 @@ pub(crate) fn get_program_id(
     let result = domain
         .dispatch(proto::PROXY_GET_PROGRAM_ID)
         .context(ctx)
-        .in_raw(as_in_bytes(&attr))
+        .in_raw(attr.as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 pub(crate) fn is_signed_system_partition_on_sd_card_valid(
@@ -816,9 +820,7 @@ pub(crate) fn get_and_clear_error_info(
         .context(ctx)
         .out_size(size_of::<FileSystemProxyErrorInfo>())
         .send(&mut ipc_buf)?;
-    Ok(unsafe {
-        core::ptr::read_unaligned(result.data.as_ptr().cast::<FileSystemProxyErrorInfo>())
-    })
+    Ok(*result.value::<FileSystemProxyErrorInfo>())
 }
 
 pub(crate) fn get_content_storage_info_index(
@@ -832,7 +834,7 @@ pub(crate) fn get_content_storage_info_index(
         .context(ctx)
         .out_size(size_of::<u32>())
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
+    Ok(*result.value::<i32>())
 }
 
 pub(crate) fn disable_auto_save_data_creation(
@@ -858,7 +860,7 @@ pub(crate) fn set_global_access_log_mode(
     domain
         .dispatch(proto::PROXY_SET_GLOBAL_ACCESS_LOG_MODE)
         .context(ctx)
-        .in_raw(as_in_bytes(&mode))
+        .in_raw(mode.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -874,7 +876,7 @@ pub(crate) fn get_global_access_log_mode(
         .context(ctx)
         .out_size(size_of::<u32>())
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 pub(crate) fn output_access_log_to_sd_card(
@@ -903,9 +905,7 @@ pub(crate) fn get_program_index_for_access_log(
         .context(ctx)
         .out_size(size_of::<ProgramIndexForAccessLogOut>())
         .send(&mut ipc_buf)?;
-    Ok(unsafe {
-        core::ptr::read_unaligned(result.data.as_ptr().cast::<ProgramIndexForAccessLogOut>())
-    })
+    Ok(*result.value::<ProgramIndexForAccessLogOut>())
 }
 
 pub(crate) fn get_and_clear_memory_report_info(
@@ -919,5 +919,5 @@ pub(crate) fn get_and_clear_memory_report_info(
         .context(ctx)
         .out_size(size_of::<MemoryReportInfo>())
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<MemoryReportInfo>()) })
+    Ok(*result.value::<MemoryReportInfo>())
 }
