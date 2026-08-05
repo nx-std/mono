@@ -55,6 +55,7 @@ Before adding or moving a module, verify:
 
 ## References
 
+- [rust-mods-naming](rust-mods-naming.md) - Related: How a module's name is chosen, and the subject split that repairs one that was not
 - [rust-mods-files](rust-mods-files.md) - Related: Where module files sit and what the named module file carries
 - [rust-mods-graph](rust-mods-graph.md) - Related: Which references between those files are legal
 - [rust-mods-members](rust-mods-members.md) - Related: Order of the items inside a single module file
