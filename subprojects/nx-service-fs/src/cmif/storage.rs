@@ -1,10 +1,9 @@
-use core::mem::size_of;
-
 use nx_sf::service::{
     BufferAttr,
     DispatchError,
     DomainObjectRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -20,10 +19,6 @@ use crate::{
     },
     storage::StorageReadWriteIn,
 };
-
-fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
-    unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<I>()) }
-}
 
 pub(crate) fn read(
     object: DomainObjectRef<'_>,
@@ -41,7 +36,7 @@ pub(crate) fn read(
     object
         .dispatch(proto::STORAGE_READ)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .out_buffer(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
@@ -66,7 +61,7 @@ pub(crate) fn write(
     object
         .dispatch(proto::STORAGE_WRITE)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .in_buffer(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),

@@ -36,7 +36,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct TimeStampRaw {
     pub created: u64,
@@ -47,7 +47,7 @@ pub struct TimeStampRaw {
 }
 const_assert_eq!(core::mem::size_of::<TimeStampRaw>(), 0x20);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CreateFileIn {
     pub option: u32,
@@ -56,7 +56,7 @@ pub(crate) struct CreateFileIn {
 }
 const_assert_eq!(core::mem::size_of::<CreateFileIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct FileReadIn {
     pub option: u32,
@@ -66,7 +66,7 @@ pub(crate) struct FileReadIn {
 }
 const_assert_eq!(core::mem::size_of::<FileReadIn>(), 0x18);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct FileWriteIn {
     pub option: u32,

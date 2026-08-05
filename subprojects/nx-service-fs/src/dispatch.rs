@@ -5,11 +5,7 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
-
-#[inline]
-pub(crate) fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
-    unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<I>()) }
-}
+use zerocopy::IntoBytes as _;
 
 pub(crate) fn dispatch_no_io(
     object: DomainObjectRef<'_>,
@@ -25,27 +21,33 @@ pub(crate) fn dispatch_no_io(
         .map(|_| ())
 }
 
-pub(crate) fn dispatch_in<I: Copy>(
+pub(crate) fn dispatch_in<I>(
     object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
     input: I,
-) -> Result<(), DispatchError> {
+) -> Result<(), DispatchError>
+where
+    I: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     object
         .dispatch(cmd_id)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
 
-pub(crate) fn dispatch_out<O: Copy>(
+pub(crate) fn dispatch_out<O>(
     object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
-) -> Result<O, DispatchError> {
+) -> Result<O, DispatchError>
+where
+    O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
@@ -53,24 +55,28 @@ pub(crate) fn dispatch_out<O: Copy>(
         .context(ctx)
         .out_size(size_of::<O>())
         .send(&mut buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<O>())
 }
 
-pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
+pub(crate) fn dispatch_in_out<I, O>(
     object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
     input: I,
-) -> Result<O, DispatchError> {
+) -> Result<O, DispatchError>
+where
+    I: zerocopy::IntoBytes + zerocopy::Immutable,
+    O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
 
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .out_size(size_of::<O>())
         .send(&mut buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<O>())
 }
 
 pub(crate) fn dispatch_out_u8(
@@ -117,7 +123,7 @@ pub(crate) fn dispatch_in_size_out_buffer(
     object
         .dispatch(cmd_id)
         .context(ctx)
-        .in_raw(as_in_bytes(&size))
+        .in_raw(size.as_bytes())
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut buf)
         .map(|_| ())

@@ -3,14 +3,14 @@
 
 use static_assertions::const_assert_eq;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct RightsId {
     pub c: [u8; 0x10],
 }
 const_assert_eq!(core::mem::size_of::<RightsId>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetRightsIdAndKeyGenOut {
     pub key_generation: u8,

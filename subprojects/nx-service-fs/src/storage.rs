@@ -64,7 +64,7 @@ pub enum NcmStorageId {
     Any = 6,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenDataStorageByDataIdIn {
     pub storage_id: u8,
@@ -73,7 +73,7 @@ pub(crate) struct OpenDataStorageByDataIdIn {
 }
 const_assert_eq!(core::mem::size_of::<OpenDataStorageByDataIdIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct StorageReadWriteIn {
     pub offset: i64,

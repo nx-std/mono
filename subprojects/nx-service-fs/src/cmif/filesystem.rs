@@ -5,6 +5,7 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -19,10 +20,6 @@ use crate::{
     path::FS_MAX_PATH,
     proto,
 };
-
-fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
-    unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<I>()) }
-}
 
 pub(crate) fn create_file(
     object: DomainObjectRef<'_>,
@@ -41,7 +38,7 @@ pub(crate) fn create_file(
     object
         .dispatch(proto::FS_CREATE_FILE)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -94,7 +91,7 @@ pub(crate) fn get_entry_type(
         .out_size(size_of::<u32>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 pub(crate) fn open_file(
@@ -108,7 +105,7 @@ pub(crate) fn open_file(
     let mut result = object
         .dispatch(proto::FS_OPEN_FILE)
         .context(ctx)
-        .in_raw(as_in_bytes(&mode))
+        .in_raw(mode.as_bytes())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -127,7 +124,7 @@ pub(crate) fn open_directory(
     let mut result = object
         .dispatch(proto::FS_OPEN_DIRECTORY)
         .context(ctx)
-        .in_raw(as_in_bytes(&mode))
+        .in_raw(mode.as_bytes())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .out_objects(1)
         .send(&mut ipc_buf)?;
@@ -155,7 +152,7 @@ pub(crate) fn get_space(
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })
+    Ok(*result.value::<i64>())
 }
 
 pub(crate) fn get_file_time_stamp_raw(
@@ -171,7 +168,7 @@ pub(crate) fn get_file_time_stamp_raw(
         .out_size(size_of::<TimeStampRaw>())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<TimeStampRaw>()) })
+    Ok(*result.value::<TimeStampRaw>())
 }
 
 pub(crate) fn query_entry(
@@ -187,7 +184,7 @@ pub(crate) fn query_entry(
     object
         .dispatch(proto::FS_QUERY_ENTRY)
         .context(ctx)
-        .in_raw(as_in_bytes(&query_id))
+        .in_raw(query_id.as_bytes())
         .in_buffer(path, BufferAttr::HIPC_POINTER)
         .in_buffer(
             in_buf,

@@ -15,7 +15,7 @@ pub enum OperationId {
     QueryRange = 3,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct RangeInfo {
     pub aes_ctr_key_type: u32,
@@ -24,7 +24,7 @@ pub struct RangeInfo {
 }
 const_assert_eq!(core::mem::size_of::<RangeInfo>(), 0x40);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OperateRangeIn {
     pub op_id: u32,

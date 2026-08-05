@@ -5,6 +5,7 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -23,10 +24,6 @@ use crate::{
         RangeInfo,
     },
 };
-
-fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {
-    unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<I>()) }
-}
 
 pub(crate) fn read(
     object: DomainObjectRef<'_>,
@@ -47,14 +44,14 @@ pub(crate) fn read(
     let result = object
         .dispatch(proto::FILE_READ)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u64>())
         .out_buffer(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
         .send(&mut ipc_buf)?;
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 pub(crate) fn write(
@@ -76,7 +73,7 @@ pub(crate) fn write(
     object
         .dispatch(proto::FILE_WRITE)
         .context(ctx)
-        .in_raw(as_in_bytes(&input))
+        .in_raw(input.as_bytes())
         .in_buffer(
             buf,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
