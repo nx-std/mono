@@ -160,10 +160,11 @@ option(
 
 option(
     'use_nx_service_fs',
-    # Disabled by default: the override is partial. Rust owns the fsp-srv session,
-    # so libnx's `g_fsSrv` stays zeroed, and the `fs*` commands that are not
-    # redirected below deadlock in `sessionmgrAttachClient` rather than failing.
-    type : 'feature', value : 'disabled',
+    # The override covers every `fs*` command libnx exports outside the
+    # fsdev/fsldr/fspr families, so nothing falls through to the zeroed `g_fsSrv`
+    # and deadlocks in `sessionmgrAttachClient`. Commands still unimplemented
+    # panic naming themselves, which is diagnosable rather than a hang.
+    type : 'feature', value : 'auto',
     description : 'Enable nx-service-fs (Filesystem service)',
     yield : true
 )

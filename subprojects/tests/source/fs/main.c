@@ -1,10 +1,15 @@
 // Filesystem (`fsp-srv` + fsdev) end-to-end tests.
 //
-// Separate from `nx-tests` because these touch the SD card. Every test builds
-// its own fixture under one directory and removes it again, so a run leaves the
-// card as it found it, but a card that is missing, full or write-protected
-// fails the whole suite for reasons that have nothing to do with the code.
-// Keeping them apart means that cannot take the unattended suite down with it.
+// Separate from `nx-tests` because these touch the console's own storage. The
+// SD card tests build a fixture under one directory and remove it again, so a
+// run leaves the card as it found it, but a card that is missing, full or
+// write-protected fails the whole suite for reasons that have nothing to do
+// with the code. Keeping them apart means that cannot take the unattended suite
+// down with it.
+//
+// The savedata tests read what the console already holds rather than creating
+// anything, and skip themselves when it holds no account savedata: which saves
+// exist is a property of the console, not of the code under test.
 //
 // What is exercised is the whole stack rather than the `fsp-srv` commands
 // alone: newlib's stdio calls libsysbase, which dispatches through the
@@ -21,6 +26,7 @@
 #include <switch.h>
 
 #include "../harness.h"
+#include "savedata/suite.h"
 #include "sdmc/suite.h"
 
 /**
@@ -29,6 +35,7 @@
 static TestSuiteFn test_suites[] = {
     // fs
     fs_sdmc_suite,
+    fs_savedata_suite,
 };
 
 int main()

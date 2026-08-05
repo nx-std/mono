@@ -2,8 +2,6 @@ use static_assertions::const_assert_eq;
 
 pub const FS_MAX_PATH: usize = 0x301;
 
-pub const FS_SAVEDATA_CURRENT_APPLICATIONID: u64 = 0;
-
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
@@ -36,46 +34,6 @@ pub enum CustomStorageId {
 pub enum ImageDirectoryId {
     Nand = 0,
     Sd = 1,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i8)]
-pub enum SaveDataSpaceId {
-    System = 0,
-    User = 1,
-    SdSystem = 2,
-    Temporary = 3,
-    SdUser = 4,
-    ProperSystem = 100,
-    SafeMode = 101,
-    All = -1,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum SaveDataType {
-    System = 0,
-    Account = 1,
-    Bcat = 2,
-    Device = 3,
-    Temporary = 4,
-    Cache = 5,
-    SystemBcat = 6,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum SaveDataRank {
-    Primary = 0,
-    Secondary = 1,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum SaveDataMetaType {
-    None = 0,
-    Thumbnail = 1,
-    ExtensionContext = 2,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -213,16 +171,6 @@ bitflags::bitflags! {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct SaveDataFlags: u32 {
-        const KEEP_AFTER_RESETTING_SYSTEM_SAVE_DATA = 1 << 0;
-        const KEEP_AFTER_REFURBISHMENT = 1 << 1;
-        const KEEP_AFTER_RESETTING_SYSTEM_SAVE_DATA_WITHOUT_USER_SAVE_DATA = 1 << 2;
-        const NEEDS_SECURE_DELETE = 1 << 3;
-    }
-}
-
-bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GameCardAttribute: u8 {
         const AUTO_BOOT = 1 << 0;
         const HISTORY_ERASE = 1 << 1;
@@ -253,13 +201,6 @@ const_assert_eq!(core::mem::size_of::<RightsId>(), 0x10);
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct AccountUid {
-    pub uid: [u64; 2],
-}
-const_assert_eq!(core::mem::size_of::<AccountUid>(), 0x10);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
 pub struct DirectoryEntry {
     pub name: [u8; FS_MAX_PATH],
     pub pad: [u8; 3],
@@ -268,91 +209,6 @@ pub struct DirectoryEntry {
     pub file_size: i64,
 }
 const_assert_eq!(core::mem::size_of::<DirectoryEntry>(), 0x310);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct SaveDataAttribute {
-    pub application_id: u64,
-    pub uid: AccountUid,
-    pub system_save_data_id: u64,
-    pub save_data_type: u8,
-    pub save_data_rank: u8,
-    pub save_data_index: u16,
-    pub pad_x24: u32,
-    pub unk_x28: u64,
-    pub unk_x30: u64,
-    pub unk_x38: u64,
-}
-const_assert_eq!(core::mem::size_of::<SaveDataAttribute>(), 0x40);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct SaveDataExtraData {
-    pub attr: SaveDataAttribute,
-    pub owner_id: u64,
-    pub timestamp: u64,
-    pub flags: u32,
-    pub unk_x54: u32,
-    pub data_size: i64,
-    pub journal_size: i64,
-    pub commit_id: u64,
-    pub unused: [u8; 0x190],
-}
-const_assert_eq!(core::mem::size_of::<SaveDataExtraData>(), 0x200);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct SaveDataMetaInfo {
-    pub size: u32,
-    pub meta_type: u8,
-    pub reserved: [u8; 0x0B],
-}
-const_assert_eq!(core::mem::size_of::<SaveDataMetaInfo>(), 0x10);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct SaveDataCreationInfo {
-    pub save_data_size: i64,
-    pub journal_size: i64,
-    pub available_size: u64,
-    pub owner_id: u64,
-    pub flags: u32,
-    pub save_data_space_id: u8,
-    pub unk: u8,
-    pub padding: [u8; 0x1a],
-}
-const_assert_eq!(core::mem::size_of::<SaveDataCreationInfo>(), 0x40);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct SaveDataInfo {
-    pub save_data_id: u64,
-    pub save_data_space_id: u8,
-    pub save_data_type: u8,
-    pub pad: [u8; 6],
-    pub uid: AccountUid,
-    pub system_save_data_id: u64,
-    pub application_id: u64,
-    pub size: u64,
-    pub save_data_index: u16,
-    pub save_data_rank: u8,
-    pub unk_x3b: [u8; 0x25],
-}
-const_assert_eq!(core::mem::size_of::<SaveDataInfo>(), 0x60);
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct SaveDataFilter {
-    pub filter_by_application_id: u8,
-    pub filter_by_save_data_type: u8,
-    pub filter_by_user_id: u8,
-    pub filter_by_system_save_data_id: u8,
-    pub filter_by_index: u8,
-    pub save_data_rank: u8,
-    pub padding: [u8; 2],
-    pub attr: SaveDataAttribute,
-}
-const_assert_eq!(core::mem::size_of::<SaveDataFilter>(), 0x48);
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -579,96 +435,11 @@ const_assert_eq!(core::mem::size_of::<OpenFileSystemWithIdV16In>(), 0x10);
 
 #[derive(Clone, Copy)]
 #[repr(C)]
-pub(crate) struct DeleteSaveDataBySpaceIdIn {
-    pub save_data_space_id: u8,
-    pub _pad: [u8; 7],
-    pub save_id: u64,
-}
-const_assert_eq!(core::mem::size_of::<DeleteSaveDataBySpaceIdIn>(), 0x10);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct DeleteSaveDataByAttributeIn {
-    pub save_data_space_id: u8,
-    pub _pad: [u8; 7],
-    pub attr: SaveDataAttribute,
-}
-const_assert_eq!(core::mem::size_of::<DeleteSaveDataByAttributeIn>(), 0x48);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct CreateSaveDataIn {
-    pub attr: SaveDataAttribute,
-    pub creation_info: SaveDataCreationInfo,
-    pub meta: SaveDataMetaInfo,
-}
-const_assert_eq!(core::mem::size_of::<CreateSaveDataIn>(), 0x90);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct CreateSaveDataBySystemIdIn {
-    pub attr: SaveDataAttribute,
-    pub creation_info: SaveDataCreationInfo,
-}
-const_assert_eq!(core::mem::size_of::<CreateSaveDataBySystemIdIn>(), 0x80);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
 pub(crate) struct OpenGameCardFileSystemIn {
     pub handle: GameCardHandle,
     pub partition: u32,
 }
 const_assert_eq!(core::mem::size_of::<OpenGameCardFileSystemIn>(), 0x8);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct ExtendSaveDataIn {
-    pub save_data_space_id: u8,
-    pub pad: [u8; 7],
-    pub save_id: u64,
-    pub data_size: i64,
-    pub journal_size: i64,
-}
-const_assert_eq!(core::mem::size_of::<ExtendSaveDataIn>(), 0x20);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct OpenSaveDataIn {
-    pub save_data_space_id: u8,
-    pub pad: [u8; 7],
-    pub attr: SaveDataAttribute,
-}
-const_assert_eq!(core::mem::size_of::<OpenSaveDataIn>(), 0x48);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct ReadExtraDataBySpaceIdIn {
-    pub save_data_space_id: u8,
-    pub _pad: [u8; 7],
-    pub save_id: u64,
-}
-const_assert_eq!(core::mem::size_of::<ReadExtraDataBySpaceIdIn>(), 0x10);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct WriteExtraDataIn {
-    pub save_data_space_id: u8,
-    pub _pad: [u8; 7],
-    pub save_id: u64,
-}
-const_assert_eq!(core::mem::size_of::<WriteExtraDataIn>(), 0x10);
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct OpenSaveDataInfoReaderWithFilterIn {
-    pub save_data_space_id: u8,
-    pub pad: [u8; 7],
-    pub filter: SaveDataFilter,
-}
-const_assert_eq!(
-    core::mem::size_of::<OpenSaveDataInfoReaderWithFilterIn>(),
-    0x50
-);
 
 #[derive(Clone, Copy)]
 #[repr(C)]
