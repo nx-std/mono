@@ -12,6 +12,8 @@ use crate::remutex::ReentrantMutex;
 /// - Requires that `mutex` points to memory that can be safely written to
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__remutex_init(mutex: *mut ReentrantMutex) {
+    // SAFETY: the caller guarantees `mutex` is writable and aligned for the type, and that no
+    // thread holds the lock while it is being initialized.
     unsafe { mutex.write(ReentrantMutex::new()) }
 }
 
@@ -24,6 +26,8 @@ pub unsafe extern "C" fn __nx_sys_sync__remutex_init(mutex: *mut ReentrantMutex)
 /// - Requires that `mutex` is properly aligned
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__remutex_lock(mutex: *mut ReentrantMutex) {
+    // SAFETY: the caller guarantees `mutex` points to a live, initialized lock that outlives
+    // the call.
     unsafe { &*mutex }.lock()
 }
 
@@ -40,6 +44,8 @@ pub unsafe extern "C" fn __nx_sys_sync__remutex_lock(mutex: *mut ReentrantMutex)
 /// Returns `true` if the mutex was successfully locked, `false` if it was already locked.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__remutex_try_lock(mutex: *mut ReentrantMutex) -> bool {
+    // SAFETY: the caller guarantees `mutex` points to a live, initialized lock that outlives the
+    // call.
     unsafe { &*mutex }.try_lock()
 }
 
@@ -52,5 +58,7 @@ pub unsafe extern "C" fn __nx_sys_sync__remutex_try_lock(mutex: *mut ReentrantMu
 /// - Requires that `mutex` is properly aligned
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__remutex_unlock(mutex: *mut ReentrantMutex) {
+    // SAFETY: the caller guarantees `mutex` points to a live, initialized lock that outlives the
+    // call, and that this thread holds it.
     unsafe { &*mutex }.unlock()
 }

@@ -4,11 +4,21 @@
 //! protect shared data from being simultaneously accessed by multiple threads. It is designed
 //! specifically for the Nintendo Switch homebrew environment.
 //!
-//! ## FFI Compatibility with libnx
+//! ## The layout is not ours to choose
 //!
-//! This implementation is FFI-compatible with `libnx`'s `RMutex` type. This allows for seamless
-//! interoperability between Rust code and existing C/C++ code that uses `libnx` for synchronization.
-//! The memory layout and core locking/unlocking logic are identical to ensure this compatibility.
+//! A C caller allocates the lock and hands it to this implementation, so its shape is fixed by the
+//! declaration the C side compiles against. That declaration is eight bytes, a lock word followed
+//! by a recursion counter:
+//!
+//! ```c
+//! struct __lock_t { _LOCK_T lock; uint32_t counter; };
+//! ```
+//!
+//! It is what every `__syscall_lock_*_recursive` entry point is handed, and there is deliberately
+//! no owner field in it. On Horizon a locked mutex word *is* the owner's thread tag, so who holds
+//! the lock is already recorded in the first four bytes and a second copy would only be one more
+//! thing to keep in step. The size assertions below pin this, because a third field here would put
+//! the counter one word past the end of every lock the C library allocates.
 //!
 //! ## Behavior
 //!
@@ -17,31 +27,49 @@
 //! for every time it called `lock`. Other threads attempting to acquire the lock will block until
 //! the owning thread has fully released it.
 //!
-//! ## Safety Enhancements
+//! ## Safety enhancements
 //!
-//! While maintaining compatibility with `libnx`, this Rust implementation introduces several
-//! key safety improvements:
+//! While keeping that layout and its semantics, this implementation refuses two things the C
+//! behaviour permits silently:
 //!
-//! - **Unlock Guard**: This implementation will trigger a panic if a thread attempts to
-//!   unlock a mutex it does not own. In `libnx`, this is undefined behavior that can lead to
-//!   crashes or data corruption.
-//! - **Counter Underflow Protection**: The internal lock counter is protected from underflowing
-//!   using saturating subtraction, preventing another potential class of bugs.
+//! - **Unlock guard**: unlocking from a thread that does not hold the lock panics, rather than
+//!   decrementing regardless and releasing the owner's mutex out from under it.
+//! - **Counter underflow protection**: the recursion count saturates instead of wrapping, so a
+//!   stray unlock cannot turn into a lock that can never be released.
 
-use core::cell::UnsafeCell;
+use core::{
+    cell::UnsafeCell,
+    mem::{
+        align_of,
+        offset_of,
+        size_of,
+    },
+};
+
+use static_assertions::const_assert_eq;
 
 use super::mutex::Mutex;
-use crate::tag::ThreadTag;
 
 /// A reentrant mutual exclusion primitive useful for protecting shared data.
 ///
-/// This is the Rust equivalent of `RMutex` from `libnx`.
+/// This is the Rust equivalent of the C standard library's `_LOCK_RECURSIVE_T`.
 #[repr(C)]
 pub struct ReentrantMutex {
+    /// The lock itself, whose word names the owning thread while it is held.
     mutex: Mutex,
-    thread_tag: UnsafeCell<ThreadTag>,
+    /// How many times the owner has taken the lock without releasing it.
     counter: UnsafeCell<u32>,
 }
+
+// The C declaration this replaces is two 32-bit words. A mismatch here would not fail a build or a
+// test: it would read one of the C caller's fields as another and write the rest past the end of
+// the object, which shows up much later as memory that changed on its own.
+const_assert_eq!(size_of::<ReentrantMutex>(), 2 * size_of::<u32>());
+const_assert_eq!(align_of::<ReentrantMutex>(), align_of::<u32>());
+const _: () = {
+    assert!(offset_of!(ReentrantMutex, mutex) == 0);
+    assert!(offset_of!(ReentrantMutex, counter) == size_of::<u32>());
+};
 
 impl Default for ReentrantMutex {
     fn default() -> Self {
@@ -49,7 +77,13 @@ impl Default for ReentrantMutex {
     }
 }
 
+// SAFETY: the recursion count is only ever read or written by the thread holding the inner mutex,
+// which is the one thing every path here establishes before touching it, so concurrent access is
+// serialized by the lock itself. The mutex word is an atomic and is sound to share on its own.
 unsafe impl Send for ReentrantMutex {}
+// SAFETY: the recursion count is only ever read or written by the thread holding the inner mutex,
+// so sharing a reference across threads cannot produce concurrent access to it. The mutex word is
+// an atomic and is sound to share on its own.
 unsafe impl Sync for ReentrantMutex {}
 
 impl ReentrantMutex {
@@ -57,7 +91,6 @@ impl ReentrantMutex {
     pub const fn new() -> Self {
         Self {
             mutex: Mutex::new(),
-            thread_tag: UnsafeCell::new(ThreadTag::NONE),
             counter: UnsafeCell::new(0),
         }
     }
@@ -65,38 +98,31 @@ impl ReentrantMutex {
     /// Locks the reentrant mutex.
     ///
     /// If the mutex is already locked by the current thread, the lock count is incremented.
-    /// If the mutex is locked by another thread, this function will block until the mutex is released.
+    /// If the mutex is locked by another thread, this function will block until the mutex is
+    /// released.
     pub fn lock(&self) {
-        let current_thread_tag = ThreadTag::current();
-        let thread_tag = unsafe { *self.thread_tag.get() };
-
-        if thread_tag != current_thread_tag {
+        if !self.mutex.is_locked_by_current_thread() {
             self.mutex.lock();
-            unsafe {
-                *self.thread_tag.get() = current_thread_tag;
-            }
         }
+
+        // SAFETY: the lock is held by this thread from here on, so nothing else reaches the count.
         let counter = unsafe { &mut *self.counter.get() };
         *counter += 1;
     }
 
     /// Attempts to lock the reentrant mutex.
     ///
-    /// If the mutex is already locked by the current thread, the lock count is incremented and `true` is returned.
+    /// If the mutex is already locked by the current thread, the lock count is incremented and
+    /// `true` is returned.
     /// If the mutex is locked by another thread, this function returns `false` immediately.
     /// If the mutex is unlocked, it becomes locked by the current thread, and `true` is returned.
     pub fn try_lock(&self) -> bool {
-        let current_thread_tag = ThreadTag::current();
-        let thread_tag = unsafe { *self.thread_tag.get() };
-
-        if thread_tag != current_thread_tag {
-            if !self.mutex.try_lock() {
-                return false;
-            }
-            unsafe {
-                *self.thread_tag.get() = current_thread_tag;
-            }
+        if !self.mutex.is_locked_by_current_thread() && !self.mutex.try_lock() {
+            return false;
         }
+
+        // SAFETY: control only reaches here when this thread already held the lock or has just
+        // taken it, so it is the only thread that can reach the count.
         let counter = unsafe { &mut *self.counter.get() };
         *counter += 1;
         true
@@ -108,24 +134,17 @@ impl ReentrantMutex {
     ///
     /// # Panics
     ///
-    /// This function will panic if it is called by a thread that has not locked the mutex.
+    /// Panics when called by a thread that does not hold the mutex. Releasing it anyway would hand
+    /// the owner's lock to whoever asked next, which the C behaviour permits and this refuses to.
     pub fn unlock(&self) {
-        let current_thread_tag = ThreadTag::current();
-        let thread_tag = unsafe { *self.thread_tag.get() };
-
-        if thread_tag != current_thread_tag {
-            // Reentrant mutexes are not allowed to be unlocked by a thread that did not lock them.
-            // This can lead to premature unlocking of the mutex, which can lead to undefined behavior.
-            // This is undefined behavior in libnx, but we can catch it.
+        if !self.mutex.is_locked_by_current_thread() {
             panic!("Thread attempted to unlock mutex it did not lock: MUTEX_UNLOCK_ERROR");
         }
 
+        // SAFETY: the lock is held by this thread, so nothing else reaches the count.
         let counter = unsafe { &mut *self.counter.get() };
         *counter = counter.saturating_sub(1);
         if *counter == 0 {
-            unsafe {
-                *self.thread_tag.get() = ThreadTag::NONE;
-            }
             self.mutex.unlock();
         }
     }
@@ -146,26 +165,25 @@ impl ReentrantMutex {
         condvar: &super::Condvar,
         timeout: crate::wait::Timeout,
     ) -> Result<nx_svc::result::ResultCode, NotHeldOnceError> {
+        // SAFETY: the caller holds the lock, or the count read here says it does not and nothing
+        // is touched.
         let counter = unsafe { *self.counter.get() };
         if counter != 1 {
             return Err(NotHeldOnceError { held: counter });
         }
 
-        // Save the thread tag and reset state before waiting
-        let thread_tag_backup = unsafe { *self.thread_tag.get() };
-        unsafe {
-            *self.thread_tag.get() = ThreadTag::NONE;
-            *self.counter.get() = 0;
-        }
+        // The wait releases the inner mutex, so the count has to say the lock is free for as long
+        // as it is. Restoring it afterwards is what makes the wait invisible to the caller.
+        //
+        // SAFETY: the count was observed to be one above, so this thread holds the lock and is the
+        // only one that can reach the count until the wait releases it.
+        unsafe { *self.counter.get() = 0 };
 
-        // Wait on the condition variable (this releases and reacquires the inner mutex)
         let result = condvar.wait_timeout(&self.mutex, timeout);
 
-        // Restore the thread tag and counter
-        unsafe {
-            *self.thread_tag.get() = thread_tag_backup;
-            *self.counter.get() = 1;
-        }
+        // SAFETY: the wait returns with the inner mutex reacquired by this thread, so the count is
+        // once again reachable only from here.
+        unsafe { *self.counter.get() = 1 };
 
         Ok(result)
     }

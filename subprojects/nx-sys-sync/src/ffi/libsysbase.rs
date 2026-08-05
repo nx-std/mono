@@ -51,6 +51,8 @@ fn errno_from_result(result: nx_svc::result::ResultCode) -> c_int {
 /// Corresponds to libsysbase's `__syscall_lock_acquire`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_acquire(lock: *mut Mutex) {
+    // SAFETY: the caller guarantees `lock` points to a live, initialized lock that outlives the
+    // call.
     unsafe { &*lock }.lock()
 }
 
@@ -62,6 +64,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_acquire(lock: *m
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_try_acquire(
     lock: *mut Mutex,
 ) -> c_int {
+    // SAFETY: the caller guarantees `lock` points to a live, initialized lock that outlives the
+    // call.
     if unsafe { &*lock }.try_lock() { 0 } else { 1 }
 }
 
@@ -70,6 +74,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_try_acquire(
 /// Corresponds to libsysbase's `__syscall_lock_release`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_release(lock: *mut Mutex) {
+    // SAFETY: the caller guarantees `lock` points to a live, initialized lock that outlives the
+    // call, and that this thread holds it.
     unsafe { &*lock }.unlock()
 }
 
@@ -78,6 +84,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_release(lock: *m
 /// Corresponds to libsysbase's `__syscall_lock_init`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_init(lock: *mut Mutex) {
+    // SAFETY: the caller guarantees `lock` is writable and aligned for the type, and that no
+    // thread holds it while it is being initialized.
     unsafe { lock.write(Mutex::new()) }
 }
 
@@ -88,6 +96,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_init(lock: *mut 
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_acquire_recursive(
     lock: *mut ReentrantMutex,
 ) {
+    // SAFETY: the caller guarantees `lock` points to a live, initialized lock that outlives the
+    // call.
     unsafe { &*lock }.lock()
 }
 
@@ -99,6 +109,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_acquire_recursiv
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_try_acquire_recursive(
     lock: *mut ReentrantMutex,
 ) -> c_int {
+    // SAFETY: the caller guarantees `lock` points to a live, initialized lock that outlives the
+    // call.
     if unsafe { &*lock }.try_lock() { 0 } else { 1 }
 }
 
@@ -109,6 +121,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_try_acquire_recu
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_release_recursive(
     lock: *mut ReentrantMutex,
 ) {
+    // SAFETY: the caller guarantees `lock` points to a live, initialized lock that outlives the
+    // call, and that this thread holds it.
     unsafe { &*lock }.unlock()
 }
 
@@ -119,6 +133,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_release_recursiv
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_init_recursive(
     lock: *mut ReentrantMutex,
 ) {
+    // SAFETY: the caller guarantees `lock` is writable and aligned for the type, and that no
+    // thread holds it while it is being initialized.
     unsafe { lock.write(ReentrantMutex::new()) }
 }
 
@@ -129,6 +145,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_lock_init_recursive(
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_signal(
     cond: *mut Condvar,
 ) -> c_int {
+    // SAFETY: the caller guarantees `cond` points to a live, initialized condition variable that
+    // outlives the call.
     unsafe { &*cond }.wake_one();
     0
 }
@@ -140,6 +158,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_signal(
 pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_broadcast(
     cond: *mut Condvar,
 ) -> c_int {
+    // SAFETY: the caller guarantees `cond` points to a live, initialized condition variable that
+    // outlives the call.
     unsafe { &*cond }.wake_all();
     0
 }
@@ -153,6 +173,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait(
     lock: *mut Mutex,
     timeout_ns: u64,
 ) -> c_int {
+    // SAFETY: the caller guarantees both `cond` and `lock` point to live, initialized objects
+    // that outlive the call, and that this thread holds `lock`.
     let result = unsafe { &*cond }.wait_timeout(unsafe { &*lock }, Timeout::from(timeout_ns));
     errno_from_result(result)
 }
@@ -167,6 +189,8 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait_recursive(
     lock: *mut ReentrantMutex,
     timeout_ns: u64,
 ) -> c_int {
+    // SAFETY: the caller guarantees both `lock` and `cond` point to live, initialized objects that
+    // outlive the call, and that this thread holds `lock`.
     match unsafe { &*lock }.cond_wait(unsafe { &*cond }, Timeout::from(timeout_ns)) {
         Ok(result) => errno_from_result(result),
         // The caller does not hold the mutex exactly once, so there is no lock state this

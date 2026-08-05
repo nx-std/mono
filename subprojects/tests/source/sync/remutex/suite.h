@@ -81,6 +81,15 @@ test_rc_t test_0005_remutex_multiple_threads_different_priority(void);
  */
 test_rc_t test_0006_remutex_reentrancy_single_thread(void);
 
+/**
+ * @brief Test that the lock operations touch only the lock's own eight bytes.
+ *
+ * Puts a known value immediately behind an `RMutex` and checks it survives a
+ * reentrant lock and release, which catches an implementation whose idea of the
+ * type is larger than the one the C caller allocated.
+ */
+test_rc_t test_0007_remutex_stays_inside_its_own_storage(void);
+
 //
 // Test suite for reentrant mutexes
 //
@@ -88,28 +97,32 @@ static void sync_remutex_suite(void)
 {
     TEST_SUITE("sync/remutex");
 
-    XTEST_CASE(
+    TEST_CASE(
         "Test 0001: remutex_lock_unlock_single_thread",
         test_0001_remutex_lock_unlock_single_thread
-    );
-    XTEST_CASE(
+    )
+    TEST_CASE(
         "Test 0002: remutex_two_threads_no_lock_overlap",
         test_0002_remutex_two_threads_no_lock_overlap
-    );
-    XTEST_CASE(
+    )
+    TEST_CASE(
         "Test 0003: remutex_two_threads_with_lock_overlap",
         test_0003_remutex_two_threads_with_lock_overlap
-    );
-    XTEST_CASE(
+    )
+    TEST_CASE(
         "Test 0004: remutex_multiple_threads_same_priority",
         test_0004_remutex_multiple_threads_same_priority
-    );
-    XTEST_CASE(
+    )
+    TEST_CASE(
         "Test 0005: remutex_multiple_threads_different_priority",
         test_0005_remutex_multiple_threads_different_priority
-    );
-    XTEST_CASE(
-        "Test 0006: remutex_reentrancy_single_thread", 
+    )
+    TEST_CASE(
+        "Test 0006: remutex_reentrancy_single_thread",
         test_0006_remutex_reentrancy_single_thread
-    );
+    )
+    TEST_CASE(
+        "Test 0007: remutex_stays_inside_its_own_storage",
+        test_0007_remutex_stays_inside_its_own_storage
+    )
 } 

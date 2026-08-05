@@ -30,6 +30,9 @@ use crate::wait::WakeCount;
 /// any of them are allowed to proceed. When a thread calls `wait()`, it blocks until all
 /// other threads have also called `wait()`. Once the last thread calls `wait()`, all threads
 /// are unblocked and can continue execution.
+// C callers allocate this and pass it in, so the field order is fixed by the declaration they
+// compile against rather than left to the compiler.
+#[repr(C)]
 pub struct Barrier {
     /// Number of threads to reach the barrier
     count: UnsafeCell<u64>,
@@ -41,9 +44,16 @@ pub struct Barrier {
     condvar: Condvar,
 }
 
-// Ensure that the Barrier has a 24 bytes size, and is properly aligned
+// Ensure that the Barrier has a 24 bytes size, and is properly aligned. The size is the same
+// whatever order the fields sit in, so each offset is pinned separately against that declaration.
 const_assert_eq!(size_of::<Barrier>(), 24);
 const_assert_eq!(align_of::<Barrier>(), align_of::<u64>());
+const _: () = {
+    assert!(core::mem::offset_of!(Barrier, count) == 0);
+    assert!(core::mem::offset_of!(Barrier, total) == 8);
+    assert!(core::mem::offset_of!(Barrier, mutex) == 16);
+    assert!(core::mem::offset_of!(Barrier, condvar) == 20);
+};
 
 // SAFETY: `Barrier`'s `count` cell is mutated only while its internal `Mutex`
 // is held, so concurrent access from multiple threads is serialized. Sharing

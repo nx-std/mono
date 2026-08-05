@@ -28,9 +28,15 @@ pub struct Semaphore {
     count: UnsafeCell<u64>,
 }
 
-// Ensure that the Semaphore object has a 16 bytes size, and is properly aligned
+// Ensure that the Semaphore object has a 16 bytes size, and is properly aligned. As with the other
+// primitives, each offset is pinned too, since the size cannot catch a reordering.
 const_assert_eq!(size_of::<Semaphore>(), 16);
 const_assert_eq!(align_of::<Semaphore>(), align_of::<u64>());
+const _: () = {
+    assert!(core::mem::offset_of!(Semaphore, condvar) == 0);
+    assert!(core::mem::offset_of!(Semaphore, mutex) == 4);
+    assert!(core::mem::offset_of!(Semaphore, count) == 8);
+};
 
 // SAFETY: `Semaphore`'s `count` cell is mutated only while its internal `Mutex`
 // is held, so concurrent access from multiple threads is serialized. Sharing
