@@ -7,6 +7,7 @@ use nx_sf::service::{
 };
 
 use crate::{
+    diagnostics::GetAndClearStorageErrorInfoOut,
     dispatch::{
         dispatch_in_out,
         dispatch_in_size_out_buffer,
@@ -15,8 +16,13 @@ use crate::{
         dispatch_out_i64,
         dispatch_out_u32,
     },
+    gamecard::{
+        GameCardErrorReportInfo,
+        GameCardHandle,
+        GameCardUpdatePartitionInfo,
+        GetDeviceCertIn,
+    },
     proto,
-    types::*,
 };
 
 fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {

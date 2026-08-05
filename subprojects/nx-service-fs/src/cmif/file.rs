@@ -13,8 +13,15 @@ use crate::{
         dispatch_no_io,
         dispatch_out_i64,
     },
+    file::{
+        FileReadIn,
+        FileWriteIn,
+    },
     proto,
-    types::*,
+    range::{
+        OperateRangeIn,
+        RangeInfo,
+    },
 };
 
 fn as_in_bytes<I: Copy>(input: &I) -> &[u8] {

@@ -7,9 +7,9 @@ use nx_sf::service::{
 };
 
 use crate::{
+    directory::DirectoryEntry,
     dispatch::dispatch_out_i64,
     proto,
-    types::DirectoryEntry,
 };
 
 pub(crate) fn read(

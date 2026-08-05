@@ -25,15 +25,67 @@ use nx_sf::{
     },
 };
 
+mod access_log;
 mod cmif;
+pub mod diagnostics;
+pub mod directory;
 mod dispatch;
+pub mod file;
+pub mod filesystem;
+pub mod gamecard;
+pub mod path;
+pub mod priority;
 mod proto;
+pub mod range;
+pub mod rights;
 pub mod savedata;
 mod session;
-pub mod types;
+pub mod storage;
 
 pub use self::{
+    diagnostics::{
+        FatFatError,
+        FatFatReportInfo1,
+        FatFatReportInfo2,
+        FatFatSafeInfo,
+        FileSystemProxyErrorInfo,
+        MemoryReportInfo,
+        StorageErrorInfo,
+    },
+    directory::{
+        DirEntryType,
+        DirOpenMode,
+        DirectoryEntry,
+    },
+    file::{
+        CreateOption,
+        OpenMode,
+        ReadOption,
+        TimeStampRaw,
+        WriteOption,
+    },
+    filesystem::{
+        ContentAttributes,
+        FileSystemAttribute,
+        FileSystemQueryId,
+        FileSystemType,
+        MountHostOption,
+    },
+    gamecard::{
+        GameCardAttribute,
+        GameCardErrorReportInfo,
+        GameCardHandle,
+        GameCardPartition,
+        GameCardUpdatePartitionInfo,
+    },
+    path::FS_MAX_PATH,
+    priority::Priority,
     proto::SERVICE_NAME,
+    range::{
+        OperationId,
+        RangeInfo,
+    },
+    rights::RightsId,
     savedata::{
         AccountUid,
         FS_SAVEDATA_CURRENT_APPLICATIONID,
@@ -50,9 +102,16 @@ pub use self::{
         SaveDataType,
         UnknownSaveDataSpaceId,
     },
-    types::*,
+    storage::{
+        BisPartitionId,
+        ContentStorageId,
+        CustomStorageId,
+        ImageDirectoryId,
+        NcmStorageId,
+    },
 };
 use self::{
+    gamecard::OpenGameCardFileSystemIn,
     savedata::{
         CreateSaveDataBySystemIdIn,
         CreateSaveDataIn,
@@ -65,6 +124,7 @@ use self::{
         WriteExtraDataIn,
     },
     session::SessionPool,
+    storage::OpenDataStorageByDataIdIn,
 };
 
 struct FsContext {
