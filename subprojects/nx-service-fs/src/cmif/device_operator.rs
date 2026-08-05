@@ -16,6 +16,7 @@ use crate::{
         dispatch_out_bool,
         dispatch_out_i64,
         dispatch_out_u32,
+        with_ipc_buffer,
     },
     gamecard::{
         GameCardErrorReportInfo,
@@ -84,16 +85,16 @@ pub(crate) fn get_and_clear_storage_error_info(
     size: i64,
     dst: &mut [u8],
 ) -> Result<GetAndClearStorageErrorInfoOut, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    let result = object
-        .dispatch(cmd_id)
-        .context(ctx)
-        .in_raw(size.as_bytes())
-        .out_size(size_of::<GetAndClearStorageErrorInfoOut>())
-        .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send(&mut ipc_buf)?;
-    Ok(*result.value::<GetAndClearStorageErrorInfoOut>())
+    with_ipc_buffer(|ipc_buf| {
+        let result = object
+            .dispatch(cmd_id)
+            .context(ctx)
+            .in_raw(size.as_bytes())
+            .out_size(size_of::<GetAndClearStorageErrorInfoOut>())
+            .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
+            .send(ipc_buf)?;
+        Ok(*result.value::<GetAndClearStorageErrorInfoOut>())
+    })
 }
 
 pub(crate) fn get_mmc_cid(
@@ -186,15 +187,15 @@ pub(crate) fn get_game_card_device_certificate_legacy(
         _pad: 0,
         buffer_size: size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    object
-        .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
-        .context(ctx)
-        .in_raw(input.as_bytes())
-        .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send(&mut ipc_buf)
-        .map(|_| 0x200)
+    with_ipc_buffer(|ipc_buf| {
+        object
+            .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
+            .context(ctx)
+            .in_raw(input.as_bytes())
+            .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
+            .send(ipc_buf)
+            .map(|_| 0x200)
+    })
 }
 
 pub(crate) fn get_game_card_device_certificate(
@@ -209,16 +210,16 @@ pub(crate) fn get_game_card_device_certificate(
         _pad: 0,
         buffer_size: size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    let result = object
-        .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
-        .context(ctx)
-        .in_raw(input.as_bytes())
-        .out_size(size_of::<i64>())
-        .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send(&mut ipc_buf)?;
-    Ok(*result.value::<i64>())
+    with_ipc_buffer(|ipc_buf| {
+        let result = object
+            .dispatch(proto::DEVICE_OPERATOR_GET_GAME_CARD_DEVICE_CERTIFICATE)
+            .context(ctx)
+            .in_raw(input.as_bytes())
+            .out_size(size_of::<i64>())
+            .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
+            .send(ipc_buf)?;
+        Ok(*result.value::<i64>())
+    })
 }
 
 pub(crate) fn get_game_card_id_set(
@@ -270,15 +271,15 @@ pub(crate) fn challenge_card_existence(
     seed: &[u8],
     value: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    object
-        .dispatch(proto::DEVICE_OPERATOR_CHALLENGE_CARD_EXISTENCE)
-        .context(ctx)
-        .in_raw(handle.as_bytes())
-        .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(seed, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(value, BufferAttr::HIPC_MAP_ALIAS)
-        .send(&mut ipc_buf)
-        .map(|_| ())
+    with_ipc_buffer(|ipc_buf| {
+        object
+            .dispatch(proto::DEVICE_OPERATOR_CHALLENGE_CARD_EXISTENCE)
+            .context(ctx)
+            .in_raw(handle.as_bytes())
+            .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
+            .in_buffer(seed, BufferAttr::HIPC_MAP_ALIAS)
+            .in_buffer(value, BufferAttr::HIPC_MAP_ALIAS)
+            .send(ipc_buf)
+            .map(|_| ())
+    })
 }

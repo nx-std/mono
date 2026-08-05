@@ -5,20 +5,39 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
+use nx_sys_thread_tls::IpcBuffer;
 use zerocopy::IntoBytes as _;
+
+/// Runs `f` against this thread's IPC buffer.
+///
+/// Borrowing the buffer twice on one thread would put two `&mut` on the same
+/// TLS bytes, so every command must know that nobody else holds it. Acquiring
+/// it here and nowhere else turns that from a claim each command has to make
+/// into one a reader can check: reaching the buffer means calling this
+/// function, and no command body calls it again while `f` is running.
+///
+/// The borrow ends when `f` returns, so whatever `f` needs from the response
+/// must be copied out rather than returned by reference.
+pub(crate) fn with_ipc_buffer<R>(f: impl FnOnce(&mut IpcBuffer) -> R) -> R {
+    // SAFETY: no other `IpcBuffer` is live on this thread. The token is created
+    // here and dropped before returning, and `f` cannot make a second one
+    // without calling back into this function, which no command body does.
+    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    f(&mut buf)
+}
 
 pub(crate) fn dispatch_no_io(
     object: DomainObjectRef<'_>,
     cmd_id: u32,
     ctx: u32,
 ) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    object
-        .dispatch(cmd_id)
-        .context(ctx)
-        .send(&mut buf)
-        .map(|_| ())
+    with_ipc_buffer(|ipc_buf| {
+        object
+            .dispatch(cmd_id)
+            .context(ctx)
+            .send(ipc_buf)
+            .map(|_| ())
+    })
 }
 
 pub(crate) fn dispatch_in<I>(
@@ -30,14 +49,14 @@ pub(crate) fn dispatch_in<I>(
 where
     I: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    object
-        .dispatch(cmd_id)
-        .context(ctx)
-        .in_raw(input.as_bytes())
-        .send(&mut buf)
-        .map(|_| ())
+    with_ipc_buffer(|ipc_buf| {
+        object
+            .dispatch(cmd_id)
+            .context(ctx)
+            .in_raw(input.as_bytes())
+            .send(ipc_buf)
+            .map(|_| ())
+    })
 }
 
 pub(crate) fn dispatch_out<O>(
@@ -48,14 +67,14 @@ pub(crate) fn dispatch_out<O>(
 where
     O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    let result = object
-        .dispatch(cmd_id)
-        .context(ctx)
-        .out_size(size_of::<O>())
-        .send(&mut buf)?;
-    Ok(*result.value::<O>())
+    with_ipc_buffer(|ipc_buf| {
+        let result = object
+            .dispatch(cmd_id)
+            .context(ctx)
+            .out_size(size_of::<O>())
+            .send(ipc_buf)?;
+        Ok(*result.value::<O>())
+    })
 }
 
 pub(crate) fn dispatch_in_out<I, O>(
@@ -68,15 +87,15 @@ where
     I: zerocopy::IntoBytes + zerocopy::Immutable,
     O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    let result = object
-        .dispatch(cmd_id)
-        .context(ctx)
-        .in_raw(input.as_bytes())
-        .out_size(size_of::<O>())
-        .send(&mut buf)?;
-    Ok(*result.value::<O>())
+    with_ipc_buffer(|ipc_buf| {
+        let result = object
+            .dispatch(cmd_id)
+            .context(ctx)
+            .in_raw(input.as_bytes())
+            .out_size(size_of::<O>())
+            .send(ipc_buf)?;
+        Ok(*result.value::<O>())
+    })
 }
 
 pub(crate) fn dispatch_out_u8(
@@ -118,13 +137,13 @@ pub(crate) fn dispatch_in_size_out_buffer(
     size: i64,
     dst: &mut [u8],
 ) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    object
-        .dispatch(cmd_id)
-        .context(ctx)
-        .in_raw(size.as_bytes())
-        .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send(&mut buf)
-        .map(|_| ())
+    with_ipc_buffer(|ipc_buf| {
+        object
+            .dispatch(cmd_id)
+            .context(ctx)
+            .in_raw(size.as_bytes())
+            .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
+            .send(ipc_buf)
+            .map(|_| ())
+    })
 }

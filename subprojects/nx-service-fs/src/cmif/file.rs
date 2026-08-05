@@ -13,6 +13,7 @@ use crate::{
         dispatch_in_out,
         dispatch_no_io,
         dispatch_out_i64,
+        with_ipc_buffer,
     },
     file::{
         FileReadIn,
@@ -39,19 +40,19 @@ pub(crate) fn read(
         offset,
         read_size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    let result = object
-        .dispatch(proto::FILE_READ)
-        .context(ctx)
-        .in_raw(input.as_bytes())
-        .out_size(size_of::<u64>())
-        .out_buffer(
-            buf,
-            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-        )
-        .send(&mut ipc_buf)?;
-    Ok(*result.value::<u64>())
+    with_ipc_buffer(|ipc_buf| {
+        let result = object
+            .dispatch(proto::FILE_READ)
+            .context(ctx)
+            .in_raw(input.as_bytes())
+            .out_size(size_of::<u64>())
+            .out_buffer(
+                buf,
+                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+            )
+            .send(ipc_buf)?;
+        Ok(*result.value::<u64>())
+    })
 }
 
 pub(crate) fn write(
@@ -68,18 +69,18 @@ pub(crate) fn write(
         offset,
         write_size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
-    object
-        .dispatch(proto::FILE_WRITE)
-        .context(ctx)
-        .in_raw(input.as_bytes())
-        .in_buffer(
-            buf,
-            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
-        )
-        .send(&mut ipc_buf)
-        .map(|_| ())
+    with_ipc_buffer(|ipc_buf| {
+        object
+            .dispatch(proto::FILE_WRITE)
+            .context(ctx)
+            .in_raw(input.as_bytes())
+            .in_buffer(
+                buf,
+                BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
+            )
+            .send(ipc_buf)
+            .map(|_| ())
+    })
 }
 
 pub(crate) fn flush(object: DomainObjectRef<'_>, ctx: u32) -> Result<(), DispatchError> {
