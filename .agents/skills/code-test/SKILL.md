@@ -1,7 +1,7 @@
 ---
 name: code-test
 description: Run nx-std tests on Nintendo Switch hardware after format/check/clippy are green. Builds the nx-tests NRO, deploys via cargo-nx, and asks the user to confirm results on the console.
-allowed-tools: "Bash(just build-tests:*), Bash(just deploy:*), Bash(just list-options-configured:*), Bash(just reconfigure:*)"
+allowed-tools: "Bash(just build-tests:*), Bash(just deploy:*), Bash(just list-options-configured:*), Bash(just clean-all:*), Bash(just configure:*)"
 ---
 
 # Code Testing Skill
@@ -42,9 +42,9 @@ Tests must be built with `use_nx=enabled` (unless the user explicitly requests o
 just list-options-configured | grep use_nx
 ```
 
-If not enabled:
+If not enabled (a fresh configure, not reconfigure — flipping a `use_nx*` feature leaves stale override link args behind on reconfigure):
 ```bash
-just reconfigure -Duse_nx=enabled
+just clean-all && just configure -Duse_nx=enabled
 ```
 
 ### Step 2 — build the test NRO
@@ -95,7 +95,7 @@ Runnable without user permission:
 - `just list-options-configured`
 - `just build-tests`
 - `just deploy <nro-path>`
-- `just reconfigure -Duse_nx=enabled`
+- `just clean-all`, `just configure -Duse_nx=enabled`
 
 ## Related Skills
 

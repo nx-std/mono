@@ -115,16 +115,17 @@ After the header, sections appear in this order. Omit any that do not apply.
 
 | #   | Section banner                  | Purpose                                                                              |
 |-----|---------------------------------|--------------------------------------------------------------------------------------|
-| 1   | `Options`                       | Resolve `get_option(...)` calls into local variables when the same value is reused.  |
-| 2   | `Dependencies`                  | Pull sibling subprojects via `subproject(...)`, collect them into a `deps` list.     |
-| 3   | `Compilation specific files`    | Linker scripts, spec files, default assets exposed to consumers.                     |
-| 4   | `Source files`                  | `files(...)` lists for native sources (skip for Rust crates — Cargo discovers them). |
-| 5   | `Data files`                    | `files(...)` for embedded data, plus any `bin2s` / `generator` plumbing.             |
-| 6   | `Static library` / `ELF` / `Target` | The actual build target: `static_library`, `executable`, or `custom_target`.     |
-| 7   | `Post-processing and bundling`  | Per-output transforms (NSP/NRO bundling, listings, post-link tools).                 |
-| 8   | `Dependency declaration`        | Final `declare_dependency(...)` exposing the target to downstream consumers.         |
+| 1   | `Features`                      | Resolve the `use_nx_*` feature set — see [meson-options-features](meson-options-features.md). |
+| 2   | `Options`                       | Resolve every other `get_option(...)` call into a local variable when the value is reused. |
+| 3   | `Dependencies`                  | Pull sibling subprojects via `subproject(...)`, collect them into a `deps` list.     |
+| 4   | `Compilation specific files`    | Linker scripts, spec files, default assets exposed to consumers.                     |
+| 5   | `Source files`                  | `files(...)` lists for native sources (skip for Rust crates — Cargo discovers them). |
+| 6   | `Data files`                    | `files(...)` for embedded data, plus any `bin2s` / `generator` plumbing.             |
+| 7   | `Static library` / `ELF` / `Target` | The actual build target: `static_library`, `executable`, or `custom_target`.     |
+| 8   | `Post-processing and bundling`  | Per-output transforms (NSP/NRO bundling, listings, post-link tools).                 |
+| 9   | `Dependency declaration`        | Final `declare_dependency(...)` exposing the target to downstream consumers.         |
 
-A binary-producing subproject (`tests`, `examples`, `nx-hbmenu`) typically stops at section 7 because nothing downstream consumes it as a dependency. A library subproject typically stops at section 6 plus section 8 and omits 7.
+A binary-producing subproject (`tests`, `examples`, `nx-hbmenu`) typically stops at section 8 because nothing downstream consumes it as a dependency. A library subproject typically stops at section 7 plus section 9 and omits 8.
 
 ### 4.3 Options Resolution Block
 
@@ -134,13 +135,13 @@ When a subproject reads the same `get_option(...)` value in multiple places, lif
 #---------------------------------------------------------------------------------
 # Options
 #---------------------------------------------------------------------------------
-use_nx = get_option('use_nx')
-use_nx_alloc = get_option('use_nx_alloc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+link_pipeline = get_option('link_pipeline')
+nx_rt_kind = get_option('nx_rt_kind')
 ```
 
-- Use `enable_auto_if` / `disable_auto_if` to derive child toggles from a master switch (the `auto` feature pattern below).
-- One option per line; align by reader preference but keep the option name as the variable name (`use_nx_alloc = get_option('use_nx_alloc')`).
+- One option per line; keep the option name as the variable name (`nx_rt_kind = get_option('nx_rt_kind')`).
 - If an option is read exactly once, calling `get_option(...)` at the use site is fine — skip the block.
+- `use_nx_*` options are **not** resolved here. They are a feature set with dependency edges between them, resolved under the `Features` banner by the rules in [meson-options-features](meson-options-features.md); reading one directly with `get_option(...)` gives the root's unresolved value.
 
 ### 4.4 Dependency Declaration
 
@@ -194,7 +195,7 @@ option(
 
 ### Cross-Subproject Mirroring
 
-When two subprojects need to expose the same toggle (typical for the `use_nx*` feature flags consumed by both `subprojects/libnx/` and `subprojects/nx-std/`), declare the option in both `meson.options` files with **identical** name, type, default, and description. The matching `yield : true` setting lets the root `meson.options` value flow into both subprojects.
+When two subprojects need to expose the same toggle (typical for the `use_nx*` feature flags), declare the option in both `meson.options` files with **identical** name, type, default, and description, copied verbatim from the workspace root. The matching `yield : true` setting lets the root `meson.options` value flow into both subprojects. A subproject reads only options it declares itself, so its `meson.build` stands on its own; see [meson-options-features](meson-options-features.md) for what the `use_nx_*` set does with those values.
 
 ---
 
@@ -259,7 +260,7 @@ Before committing a new or modified `subprojects/<name>/meson.build` or `meson.o
 ### `meson.build`
 
 - [ ] First non-comment line is `project('<name>', version : '...')` with the right language list and `default_options` for the subproject kind.
-- [ ] Sections appear in the canonical order (Options → Dependencies → … → Dependency declaration) and are separated by `#----` banners.
+- [ ] Sections appear in the canonical order (Features → Options → Dependencies → … → Dependency declaration) and are separated by `#----` banners.
 - [ ] Repeated `get_option(...)` reads are lifted into an `Options` block; one-shot reads stay inline.
 - [ ] `declare_dependency(...)` is the final section for library subprojects; binary subprojects stop at the build target / bundling block.
 
@@ -279,6 +280,7 @@ Before committing a new or modified `subprojects/<name>/meson.build` or `meson.o
 
 ## References
 
+- [meson-options-features](meson-options-features.md) - Related: the `use_nx_*` feature set and how it resolves
 - [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate specialization of this layout
 - [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts exposed as subproject variables
 - [../workspace](../workspace.md) - See also: Workspace-level Meson root and crate categorization

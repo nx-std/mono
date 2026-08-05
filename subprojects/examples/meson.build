@@ -3,6 +3,34 @@ project('switch-examples', 'cpp', 'c',
         meson_version : '>=1.4.0')
 
 #---------------------------------------------------------------------------------
+# Features
+#---------------------------------------------------------------------------------
+# The runtime override is kind-specific: `nx_rt_kind` selects the entry crate
+# bundled into `nx-std`, and every artifact this subproject produces is an NRO.
+# An NRO carrying the `nso` runtime links cleanly and never boots - the
+# pm-launch startup expects no homebrew loader, so env and argv come up from
+# state the loader never wrote.
+use_nx = get_option('use_nx')
+#
+# Against the prebuilt devkitPro archive the runtime feature is unavailable -
+# that archive brings its own runtime - so there is nothing kind-specific to
+# gate, and an explicit `use_nx_rt` is refused by `nx-std`'s resolution.
+nx_rt_available = not get_option('use_libnx_dkp').enabled()
+use_nx_rt = get_option('use_nx_rt').enable_auto_if(use_nx.enabled())
+if nx_rt_available and use_nx_rt.enabled() and get_option('nx_rt_kind') != 'nro'
+    error(
+        'switch-examples bundles NRO artifacts, but nx_rt_kind is \'@0@\': the runtime linked '.format(
+            get_option('nx_rt_kind'),
+        )
+        + 'into them would be the pm-launch one, which never boots under the homebrew '
+        + 'loader. Set -Dnx_rt_kind=nro or disable use_nx_rt.',
+    )
+endif
+if nx_rt_available and use_nx_rt.enabled()
+    debug('rt feature: enabled')
+endif
+
+#---------------------------------------------------------------------------------
 # Dependencies
 #---------------------------------------------------------------------------------
 # libnx

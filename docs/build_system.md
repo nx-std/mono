@@ -174,50 +174,30 @@ just list-options-configured
 - **`disabled`**: Force disable (always use C implementation)
 - **`auto`** (default): Follow the `use_nx` master switch
 
-### Auto-Enable/Disable Pattern
+### Feature Resolution (Cargo-Style)
 
-Individual options use conditional logic based on the master `use_nx` switch:
+The `use_nx_*` options resolve the way Cargo resolves `[features]`: a feature is asked for by name, and asking
+for it also asks for what it depends on.
 
-```meson
-use_nx = get_option('use_nx')
+| You pass                                        | You get                                          |
+|-------------------------------------------------|--------------------------------------------------|
+| `-Duse_nx=enabled`                              | every feature left on `auto`                     |
+| `-Duse_nx_fsdev=enabled`                        | `fsdev` plus `sys_fd`, `service_fs`, `rt`        |
+| `-Duse_nx=enabled -Duse_nx_time=disabled`       | everything except `time` (and what needed it)    |
+| `-Duse_nx_fsdev=enabled -Duse_nx_service_fs=disabled` | a configure error naming both sides        |
 
-use_nx_alloc = get_option('use_nx_alloc')
-    .enable_auto_if(use_nx.enabled())
-    .disable_auto_if(use_nx.disabled())
-```
+Pull-up and push-down only move features left on `auto`; two explicit choices that contradict each other fail
+configuration rather than being silently reconciled. Against the prebuilt archive (`use_libnx_dkp`), features
+that would alias over its own runtime and services are unavailable and refused when named.
 
-**Examples**:
-
-| `use_nx` | `use_nx_alloc` | Result                             |
-|----------|----------------|------------------------------------|
-| enabled  | auto           | **enabled** (follows master)       |
-| disabled | auto           | **disabled** (follows master)      |
-| enabled  | disabled       | **disabled** (override forces off) |
-| disabled | enabled        | **enabled** (override forces on)   |
+The rules live in [`docs/code/meson-options-features.md`](code/meson-options-features.md).
 
 ### Option Propagation
 
-Options are declared in `meson.options` with `yield: true`, allowing them to propagate to subprojects:
-
-```meson
-option('use_nx_alloc',
-    type : 'feature', value : 'auto',
-    description : 'Override libnx allocation with nx-alloc',
-    yield : true  # Propagate to subprojects
-)
-```
-
-Subprojects receive these options and can pass them further:
-
-```meson
-# In libnx/meson.build
-nx_std_proj = subproject('nx-std',
-    default_options : {
-        'use_nx_alloc' : '@0@'.format(use_nx_alloc),
-        'use_nx_svc' : '@0@'.format(use_nx_svc),
-    }
-)
-```
+Every `use_nx_*` option is declared at the workspace root and mirrored verbatim (with `yield : true`) into the
+`meson.options` of each subproject that reads it, so the root's value reaches every depth. Each consuming
+`meson.build` resolves the feature set for itself from those options — nothing is forwarded through
+`subproject(default_options : ...)`, and no subproject reads another's resolution.
 
 ### Usage Examples
 

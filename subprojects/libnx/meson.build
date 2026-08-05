@@ -8,45 +8,54 @@ project('nx', 'c',
         ])
 
 #---------------------------------------------------------------------------------
-# Options
+# Features
 #---------------------------------------------------------------------------------
-# The `use_nx` global option is used to enable/disable the function overrides.
-# If enabled, and the specialized options are in auto mode, the overrides are enabled.
-# If disabled, and the specialized options are in auto mode, the overrides are disabled.
-# Individually, the specialized options can override the `use_nx` global option.
+# Whether any `use_nx_*` feature is on, which is the only thing this archive asks
+# of the feature set: it decides whether `nx-std` is linked in at all. Which
+# features are on is resolved by `nx-std` itself, from the same options read
+# here.
+#
+# A feature is on when it is named explicitly or when the `use_nx` master switch
+# turns it on. The dependency edges between features are not applied here and do
+# not need to be: pull-up only ever enables a feature behind one that is already
+# enabled, so it cannot turn this answer from false to true, and push-down only
+# retracts a feature the master switch turned on, which already answered true.
 use_nx = get_option('use_nx')
 
-use_nx_alloc = get_option('use_nx_alloc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_rand = get_option('use_nx_rand').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_rt = get_option('use_nx_rt').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_std_sync = get_option('use_nx_std_sync').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_svc = get_option('use_nx_svc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_sys_mem = get_option('use_nx_sys_mem').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_sys_sync = get_option('use_nx_sys_sync').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_sys_thread = get_option('use_nx_sys_thread').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_sys_thread_tls = get_option('use_nx_sys_thread_tls').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_time = get_option('use_nx_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_sf = get_option('use_nx_sf').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_apm = get_option('use_nx_service_apm').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_applet = get_option('use_nx_service_applet').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_hid = get_option('use_nx_service_hid').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_set = get_option('use_nx_service_set').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_time = get_option('use_nx_service_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_sm = get_option('use_nx_service_sm').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_nv = get_option('use_nx_service_nv').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
-use_nx_service_vi = get_option('use_nx_service_vi').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+nx_features_asked = {
+    'alloc' : get_option('use_nx_alloc'),
+    'display' : get_option('use_nx_display'),
+    'fsdev' : get_option('use_nx_fsdev'),
+    'pm' : get_option('use_nx_pm'),
+    'rand' : get_option('use_nx_rand'),
+    'rt' : get_option('use_nx_rt'),
+    'service_apm' : get_option('use_nx_service_apm'),
+    'service_applet' : get_option('use_nx_service_applet'),
+    'service_applet_err' : get_option('use_nx_service_applet_err'),
+    'service_fs' : get_option('use_nx_service_fs'),
+    'service_hid' : get_option('use_nx_service_hid'),
+    'service_nv' : get_option('use_nx_service_nv'),
+    'service_set' : get_option('use_nx_service_set'),
+    'service_sfdnsres' : get_option('use_nx_service_sfdnsres'),
+    'service_sm' : get_option('use_nx_service_sm'),
+    'service_time' : get_option('use_nx_service_time'),
+    'service_vi' : get_option('use_nx_service_vi'),
+    'sf' : get_option('use_nx_sf'),
+    'std_sync' : get_option('use_nx_std_sync'),
+    'svc' : get_option('use_nx_svc'),
+    'sys_fd' : get_option('use_nx_sys_fd'),
+    'sys_mem' : get_option('use_nx_sys_mem'),
+    'sys_sync' : get_option('use_nx_sys_sync'),
+    'sys_thread' : get_option('use_nx_sys_thread'),
+    'sys_thread_tls' : get_option('use_nx_sys_thread_tls'),
+    'time' : get_option('use_nx_time'),
+    'wlaninf' : get_option('use_nx_wlaninf'),
+}
 
-# `use_nx_service_time` implies `use_nx_time`: the Time service anchors the realtime clock, and
-# the newlib syscalls that read that anchor back belong to `nx-time`.
-use_nx_time = use_nx_time.enable_auto_if(use_nx_service_time.enabled())
-
-# `enable_auto_if` only resolves an `auto`, so an explicit `disabled` still contradicts it.
-if use_nx_service_time.enabled() and use_nx_time.disabled()
-    error(
-        'use_nx_service_time requires use_nx_time: the wall-clock anchor and the syscalls '
-        + 'that read it must come from the same implementation.',
-    )
-endif
+nx_features_any = use_nx.enabled()
+foreach _, asked : nx_features_asked
+    nx_features_any = nx_features_any or asked.enabled()
+endforeach
 
 #---------------------------------------------------------------------------------
 # Dependencies
@@ -55,37 +64,8 @@ deps = []
 deps_override_link_args = []
 
 # nx-std
-if (use_nx.enabled()
-    or use_nx_alloc.enabled() or use_nx_rand.enabled() or use_nx_rt.enabled() or use_nx_std_sync.enabled()
-    or use_nx_svc.enabled() or use_nx_sys_mem.enabled() or use_nx_sys_sync.enabled() or use_nx_sys_thread.enabled() or use_nx_sys_thread_tls.enabled()
-    or use_nx_time.enabled() or use_nx_sf.enabled()
-    or use_nx_service_apm.enabled() or use_nx_service_applet.enabled() or use_nx_service_hid.enabled() or use_nx_service_nv.enabled() or use_nx_service_set.enabled() or use_nx_service_time.enabled() or use_nx_service_sm.enabled() or use_nx_service_vi.enabled())
-
-    nx_std_proj = subproject(
-        'nx-std',
-        default_options : {
-            'use_nx_alloc' : '@0@'.format(use_nx_alloc),
-            'use_nx_rand' : '@0@'.format(use_nx_rand),
-            'use_nx_rt' : '@0@'.format(use_nx_rt),
-            'use_nx_std_sync' : '@0@'.format(use_nx_std_sync),
-            'use_nx_svc' : '@0@'.format(use_nx_svc),
-            'use_nx_sys_mem' : '@0@'.format(use_nx_sys_mem),
-            'use_nx_sys_sync' : '@0@'.format(use_nx_sys_sync),
-            'use_nx_sys_thread' : '@0@'.format(use_nx_sys_thread),
-            'use_nx_sys_thread_tls' : '@0@'.format(use_nx_sys_thread_tls),
-            'use_nx_time' : '@0@'.format(use_nx_time),
-            'use_nx_sf' : '@0@'.format(use_nx_sf),
-            'use_nx_service_apm' : '@0@'.format(use_nx_service_apm),
-            'use_nx_service_applet' : '@0@'.format(use_nx_service_applet),
-            'use_nx_service_hid' : '@0@'.format(use_nx_service_hid),
-            'use_nx_service_set' : '@0@'.format(use_nx_service_set),
-            'use_nx_service_time' : '@0@'.format(use_nx_service_time),
-            'use_nx_service_sm' : '@0@'.format(use_nx_service_sm),
-            'use_nx_service_nv' : '@0@'.format(use_nx_service_nv),
-            'use_nx_service_vi' : '@0@'.format(use_nx_service_vi),
-        },
-    )
-
+if nx_features_any
+    nx_std_proj = subproject('nx-std')
 
     debug('Using nx-std')
     deps += nx_std_proj.get_variable('nx_std_dep')

@@ -19,6 +19,56 @@ if get_option('buildtype') != 'release'
 endif
 
 #---------------------------------------------------------------------------------
+# Features
+#---------------------------------------------------------------------------------
+# Tests link against the Rust oneshot FFI exported by `nx-std-sync`, which is
+# emitted only when the `std_sync` feature is on.
+#
+# The master switch has to be applied here rather than reading the option raw:
+# `get_option` answers with the root's unresolved value, so a build configured
+# with `-Duse_nx=enabled` alone would be rejected for an `auto` that the switch
+# had in fact turned on.
+#
+# No dependency table is needed. `std_sync` sits at the bottom of the feature
+# graph and depends on nothing, so the master switch is the whole resolution.
+use_nx = get_option('use_nx')
+use_nx_std_sync = get_option('use_nx_std_sync').enable_auto_if(use_nx.enabled())
+
+# Fail configuration here rather than letting the linker report missing
+# `__nx_std_sync__*` symbols.
+if not use_nx_std_sync.enabled()
+    error(
+        'nx-tests requires the std_sync feature, which is @0@: enable it with '.format(use_nx_std_sync)
+        + '-Duse_nx_std_sync=enabled, or with -Duse_nx=enabled for the whole feature set.',
+    )
+endif
+debug('std_sync feature: enabled')
+
+# The runtime override is kind-specific: `nx_rt_kind` selects the entry crate
+# bundled into `nx-std`, and every artifact this subproject produces is an NRO.
+# An NRO carrying the `nso` runtime links cleanly and never boots - the
+# pm-launch startup expects no homebrew loader, so env and argv come up from
+# state the loader never wrote.
+#
+# Against the prebuilt devkitPro archive the runtime feature is unavailable -
+# that archive brings its own runtime - so there is nothing kind-specific to
+# gate, and an explicit `use_nx_rt` is refused by `nx-std`'s resolution.
+nx_rt_available = not get_option('use_libnx_dkp').enabled()
+use_nx_rt = get_option('use_nx_rt').enable_auto_if(use_nx.enabled())
+if nx_rt_available and use_nx_rt.enabled() and get_option('nx_rt_kind') != 'nro'
+    error(
+        'nx-tests bundles NRO artifacts, but nx_rt_kind is \'@0@\': the runtime linked '.format(
+            get_option('nx_rt_kind'),
+        )
+        + 'into them would be the pm-launch one, which never boots under the homebrew '
+        + 'loader. Set -Dnx_rt_kind=nro or disable use_nx_rt.',
+    )
+endif
+if nx_rt_available and use_nx_rt.enabled()
+    debug('rt feature: enabled')
+endif
+
+#---------------------------------------------------------------------------------
 # Dependencies
 #---------------------------------------------------------------------------------
 # libnx
@@ -33,14 +83,6 @@ nx_switch_specs = nx_proj.get_variable('nx_switch_specs')
 nx_default_icon = nx_proj.get_variable('nx_default_icon')
 
 # nx-std-sync
-# Tests link against the Rust oneshot FFI exported by nx-std-sync. That FFI is
-# only emitted when `use_nx_std_sync` is explicitly enabled — `auto` resolves to
-# off here because libnx itself does not pull the symbols in. Fail configuration
-# early instead of letting the linker report missing `__nx_std_sync__*` symbols.
-if not get_option('use_nx_std_sync').enabled()
-    error('nx-tests requires -Duse_nx_std_sync=enabled (currently @0@)'.format(get_option('use_nx_std_sync')))
-endif
-
 nx_std_sync_proj = subproject('nx-std-sync')
 nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
 
