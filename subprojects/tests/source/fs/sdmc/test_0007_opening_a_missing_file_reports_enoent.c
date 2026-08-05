@@ -8,7 +8,8 @@
 
 //<editor-fold desc="Test 0007: opening a missing file reports ENOENT">
 
-#define MISSING_PATH SDMC_PATH("not-here.txt")
+#define TEST_DIR SDMC_TEST_DIR("0007-opening-a-missing-file-reports-enoent")
+#define MISSING_PATH TEST_DIR "/not-here.txt"
 
 test_rc_t test_0007_opening_a_missing_file_reports_enoent(void)
 {
@@ -16,8 +17,8 @@ test_rc_t test_0007_opening_a_missing_file_reports_enoent(void)
     // An empty fixture directory, so the path below names nothing. The error
     // number is cleared first, because a successful call may leave whatever an
     // earlier failure put there.
-    if (!sdmc_fixture_reset()) {
-        return TEST_ASSERTION_FAILED;
+    if (!sdmc_fixture_open(TEST_DIR)) {
+        return TEST_SETUP_FAILED;
     }
     errno = 0;
 
@@ -34,7 +35,7 @@ test_rc_t test_0007_opening_a_missing_file_reports_enoent(void)
         fclose(file);
     }
 
-    sdmc_remove_tree(SDMC_ROOT);
+    sdmc_fixture_close(TEST_DIR);
     return correct ? TEST_SUCCESS : TEST_ASSERTION_FAILED;
 }
 

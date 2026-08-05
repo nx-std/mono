@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 /**
- * @brief Directory every test in this suite works inside.
+ * @brief Directory the suite works inside.
  *
  * Named after the binary so a run that dies partway leaves something
  * identifiable on the SD card rather than litter under the root.
@@ -15,16 +15,19 @@
 #define SDMC_ROOT "sdmc:/nx-tests-fs"
 
 /**
- * @brief Builds a path inside the suite's directory.
+ * @brief Builds the path of a directory belonging to one test.
+ *
+ * Every test works inside its own, named after itself. Sharing one directory
+ * would make each test's setup responsible for cleaning up after whichever test
+ * ran before it: a leak would be silently absorbed by the next reset, and a
+ * failure would be attributable to no one in particular.
  */
-#define SDMC_PATH(name) SDMC_ROOT "/" name
+#define SDMC_TEST_DIR(test_name) SDMC_ROOT "/" test_name
 
 /**
  * @brief Removes `path` and everything under it, ignoring what was not there.
  *
- * Tests call this before and after their own work: before, because a previous
- * run may have died holding the fixture, and after, so the SD card is left as
- * it was found. One level of nesting is enough — no test here builds deeper.
+ * One level of nesting is enough — no test here builds deeper.
  */
 static inline void sdmc_remove_tree(const char* path) {
     DIR* dir = opendir(path);
@@ -52,13 +55,31 @@ static inline void sdmc_remove_tree(const char* path) {
 }
 
 /**
- * @brief Empties the suite's directory and recreates it.
+ * @brief Gives a test an empty directory of its own to work in.
+ *
+ * Removes whatever a previous run left at `dir` before recreating it, so a test
+ * starts from the same state whether or not the last run finished.
  *
  * @return true when the directory exists and is empty afterwards.
  */
-static inline bool sdmc_fixture_reset(void) {
-    sdmc_remove_tree(SDMC_ROOT);
-    return mkdir(SDMC_ROOT, 0777) == 0;
+static inline bool sdmc_fixture_open(const char* dir) {
+    // The suite's own directory may or may not be there; only its absence after
+    // this call is a problem, which the per-test `mkdir` below reports.
+    mkdir(SDMC_ROOT, 0777);
+
+    sdmc_remove_tree(dir);
+    return mkdir(dir, 0777) == 0;
+}
+
+/**
+ * @brief Gives back the directory a test was working in.
+ *
+ * Called once per test, after its verdict has been decided, so that nothing it
+ * asserts on can be disturbed by the cleanup — an `errno` read after this would
+ * report whatever the removal did, not what the test saw.
+ */
+static inline void sdmc_fixture_close(const char* dir) {
+    sdmc_remove_tree(dir);
 }
 
 /**

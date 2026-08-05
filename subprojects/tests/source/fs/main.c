@@ -9,10 +9,11 @@
 // What is exercised is the whole stack rather than the `fsp-srv` commands
 // alone: newlib's stdio calls libsysbase, which dispatches through the
 // descriptor table to fsdev, which issues the commands. The same binary links
-// with or without `use_nx_service_fs` — with the option off the commands
-// resolve to libnx and show what the stock implementation does, with it on they
-// resolve to `__nx_rt_nro__libnx_fs_*` and Rust owns the session. Running both
-// is the comparison worth making.
+// whichever way the build is configured — with `use_nx_service_fs` and
+// `use_nx_fsdev` off, the commands and the device above them resolve to libnx
+// and show what the stock implementation does; with them on, they resolve to
+// `__nx_rt_nro__libnx_fs_*` and `__nx_fsdev__*` and Rust owns both the session
+// and the device. Running both is the comparison worth making.
 
 #include <inttypes.h>
 #include <stdio.h>

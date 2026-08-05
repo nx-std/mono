@@ -186,8 +186,9 @@ custom_target(name + '.nro',
 # the SD card: a card that is missing, full or write-protected fails this whole
 # suite for reasons that have nothing to do with the code, and that must not be
 # able to take the main suite down with it. It links either way — with
-# `use_nx_service_fs` off the `fs*` commands resolve to libnx, which is the
-# baseline to compare our implementation against.
+# `use_nx_service_fs` and `use_nx_fsdev` off the `fs*` commands and the devoptab
+# layer above them resolve to libnx, which is the baseline to compare our
+# implementation against.
 name = 'nx-tests-fs'
 src = files(
     'source/fs/sdmc/fixture.h',
@@ -199,6 +200,16 @@ src = files(
     'source/fs/sdmc/test_0005_rename_moves_the_entry.c',
     'source/fs/sdmc/test_0006_unlink_and_rmdir_remove_entries.c',
     'source/fs/sdmc/test_0007_opening_a_missing_file_reports_enoent.c',
+    'source/fs/sdmc/test_0008_chdir_makes_relative_paths_resolve.c',
+    'source/fs/sdmc/test_0009_getcwd_reports_the_working_directory.c',
+    'source/fs/sdmc/test_0010_mkdir_on_an_existing_entry_reports_eexist.c',
+    'source/fs/sdmc/test_0011_rmdir_on_a_non_empty_directory_fails.c',
+    'source/fs/sdmc/test_0012_append_mode_writes_at_the_end.c',
+    'source/fs/sdmc/test_0013_ftruncate_shortens_the_file.c',
+    'source/fs/sdmc/test_0014_write_larger_than_one_command_round_trips.c',
+    'source/fs/sdmc/test_0015_two_descriptors_on_one_file_are_independent.c',
+    'source/fs/sdmc/test_0016_statvfs_reports_the_card_capacity.c',
+    'source/fs/sdmc/test_0017_exclusive_create_on_an_existing_file_reports_eexist.c',
     'source/fs/main.c',
 )
 elf = executable(name + '.elf', src,

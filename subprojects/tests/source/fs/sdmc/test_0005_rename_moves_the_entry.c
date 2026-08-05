@@ -9,8 +9,9 @@
 
 //<editor-fold desc="Test 0005: rename moves the entry">
 
-#define OLD_PATH SDMC_PATH("before.txt")
-#define NEW_PATH SDMC_PATH("after.txt")
+#define TEST_DIR SDMC_TEST_DIR("0005-rename-moves-the-entry")
+#define OLD_PATH TEST_DIR "/before.txt"
+#define NEW_PATH TEST_DIR "/after.txt"
 #define CONTENT "contents survive the rename"
 
 test_rc_t test_0005_rename_moves_the_entry(void)
@@ -18,9 +19,9 @@ test_rc_t test_0005_rename_moves_the_entry(void)
     //* Given
     // A file under a name nothing else uses, with known contents so the move
     // can be shown to have carried them.
-    if (!sdmc_fixture_reset() || !sdmc_write_file(OLD_PATH, CONTENT)) {
-        sdmc_remove_tree(SDMC_ROOT);
-        return TEST_ASSERTION_FAILED;
+    if (!sdmc_fixture_open(TEST_DIR) || !sdmc_write_file(OLD_PATH, CONTENT)) {
+        sdmc_fixture_close(TEST_DIR);
+        return TEST_SETUP_FAILED;
     }
 
     //* When
@@ -39,7 +40,7 @@ test_rc_t test_0005_rename_moves_the_entry(void)
 
     const bool correct = renamed && old_gone && new_exists && contents_kept;
 
-    sdmc_remove_tree(SDMC_ROOT);
+    sdmc_fixture_close(TEST_DIR);
     return correct ? TEST_SUCCESS : TEST_ASSERTION_FAILED;
 }
 

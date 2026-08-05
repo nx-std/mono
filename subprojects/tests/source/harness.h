@@ -43,6 +43,15 @@ typedef void (*TestSuiteFn)(void);
 #define TEST_SKIPPED ((test_rc_t)-502)
 
 /**
+ * @brief The failure code for a test case whose fixture could not be built.
+ *
+ * Distinct from an assertion failure on purpose: it says the test never got as
+ * far as exercising what it is named after, so the thing under test is neither
+ * accused nor cleared.
+ */
+#define TEST_SETUP_FAILED ((test_rc_t)-503)
+
+/**
  * Test suite declaration.
  *
  * @param suite_name The name of the test suite.
@@ -109,6 +118,8 @@ static int test_case_thread_func(void* arg) {
                     printf(CONSOLE_GREEN "OK" CONSOLE_RESET "\n"); \
                 } else if (test_res == TEST_TODO) { \
                     printf(CONSOLE_MAGENTA "TODO" CONSOLE_RESET "\n"); \
+                } else if (test_res == TEST_SETUP_FAILED) { \
+                    printf(CONSOLE_YELLOW "SETUP FAILED" CONSOLE_RESET "\n"); \
                 } else { \
                     printf(CONSOLE_RED "FAILED" CONSOLE_RESET " (0x%X)\n", test_res); \
                 } \

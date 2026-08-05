@@ -8,7 +8,8 @@
 
 //<editor-fold desc="Test 0003: seek moves the read position">
 
-#define FILE_PATH SDMC_PATH("seek.txt")
+#define TEST_DIR SDMC_TEST_DIR("0003-seek-moves-the-read-position")
+#define FILE_PATH TEST_DIR "/seek.txt"
 #define CONTENT "0123456789"
 
 test_rc_t test_0003_seek_moves_the_read_position(void)
@@ -16,14 +17,14 @@ test_rc_t test_0003_seek_moves_the_read_position(void)
     //* Given
     // A file whose every byte says where it sits, so a read proves which
     // position it started from.
-    if (!sdmc_fixture_reset() || !sdmc_write_file(FILE_PATH, CONTENT)) {
-        sdmc_remove_tree(SDMC_ROOT);
-        return TEST_ASSERTION_FAILED;
+    if (!sdmc_fixture_open(TEST_DIR) || !sdmc_write_file(FILE_PATH, CONTENT)) {
+        sdmc_fixture_close(TEST_DIR);
+        return TEST_SETUP_FAILED;
     }
 
     FILE* file = fopen(FILE_PATH, "r");
     if (file == NULL) {
-        sdmc_remove_tree(SDMC_ROOT);
+        sdmc_fixture_close(TEST_DIR);
         return TEST_ASSERTION_FAILED;
     }
 
@@ -55,7 +56,7 @@ test_rc_t test_0003_seek_moves_the_read_position(void)
         && from_current == '2'
         && from_end == '9';
 
-    sdmc_remove_tree(SDMC_ROOT);
+    sdmc_fixture_close(TEST_DIR);
     return correct ? TEST_SUCCESS : TEST_ASSERTION_FAILED;
 }
 

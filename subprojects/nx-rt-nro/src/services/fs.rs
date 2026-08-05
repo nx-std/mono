@@ -1,96 +1,70 @@
-//! `fsp-srv` service state and singleton API.
+//! `fsp-srv` service bootstrap.
 //!
-//! This module manages the `fsp-srv` service session and provides a singleton
-//! interface for accessing the filesystem service throughout the application
-//! lifecycle.
+//! Connecting is this crate's business, because it needs the Service Manager the runtime
+//! bootstraps. Holding the session afterwards is not: every filesystem, file and directory handed
+//! to C is an id inside that session's domain, and so is every object the filesystem device opens,
+//! so the session lives in [`nx_fsdev::service`] where both can reach it.
 //!
-//! Unlike the other service managers, the session this one owns is a *domain*
-//! backed by a pool of cloned sessions, mirroring libnx's `g_fsSessionMgr`.
-//! Every filesystem, file and directory handed to C is a domain object id
-//! addressed through that pool, so the pool must outlive them all.
+//! What remains here is [`init`], which connects and hands the session down, and the two
+//! accessors the FFI modules use, re-exported so a call site reads the same as it did when the
+//! session lived here.
 
-use nx_service_fs::FsService;
-use nx_std_sync::{
-    once_lock::OnceLock,
-    rwlock::RwLock,
+pub use nx_fsdev::service::{
+    clear as exit,
+    get as get_service,
 };
 
 use crate::services::sm;
 
-/// Global `fsp-srv` state, lazily initialized.
-static FS_STATE: OnceLock<RwLock<Option<FsState>>> = OnceLock::new();
-
-/// Returns a reference to the `fsp-srv` state lock, initializing it if needed.
-fn state() -> &'static RwLock<Option<FsState>> {
-    FS_STATE.get_or_init(|| RwLock::new(None))
-}
-
 /// Initializes the `fsp-srv` service.
 ///
-/// This matches libnx's `fsInitialize()`: it looks the service up through SM,
-/// converts the session to a domain, announces the current process, and clones
-/// the session into the request pool.
+/// This matches libnx's `fsInitialize()`: it looks the service up through SM, converts the session
+/// to a domain, announces the current process, and clones the session into the request pool.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if SM is not initialized.
-pub fn init() -> Result<(), ConnectError> {
+/// Returns [`InitError::SmNotInitialized`] when the Service Manager has not been bootstrapped
+/// yet, and [`InitError::Connect`] when `fsp-srv` could not be reached through it.
+pub fn init() -> Result<(), InitError> {
     let sm_guard = sm::sm_session();
-    let sm = sm_guard.as_ref().expect("SM not initialized");
+    let Some(sm) = sm_guard.as_ref() else {
+        return Err(InitError::SmNotInitialized);
+    };
 
-    let service = nx_service_fs::connect_cmif(sm).map_err(ConnectError)?;
-
-    let mut guard = state().write();
-    *guard = Some(FsState { service });
+    let service = nx_service_fs::connect_cmif(sm).map_err(InitError::Connect)?;
+    nx_fsdev::service::set(service);
 
     Ok(())
 }
 
-/// Gets the `fsp-srv` service.
-pub fn get_service() -> Option<impl core::ops::Deref<Target = FsService> + 'static> {
-    let guard = state().read();
-    if guard.is_some() {
-        Some(FsServiceRef(guard))
-    } else {
-        None
-    }
-}
-
-/// Exits the `fsp-srv` service.
-pub fn exit() {
-    let mut guard = state().write();
-    // `FsService` is RAII; dropping the taken state closes the pooled sessions.
-    let _ = guard.take();
-}
-
-/// Internal storage for the `fsp-srv` service.
-struct FsState {
-    /// `fsp-srv` service session, converted to a domain and pooled.
-    service: FsService,
-}
-
-/// Wrapper for accessing `FsService` through `RwLockReadGuard`.
-struct FsServiceRef(nx_std_sync::rwlock::RwLockReadGuard<'static, Option<FsState>>);
-
-impl core::ops::Deref for FsServiceRef {
-    type Target = FsService;
-
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create FsServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
-    }
-}
-
-/// Error returned by [`init`] when connecting to the `fsp-srv` service fails.
+/// Errors returned by [`init`].
 #[derive(Debug, thiserror::Error)]
-#[error("failed to connect to fsp-srv service")]
-pub struct ConnectError(#[source] pub nx_service_fs::ConnectCmifError);
+pub enum InitError {
+    /// The Service Manager has not been bootstrapped
+    ///
+    /// Occurs when `fsInitialize` runs before `smInitialize`, which is the order libnx's startup
+    /// establishes. Nothing was connected and no session was installed.
+    #[error("the Service Manager is not initialized")]
+    SmNotInitialized,
+
+    /// The `fsp-srv` service could not be reached
+    ///
+    /// Occurs when the Service Manager refused the request or the session could not be converted
+    /// to a domain. Nothing was installed.
+    #[error("failed to connect to the fsp-srv service")]
+    Connect(#[source] nx_service_fs::ConnectCmifError),
+}
 
 #[cfg(feature = "ffi")]
-impl nx_rt_core::error::ToResultCode for ConnectError {
+impl nx_rt_core::error::ToResultCode for InitError {
     fn to_rc(self) -> nx_rt_core::error::ResultCode {
         use nx_sf::error::ToResultCode as _;
 
-        self.0.to_rc()
+        match self {
+            // The Service Manager owns no code for "you called me too early", and libnx aborts
+            // rather than reporting one, so this borrows the generic failure the caller can act on.
+            Self::SmNotInitialized => nx_rt_core::ffi::common::GENERIC_ERROR,
+            Self::Connect(err) => err.to_rc(),
+        }
     }
 }

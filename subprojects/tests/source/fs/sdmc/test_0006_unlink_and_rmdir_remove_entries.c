@@ -8,19 +8,20 @@
 
 //<editor-fold desc="Test 0006: unlink and rmdir remove entries">
 
-#define FILE_PATH SDMC_PATH("doomed.txt")
-#define DIR_PATH SDMC_PATH("doomed-dir")
+#define TEST_DIR SDMC_TEST_DIR("0006-unlink-and-rmdir-remove-entries")
+#define FILE_PATH TEST_DIR "/doomed.txt"
+#define DIR_PATH TEST_DIR "/doomed-dir"
 
 test_rc_t test_0006_unlink_and_rmdir_remove_entries(void)
 {
     //* Given
     // One file and one empty directory, which are the two things the device is
     // asked to remove and which it removes through different commands.
-    if (!sdmc_fixture_reset()
+    if (!sdmc_fixture_open(TEST_DIR)
         || !sdmc_write_file(FILE_PATH, "delete me")
         || mkdir(DIR_PATH, 0777) != 0) {
-        sdmc_remove_tree(SDMC_ROOT);
-        return TEST_ASSERTION_FAILED;
+        sdmc_fixture_close(TEST_DIR);
+        return TEST_SETUP_FAILED;
     }
 
     //* When
@@ -35,7 +36,7 @@ test_rc_t test_0006_unlink_and_rmdir_remove_entries(void)
 
     const bool correct = file_removed && dir_removed && file_gone && dir_gone;
 
-    sdmc_remove_tree(SDMC_ROOT);
+    sdmc_fixture_close(TEST_DIR);
     return correct ? TEST_SUCCESS : TEST_ASSERTION_FAILED;
 }
 

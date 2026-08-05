@@ -8,16 +8,17 @@
 
 //<editor-fold desc="Test 0002: stat reports size and type">
 
-#define FILE_PATH SDMC_PATH("stat.txt")
+#define TEST_DIR SDMC_TEST_DIR("0002-stat-reports-size-and-type")
+#define FILE_PATH TEST_DIR "/stat.txt"
 #define CONTENT "twenty-four characters!!"
 
 test_rc_t test_0002_stat_reports_size_and_type(void)
 {
     //* Given
     // A file of known length, and the directory holding it.
-    if (!sdmc_fixture_reset() || !sdmc_write_file(FILE_PATH, CONTENT)) {
-        sdmc_remove_tree(SDMC_ROOT);
-        return TEST_ASSERTION_FAILED;
+    if (!sdmc_fixture_open(TEST_DIR) || !sdmc_write_file(FILE_PATH, CONTENT)) {
+        sdmc_fixture_close(TEST_DIR);
+        return TEST_SETUP_FAILED;
     }
 
     //* When
@@ -34,7 +35,7 @@ test_rc_t test_0002_stat_reports_size_and_type(void)
     }
 
     struct stat dir_stat;
-    const bool dir_ok = stat(SDMC_ROOT, &dir_stat) == 0;
+    const bool dir_ok = stat(TEST_DIR, &dir_stat) == 0;
 
     //* Then
     // Both routes report the written length and agree it is a regular file,
@@ -47,7 +48,7 @@ test_rc_t test_0002_stat_reports_size_and_type(void)
         && S_ISREG(by_fd.st_mode)
         && S_ISDIR(dir_stat.st_mode);
 
-    sdmc_remove_tree(SDMC_ROOT);
+    sdmc_fixture_close(TEST_DIR);
     return correct ? TEST_SUCCESS : TEST_ASSERTION_FAILED;
 }
 
