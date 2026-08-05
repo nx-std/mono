@@ -1,7 +1,8 @@
 /* Linker script — homebrew-NRO entry overrides (always linked when use_nx_rt is enabled).
  *
  * Redirects the libnx C runtime symbols specific to the homebrew-NRO startup
- * (loader-config env setup, argv parsing, nxlink host) to nx-rt-nro Rust FFI
+ * (loader-config env setup, argv parsing, startup working directory, nxlink
+ * host) to nx-rt-nro Rust FFI
  * implementations. Kind-agnostic runtime + Service Manager symbols are owned
  * by nx-rt-core's rt_core_libnx_core.ld; per-service overrides live in sibling
  * rt_nro_libnx_service_*.ld fragments.
@@ -31,6 +32,17 @@ EXTERN(__nx_rt_nro__libnx_system_argv);
 argvSetup = __nx_rt_nro__libnx_argv_setup;
 __system_argc = __nx_rt_nro__libnx_system_argc;
 __system_argv = __nx_rt_nro__libnx_system_argv;
+
+/*
+ * Startup Working Directory
+ * Rust: ffi/libnx/cwd.rs
+ * libnx: runtime/devices/fs_dev.c
+ *
+ * Only this one symbol is claimed from fs_dev.c. The rest of that file is the
+ * fsdev devoptab layer, which is a separate concern and stays with libnx.
+ */
+EXTERN(__nx_rt_nro__libnx_init_cwd);
+__libnx_init_cwd = __nx_rt_nro__libnx_init_cwd;
 
 /*
  * nxlink Host Address

@@ -39,7 +39,7 @@
 //!
 //! ## Always compiled
 //!
-//! - **Runtime core:** `argv`, `env`
+//! - **Runtime core:** `argv`, `cwd`, `env`
 //! - **Service Manager:** `services::sm` — a thin re-export of
 //!   [`nx_rt_core::services::sm`]; the SM bootstrap is kind-agnostic and
 //!   owned by `nx-rt-core`, along with its FFI surface and overrides.
@@ -49,7 +49,7 @@
 //! - `ffi` — gates the entire `pub mod ffi` surface. Without it, no
 //!   `__nx_rt_nro__libnx_*` symbols are emitted and the linker overrides have
 //!   nothing to bind to. Enabling `ffi` alone yields the `rt_nro_libnx_core.ld`
-//!   entry surface (`env_setup`, `argv`, `nxlink`).
+//!   entry surface (`env_setup`, `argv`, `init_cwd`, `nxlink`).
 //! - `rt-link` — emits this crate's hbloader `.crt0` (the homebrew-NRO
 //!   `_start`) for the opt-in `rustc`-driven link pipeline. It is off on the
 //!   default GCC pipeline, where `_start` is supplied by libnx's
@@ -78,6 +78,7 @@
 
 #![no_std]
 
+extern crate alloc;
 extern crate nx_alloc as _; // provides #[global_allocator]
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
@@ -92,5 +93,6 @@ core::arch::global_asm!(include_str!("crt0.s"));
 pub mod ffi;
 
 pub mod argv;
+pub mod cwd;
 pub mod env;
 pub mod services;

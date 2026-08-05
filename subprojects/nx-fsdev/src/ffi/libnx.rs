@@ -1,4 +1,4 @@
-//! libnx's `fsdev*` surface, and the working directory the runtime starts in.
+//! libnx's `fsdev*` surface.
 //!
 //! The entry points fall into three groups. Those that mount or unmount go through
 //! [`crate::mount`]. Those that act on a path resolve the device out of the path's `"name:"`
@@ -11,7 +11,6 @@
 //! default to resolve against. libnx falls back to the device holding the process-wide working
 //! directory; nothing in this workspace calls these with a bare path.
 
-use alloc::ffi::CString;
 use core::{
     ffi::{
         CStr,
@@ -72,22 +71,6 @@ static FILESYSTEM_VIEWS: [SyncUnsafeCell<MaybeUninit<Service>>; MAX_DEVICES] =
     [const { SyncUnsafeCell::new(MaybeUninit::zeroed()) }; MAX_DEVICES];
 
 unsafe extern "C" {
-    /// libsysbase's `chdir`, which sets both the default device and its working directory.
-    ///
-    /// Called rather than reimplemented because the default-device half of it belongs to the
-    /// descriptor table, and this is the entry point that owns both halves.
-    fn chdir(path: *const c_char) -> c_int;
-
-    /// libnx's `envIsNso`, reporting whether this process was launched as an NSO.
-    fn envIsNso() -> bool;
-
-    /// How many arguments the runtime built.
-    static __system_argc: c_int;
-
-    /// The runtime's argument vector, whose first entry names the binary this process was loaded
-    /// from.
-    static __system_argv: *mut *mut c_char;
-
     /// libsysbase's `setDefaultDevice`, naming the device a path without a prefix resolves to.
     fn setDefaultDevice(device: c_int);
 }
@@ -382,44 +365,6 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_unmount_all() -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_get_last_result() -> u32 {
     error::last_result()
-}
-
-/// Sets the working directory the process starts in.
-///
-/// Corresponds to `__libnx_init_cwd()` in libnx: a homebrew NRO starts in the directory it was
-/// loaded from, which is what a program reading a file next to itself expects. An NSO has no such
-/// path, and neither does a process launched without arguments.
-///
-/// # Safety
-///
-/// Called once during startup, after the SD card has been mounted and the argument vector built.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_fsdev__libnx_init_cwd() {
-    // SAFETY: both are runtime globals, initialized before this runs.
-    let (argc, argv) = unsafe { (__system_argc, __system_argv) };
-
-    // SAFETY: `envIsNso` reads a flag the runtime parsed at startup.
-    if unsafe { envIsNso() } || argc == 0 || argv.is_null() {
-        return;
-    }
-
-    // SAFETY: `argc` is non-zero, so the vector holds at least one entry.
-    let program = unsafe { *argv };
-    // SAFETY: the runtime nul-terminates every argument it builds.
-    let Some(program) = (unsafe { as_cstr(program) }) else {
-        return;
-    };
-
-    let bytes = program.to_bytes();
-    let Some(last_slash) = bytes.iter().rposition(|byte| *byte == b'/') else {
-        return;
-    };
-
-    let Ok(directory) = CString::new(&bytes[..last_slash]) else {
-        return;
-    };
-    // SAFETY: `directory` is a NUL-terminated string that outlives the call.
-    unsafe { chdir(directory.as_ptr()) };
 }
 
 /// Stands in for libnx's `fsdevSetConcatenationFileAttribute`.

@@ -80,10 +80,3 @@ fsdevDeleteDirectoryRecursively = __nx_fsdev__libnx_fsdev_delete_directory_recur
 fsdevSetConcatenationFileAttribute = __nx_fsdev__libnx_fsdev_set_concatenation_file_attribute;
 fsdevIsValidSignedSystemPartitionOnSdCard = __nx_fsdev__libnx_fsdev_is_valid_signed_system_partition_on_sd_card;
 fsdevGetLastResult       = __nx_fsdev__libnx_fsdev_get_last_result;
-
-/*
- * Startup working directory
- * libnx: runtime/devices/fs_dev.c
- */
-EXTERN(__nx_fsdev__libnx_init_cwd);
-__libnx_init_cwd = __nx_fsdev__libnx_init_cwd;

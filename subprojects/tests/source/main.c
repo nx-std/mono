@@ -4,6 +4,7 @@
 
 #include "harness.h"
 #include "rand/suite.h"
+#include "rt/cwd/suite.h"
 #include "thread/suite.h"
 
 /**
@@ -12,6 +13,8 @@
 static TestSuiteFn test_suites[] = {
     // random
     rand_suite,
+    // runtime
+    rt_cwd_suite,
     // thread
     thread_suite,
 };

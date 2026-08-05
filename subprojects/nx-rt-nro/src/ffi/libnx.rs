@@ -1,13 +1,14 @@
 //! `libnx` symbol-override FFI for `nx-rt-nro`.
 //!
 //! Holds the `__nx_rt_nro__libnx_*` symbols that redirect the homebrew-NRO
-//! `libnx` entry points — the loader-config `env` setup, the `argv` path, the
-//! `nxlink` host global, the applet-type-sourcing applet shims, and the
-//! per-service surfaces — to this crate. The override aliases live in
+//! `libnx` entry points to this crate: the loader-config `env` setup, the
+//! `argv` path, the startup working directory, the `nxlink` host global, the
+//! applet-type-sourcing applet shims, and the per-service surfaces. The override aliases live in
 //! `overrides/rt_nro_libnx_core.ld` and the per-service `overrides/rt_nro_libnx_service_*.ld`
 //! fragments.
 
 mod argv;
+mod cwd;
 mod env;
 
 #[cfg(feature = "service-apm")]
