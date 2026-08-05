@@ -29,7 +29,9 @@ service-applet-err = ["dep:nx-service-applet-err", "service-applet"]
 # Filesystem (fsp-srv) service — gates `services::fs` + `ffi::fs`.
 # Pulls `nx-fsdev`: the session it connects lives there, alongside the filesystem
 # device that also addresses objects inside it.
-service-fs = ["dep:nx-service-fs", "dep:nx-fsdev"]
+# Pulls `nx-fsdev/ffi`: the startup sequence mounts the SD card through
+# `nx_fsdev::mount`, which that crate gates with the C surface it serves.
+service-fs = ["dep:nx-service-fs", "dep:nx-fsdev", "nx-fsdev/ffi"]
 # Human Input Device service — gates `services::hid` + `ffi::hid`. Pulls `service-applet` (aruid lookup).
 service-hid = ["dep:nx-service-hid", "service-applet"]
 # NVIDIA driver service — gates `services::nv` + `ffi::nv`. Pulls `service-applet` (aruid lookup).

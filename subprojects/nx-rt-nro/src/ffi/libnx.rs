@@ -2,11 +2,13 @@
 //!
 //! Holds the `__nx_rt_nro__libnx_*` symbols that redirect the homebrew-NRO
 //! `libnx` entry points to this crate: the loader-config `env` setup, the
-//! `argv` path, the startup working directory, the `nxlink` host global, the
+//! `argv` path, the service bring-up and teardown sequence, the startup
+//! working directory, the `nxlink` host global, the
 //! applet-type-sourcing applet shims, and the per-service surfaces. The override aliases live in
 //! `overrides/rt_nro_libnx_core.ld` and the per-service `overrides/rt_nro_libnx_service_*.ld`
 //! fragments.
 
+mod app;
 mod argv;
 mod cwd;
 mod env;

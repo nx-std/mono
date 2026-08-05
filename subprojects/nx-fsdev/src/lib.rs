@@ -82,8 +82,13 @@ extern crate alloc;
 extern crate nx_alloc as _;
 
 // The device layer exists to be reached from C: the descriptor table dispatches into it through
-// the `fsdev*` entry points, and nothing in Rust names it yet. It is gated with the surface it
-// serves so a build without that surface carries none of it.
+// the `fsdev*` entry points. It is gated with the surface it serves so a build without that
+// surface carries none of it.
+//
+// `mount` is public within that gate because the runtime mounts the SD card during startup and
+// must reach this crate through Rust rather than through the `fsdev*` C name the linker aliases.
+// The gate still holds for it: the runtime takes this crate as a dependency and the C surface in
+// the same Meson option, so a build that has the one has the other.
 #[cfg(feature = "ffi")]
 pub(crate) mod device;
 #[cfg(feature = "ffi")]
@@ -91,7 +96,7 @@ pub(crate) mod error;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 #[cfg(feature = "ffi")]
-pub(crate) mod mount;
+pub mod mount;
 #[cfg(feature = "ffi")]
 pub(crate) mod path;
 pub mod service;

@@ -10,11 +10,9 @@
 //! fragment binds it for this link.
 
 use nx_rt_core::error::ToResultCode as _;
-use nx_svc::process::Handle as ProcessHandle;
 
 use crate::{
     env,
-    ffi::common::GENERIC_ERROR,
     services::applet,
 };
 
@@ -27,29 +25,14 @@ use crate::{
 /// SM must be initialized before calling this function.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_applet_initialize() -> u32 {
-    // The applet type is loader-supplied: read it from the parsed environment
-    // state rather than a weak global. The NRO hbl config never yields
-    // `AppletType::None`, and `applet::init` resolves `Default` and
-    // short-circuits `None` itself, so the dispatch stays unchanged.
-    let Some(applet_type) =
-        nx_service_applet::AppletType::from_raw(env::applet_type().as_raw() as i32)
-    else {
-        return GENERIC_ERROR;
-    };
-
-    // Get process handle
-    let process_handle = env::own_process_handle()
-        .map(|h| {
-            // SAFETY: a handle from `env::own_process_handle()` is valid.
-            ProcessHandle::from_raw_unchecked(h.to_raw())
-        })
-        .unwrap_or_else(ProcessHandle::current_process);
-
-    if let Err(err) = applet::init(applet_type, process_handle) {
-        return err.to_rc();
+    // The applet type is loader-supplied, so reading it and dispatching on it
+    // is the NRO's own step rather than the shared handshake's. It lives in
+    // the manager beside the session it opens, because the startup sequence
+    // performs the same step and the two must not drift.
+    match applet::init_from_env() {
+        Ok(()) => 0,
+        Err(err) => err.to_rc(),
     }
-
-    0
 }
 
 /// Gets the current applet type.
