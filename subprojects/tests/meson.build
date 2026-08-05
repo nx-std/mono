@@ -97,6 +97,35 @@ src = files(
     'source/rand/suite.h',
     'source/rand/test_0001_rand_get_fills_buffers_with_random_data.c',
     'source/rand/test_0002_rand_get64_returns_different_values.c',
+    'source/thread/suite.h',
+    'source/thread/test_0001_detach_running_thread_self_reclaims.c',
+    'source/thread/test_0002_detach_after_exit_reclaims.c',
+    'source/main.c',
+)
+elf = executable(name + '.elf', src,
+                 dependencies : [nx_dep, nx_std_sync_dep],
+                 c_args : c_opts, cpp_args : cpp_opts,
+                 link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
+                 pie : true)
+custom_target(name + '.lst',
+              input : elf, output : name + '.lst',
+              command : [nm, '-CSn', '@INPUT@'], capture : true)
+custom_target(name + '.nro',
+              command : bundle_base + ['--name', name],
+              input : elf, output : name + '.nro',
+              build_by_default : true, depends : elf)
+
+# ── nx-tests-sync ─────────────────────────────────────────────────────────
+# The synchronization primitives, kept in their own binary because they stand on
+# the C ABI of a lock: a C caller allocates the object and a Rust implementation
+# has to agree to the byte about what is inside it. A disagreement writes past
+# the end of the caller's object rather than failing, so the damage surfaces
+# somewhere else entirely — which is exactly what must not be allowed to land in
+# the middle of an unrelated suite's results. It links either way: with
+# `use_nx_sys_sync` off the primitives resolve to the C implementation, the
+# baseline to compare against.
+name = 'nx-tests-sync'
+src = files(
     'source/sync/suite.h',
     'source/sync/mutex/suite.h',
     'source/sync/mutex/test_0001_mutex_lock_unlock_single_thread.c',
@@ -110,6 +139,7 @@ src = files(
     'source/sync/remutex/test_0004_remutex_multiple_threads_same_priority.c',
     'source/sync/remutex/test_0005_remutex_multiple_threads_different_priority.c',
     'source/sync/remutex/test_0006_remutex_reentrancy_single_thread.c',
+    'source/sync/remutex/test_0007_remutex_stays_inside_its_own_storage.c',
     'source/sync/condvar/suite.h',
     'source/sync/condvar/test_0001_condvar_basic_wait_wake_one.c',
     'source/sync/condvar/test_0002_condvar_wait_timeout_expiry.c',
@@ -136,10 +166,7 @@ src = files(
     'source/sync/oneshot/test_0001_oneshot_two_threads_send_recv.c',
     'source/sync/oneshot/test_0002_oneshot_recv_sender_dropped.c',
     'source/sync/oneshot/test_0003_oneshot_send_receiver_dropped.c',
-    'source/thread/suite.h',
-    'source/thread/test_0001_detach_running_thread_self_reclaims.c',
-    'source/thread/test_0002_detach_after_exit_reclaims.c',
-    'source/main.c',
+    'source/sync/main.c',
 )
 elf = executable(name + '.elf', src,
                  dependencies : [nx_dep, nx_std_sync_dep],

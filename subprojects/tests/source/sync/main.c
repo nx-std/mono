@@ -1,19 +1,39 @@
-#include <stdio.h>
+// Synchronization primitive tests.
+//
+// Split out of `nx-tests` because these are the suites that stand on the C ABI
+// of a lock: a C caller allocates a `Mutex`, `RMutex`, `RwLock`, `Barrier` or
+// `Semaphore` and hands it to a Rust implementation that has to agree, to the
+// byte, about what is inside it. A disagreement does not fail cleanly — it
+// reads one of the caller's fields as another and writes the rest past the end
+// of the object, so the damage lands somewhere else entirely, often in another
+// suite. Keeping them in their own binary means that when they do misbehave,
+// what they corrupt is their own address space and not the results of every
+// test that ran before them.
+//
+// The same binary links either way: with `use_nx_sys_sync` off the primitives
+// resolve to the C implementation, which is the baseline to compare ours
+// against.
+
 #include <inttypes.h>
+#include <stdio.h>
+
 #include <switch.h>
 
-#include "harness.h"
-#include "rand/suite.h"
-#include "thread/suite.h"
+#include "../harness.h"
+#include "suite.h"
 
 /**
  * Test suites
  */
 static TestSuiteFn test_suites[] = {
-    // random
-    rand_suite,
-    // thread
-    thread_suite,
+    // sync
+    sync_mutex_suite,
+    sync_remutex_suite,
+    sync_condvar_suite,
+    sync_barrier_suite,
+    sync_rwlock_suite,
+    sync_semaphore_suite,
+    sync_oneshot_suite,
 };
 
 int main()
@@ -28,7 +48,7 @@ int main()
     padInitializeDefault(&pad);
 
     // Print the test header
-    printf("NX-TESTS (%s)\n", VERSION);
+    printf("NX-TESTS-SYNC (%s)\n", VERSION);
     u32 ver = hosversionGet();
     printf("HOS %d.%d.%d%s\n",
         HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),

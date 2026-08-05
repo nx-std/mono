@@ -25,9 +25,20 @@ pub struct RwLock {
     write_owner_tag: WriteOwnerTag,
 }
 
-// Ensure the struct is the same size as the C struct and has the same layout
+// Ensure the struct is the same size as the C struct and has the same layout. The size alone
+// cannot catch two same-typed fields swapped, so every offset is pinned against the C declaration.
 const_assert_eq!(size_of::<RwLock>(), 32);
 const_assert_eq!(align_of::<RwLock>(), align_of::<u32>());
+const _: () = {
+    assert!(core::mem::offset_of!(RwLock, mutex) == 0);
+    assert!(core::mem::offset_of!(RwLock, condvar_reader_wait) == 4);
+    assert!(core::mem::offset_of!(RwLock, condvar_writer_wait) == 8);
+    assert!(core::mem::offset_of!(RwLock, read_lock_count) == 12);
+    assert!(core::mem::offset_of!(RwLock, read_waiter_count) == 16);
+    assert!(core::mem::offset_of!(RwLock, write_lock_count) == 20);
+    assert!(core::mem::offset_of!(RwLock, write_waiter_count) == 24);
+    assert!(core::mem::offset_of!(RwLock, write_owner_tag) == 28);
+};
 
 // SAFETY: `RwLock`'s `UnsafeCell` counters are mutated only while its internal
 // `Mutex` is held, so concurrent access from multiple threads is serialized.
