@@ -44,9 +44,7 @@ pub fn open_session(
     module_id: PcvModuleId,
     unk: u32,
 ) -> Result<OwnedSessionHandle, OpenSessionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = OpenSessionIn {
         module_id: module_id.as_raw(),
@@ -75,9 +73,7 @@ pub fn set_clock_rate(
     session: BorrowedSessionHandle<'_>,
     hz: u32,
 ) -> Result<(), SetClockRateError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_CLOCK_RATE)
         .with_data_value(&hz)
@@ -92,9 +88,7 @@ pub fn set_clock_rate(
 
 /// Gets the current clock rate in Hz.
 pub fn get_clock_rate(session: BorrowedSessionHandle<'_>) -> Result<u32, GetClockRateError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_CLOCK_RATE).build();
     req.send(&mut buf, session)
@@ -123,9 +117,7 @@ pub fn get_possible_clock_rates(
 ) -> Result<PossibleClockRates, GetPossibleClockRatesError> {
     let max_count: i32 = rates.len() as i32;
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_POSSIBLE_CLOCK_RATES)
         .with_data_value(&max_count)

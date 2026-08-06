@@ -148,9 +148,7 @@ fn dispatch_pid_delay(
 ) -> Result<(), SuspendResumeError> {
     let input = PidDelayIn { pid, delay };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd)
         .with_data_value(&input)
@@ -168,9 +166,7 @@ fn dispatch_get_volume(
     cmd: u32,
     pid: u64,
 ) -> Result<f32, GetVolumeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd)
         .with_data_value(&pid)
@@ -197,9 +193,7 @@ fn dispatch_set_volume(
         delay,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd)
         .with_data_value(&input)

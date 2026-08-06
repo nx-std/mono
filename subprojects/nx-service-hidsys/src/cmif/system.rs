@@ -107,7 +107,7 @@ pub(crate) fn get_unique_pads_from_npad(
             core::mem::size_of_val(out_pads),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_UNIQUE_PADS_FROM_NPAD)

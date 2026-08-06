@@ -68,9 +68,7 @@ fn get_sub_service_no_params(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<Session, GetSubServiceError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)
@@ -98,9 +96,7 @@ pub fn open_display(
     session: BorrowedSessionHandle<'_>,
     name: &DisplayName,
 ) -> Result<DisplayId, OpenDisplayError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(application_cmds::OPEN_DISPLAY)
         .with_data(name.as_bytes())
@@ -121,9 +117,7 @@ pub fn close_display(
     session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<(), CloseDisplayError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_DISPLAY)
@@ -151,9 +145,7 @@ pub fn get_display_resolution(
     session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<DisplayResolution, GetDisplayResolutionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_RESOLUTION)
@@ -199,9 +191,7 @@ pub fn open_layer(
 ) -> Result<OpenLayerOutput, OpenLayerError> {
     let mut native_window = [0u8; NATIVE_WINDOW_SIZE];
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -242,9 +232,7 @@ pub fn close_layer(
     session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
 ) -> Result<(), CloseLayerError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::CLOSE_LAYER)
@@ -302,9 +290,7 @@ pub(crate) fn create_stray_layer_dispatch(
 ) -> Result<CreateStrayLayerOutput, CreateStrayLayerError> {
     let mut native_window = [0u8; NATIVE_WINDOW_SIZE];
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -349,9 +335,7 @@ pub fn destroy_stray_layer(
     session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
 ) -> Result<(), DestroyStrayLayerError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::DESTROY_STRAY_LAYER)
@@ -371,9 +355,7 @@ pub fn set_layer_scaling_mode(
     scaling_mode: ViScalingMode,
     layer_id: LayerId,
 ) -> Result<(), SetLayerScalingModeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -419,9 +401,7 @@ pub fn get_indirect_layer_image_map(
     aruid: u64,
     buffer: &mut [u8],
 ) -> Result<IndirectLayerImageInfo, GetIndirectLayerImageMapError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -479,9 +459,7 @@ pub fn get_indirect_layer_image_required_memory_info(
     width: i64,
     height: i64,
 ) -> Result<IndirectLayerMemoryInfo, GetIndirectLayerImageRequiredMemoryInfoError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -521,9 +499,7 @@ pub fn get_display_vsync_event(
     session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<RawHandle, GetDisplayVsyncEventError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(application_cmds::GET_DISPLAY_VSYNC_EVENT)

@@ -19,9 +19,7 @@ fn dispatch_no_io(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<(), DispatchNoIoError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)
@@ -46,9 +44,7 @@ fn dispatch_in_u32(
     cmd_id: u32,
     value: u32,
 ) -> Result<(), DispatchInU32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
@@ -75,9 +71,7 @@ fn dispatch_in_bool(
     cmd_id: u32,
     value: bool,
 ) -> Result<(), DispatchInBoolError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let value_u8 = value as u8;
     let req = cmif::CmifRequestBuilder::new(cmd_id)
@@ -105,9 +99,7 @@ fn dispatch_in_f32(
     cmd_id: u32,
     value: f32,
 ) -> Result<(), DispatchInF32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
@@ -137,9 +129,7 @@ fn dispatch_in_struct<T>(
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
@@ -165,9 +155,7 @@ fn dispatch_out_i32(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<i32, DispatchOutI32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)
@@ -193,9 +181,7 @@ fn dispatch_out_u32(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<u32, DispatchOutU32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)
@@ -221,9 +207,7 @@ fn dispatch_out_f32(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<f32, DispatchOutF32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)
@@ -250,9 +234,7 @@ fn dispatch_in_u32_out_i32(
     cmd_id: u32,
     input: u32,
 ) -> Result<i32, DispatchInU32OutI32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&input)
@@ -282,9 +264,7 @@ fn dispatch_in_u32_out_u32(
     cmd_id: u32,
     input: u32,
 ) -> Result<u32, DispatchInU32OutU32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&input)
@@ -314,9 +294,7 @@ fn dispatch_in_u32_out_bool(
     cmd_id: u32,
     input: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&input)
@@ -345,9 +323,7 @@ fn dispatch_event(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<u32, DispatchEventError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)

@@ -18,9 +18,7 @@ fn dispatch_no_io(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<(), DispatchNoIoError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
@@ -45,9 +43,7 @@ fn dispatch_in_u32(
     cmd_id: u32,
     value: u32,
 ) -> Result<(), DispatchInU32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
@@ -75,9 +71,7 @@ fn dispatch_in_bool(
 ) -> Result<(), DispatchInBoolError> {
     let raw: u8 = value as u8;
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&raw)
@@ -102,9 +96,7 @@ fn dispatch_out_u32(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<u32, DispatchOutU32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
@@ -128,9 +120,7 @@ fn dispatch_out_bool(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<bool, DispatchOutBoolError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // This request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
@@ -155,9 +145,7 @@ fn dispatch_in_u32_out_bool(
     cmd_id: u32,
     value: u32,
 ) -> Result<bool, DispatchInU32OutBoolError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&value)
@@ -184,9 +172,7 @@ pub fn open_session(
     session: BorrowedSessionHandle<'_>,
     pad_name: u32,
 ) -> Result<Session, OpenSessionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&pad_name)
@@ -230,9 +216,7 @@ pub fn open_session2(
         access_mode,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION2)
         .with_data_value(&input)
@@ -346,7 +330,7 @@ pub fn pad_get_value(session: BorrowedSessionHandle<'_>) -> Result<u32, Dispatch
 
 /// Binds the interrupt and returns the event handle.
 pub fn pad_bind_interrupt(service: &Session) -> Result<u32, BindInterruptError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PAD_BIND_INTERRUPT)

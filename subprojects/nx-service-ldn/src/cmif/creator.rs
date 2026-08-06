@@ -25,8 +25,7 @@ use crate::proto::{
 /// outlives this call; callers re-address the id per request via
 /// [`SessionGuard::open_object_unchecked`](crate::session::SessionGuard::open_object_unchecked).
 pub(crate) fn create_service_domain(creator: DomainRef<'_>) -> Result<u32, CreateServiceError> {
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = creator
         .dispatch(CMD_CREATE_SERVICE)
@@ -46,8 +45,7 @@ pub(crate) fn create_service_domain(creator: DomainRef<'_>) -> Result<u32, Creat
 pub(crate) fn create_service_session(
     creator: &Session,
 ) -> Result<OwnedSessionHandle, CreateServiceError> {
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = creator
         .dispatch(CMD_CREATE_SERVICE)
@@ -81,8 +79,7 @@ pub enum CreateServiceError {
 pub(crate) fn create_client_process_monitor(
     creator: DomainRef<'_>,
 ) -> Result<u32, CreateClientProcessMonitorError> {
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = creator
         .dispatch(CMD_CREATE_CLIENT_PROCESS_MONITOR)

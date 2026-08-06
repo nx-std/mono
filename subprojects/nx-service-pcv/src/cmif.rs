@@ -64,8 +64,7 @@ pub(crate) fn get_possible_clock_rates(
             core::mem::size_of_val(rates),
         )
     };
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_POSSIBLE_CLOCK_RATES)

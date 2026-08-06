@@ -31,7 +31,7 @@ pub(crate) fn read(
         offset,
         size: read_size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::STORAGE_READ)
@@ -56,7 +56,7 @@ pub(crate) fn write(
         offset,
         size: write_size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::STORAGE_WRITE)

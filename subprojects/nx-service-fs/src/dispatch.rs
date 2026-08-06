@@ -12,12 +12,12 @@ pub(crate) fn dispatch_no_io(
     cmd_id: u32,
     ctx: u32,
 ) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(cmd_id)
         .context(ctx)
-        .send(&mut buf)
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -30,13 +30,13 @@ pub(crate) fn dispatch_in<I>(
 where
     I: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(input.as_bytes())
-        .send(&mut buf)
+        .send(&mut ipc_buf)
         .map(|_| ())
 }
 
@@ -48,13 +48,13 @@ pub(crate) fn dispatch_out<O>(
 where
     O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
         .out_size(size_of::<O>())
-        .send(&mut buf)?;
+        .send(&mut ipc_buf)?;
     Ok(*result.value::<O>())
 }
 
@@ -68,14 +68,14 @@ where
     I: zerocopy::IntoBytes + zerocopy::Immutable,
     O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(input.as_bytes())
         .out_size(size_of::<O>())
-        .send(&mut buf)?;
+        .send(&mut ipc_buf)?;
     Ok(*result.value::<O>())
 }
 
@@ -118,13 +118,13 @@ pub(crate) fn dispatch_in_size_out_buffer(
     size: i64,
     dst: &mut [u8],
 ) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(cmd_id)
         .context(ctx)
         .in_raw(size.as_bytes())
         .out_buffer(dst, BufferAttr::HIPC_MAP_ALIAS)
-        .send(&mut buf)
+        .send(&mut ipc_buf)
         .map(|_| ())
 }

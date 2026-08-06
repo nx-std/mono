@@ -31,9 +31,7 @@ pub fn get_service_handle(
     session: BorrowedSessionHandle<'_>,
     name: ServiceName,
 ) -> Result<OwnedSessionHandle, GetServiceError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
@@ -106,9 +104,7 @@ pub fn register_service(
         max_sessions,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<RegisterServiceIn>()];
     // SAFETY: `payload` is exactly `size_of::<RegisterServiceIn>()` bytes.
@@ -164,9 +160,7 @@ pub fn unregister_service(
     session: BorrowedSessionHandle<'_>,
     name: ServiceName,
 ) -> Result<(), UnregisterServiceError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
@@ -207,9 +201,7 @@ impl ToResultCode for UnregisterServiceError {
 /// Only available on HOS 11.0.0-11.0.1.
 #[inline]
 pub fn detach_client(session: BorrowedSessionHandle<'_>) -> Result<(), DetachClientError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = [0u8; size_of::<u64>()];
     let req = cmif::CmifRequestBuilder::new(proto::DETACH_CLIENT)
@@ -249,9 +241,7 @@ impl ToResultCode for DetachClientError {
 /// Sends the RegisterClient command (cmd 0) with PID.
 #[inline]
 pub fn register_client(session: BorrowedSessionHandle<'_>) -> Result<(), RegisterClientError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = [0u8; size_of::<u64>()];
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_CLIENT)

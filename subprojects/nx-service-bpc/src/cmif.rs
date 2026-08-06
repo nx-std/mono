@@ -12,9 +12,7 @@ use crate::{
 
 /// Initiates a full system shutdown.
 pub fn shutdown_system(session: BorrowedSessionHandle<'_>) -> Result<(), ShutdownSystemError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN_SYSTEM).build();
     req.send(&mut buf, session)
@@ -27,9 +25,7 @@ pub fn shutdown_system(session: BorrowedSessionHandle<'_>) -> Result<(), Shutdow
 
 /// Initiates a full system reboot.
 pub fn reboot_system(session: BorrowedSessionHandle<'_>) -> Result<(), RebootSystemError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::REBOOT_SYSTEM).build();
     req.send(&mut buf, session)
@@ -47,9 +43,7 @@ pub fn reboot_system(session: BorrowedSessionHandle<'_>) -> Result<(), RebootSys
 pub fn get_sleep_button_state(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<SleepButtonState, GetSleepButtonStateError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SLEEP_BUTTON_STATE).build();
     req.send(&mut buf, session)
@@ -68,9 +62,7 @@ pub fn get_sleep_button_state(
 /// Only available on HOS [6.0.0+]. The caller must ensure the correct
 /// HOS version before invoking this command.
 pub fn get_power_button(session: BorrowedSessionHandle<'_>) -> Result<bool, GetPowerButtonError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_POWER_BUTTON).build();
     req.send(&mut buf, session)

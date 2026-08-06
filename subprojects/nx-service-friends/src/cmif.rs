@@ -25,7 +25,7 @@ use crate::{
 pub(crate) fn create_friend_service(
     domain: DomainRef<'_>,
 ) -> Result<u32, CreateFriendServiceError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::CREATE_FRIEND_SERVICE)
@@ -61,7 +61,7 @@ pub(crate) fn get_user_setting(
             size_of::<FriendsUserSetting>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::GET_USER_SETTING)

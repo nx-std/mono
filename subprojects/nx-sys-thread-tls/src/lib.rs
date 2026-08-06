@@ -202,12 +202,17 @@
 //! - [ARM: Thread-Local Storage](https://developer.arm.com/documentation/100748/0624/Thread-Local-Storage)
 
 #![no_std]
+#![feature(thread_local)]
 
 extern crate nx_panic_handler; // Provides #[panic_handler]
 
 use core::{
-    cell::UnsafeCell,
+    cell::{
+        Cell,
+        UnsafeCell,
+    },
     ffi::c_void,
+    marker::PhantomData,
     mem::offset_of,
     ptr,
     ptr::NonNull,
@@ -319,27 +324,49 @@ pub fn ipc_buffer_ptr() -> NonNull<u8> {
     unsafe { NonNull::new_unchecked((*tls).ipc_buffer.as_mut_ptr()) }
 }
 
-/// Borrows the current thread's IPC buffer as an [`IpcBuffer`].
+/// Set while an [`IpcBufferGuard`] is outstanding on this thread.
 ///
-/// # Safety
+/// This is the whole of the bookkeeping. Only exclusive access is ever handed
+/// out, so what has to be tracked is one bit - a [`RefCell`] would carry a
+/// borrow counter for shared borrows nobody takes, and could not return a guard
+/// anyway: rustc refuses to let a borrow of a `#[thread_local]` outlive the
+/// function that took it (E0712), which is what forces [`std::thread_local`]
+/// into its `with(|x| ..)` closure. Keeping the flag separate from the token
+/// sidesteps that, because the guard owns a value rather than borrowing this.
 ///
-/// No other [`IpcBuffer`] may be live on this thread for the lifetime of
-/// the returned value. Two live tokens on the same thread would allow
-/// aliased `&mut [u8; IPC_BUFFER_SIZE]` to be constructed via
-/// [`IpcBuffer::as_array_mut`], which is undefined behavior.
+/// A plain [`Cell`] rather than an atomic because it is thread-local: no other
+/// thread can observe it. That leaves one gap, unreachable today - code
+/// re-entering on this same thread between the load and the store, which only
+/// an exception handler performing IPC could do.
+#[thread_local]
+static IPC_BUFFER_BORROWED: Cell<bool> = Cell::new(false);
+
+/// Borrows the current thread's IPC buffer until the returned token drops.
 ///
-/// Note that — unlike earlier revisions of this API — the token itself
-/// may legally outlive a kernel write to the buffer (e.g. across
-/// `svcSendSyncRequest`). See [`IpcBuffer`] for the model.
+/// The token *is* the guard: it carries no data, so there is nothing for a
+/// separate wrapper to own, and folding the two together means an IPC call
+/// takes `&mut` to the same type it always did.
+///
+/// Two live `&mut [u8; IPC_BUFFER_SIZE]` on one thread would be undefined
+/// behaviour, and nothing static can relate borrows taken in unrelated call
+/// frames, so the exclusion is checked here: a second borrow is refused rather
+/// than served.
+///
+/// # Panics
+///
+/// Panics if this thread already holds a token. That means one IPC exchange
+/// began inside another on the same thread, which has no correct outcome: the
+/// inner one would overwrite the request the outer one is still assembling.
 #[inline]
-pub unsafe fn ipc_buffer() -> IpcBuffer {
-    // SAFETY: ipc_buffer_ptr always points to a valid IPC_BUFFER_SIZE-byte
-    // region in the current thread's TLS. Reinterpreting that pointer as
-    // `*mut UnsafeCell<[u8; N]>` is layout-compatible because `UnsafeCell`
-    // is `#[repr(transparent)]` over its inner type. Caller upholds the
-    // singleton-per-thread contract documented above.
-    let ptr = ipc_buffer_ptr().cast::<UnsafeCell<[u8; IPC_BUFFER_SIZE]>>();
-    IpcBuffer { ptr }
+pub fn ipc_buffer() -> IpcBuffer {
+    assert!(
+        !IPC_BUFFER_BORROWED.replace(true),
+        "IPC buffer already borrowed on this thread",
+    );
+
+    // SAFETY: the flag was clear and is now set, so no other `IpcBuffer` is
+    // live on this thread; it is cleared only by dropping the token below.
+    unsafe { IpcBuffer::new_unchecked() }
 }
 
 /// Thread-affine token granting access to the current thread's IPC buffer.
@@ -386,9 +413,8 @@ pub unsafe fn ipc_buffer() -> IpcBuffer {
 ///    though Rust does not own the underlying memory.
 ///
 ///    Consequently, `&IpcBuffer` (and `&mut IpcBuffer`) **may legally
-///    outlive a kernel write to the buffer**. The plumbing the token
-///    holds — a `NonNull` to an `UnsafeCell` — makes no promise the
-///    kernel would falsify.
+///    outlive a kernel write to the buffer**. The token holds no data at
+///    all, so it makes no promise the kernel could falsify.
 ///
 /// 4. **Short-lived `&[u8; N]` borrows still must not span a kernel
 ///    write.** [`as_array`], [`as_array_mut`], and the [`Deref`] /
@@ -404,30 +430,78 @@ pub unsafe fn ipc_buffer() -> IpcBuffer {
 ///
 /// | Concern                              | Discharged by                                       |
 /// |--------------------------------------|-----------------------------------------------------|
-/// | Thread affinity                      | `NonNull` field → `!Send + !Sync` (asserted below)  |
-/// | Single token per thread              | `unsafe fn ipc_buffer()` precondition               |
-/// | Token may outlive a kernel write     | `UnsafeCell<[u8; N]>` interior (no stability promise) |
+/// | Thread affinity                      | `PhantomData<*mut ()>` → `!Send + !Sync` (asserted below) |
+/// | Single token per thread              | private `const fn new`, reachable only via [`ipc_buffer`] |
+/// | A second live token                  | [`IPC_BUFFER_BORROWED`], checked by [`ipc_buffer`]  |
+/// | Token may outlive a kernel write     | `UnsafeCell<[u8; N]>` view (no stability promise)   |
 /// | No `&[u8; N]` borrow across syscall  | syscall wrapper takes `&mut IpcBuffer`              |
 pub struct IpcBuffer {
-    // `UnsafeCell` is what tells the compiler the bytes here may be mutated
-    // through paths other than any live `&` to them — specifically, the
-    // kernel during an IPC syscall. Without it, holding `&IpcBuffer` across
-    // such a syscall would violate the shared-reference stability promise.
+    // The token is address-free. The buffer it names is always at this
+    // thread's TLS base, so there is nothing to store: `as_array`/
+    // `as_array_mut` resolve the address on access. That is what lets the
+    // token be `const`-constructed, which is what lets a single instance
+    // exist as a static and no constructor be reachable anywhere else.
     //
-    // The pointee lives in TLS (not in this struct); `NonNull` is just the
-    // handle. `UnsafeCell` is `#[repr(transparent)]`, so reinterpreting the
-    // raw TLS address as `*mut UnsafeCell<[u8; N]>` is layout-correct.
-    // `NonNull` wraps a raw pointer, so it is neither `Send` nor `Sync`;
-    // that auto-trait blocking propagates to `IpcBuffer` and enforces
-    // thread-affinity without a dedicated `PhantomData` marker. The
-    // `assert_not_impl_any!` below pins the guarantee.
-    ptr: NonNull<UnsafeCell<[u8; IPC_BUFFER_SIZE]>>,
+    // A raw-pointer `PhantomData` blocks `Send`/`Sync`, confining the token
+    // to the thread whose buffer it names. The `assert_not_impl_any!` below
+    // pins the guarantee.
+    _not_send_sync: PhantomData<*mut ()>,
+}
+
+impl Drop for IpcBuffer {
+    /// Releases the borrow recorded by [`ipc_buffer`].
+    #[inline]
+    fn drop(&mut self) {
+        IPC_BUFFER_BORROWED.set(false);
+    }
+}
+
+impl IpcBuffer {
+    /// Mints a token without claiming [`IPC_BUFFER_BORROWED`].
+    ///
+    /// Private, and called from exactly one place: [`ipc_buffer`], which claims
+    /// the flag first. Widening this to `pub` would let a caller mint a token
+    /// the flag knows nothing about, which is the aliasing the flag exists to
+    /// prevent.
+    ///
+    /// # Safety
+    ///
+    /// No other [`IpcBuffer`] may be live on this thread for the lifetime of
+    /// the returned value. Two live tokens would each hand out
+    /// `&mut [u8; IPC_BUFFER_SIZE]` to the same memory, which is undefined
+    /// behaviour.
+    ///
+    /// Dropping the returned token clears the flag, so a token minted while one
+    /// was already outstanding also releases the borrow the other still holds.
+    const unsafe fn new_unchecked() -> Self {
+        Self {
+            _not_send_sync: PhantomData,
+        }
+    }
+
+    /// Raw view of this thread's IPC buffer.
+    ///
+    /// `UnsafeCell` is `#[repr(transparent)]`, so reinterpreting the raw TLS
+    /// address as `*mut UnsafeCell<[u8; N]>` is layout-correct, and the
+    /// interior is what lets a `&` derived from it legally span a kernel
+    /// write.
+    #[inline]
+    fn cell(&self) -> &UnsafeCell<[u8; IPC_BUFFER_SIZE]> {
+        // SAFETY: `ipc_buffer_ptr` always points at this thread's
+        // IPC_BUFFER_SIZE-byte TLS buffer, valid for the thread's lifetime,
+        // and `!Send`/`!Sync` confine this token to that thread.
+        unsafe {
+            ipc_buffer_ptr()
+                .cast::<UnsafeCell<[u8; IPC_BUFFER_SIZE]>>()
+                .as_ref()
+        }
+    }
 }
 
 // Thread-affinity guard: if a future field accidentally restores `Send`
 // or `Sync` (e.g. wrapping `ptr` in an `Arc`), this assertion fails at
 // compile time. See the type docs for why both must remain blocked.
-assert_not_impl_any!(IpcBuffer: Send, Sync);
+assert_not_impl_any!(IpcBuffer: Send, Sync, Clone, Copy);
 
 impl IpcBuffer {
     /// Borrowed view of the underlying fixed-size array.
@@ -449,7 +523,7 @@ impl IpcBuffer {
         //   prevents that lifetime from spanning a syscall (see doc above).
         // - `&self` excludes a concurrent `as_array_mut`/`DerefMut`, so
         //   no aliased `&mut` to the same bytes can exist.
-        unsafe { &*self.ptr.as_ref().get() }
+        unsafe { &*self.cell().get() }
     }
 
     /// Borrowed mutable view of the underlying fixed-size array.
@@ -464,7 +538,7 @@ impl IpcBuffer {
         // unique access to the token, and the singleton-per-thread
         // invariant on `ipc_buffer()` ensures no other token can hand out
         // an overlapping borrow.
-        unsafe { &mut *self.ptr.as_ref().get() }
+        unsafe { &mut *self.cell().get() }
     }
 }
 

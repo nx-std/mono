@@ -42,7 +42,7 @@ pub(crate) fn get_option(object: DomainObjectRef<'_>, option: u32) -> Result<i32
 /// The close obligation is handed on rather than discharged: the caller
 /// re-addresses the id through the long-lived parent domain.
 pub(crate) fn create_connection(object: DomainObjectRef<'_>) -> Result<u32, CreateConnectionError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(proto::CTX_CREATE_CONNECTION)
@@ -62,7 +62,7 @@ pub(crate) fn create_connection(object: DomainObjectRef<'_>) -> Result<u32, Crea
 pub(crate) fn create_connection_for_system(
     object: DomainObjectRef<'_>,
 ) -> Result<u32, CreateConnectionError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(proto::CTX_CREATE_CONNECTION_FOR_SYSTEM)
@@ -101,7 +101,7 @@ pub(crate) fn import_server_pki(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const format).cast::<u8>(), size_of::<u32>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_IMPORT_SERVER_PKI)
@@ -127,7 +127,7 @@ pub(crate) fn import_client_pki(
     pkcs12: &[u8],
     password: &[u8],
 ) -> Result<u64, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_IMPORT_CLIENT_PKI)
@@ -212,7 +212,7 @@ pub(crate) fn register_internal_pki(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const internal_pki).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_REGISTER_INTERNAL_PKI)
@@ -233,7 +233,7 @@ pub(crate) fn register_internal_pki(
 
 /// Adds a policy OID string.
 pub(crate) fn add_policy_oid(object: DomainObjectRef<'_>, oid: &[u8]) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::CTX_ADD_POLICY_OID)
@@ -247,7 +247,7 @@ pub(crate) fn import_crl(
     object: DomainObjectRef<'_>,
     crl_data: &[u8],
 ) -> Result<u64, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_IMPORT_CRL)
@@ -277,7 +277,7 @@ pub(crate) fn import_client_cert_key_pki(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const format).cast::<u8>(), size_of::<u32>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_IMPORT_CLIENT_CERT_KEY_PKI)
@@ -318,7 +318,7 @@ pub(crate) fn generate_private_key_and_cert(
             size_of::<crate::types::KeyAndCertParams>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_GENERATE_PRIVATE_KEY_AND_CERT)

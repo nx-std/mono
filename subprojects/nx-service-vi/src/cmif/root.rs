@@ -40,9 +40,7 @@ pub fn get_display_service(
         crate::types::ViServiceType::Default => 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&inval)
@@ -70,9 +68,7 @@ pub fn get_display_service(
 ///
 /// Available on 16.0.0+ with Manager service type.
 pub fn prepare_fatal(session: BorrowedSessionHandle<'_>) -> Result<(), PrepareFatalError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::PREPARE_FATAL).build();
     req.send(&mut buf, session)
@@ -87,9 +83,7 @@ pub fn prepare_fatal(session: BorrowedSessionHandle<'_>) -> Result<(), PrepareFa
 ///
 /// Available on 16.0.0+ with Manager service type.
 pub fn show_fatal(session: BorrowedSessionHandle<'_>) -> Result<(), ShowFatalError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(root_cmds::SHOW_FATAL).build();
     req.send(&mut buf, session)
@@ -111,9 +105,7 @@ pub fn draw_fatal_rectangle(
     end_y: i32,
     color: u16,
 ) -> Result<(), DrawFatalRectangleError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // libnx layout: `struct { u16 color; s32 x, y, end_x, end_y; }` - naturally
     // aligned, total 20 bytes (u16 + 2 bytes padding + 4 * s32).
@@ -164,9 +156,7 @@ pub fn draw_fatal_text32(
     fg_color: u32,
     initial_advance: i32,
 ) -> Result<i32, DrawFatalText32Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]

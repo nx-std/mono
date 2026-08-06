@@ -29,9 +29,7 @@ fn dispatch_in<T>(
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
@@ -58,9 +56,7 @@ fn dispatch_out<T>(session: BorrowedSessionHandle<'_>, cmd_id: u32) -> Result<T,
 where
     T: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id).build();
     req.send(&mut buf, session)
@@ -83,9 +79,7 @@ pub enum DispatchOutError {
 
 /// Opens a receiver sub-object.
 pub fn rcv_open_receiver(session: BorrowedSessionHandle<'_>) -> Result<Session, OpenReceiverError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::RCV_OPEN_RECEIVER).build();
     req.send(&mut buf, session)
@@ -142,9 +136,7 @@ pub fn receiver_remove_source(
 pub fn receiver_get_receive_event_handle(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, GetReceiveEventHandleError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::RECEIVER_GET_RECEIVE_EVENT_HANDLE).build();
     req.send(&mut buf, session)
@@ -205,9 +197,7 @@ pub fn snd_open_sender(
         attribute: *attribute,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SND_OPEN_SENDER)
         .with_data_value(&input)

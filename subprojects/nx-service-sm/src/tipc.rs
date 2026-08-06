@@ -33,9 +33,7 @@ pub fn get_service_handle(
     session: BorrowedSessionHandle<'_>,
     name: ServiceName,
 ) -> Result<OwnedSessionHandle, GetServiceError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
@@ -108,9 +106,7 @@ pub fn register_service(
         is_light: u8::from(is_light),
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<RegisterServiceTipcIn>()];
     // SAFETY: `payload` is exactly `size_of::<RegisterServiceTipcIn>()` bytes.
@@ -168,9 +164,7 @@ pub fn unregister_service(
     session: BorrowedSessionHandle<'_>,
     name: ServiceName,
 ) -> Result<(), UnregisterServiceError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<ServiceName>()];
     // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
@@ -213,9 +207,7 @@ impl ToResultCode for UnregisterServiceError {
 /// Only available on Atmosphere.
 #[inline]
 pub fn detach_client(session: BorrowedSessionHandle<'_>) -> Result<(), DetachClientError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // The detach-client request carries no payload data.
     tipc::TipcRequestBuilder::new(proto::DETACH_CLIENT)
@@ -256,9 +248,7 @@ impl ToResultCode for DetachClientError {
 /// Requires HOS 12.0.0+ or Atmosphere.
 #[inline]
 pub fn register_client(session: BorrowedSessionHandle<'_>) -> Result<(), RegisterClientError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // The register-client request carries no payload data.
     tipc::TipcRequestBuilder::new(proto::REGISTER_CLIENT)

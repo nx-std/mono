@@ -42,9 +42,7 @@ pub fn get_z_order_count_min(
     session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<i64, GetZOrderCountError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MIN)
@@ -65,9 +63,7 @@ pub fn get_z_order_count_max(
     session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<i64, GetZOrderCountError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_Z_ORDER_COUNT_MAX)
@@ -97,9 +93,7 @@ pub fn get_display_logical_resolution(
     session: BorrowedSessionHandle<'_>,
     display_id: DisplayId,
 ) -> Result<LogicalResolution, GetDisplayLogicalResolutionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let display_id_raw = display_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(system_cmds::GET_DISPLAY_LOGICAL_RESOLUTION)
@@ -133,9 +127,7 @@ pub fn set_display_magnification(
     width: i32,
     height: i32,
 ) -> Result<(), SetDisplayMagnificationError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -173,9 +165,7 @@ pub fn set_layer_position(
     x: f32,
     y: f32,
 ) -> Result<(), SetLayerPositionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -209,9 +199,7 @@ pub fn set_layer_size(
     width: i64,
     height: i64,
 ) -> Result<(), SetLayerSizeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -244,9 +232,7 @@ pub fn set_layer_z(
     layer_id: LayerId,
     z: i64,
 ) -> Result<(), SetLayerZError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -277,9 +263,7 @@ pub fn set_layer_visibility(
     layer_id: LayerId,
     visible: bool,
 ) -> Result<(), SetLayerVisibilityError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]

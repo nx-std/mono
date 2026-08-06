@@ -22,7 +22,7 @@ pub(crate) fn initialize(domain: &Domain) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::INITIALIZE)
@@ -49,7 +49,7 @@ pub(crate) fn register_alarm_setting(
             size_of::<AlarmSetting>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::REGISTER_ALARM_SETTING)
@@ -78,7 +78,7 @@ pub(crate) fn update_alarm_setting(
             size_of::<AlarmSetting>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::UPDATE_ALARM_SETTING)
@@ -101,7 +101,7 @@ pub(crate) fn list_alarm_settings(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::LIST_ALARM_SETTINGS)
@@ -126,7 +126,7 @@ pub(crate) fn load_application_parameter(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const alarm_setting_id).cast::<u8>(), size_of::<u16>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::LOAD_APPLICATION_PARAMETER)

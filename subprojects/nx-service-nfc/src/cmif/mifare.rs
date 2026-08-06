@@ -32,7 +32,7 @@ use crate::{
 /// The close obligation is handed on rather than discharged: the caller
 /// re-addresses the id through the long-lived parent domain.
 pub(crate) fn create_interface(domain: DomainRef<'_>) -> Result<u32, CreateInterfaceError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
@@ -75,7 +75,7 @@ pub(crate) fn initialize(
             core::mem::size_of_val(version_data),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::MF_INITIALIZE)
@@ -88,7 +88,7 @@ pub(crate) fn initialize(
 
 /// Finalize.
 pub(crate) fn finalize(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::MF_FINALIZE)
@@ -106,7 +106,7 @@ pub(crate) fn list_devices(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MF_LIST_DEVICES)
@@ -169,7 +169,7 @@ pub(crate) fn read_mifare(
             core::mem::size_of_val(read_block_parameter),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::MF_READ_MIFARE)
@@ -202,7 +202,7 @@ pub(crate) fn write_mifare(
             core::mem::size_of_val(write_block_parameter),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::MF_WRITE_MIFARE)
@@ -234,7 +234,7 @@ pub(crate) fn get_tag_info(
             size_of::<NfcTagInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::MF_GET_TAG_INFO)
@@ -260,7 +260,7 @@ pub(crate) fn attach_activate_event(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MF_ATTACH_ACTIVATE_EVENT)
@@ -283,7 +283,7 @@ pub(crate) fn attach_deactivate_event(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MF_ATTACH_DEACTIVATE_EVENT)
@@ -297,7 +297,7 @@ pub(crate) fn attach_deactivate_event(
 pub(crate) fn attach_availability_change_event(
     object: DomainObjectRef<'_>,
 ) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MF_ATTACH_AVAILABILITY_CHANGE_EVENT)

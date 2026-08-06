@@ -41,9 +41,7 @@ pub fn transact_parcel(
     // separate branch keyed off the caller-supplied HOS version.
     let cmd_id = binder_cmds::TRANSACT_PARCEL_AUTO;
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -84,9 +82,7 @@ pub fn adjust_refcount(
     addval: i32,
     type_: i32,
 ) -> Result<(), AdjustRefcountError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -119,9 +115,7 @@ pub fn get_native_handle(
     binder_id: BinderObjectId,
     inval: u32,
 ) -> Result<RawHandle, GetNativeHandleError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]

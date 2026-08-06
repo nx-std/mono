@@ -29,9 +29,7 @@ pub fn set_shim_library_version(
     version: u64,
     applet_resource_user_id: u64,
 ) -> Result<(), SetShimVersionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = SetShimVersionIn {
         version,
@@ -57,9 +55,7 @@ pub fn save_screen_shot_ex0(
     applet_resource_user_id: u64,
     image: &[u8],
 ) -> Result<ApplicationAlbumEntry, SaveScreenShotEx0Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = SaveScreenShotIn {
         attr: *attr,
@@ -90,9 +86,7 @@ pub fn save_screen_shot_ex1(
     appdata: &ApplicationData,
     image: &[u8],
 ) -> Result<ApplicationAlbumEntry, SaveScreenShotEx1Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = SaveScreenShotIn {
         attr: *attr,
@@ -133,9 +127,7 @@ pub fn save_screen_shot_ex2(
     list: &UserIdList,
     image: &[u8],
 ) -> Result<ApplicationAlbumEntry, SaveScreenShotEx2Error> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = SaveScreenShotIn {
         attr: *attr,

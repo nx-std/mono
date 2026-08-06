@@ -40,7 +40,7 @@ pub(crate) fn manager_pid_init(domain: DomainRef<'_>) -> Result<(), DispatchErro
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::MANAGER_PID_INIT)
@@ -58,7 +58,7 @@ pub(crate) fn monitor_pid_init(session: &Session) -> Result<(), DispatchError> {
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::MONITOR_PID_INIT)
@@ -73,7 +73,7 @@ pub(crate) fn get_peer_name(
     domain: DomainRef<'_>,
     cmd_id: u32,
 ) -> Result<HtcsPeerName, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(cmd_id)
@@ -98,7 +98,7 @@ pub(crate) fn create_socket(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u8>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::CREATE_SOCKET)
@@ -155,7 +155,7 @@ pub(crate) fn start_select(
             core::mem::size_of_val(except_fds),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::START_SELECT)
@@ -210,7 +210,7 @@ pub(crate) fn end_select(
             core::mem::size_of_val(except_fds),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::END_SELECT)
@@ -228,7 +228,7 @@ pub(crate) fn end_select(
 
 /// Socket close (cmd 0).
 pub(crate) fn socket_close(object: DomainObjectRef<'_>) -> Result<SocketResult, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_CLOSE)
@@ -254,7 +254,7 @@ pub(crate) fn socket_cmd_in_address(
             size_of::<HtcsSockAddr>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
@@ -277,7 +277,7 @@ pub(crate) fn socket_cmd_in_i32(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<i32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
@@ -303,7 +303,7 @@ pub(crate) fn socket_fcntl(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<FcntlIn>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_FCNTL)
@@ -322,7 +322,7 @@ pub(crate) fn socket_fcntl(
 pub(crate) fn socket_accept_start(
     object: DomainObjectRef<'_>,
 ) -> Result<(u32, u32), AcceptStartError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_ACCEPT_START)
@@ -352,7 +352,7 @@ pub(crate) fn socket_accept_results(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(proto::SOCKET_ACCEPT_RESULTS)
@@ -389,7 +389,7 @@ pub(crate) fn socket_recv_start(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<RecvStartIn>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_RECV_START)
@@ -419,7 +419,7 @@ pub(crate) fn socket_recv_results(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_RECV_RESULTS)
@@ -443,7 +443,7 @@ pub(crate) fn socket_cmd_in_u32_out_transfer(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
@@ -474,7 +474,7 @@ pub(crate) fn socket_start_send(
             size_of::<StartTransferIn>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_START_SEND)
@@ -512,7 +512,7 @@ pub(crate) fn socket_start_recv(
             size_of::<StartTransferIn>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_START_RECV)
@@ -542,7 +542,7 @@ pub(crate) fn socket_end_recv(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_END_RECV)
@@ -568,7 +568,7 @@ pub(crate) fn socket_send_start(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<i32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_SEND_START)
@@ -602,7 +602,7 @@ pub(crate) fn socket_continue_send(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const task_id).cast::<u8>(), size_of::<u32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_CONTINUE_SEND)
@@ -621,7 +621,7 @@ pub(crate) fn socket_continue_send(
 
 /// Socket get_primitive (cmd 130).
 pub(crate) fn socket_get_primitive(object: DomainObjectRef<'_>) -> Result<i32, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SOCKET_GET_PRIMITIVE)

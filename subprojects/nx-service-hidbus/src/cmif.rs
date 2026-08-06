@@ -31,9 +31,7 @@ fn dispatch_in<T>(
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
@@ -55,9 +53,7 @@ where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
     U: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
@@ -159,9 +155,7 @@ pub fn send_command_async(
     handle: BusHandle,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SEND_COMMAND_ASYNC)
         .with_data_value(&handle)
@@ -181,9 +175,7 @@ pub fn get_send_command_async_result(
     handle: BusHandle,
     buffer: &mut [u8],
 ) -> Result<u32, GetSendCommandAsyncResultError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SEND_COMMAND_ASYNC_RESULT)
         .with_data_value(&handle)
@@ -212,9 +204,7 @@ pub fn set_event_for_send_command_async_result(
     session: BorrowedSessionHandle<'_>,
     handle: BusHandle,
 ) -> Result<u32, SetEventError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_EVENT_FOR_SEND_COMMAND_ASYNC_RESULT)
         .with_data_value(&handle)
@@ -245,9 +235,7 @@ pub enum SetEventError {
 pub fn get_shared_memory_handle(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, GetSharedMemoryError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_HANDLE).build();
     req.send(&mut buf, session)
@@ -287,9 +275,7 @@ pub fn enable_joy_polling_receive_mode(
         handle,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::ENABLE_JOY_POLLING_RECEIVE_MODE)
         .with_data_value(&input)

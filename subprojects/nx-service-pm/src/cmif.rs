@@ -76,8 +76,7 @@ pub(crate) fn get_jit_debug_process_id_list(
             core::mem::size_of_val(out_pids),
         )
     };
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -120,8 +119,7 @@ pub(crate) fn hook_to_create_process(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<ProgramId>())
     };
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -147,8 +145,7 @@ pub(crate) fn hook_to_create_application_process(
     service: &Session,
     cmd_id: u32,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -239,8 +236,7 @@ pub(crate) fn terminate_program(
 ///
 /// Returns a copy-handle for the event.
 pub(crate) fn get_process_event_handle(service: &Session) -> Result<u32, DispatchError> {
-    // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(shell_proto::GET_PROCESS_EVENT_HANDLE)

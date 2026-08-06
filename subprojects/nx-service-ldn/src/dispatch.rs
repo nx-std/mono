@@ -37,9 +37,7 @@ pub(crate) trait DispatchTarget {
 impl DispatchTarget for Session {
     #[inline]
     fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
-        // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
         self.dispatch(cmd_id).send(&mut buf).map(|_| ())
     }
 
@@ -49,8 +47,7 @@ impl DispatchTarget for Session {
         // returns; viewing its bytes as a slice is sound.
         let in_bytes =
             unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
-        // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         self.dispatch(cmd_id)
             .in_raw(in_bytes)
@@ -60,8 +57,7 @@ impl DispatchTarget for Session {
 
     #[inline]
     fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError> {
-        // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         let result = self
             .dispatch(cmd_id)
@@ -75,9 +71,7 @@ impl DispatchTarget for Session {
 impl DispatchTarget for DomainObjectRef<'_> {
     #[inline]
     fn send_no_io(&self, cmd_id: u32) -> Result<(), DispatchError> {
-        // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
         self.dispatch(cmd_id).send(&mut buf).map(|_| ())
     }
 
@@ -87,8 +81,7 @@ impl DispatchTarget for DomainObjectRef<'_> {
         // returns; viewing its bytes as a slice is sound.
         let in_bytes =
             unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
-        // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         self.dispatch(cmd_id)
             .in_raw(in_bytes)
@@ -98,8 +91,7 @@ impl DispatchTarget for DomainObjectRef<'_> {
 
     #[inline]
     fn read_out<O: Copy>(&self, cmd_id: u32) -> Result<O, DispatchError> {
-        // SAFETY: one IpcBuffer token per thread; IPC is serialized per thread.
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         let result = self
             .dispatch(cmd_id)

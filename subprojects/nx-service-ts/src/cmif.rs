@@ -18,9 +18,7 @@ pub fn get_temperature_range(
     session: BorrowedSessionHandle<'_>,
     location: u8,
 ) -> Result<(i32, i32), GetTemperatureRangeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_RANGE)
         .with_data_value(&location)
@@ -41,9 +39,7 @@ pub fn get_temperature(
     session: BorrowedSessionHandle<'_>,
     location: u8,
 ) -> Result<i32, GetTemperatureError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE)
         .with_data_value(&location)
@@ -61,9 +57,7 @@ pub fn get_temperature_milli_c(
     session: BorrowedSessionHandle<'_>,
     location: u8,
 ) -> Result<i32, GetTemperatureMilliCError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_TEMPERATURE_MILLI_C)
         .with_data_value(&location)
@@ -84,9 +78,7 @@ pub fn open_session(
     session: BorrowedSessionHandle<'_>,
     device_code: u32,
 ) -> Result<OwnedSessionHandle, OpenSessionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&device_code)
@@ -110,9 +102,7 @@ pub fn open_session(
 pub fn session_get_temperature(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<f32, SessionGetTemperatureError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SESSION_GET_TEMPERATURE).build();
     req.send(&mut buf, session)

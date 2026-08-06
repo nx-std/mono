@@ -37,9 +37,7 @@ pub fn create_applet_resource(
 ) -> Result<OwnedSessionHandle, CreateAppletResourceError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::INITIALIZE_APPLET_RESOURCE)
         .with_context(0x20)
@@ -68,9 +66,7 @@ pub fn create_applet_resource(
 pub fn get_shared_memory_handle(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<ShmemHandle, GetSharedMemoryHandleError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(applet_resource_cmds::GET_SHARED_MEMORY_HANDLE).build();
     req.send(&mut buf, session)
@@ -114,9 +110,7 @@ pub fn activate_npad(
         aruid,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_NPAD_WITH_REVISION)
         .with_context(0x20)
@@ -154,9 +148,7 @@ pub fn set_supported_npad_style_set(
         aruid,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_STYLE_SET)
         .with_context(0x20)
@@ -182,9 +174,7 @@ pub fn set_supported_npad_id_type(
     let buffer_size = core::mem::size_of_val(ids);
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // SAFETY: `ids` is a live `&[u32]`; reinterpreting its bytes as `&[u8]`
     // of the matching length is sound for the lifetime of the borrow, and
@@ -213,9 +203,7 @@ pub fn activate_touch_screen(
 ) -> Result<(), ActivateTouchScreenError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_TOUCH_SCREEN)
         .with_context(0x20)
@@ -239,9 +227,7 @@ pub fn activate_keyboard(
 ) -> Result<(), ActivateKeyboardError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_KEYBOARD)
         .with_context(0x20)
@@ -265,9 +251,7 @@ pub fn activate_mouse(
 ) -> Result<(), ActivateMouseError> {
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_MOUSE)
         .with_context(0x20)
@@ -304,9 +288,7 @@ pub fn activate_gesture(
         aruid,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::ACTIVATE_GESTURE)
         .with_context(0x20)

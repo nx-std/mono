@@ -57,9 +57,7 @@ fn get_firmware_version_inner(
     // Allocate output buffer on stack.
     let mut out = FirmwareVersion::new();
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // SAFETY: `FirmwareVersion` is `#[repr(C)]` with only `u8`/byte-array fields,
     // so it is plain-old-data and any byte pattern is a valid value. The borrow

@@ -44,7 +44,7 @@ pub(crate) fn open_code_filesystem_legacy<'d>(
     // SAFETY: `path` is a valid reference that lives for the duration of this
     // call, which encompasses the `.send()` invocation below.
     let path_bytes = unsafe { core::slice::from_raw_parts(path.as_ptr(), FS_MAX_PATH) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
@@ -93,7 +93,7 @@ pub(crate) fn open_code_filesystem_v10<'d>(
             size_of::<FsCodeInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
@@ -148,7 +148,7 @@ pub(crate) fn open_code_filesystem_v16<'d>(
             size_of::<FsCodeInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
@@ -203,7 +203,7 @@ pub(crate) fn open_code_filesystem_v17<'d>(
             size_of::<FsCodeInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
@@ -252,7 +252,7 @@ pub(crate) fn open_code_filesystem_v20<'d>(
             size_of::<FsCodeInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::OPEN_CODE_FILE_SYSTEM)
@@ -286,7 +286,7 @@ pub(crate) fn set_current_process(domain: &Domain) -> Result<(), DispatchError> 
             size_of::<SetCurrentProcessIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::SET_CURRENT_PROCESS)

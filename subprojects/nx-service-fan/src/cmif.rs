@@ -16,9 +16,7 @@ pub fn open_controller(
     session: BorrowedSessionHandle<'_>,
     device_code: u32,
 ) -> Result<OwnedSessionHandle, OpenControllerError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_CONTROLLER)
         .with_data_value(&device_code)
@@ -43,9 +41,7 @@ pub fn set_rotation_speed_level(
     session: BorrowedSessionHandle<'_>,
     level: f32,
 ) -> Result<(), SetRotationSpeedLevelError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_ROTATION_SPEED_LEVEL)
         .with_data_value(&level)
@@ -62,9 +58,7 @@ pub fn set_rotation_speed_level(
 pub fn get_rotation_speed_level(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<f32, GetRotationSpeedLevelError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // The get-rotation-speed-level request carries no payload data.
     let req = cmif::CmifRequestBuilder::new(proto::GET_ROTATION_SPEED_LEVEL).build();

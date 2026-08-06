@@ -38,7 +38,7 @@ pub(crate) fn get_highest_available_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_HIGHEST_AVAILABLE_VERSION)
@@ -61,7 +61,7 @@ pub(crate) fn get_highest_required_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetVersionIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_HIGHEST_REQUIRED_VERSION)
@@ -82,7 +82,7 @@ pub(crate) fn get_version_list_entry(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_VERSION_LIST_ENTRY)
@@ -97,7 +97,7 @@ pub(crate) fn get_version_list_entry(
 pub(crate) fn get_version_list_importer<'d>(
     domain: &'d Domain,
 ) -> Result<DomainObject<'d>, GetVersionListImporterError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::GET_VERSION_LIST_IMPORTER)
@@ -120,7 +120,7 @@ pub(crate) fn get_launch_required_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_LAUNCH_REQUIRED_VERSION)
@@ -146,7 +146,7 @@ pub(crate) fn upgrade_launch_required_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::UPGRADE_LAUNCH_REQUIRED_VERSION)
@@ -170,7 +170,7 @@ pub(crate) fn push_launch_version(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PushVersionIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::PUSH_LAUNCH_VERSION)
@@ -192,7 +192,7 @@ pub(crate) fn list_version_list(
             core::mem::size_of_val(buffer),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::LIST_VERSION_LIST)
@@ -221,7 +221,7 @@ pub(crate) fn list_required_version(
             core::mem::size_of_val(buffer),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::LIST_REQUIRED_VERSION)
@@ -260,7 +260,7 @@ pub(crate) fn importer_set_data(
             core::mem::size_of_val(entries),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::IMPORTER_SET_DATA)

@@ -24,7 +24,7 @@ use crate::{
 
 /// Gets a PM module sub-object from the root domain service.
 pub(crate) fn get_pm_module<'d>(domain: &'d Domain) -> Result<DomainObject<'d>, GetPmModuleError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::GET_PM_MODULE)
@@ -57,7 +57,7 @@ pub(crate) fn module_initialize(
             core::mem::size_of_val(dependencies),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MODULE_INITIALIZE)
@@ -77,7 +77,7 @@ pub(crate) fn module_initialize(
 pub(crate) fn module_get_request(
     object: &DomainObject<'_>,
 ) -> Result<GetRequestOut, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MODULE_GET_REQUEST)

@@ -40,7 +40,7 @@ use crate::{
 /// The close obligation is handed on rather than discharged: the caller
 /// re-addresses the id through the long-lived parent domain.
 pub(crate) fn create_interface(domain: DomainRef<'_>) -> Result<u32, CreateInterfaceError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::CREATE_INTERFACE)
@@ -83,7 +83,7 @@ pub(crate) fn initialize(
             core::mem::size_of_val(version_data),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_INITIALIZE)
@@ -109,7 +109,7 @@ pub(crate) fn list_devices(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::NFP_LIST_DEVICES)
@@ -191,7 +191,7 @@ pub(crate) fn get_application_area(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::NFP_GET_APPLICATION_AREA)
@@ -222,7 +222,7 @@ pub(crate) fn set_application_area(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_SET_APPLICATION_AREA)
@@ -267,7 +267,7 @@ pub(crate) fn create_application_area(
             size_of::<DeviceHandleAppIdIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_CREATE_APPLICATION_AREA)
@@ -296,7 +296,7 @@ pub(crate) fn recreate_application_area(
             size_of::<DeviceHandleAppIdIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_RECREATE_APPLICATION_AREA)
@@ -336,7 +336,7 @@ pub(crate) fn get_tag_info(
             size_of::<NfpTagInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_TAG_INFO)
@@ -371,7 +371,7 @@ pub(crate) fn get_register_info(
             size_of::<NfpRegisterInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_REGISTER_INFO)
@@ -406,7 +406,7 @@ pub(crate) fn get_common_info(
             size_of::<NfpCommonInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_COMMON_INFO)
@@ -441,7 +441,7 @@ pub(crate) fn get_model_info(
             size_of::<NfpModelInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_MODEL_INFO)
@@ -467,7 +467,7 @@ pub(crate) fn attach_activate_event(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::NFP_ATTACH_ACTIVATE_EVENT)
@@ -490,7 +490,7 @@ pub(crate) fn attach_deactivate_event(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::NFP_ATTACH_DEACTIVATE_EVENT)
@@ -504,7 +504,7 @@ pub(crate) fn attach_deactivate_event(
 pub(crate) fn attach_availability_change_event(
     object: DomainObjectRef<'_>,
 ) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::NFP_ATTACH_AVAILABILITY_CHANGE_EVENT)
@@ -564,7 +564,7 @@ pub(crate) fn get_admin_info(
             size_of::<NfpAdminInfo>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_ADMIN_INFO)
@@ -599,7 +599,7 @@ pub(crate) fn get_register_info_private(
             size_of::<NfpRegisterInfoPrivate>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_REGISTER_INFO_PRIVATE)
@@ -634,7 +634,7 @@ pub(crate) fn set_register_info_private(
             size_of::<NfpRegisterInfoPrivate>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_SET_REGISTER_INFO_PRIVATE)
@@ -691,7 +691,7 @@ pub(crate) fn get_all(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut((out as *mut NfpData).cast::<u8>(), size_of::<NfpData>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_ALL)
@@ -723,7 +723,7 @@ pub(crate) fn set_all(
     let data_bytes = unsafe {
         core::slice::from_raw_parts((data as *const NfpData).cast::<u8>(), size_of::<NfpData>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_SET_ALL)
@@ -771,7 +771,7 @@ pub(crate) fn read_backup_data(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::NFP_READ_BACKUP_DATA)
@@ -802,7 +802,7 @@ pub(crate) fn write_backup_data(
             size_of::<NfcDeviceHandle>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_WRITE_BACKUP_DATA)
@@ -828,7 +828,7 @@ pub(crate) fn write_ntf(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<WriteNtfIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_WRITE_NTF)

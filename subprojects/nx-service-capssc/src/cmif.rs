@@ -41,9 +41,7 @@ pub fn capture_raw_image_with_timeout(
         timeout,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
     // completes; viewing its bytes as a slice is sound.
@@ -87,9 +85,7 @@ pub fn open_raw_screen_shot_read_stream(
         timeout,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
     // completes; viewing its bytes as a slice is sound.
@@ -121,9 +117,7 @@ pub fn open_raw_screen_shot_read_stream(
 pub fn close_raw_screen_shot_read_stream(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<(), CloseReadStreamError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::CLOSE_RAW_SCREEN_SHOT_READ_STREAM).build();
     req.send(&mut buf, session)
@@ -142,9 +136,7 @@ pub fn read_raw_screen_shot_read_stream(
     offset: u64,
     out_buf: &mut [u8],
 ) -> Result<u64, ReadStreamError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::READ_RAW_SCREEN_SHOT_READ_STREAM)
         .with_data_value(&offset)
@@ -175,9 +167,7 @@ pub fn capture_jpeg_screen_shot(
         timeout,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
     // completes; viewing its bytes as a slice is sound.
