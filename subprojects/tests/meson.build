@@ -104,6 +104,7 @@ src = files(
     'source/thread/suite.h',
     'source/thread/test_0001_detach_running_thread_self_reclaims.c',
     'source/thread/test_0002_detach_after_exit_reclaims.c',
+    'source/thread/test_0003_thread_pointer_is_per_thread_and_preserved.c',
     'source/main.c',
 )
 elf = executable(name + '.elf', src,

@@ -24,7 +24,7 @@ scope: "global"
 
 ## 1. Why `#![no_std]`
 
-Every Rust crate in this workspace targets `aarch64-nintendo-switch-freestanding`, a custom Tier-3 target with no
+Every Rust crate in this workspace targets `aarch64-nintendo-horizon.json`, a repo-local target spec with no
 operating system in the conventional sense — only Horizon OS supervisor calls. The Rust `std` library is not available
 because it assumes Unix-like syscalls, a thread runtime, file descriptors, and a host allocator, none of which exist on
 a freestanding Switch homebrew.

@@ -82,7 +82,7 @@ the meaning ([pattern-newtype](pattern-newtype.md)).
   formatting impl, because the exact rendering is the promise and an assertion is the only form of it that
   cannot drift. A doctest asserting a contract is required; one demonstrating typical usage is not written.
   Be honest about the reach of that exception here: these crates are `no_std` and target
-  `aarch64-nintendo-switch-freestanding`, so a doctest only runs where the item builds and runs on the host.
+  `aarch64-nintendo-horizon.json`, so a doctest only runs where the item builds and runs on the host.
   Most of this workspace's surface calls SVCs, so a code block in rustdoc is the rare case, not the habit.
 
 Every one of those bans rests on the same premise: the reader is holding the signature. The return type is

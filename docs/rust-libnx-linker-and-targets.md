@@ -35,7 +35,7 @@ questions:
   orchestrated by Meson, against the C `libnx` in `subprojects/libnx/`.
 - The linker script in use is the C `libnx` script,
   `subprojects/libnx/src/nx/switch.ld`, passed to the linker via `-T` in Meson link args.
-- The Rust default target is `aarch64-nintendo-switch-freestanding` (`.cargo/config.toml`),
+- The Rust default target is the repo-local `aarch64-nintendo-horizon.json` (`.cargo/config.toml`),
   built with `build-std` for `core`/`compiler_builtins`/`alloc` and `panic = "abort"`.
 - `cargo-nx` is used today only to **deploy** built NROs to hardware (the `/code-deploy`
   workflow), not to build them.

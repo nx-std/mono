@@ -94,3 +94,48 @@ pub unsafe extern "C" fn tpidrro_el0() -> usize {
         "ret",
     );
 }
+
+/// Read the `tpidr_el0` system register.
+///
+/// The companion to [`set_tpidr_el0`]: returns the thread pointer the AArch64
+/// ELF TLS ABI resolves thread-locals against.
+///
+/// # Safety
+///
+/// This function is `naked`, and its body is written in assembly. It reads
+/// `tpidr_el0` into `x0` per the AArch64 procedure call standard.
+#[unsafe(naked)]
+pub unsafe extern "C" fn tpidr_el0() -> usize {
+    naked_asm!(
+        "mrs x0, tpidr_el0", // Move the value of `tpidr_el0` into `x0`
+        "ret",
+    );
+}
+
+/// Write the `tpidr_el0` system register.
+///
+/// `tpidr_el0` is the writable companion to [`tpidrro_el0`], and is the
+/// register the AArch64 ELF TLS ABI resolves a thread-local's address against:
+/// LLVM emits `mrs <x>, tpidr_el0` followed by a TPREL offset. Horizon does not
+/// populate it, so a thread that never writes it here reads thread-locals off
+/// whatever the register happened to hold.
+///
+/// # References
+///
+/// - [ARM TPIDR_EL0 Register](https://developer.arm.com/documentation/ddi0601/2024-12/AArch64-Registers/TPIDR-EL0--EL0-Read-Write-Software-Thread-ID-Register)
+///
+/// # Safety
+///
+/// This function is `naked`, and its body is written in assembly. It writes the
+/// argument in `x0` to `tpidr_el0` per the AArch64 procedure call standard.
+///
+/// The caller must run on the thread whose register is being set, and must pass
+/// the thread pointer that thread's TLS block was laid out for. A wrong value
+/// silently redirects every thread-local access on that thread.
+#[unsafe(naked)]
+pub unsafe extern "C" fn set_tpidr_el0(tp: usize) {
+    naked_asm!(
+        "msr tpidr_el0, x0", // Move the argument in `x0` into `tpidr_el0`
+        "ret",
+    );
+}

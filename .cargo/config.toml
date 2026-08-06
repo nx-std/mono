@@ -3,9 +3,27 @@
 [build]
 # Set the default target platform for `cargo build`.
 # This is for the Nintendo Switch, using a freestanding (no-std) environment.
-# For more information on this target, see:
-# https://doc.rust-lang.org/rustc/platform-support/aarch64-nintendo-switch-freestanding.html
-target = ["aarch64-nintendo-switch-freestanding"]
+#
+# The repo-local spec is used rather than the built-in
+# `aarch64-nintendo-switch-freestanding` because two of its properties are not
+# expressible anywhere else. `tls-model = "local-exec"` is the one that matters:
+# the built-in target reports `dynamic-linking`, so LLVM defaults to the TLSDESC
+# model and emits descriptors a dynamic loader is expected to resolve at load
+# time. Nothing in this stack resolves them - Horizon has no such loader - so a
+# `#[thread_local]` compiled that way links but faults on first access. Local
+# exec instead emits TPREL relocations the linker resolves against the layout
+# `switch.ld` already defines, which is what `libnx` and `nx-sys-thread` both
+# set the thread pointer up for.
+#
+# Because the spec is a property of the target rather than a flag, it cannot be
+# applied to some crates and missed on others. A `RUSTFLAGS` entry could be:
+# `subprojects/nx-rt-nso/meson.build` overwrites `RUSTFLAGS` wholesale, which
+# would leave that one crate on a different TLS model than everything it links
+# against.
+#
+# See docs/rustc-link-pipeline.md for the spec's other role, and
+# `just check-target-json` for the check keeping its link script in sync.
+target = ["aarch64-nintendo-horizon.json"]
 
 # Override the default target directory for build artifacts.
 # This places all compiled files in `buildDir/cargo-target` instead of the default `target/`.
@@ -23,8 +41,12 @@ rustflags = ["--cfg", 'nso_applet_type="application"']
 [unstable]
 # This section enables unstable Cargo features.
 
+# Passing a `.json` target spec to Cargo is itself unstable, so `[build] target`
+# above does not resolve without this.
+json-target-spec = true
+
 # The `build-std` feature allows Cargo to recompile parts of the standard library.
-# This is necessary for custom targets like `aarch64-nintendo-switch-freestanding`
+# This is necessary for custom targets like `aarch64-nintendo-horizon`
 # which don't have a pre-built standard library.
 # We are building `core`, `compiler_builtins`, and `alloc`.
 # See:

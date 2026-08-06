@@ -37,7 +37,7 @@ drives the final link.
 | Aspect            | GCC pipeline (default, today)                         | `rustc` pipeline (opt-in, new)                              |
 |-------------------|-------------------------------------------------------|-------------------------------------------------------------|
 | Link driver       | devkitA64 GCC, orchestrated by Meson                  | `rustc` / Cargo                                             |
-| Compilation target| built-in tier-3 `aarch64-nintendo-switch-freestanding`| custom target JSON (this document)                          |
+| Compilation target| `aarch64-nintendo-horizon.json` (this document)       | `aarch64-nintendo-horizon.json` (this document)              |
 | Linker script     | C `libnx` `switch.ld`, passed via `-T`                | embedded in the target JSON's `link-script` field           |
 | `_start` / `.crt0`| `libnx`'s `switch_crt0.s`                             | per-kind `.crt0` from the entry crate (`rt-link`-gated)     |
 | Rust artifacts    | `rlib` inputs; `nx-std` is the override `staticlib`   | the entry-crate binary is linked directly                   |
@@ -49,9 +49,15 @@ every existing `just` target. The `rustc` pipeline is selected explicitly
 targets documented here.
 
 The leverage that makes coexistence cheap: the two pipelines diverge along
-exactly **three** axes — the compilation target, the linker-script delivery,
-and the `.crt0`. Everything above the link layer is shared, so a single Rust
-codebase feeds both.
+exactly **two** axes — the linker-script delivery and the `.crt0`. Everything
+above the link layer is shared, so a single Rust codebase feeds both.
+
+Both pipelines now *compile* against the target spec documented here, even
+though only the `rustc` pipeline consumes its embedded `link-script`. The GCC
+pipeline adopted it for a property the built-in target cannot express:
+`tls-model = "local-exec"`, without which `#[thread_local]` compiles to TLSDESC
+descriptors that no loader on this platform resolves. See
+[§3](#3-the-custom-target-specification).
 
 ## 2. Why a Custom Target Is Required
 

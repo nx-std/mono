@@ -385,6 +385,38 @@ if get_option('use_nx_wlaninf').enabled()
 endif
 
 #---------------------------------------------------------------------------------
+# Configuration constraints
+#---------------------------------------------------------------------------------
+# Any Rust feature above reaches IPC, and IPC reads a `#[thread_local]` that LLVM
+# resolves against `tpidr_el0`. Horizon does not maintain that register: it is
+# written by `nx_sys_thread_tls::init_thread_vars`, and only Rust calls that -
+# `nx-rt-core` for the main thread, `nx-sys-thread` for spawned ones.
+#
+# libnx's own `newlibSetup`/`threadCreate` set the soft thread pointer in
+# `ThreadVars.tls_ptr`, which is what `__aarch64_read_tp` reads, and leave
+# `tpidr_el0` alone. A thread they started therefore has no valid base, and a
+# Rust thread-local read on it resolves against a stale one - returning another
+# thread's memory rather than faulting, which is why this is refused at
+# configure time instead of left to be found at runtime.
+if deps_cargo_features.length() > 0
+    if not get_option('use_nx_rt').enabled()
+        error(
+            'nx-std with Rust features enabled requires -Duse_nx_rt=enabled (currently @0@): otherwise libnx starts the main thread and leaves tpidr_el0 unset, so Rust thread-locals resolve against a stale base'.format(
+                get_option('use_nx_rt'),
+            ),
+        )
+    endif
+
+    if not get_option('use_nx_sys_thread').enabled()
+        error(
+            'nx-std with Rust features enabled requires -Duse_nx_sys_thread=enabled (currently @0@): otherwise libnx starts spawned threads and leaves tpidr_el0 unset, so Rust thread-locals resolve against a stale base'.format(
+                get_option('use_nx_sys_thread'),
+            ),
+        )
+    endif
+endif
+
+#---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------
 # Include directories
