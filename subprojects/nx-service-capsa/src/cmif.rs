@@ -19,6 +19,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use static_assertions::const_assert_eq;
 use zerocopy::IntoBytes as _;
 
 use crate::{
@@ -37,7 +38,6 @@ use crate::{
         GetMinMaxAppletIdOut,
         GetRequiredStorageSizeIn,
         LoadScreenShotEx0Out,
-        LoadScreenShotExIn,
         LoadScreenShotOut,
         ReadStreamIn,
         StorageCopyAlbumFileIn,
@@ -202,26 +202,26 @@ pub(crate) fn load_album_screen_shot_image_ex(
     image: &mut [u8],
     workbuf: &mut [u8],
 ) -> Result<LoadScreenShotOut, LoadScreenShotError> {
+    /// Wire-layout input for screenshot commands with decode options.
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+    #[repr(C)]
+    struct LoadScreenShotExIn {
+        file_id: AlbumFileId,
+        opts: ScreenShotDecodeOption,
+    }
+
+    const_assert_eq!(size_of::<LoadScreenShotExIn>(), 0x38);
+
     let input = LoadScreenShotExIn {
         file_id: *file_id,
         opts: *opts,
     };
 
-    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
-    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<LoadScreenShotExIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(
             image,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
@@ -243,26 +243,26 @@ pub(crate) fn load_album_screen_shot_image_ex0(
     image: &mut [u8],
     workbuf: &mut [u8],
 ) -> Result<LoadScreenShotEx0Out, LoadScreenShotError> {
+    /// Wire-layout input for screenshot commands with decode options.
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+    #[repr(C)]
+    struct LoadScreenShotExIn {
+        file_id: AlbumFileId,
+        opts: ScreenShotDecodeOption,
+    }
+
+    const_assert_eq!(size_of::<LoadScreenShotExIn>(), 0x38);
+
     let input = LoadScreenShotExIn {
         file_id: *file_id,
         opts: *opts,
     };
 
-    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
-    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<LoadScreenShotExIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(
             image,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
@@ -428,26 +428,26 @@ pub(crate) fn load_album_screen_shot_image_ex1(
     image: &mut [u8],
     workbuf: &mut [u8],
 ) -> Result<(), LoadScreenShotError> {
+    /// Wire-layout input for screenshot commands with decode options.
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+    #[repr(C)]
+    struct LoadScreenShotExIn {
+        file_id: AlbumFileId,
+        opts: ScreenShotDecodeOption,
+    }
+
+    const_assert_eq!(size_of::<LoadScreenShotExIn>(), 0x38);
+
     let input = LoadScreenShotExIn {
         file_id: *file_id,
         opts: *opts,
     };
 
-    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
-    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<LoadScreenShotExIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(
             out.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),

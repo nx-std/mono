@@ -12,6 +12,7 @@ bench = false
 
 [dependencies]
 bitflags = "2"
+modular-bitfield = "0.11"
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 static_assertions = "1"
 zerocopy = { workspace = true }

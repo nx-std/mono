@@ -4,7 +4,6 @@ use nx_service_caps::{
     AccountUid,
     AlbumFileDateTime,
     ApplicationAlbumFileEntry,
-    ScreenShotDecodeOption,
 };
 use static_assertions::const_assert_eq;
 
@@ -52,17 +51,6 @@ pub(crate) struct GetAlbumFileSizeIn {
 }
 
 const_assert_eq!(size_of::<GetAlbumFileSizeIn>(), 0x38);
-
-/// Wire-layout input for load-screenshot commands (cmds 110, 120).
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct LoadScreenShotIn {
-    pub entry: ApplicationAlbumFileEntry,
-    pub option: ScreenShotDecodeOption,
-    pub applet_resource_user_id: u64,
-}
-
-const_assert_eq!(size_of::<LoadScreenShotIn>(), 0x58);
 
 /// Wire-layout input for [`precheck_to_create_contents`](crate::cmif::precheck_to_create_contents) (cmd 130).
 #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]

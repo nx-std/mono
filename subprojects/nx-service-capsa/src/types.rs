@@ -4,7 +4,6 @@ use nx_service_caps::{
     AlbumFileId,
     ApplicationAlbumEntry,
     ScreenShotAttribute,
-    ScreenShotDecodeOption,
 };
 use static_assertions::const_assert_eq;
 
@@ -38,16 +37,6 @@ pub(crate) struct GetAlbumEntryFromAppEntryIn {
 }
 
 const_assert_eq!(size_of::<GetAlbumEntryFromAppEntryIn>(), 0x28);
-
-/// Wire-layout input for screenshot commands with decode options (cmds 12, 13, 14, 1001).
-#[derive(Clone, Copy)]
-#[repr(C)]
-pub(crate) struct LoadScreenShotExIn {
-    pub file_id: AlbumFileId,
-    pub opts: ScreenShotDecodeOption,
-}
-
-const_assert_eq!(size_of::<LoadScreenShotExIn>(), 0x38);
 
 /// Wire-layout output for screenshot commands returning attributes + dimensions (cmds 14, 1001).
 #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
