@@ -8,6 +8,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use static_assertions::const_assert_eq;
 use zerocopy::IntoBytes as _;
 
 use crate::{
@@ -24,7 +25,6 @@ use crate::{
         GetAlbumFileListAaeUidIn,
         GetAlbumFileListDeprecated0In,
         GetAlbumFileSizeIn,
-        LoadScreenShotIn,
         OpenAccessorSessionIn,
         OpenMovieStreamIn,
         PrecheckToCreateContentsIn,
@@ -118,27 +118,28 @@ pub(crate) fn load_album_screenshot_image(
     image: &mut [u8],
     workbuf: &mut [u8],
 ) -> Result<(), LoadScreenShotImageError> {
+    /// Wire-layout input for load-screenshot commands (cmds 110, 120).
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+    #[repr(C)]
+    struct LoadScreenShotIn {
+        entry: nx_service_caps::ApplicationAlbumFileEntry,
+        option: nx_service_caps::ScreenShotDecodeOption,
+        applet_resource_user_id: u64,
+    }
+
+    const_assert_eq!(size_of::<LoadScreenShotIn>(), 0x58);
+
     let input = LoadScreenShotIn {
         entry: *entry,
         option: *option,
         applet_resource_user_id,
     };
 
-    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
-    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<LoadScreenShotIn>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .out_buffer(out.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(

@@ -1,5 +1,10 @@
 //! Shared capture-service wire-layout types.
 
+// `modular_bitfield`'s generated code trips both lints; the same suppression
+// sits at the top of `nx-service-capsdc`'s wire types for the same reason.
+#![expect(unused_parens, clippy::identity_op)]
+
+use modular_bitfield::prelude::*;
 use static_assertions::const_assert_eq;
 
 /// Maximum number of user IDs in a [`UserIdList`].
@@ -59,19 +64,35 @@ pub enum AlbumFileContents {
     ExtraMovie = 3,
 }
 
-bitflags::bitflags! {
-    /// Flags controlling JPEG decode behaviour.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    #[repr(transparent)]
-    pub struct ScreenShotDecoderFlag: u64 {
-        /// No special processing.
-        const NONE = 0;
-        /// See libjpeg-turbo `do_fancy_upsampling`.
-        const ENABLE_FANCY_UPSAMPLING = 1 << 0;
-        /// See libjpeg-turbo `do_block_smoothing`.
-        const ENABLE_BLOCK_SMOOTHING = 1 << 1;
-    }
+/// Flags controlling JPEG decode behaviour.
+///
+/// A bitfield rather than a `bitflags` set, so it derives its own wire
+/// encoding: `bitflags` keeps its bits behind a generated inner type that
+/// implements no `zerocopy` trait, which forces every payload carrying these
+/// flags to encode itself by hand. `nx-service-capsdc` declares the same flags
+/// the same way.
+#[bitfield]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(C)]
+pub struct ScreenShotDecoderFlag {
+    /// See libjpeg-turbo `do_fancy_upsampling`.
+    pub enable_fancy_upsampling: bool,
+    /// See libjpeg-turbo `do_block_smoothing`.
+    pub enable_block_smoothing: bool,
+    #[skip]
+    __: B62,
 }
+
+const_assert_eq!(size_of::<ScreenShotDecoderFlag>(), 0x8);
 
 bitflags::bitflags! {
     /// Flags for querying album contents by file type.
@@ -165,14 +186,26 @@ pub struct ScreenShotAttributeForApplication {
 const_assert_eq!(size_of::<ScreenShotAttributeForApplication>(), 0x40);
 
 /// Decode options passed to JPEG decode/shrink commands.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct ScreenShotDecodeOption {
     pub flags: ScreenShotDecoderFlag,
-    pub reserved: [u64; 3],
+    /// Reserved words the wire form carries after the flags. Private: a caller
+    /// has nothing to put in them, and [`new`](Self::new) zeroes them.
+    _reserved: [u64; 3],
 }
 
 const_assert_eq!(size_of::<ScreenShotDecodeOption>(), 0x20);
+
+impl ScreenShotDecodeOption {
+    /// Creates decode options carrying `flags`.
+    pub fn new(flags: ScreenShotDecoderFlag) -> Self {
+        Self {
+            flags,
+            _reserved: [0; 3],
+        }
+    }
+}
 
 /// Album file date-time. Corresponds to each field in the album entry
 /// filename prior to the "-": "YYYYMMDDHHMMSSII".

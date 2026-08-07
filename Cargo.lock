@@ -463,6 +463,7 @@ name = "nx-service-caps"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "modular-bitfield",
  "nx-panic-handler",
  "static_assertions",
  "zerocopy",
