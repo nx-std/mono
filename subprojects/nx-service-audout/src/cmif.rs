@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the audio output service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::dispatch_no_io,
@@ -23,10 +21,6 @@ use crate::{
         SetVolumeIn,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Root service commands (IAudioOutManager)
-// ---------------------------------------------------------------------------
 
 /// Lists available audio output devices (auto-select). \[3.0.0+\]
 pub(crate) fn list_audio_outs(
@@ -69,10 +63,7 @@ fn list_audio_outs_impl(
         .send(&mut ipc_buf)
         .map_err(ListAudioOutsError)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let count = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(count)
+    Ok(*result.value::<u32>())
 }
 
 /// Opens an audio output device (auto-select). \[3.0.0+\]
@@ -117,19 +108,11 @@ fn open_audio_out_impl(
     device_name_out: &mut [u8],
     transfer_attr: BufferAttr,
 ) -> Result<(u32, OpenAudioOutOut), OpenAudioOutError> {
-    // SAFETY: `input` is a `Copy`-compatible value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const *input).cast::<u8>(),
-            size_of::<OpenAudioOutIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
         .send_pid()
         .in_buffer(device_name_in, transfer_attr)
@@ -142,15 +125,8 @@ fn open_audio_out_impl(
         return Err(OpenAudioOutError::MissingHandle);
     };
 
-    // SAFETY: response payload is at least size_of::<OpenAudioOutOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<OpenAudioOutOut>()) };
-
-    Ok((handle, out))
+    Ok((handle, *result.value::<OpenAudioOutOut>()))
 }
-
-// ---------------------------------------------------------------------------
-// Audio-out sub-object commands (IAudioOut)
-// ---------------------------------------------------------------------------
 
 /// Gets the current audio output state.
 pub(crate) fn audio_out_get_state(service: &Session) -> Result<u32, DispatchError> {
@@ -161,10 +137,7 @@ pub(crate) fn audio_out_get_state(service: &Session) -> Result<u32, DispatchErro
         .out_size(size_of::<u32>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let state = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(state)
+    Ok(*result.value::<u32>())
 }
 
 /// Starts audio output playback.
@@ -226,28 +199,12 @@ fn append_buffer_impl(
     buffer: &AudioOutBuffer,
     buffer_attr: BufferAttr,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const buffer_client_ptr).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
-    // SAFETY: `buffer` is a valid `&AudioOutBuffer`; viewing it as a byte
-    // slice for the IN buffer is sound, and the slice borrows `buffer`.
-    let buf_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const *buffer).cast::<u8>(),
-            size_of::<AudioOutBuffer>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
-        .in_buffer(buf_bytes, buffer_attr)
+        .in_raw(buffer_client_ptr.as_bytes())
+        .in_buffer(buffer.as_bytes(), buffer_attr)
         .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(AppendBufferError)
@@ -285,24 +242,16 @@ fn get_released_buffer_impl(
     out_buffer_ptr: &mut u64,
     buffer_attr: BufferAttr,
 ) -> Result<u32, GetReleasedBufferError> {
-    // SAFETY: `out_buffer_ptr` is a valid `&mut u64`; viewing it as a byte
-    // slice for the OUT buffer is sound, and the slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut((out_buffer_ptr as *mut u64).cast::<u8>(), size_of::<u64>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())
-        .out_buffer(out_bytes, buffer_attr)
+        .out_buffer(out_buffer_ptr.as_mut_bytes(), buffer_attr)
         .send(&mut ipc_buf)
         .map_err(GetReleasedBufferError)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let count = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(count)
+    Ok(*result.value::<u32>())
 }
 
 /// Checks whether a buffer is contained in the audio output.
@@ -310,27 +259,16 @@ pub(crate) fn audio_out_contains_buffer(
     service: &Session,
     buffer_client_ptr: u64,
 ) -> Result<bool, ContainsBufferError> {
-    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const buffer_client_ptr).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_CONTAINS_BUFFER)
-        .in_raw(in_bytes)
+        .in_raw(buffer_client_ptr.as_bytes())
         .out_size(size_of::<u8>())
         .send(&mut ipc_buf)
         .map_err(ContainsBufferError)?;
 
-    // SAFETY: response payload is at least size_of::<u8>().
-    let val = unsafe { ptr::read_unaligned(result.data.as_ptr()) };
-
-    Ok(val & 1 != 0)
+    Ok(*result.value::<u8>() & 1 != 0)
 }
 
 /// Gets the number of queued audio output buffers. \[4.0.0+\]
@@ -342,10 +280,7 @@ pub(crate) fn audio_out_get_buffer_count(service: &Session) -> Result<u32, Dispa
         .out_size(size_of::<u32>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let count = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(count)
+    Ok(*result.value::<u32>())
 }
 
 /// Gets the total number of played samples. \[4.0.0+\]
@@ -357,10 +292,7 @@ pub(crate) fn audio_out_get_played_sample_count(service: &Session) -> Result<u64
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let count = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(count)
+    Ok(*result.value::<u64>())
 }
 
 /// Flushes all queued audio output buffers. \[4.0.0+\]
@@ -372,23 +304,16 @@ pub(crate) fn audio_out_flush_buffers(service: &Session) -> Result<bool, Dispatc
         .out_size(size_of::<u8>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u8>().
-    let val = unsafe { ptr::read_unaligned(result.data.as_ptr()) };
-
-    Ok(val & 1 != 0)
+    Ok(*result.value::<u8>() & 1 != 0)
 }
 
 /// Sets the audio output volume. \[6.0.0+\]
 pub(crate) fn audio_out_set_volume(service: &Session, volume: f32) -> Result<(), SetVolumeError> {
-    // SAFETY: `volume` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const volume).cast::<u8>(), size_of::<f32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::AUDIO_OUT_SET_VOLUME)
-        .in_raw(in_bytes)
+        .in_raw(volume.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SetVolumeError)
@@ -404,15 +329,8 @@ pub(crate) fn audio_out_get_volume(service: &Session) -> Result<f32, GetVolumeEr
         .send(&mut ipc_buf)
         .map_err(GetVolumeError)?;
 
-    // SAFETY: response payload is at least size_of::<f32>().
-    let volume = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<f32>()) };
-
-    Ok(volume)
+    Ok(*result.value::<f32>())
 }
-
-// ---------------------------------------------------------------------------
-// audout:a commands (pre-11.0.0)
-// ---------------------------------------------------------------------------
 
 /// Suspends audio output for a process.
 pub(crate) fn audouta_request_suspend(
@@ -480,10 +398,6 @@ pub(crate) fn audouta_set_process_record_volume(
     )
 }
 
-// ---------------------------------------------------------------------------
-// audout:d commands (pre-11.0.0)
-// ---------------------------------------------------------------------------
-
 /// Suspends audio output for a process (debug).
 pub(crate) fn audoutd_request_suspend_for_debug(
     service: &Session,
@@ -507,10 +421,6 @@ pub(crate) fn audoutd_request_resume_for_debug(
     dispatch_pid_delay(service, proto::AUDOUTD_REQUEST_RESUME_FOR_DEBUG, pid, delay)
 }
 
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
-
 fn dispatch_pid_delay(
     service: &Session,
     cmd_id: u32,
@@ -518,39 +428,27 @@ fn dispatch_pid_delay(
     delay: u64,
 ) -> Result<(), SuspendResumeError> {
     let input = PidDelayIn { pid, delay };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PidDelayIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SuspendResumeError)
 }
 
 fn dispatch_get_volume(service: &Session, cmd_id: u32, pid: u64) -> Result<f32, GetVolumeError> {
-    // SAFETY: `pid` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const pid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(pid.as_bytes())
         .out_size(size_of::<f32>())
         .send(&mut ipc_buf)
         .map_err(GetVolumeError)?;
 
-    // SAFETY: response payload is at least size_of::<f32>().
-    let volume = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<f32>()) };
-
-    Ok(volume)
+    Ok(*result.value::<f32>())
 }
 
 fn dispatch_set_volume(
@@ -566,24 +464,15 @@ fn dispatch_set_volume(
         pid,
         delay,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SetVolumeIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(SetVolumeError)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by list-audio-outs operations.
 #[derive(Debug, thiserror::Error)]

@@ -5,7 +5,7 @@ use static_assertions::const_assert_eq;
 /// Audio output buffer descriptor.
 ///
 /// Describes a sample buffer's layout for audio playback.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AudioOutBuffer {
     /// Client-side pointer to the next buffer (linked list, unused).
@@ -24,7 +24,7 @@ const_assert_eq!(size_of::<AudioOutBuffer>(), 0x28);
 
 /// Wire-layout input for `OpenAudioOut`:
 /// `{ u32 sample_rate, u32 channel_count, u64 applet_resource_user_id }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenAudioOutIn {
     pub sample_rate: u32,
@@ -35,7 +35,7 @@ pub(crate) struct OpenAudioOutIn {
 const_assert_eq!(size_of::<OpenAudioOutIn>(), 0x10);
 
 /// Output parameters returned when opening an audio output device.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct OpenAudioOutOut {
     /// Actual sample rate in Hz.
@@ -62,7 +62,7 @@ pub enum AudioOutState {
 
 /// Wire-layout input for audout:a suspend/resume commands:
 /// `{ u64 pid, u64 delay }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct PidDelayIn {
     pub pid: u64,
@@ -73,7 +73,7 @@ const_assert_eq!(size_of::<PidDelayIn>(), 0x10);
 
 /// Wire-layout input for audout:a set-volume commands:
 /// `{ f32 volume, pad[4], u64 pid, u64 delay }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetVolumeIn {
     pub volume: f32,

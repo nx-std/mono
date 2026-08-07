@@ -5,7 +5,7 @@ use static_assertions::const_assert_eq;
 /// Audio input buffer descriptor.
 ///
 /// Describes a sample buffer's layout for audio capture.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AudioInBuffer {
     /// Client-side pointer to the next buffer (linked list, unused).
@@ -24,7 +24,7 @@ const_assert_eq!(size_of::<AudioInBuffer>(), 0x28);
 
 /// Wire-layout input for `OpenAudioIn`:
 /// `{ u32 sample_rate, u32 channel_count, u64 client_pid }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenAudioInIn {
     pub sample_rate: u32,
@@ -35,7 +35,7 @@ pub(crate) struct OpenAudioInIn {
 const_assert_eq!(size_of::<OpenAudioInIn>(), 0x10);
 
 /// Output parameters returned when opening an audio input device.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct OpenAudioInOut {
     /// Actual sample rate in Hz.

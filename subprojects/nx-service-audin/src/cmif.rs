@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the audio input service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::dispatch_no_io,
@@ -21,10 +19,6 @@ use crate::{
         OpenAudioInOut,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Root service commands (IAudioInManager)
-// ---------------------------------------------------------------------------
 
 /// Lists available audio input devices (auto-select). \[3.0.0+\]
 ///
@@ -71,10 +65,7 @@ fn list_audio_ins_impl(
         .send(&mut buf)
         .map_err(ListAudioInsError)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let count = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(count)
+    Ok(*result.value::<u32>())
 }
 
 /// Opens an audio input device (auto-select). \[3.0.0+\]
@@ -125,16 +116,11 @@ fn open_audio_in_impl(
     device_name_out: &mut [u8],
     transfer_attr: BufferAttr,
 ) -> Result<(u32, OpenAudioInOut), OpenAudioInError> {
-    // SAFETY: `input` is a `Copy`-compatible value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<OpenAudioInIn>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
         .send_pid()
         .in_buffer(device_name_in, transfer_attr)
@@ -147,15 +133,8 @@ fn open_audio_in_impl(
         return Err(OpenAudioInError::MissingHandle);
     };
 
-    // SAFETY: response payload is at least size_of::<OpenAudioInOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<OpenAudioInOut>()) };
-
-    Ok((handle, out))
+    Ok((handle, *result.value::<OpenAudioInOut>()))
 }
-
-// ---------------------------------------------------------------------------
-// Audio-in sub-object commands (IAudioIn)
-// ---------------------------------------------------------------------------
 
 /// Gets the current audio input state.
 pub(crate) fn audio_in_get_state(service: &Session) -> Result<u32, DispatchError> {
@@ -166,10 +145,7 @@ pub(crate) fn audio_in_get_state(service: &Session) -> Result<u32, DispatchError
         .out_size(size_of::<u32>())
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let state = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(state)
+    Ok(*result.value::<u32>())
 }
 
 /// Starts audio input capture.
@@ -231,28 +207,12 @@ fn append_buffer_impl(
     buffer: &AudioInBuffer,
     buffer_attr: BufferAttr,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const buffer_client_ptr).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
-    // SAFETY: `buffer` is a valid `&AudioInBuffer`; viewing it as a byte slice
-    // for the IN buffer is sound, and the slice borrows `buffer`.
-    let buf_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const *buffer).cast::<u8>(),
-            size_of::<AudioInBuffer>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
-        .in_buffer(buf_bytes, buffer_attr)
+        .in_raw(buffer_client_ptr.as_bytes())
+        .in_buffer(buffer.as_bytes(), buffer_attr)
         .send(&mut buf)
         .map(|_| ())
         .map_err(AppendBufferError)
@@ -296,24 +256,16 @@ fn get_released_buffer_impl(
     out_buffer_ptr: &mut u64,
     buffer_attr: BufferAttr,
 ) -> Result<u32, GetReleasedBufferError> {
-    // SAFETY: `out_buffer_ptr` is a valid `&mut u64`; viewing it as a byte
-    // slice for the OUT buffer is sound, and the slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut((out_buffer_ptr as *mut u64).cast::<u8>(), size_of::<u64>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<u32>())
-        .out_buffer(out_bytes, buffer_attr)
+        .out_buffer(out_buffer_ptr.as_mut_bytes(), buffer_attr)
         .send(&mut buf)
         .map_err(GetReleasedBufferError)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let count = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(count)
+    Ok(*result.value::<u32>())
 }
 
 /// Checks whether a buffer is contained in the audio input.
@@ -321,32 +273,17 @@ pub(crate) fn audio_in_contains_buffer(
     service: &Session,
     buffer_client_ptr: u64,
 ) -> Result<bool, ContainsBufferError> {
-    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const buffer_client_ptr).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_IN_CONTAINS_BUFFER)
-        .in_raw(in_bytes)
+        .in_raw(buffer_client_ptr.as_bytes())
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(ContainsBufferError)?;
 
-    // SAFETY: response payload is at least size_of::<u8>().
-    let val = unsafe { ptr::read_unaligned(result.data.as_ptr()) };
-
-    Ok(val & 1 != 0)
+    Ok(*result.value::<u8>() & 1 != 0)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by list-audio-ins operations.
 #[derive(Debug, thiserror::Error)]
