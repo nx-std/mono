@@ -8,6 +8,7 @@ use nx_sf::{
     },
     service::BorrowedSessionHandle,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -42,13 +43,8 @@ pub fn list_system_update_task(
 ) -> Result<i32, ListSystemUpdateTaskError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `out` is a valid `&mut` slice; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
-    };
     let req = cmif::CmifRequestBuilder::new(proto::LIST_SYSTEM_UPDATE_TASK)
-        .add_output_buffer(OutputBuffer::new(out_bytes, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out.as_mut_bytes(), BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
         .map_err(ListSystemUpdateTaskError::SendRequest)?;

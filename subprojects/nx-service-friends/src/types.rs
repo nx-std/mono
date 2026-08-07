@@ -3,7 +3,15 @@
 use static_assertions::const_assert_eq;
 
 /// Account user ID (matches libnx's `AccountUid`).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
@@ -49,7 +57,14 @@ pub struct FriendInvitationGroupId {
 const_assert_eq!(size_of::<FriendInvitationGroupId>(), 0x8);
 
 /// User setting returned by the friends service.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct FriendsUserSetting {
     pub uid: AccountUid,

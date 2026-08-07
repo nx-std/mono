@@ -9,6 +9,7 @@ use nx_sf::service::{
     Session,
 };
 use static_assertions::const_assert_eq;
+use zerocopy::IntoBytes as _;
 
 use super::{
     dispatch::{
@@ -40,8 +41,8 @@ use super::{
 /// Input for `pm:shell` `LaunchProgram`.
 ///
 /// Wire layout: `{ u32 launch_flags, u32 pad, NcmProgramLocation }`.
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 struct LaunchProgramIn {
     launch_flags: u32,
     pad: u32,
@@ -68,24 +69,15 @@ pub(crate) fn get_jit_debug_process_id_list(
     cmd_id: u32,
     out_pids: &mut [ProcessId],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `out_pids` is a valid `&mut` slice; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `out_pids`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            out_pids.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out_pids),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(out_pids.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u32>())
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>() bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 /// Starts a process by PID.
@@ -114,16 +106,11 @@ pub(crate) fn hook_to_create_process(
     cmd_id: u32,
     program_id: ProgramId,
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `program_id` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<ProgramId>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(program_id.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut buf)?;
 

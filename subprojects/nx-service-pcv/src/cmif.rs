@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -47,36 +48,16 @@ pub(crate) fn get_possible_clock_rates(
         max_count: rates.len() as i32,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<GetPossibleClockRatesIn>()` bytes as a
-    // slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<GetPossibleClockRatesIn>(),
-        )
-    };
-    // SAFETY: `rates` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `rates`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            rates.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(rates),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_POSSIBLE_CLOCK_RATES)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<GetPossibleClockRatesOut>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(rates.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .send(&mut buf)?;
 
-    // SAFETY: the response payload is at least `size_of::<GetPossibleClockRatesOut>()` bytes.
-    Ok(unsafe {
-        core::ptr::read_unaligned(result.data.as_ptr().cast::<GetPossibleClockRatesOut>())
-    })
+    Ok(*result.value::<GetPossibleClockRatesOut>())
 }
 
 /// Sets the voltage-enabled state for a power domain (pre-8.0.0).

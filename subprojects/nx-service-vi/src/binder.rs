@@ -12,6 +12,7 @@ use nx_sf::{
     service::Session,
 };
 use nx_svc::raw::Handle as RawHandle;
+use zerocopy::FromBytes as _;
 
 use crate::{
     cmif,
@@ -150,9 +151,8 @@ impl Binder {
         )?;
 
         // Parse output header
-        // SAFETY: We're reading from the start of out_buf which has enough space.
-        let out_header =
-            unsafe { core::ptr::read_unaligned(out_buf.as_ptr().cast::<ParcelHeader>()) };
+        let (out_header, _) =
+            ParcelHeader::read_from_prefix(&out_buf).map_err(|_| TransactError::InvalidResponse)?;
 
         // Validate header
         if out_header.payload_size as usize > PARCEL_MAX_PAYLOAD {

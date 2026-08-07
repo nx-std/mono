@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the UART service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::{
     cmif,
@@ -17,6 +14,7 @@ use nx_sf::{
         Session,
     },
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -276,28 +274,18 @@ pub fn port_open_legacy(
         send_buffer_length,
         receive_buffer_length,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenPortLegacyIn>()` bytes as a slice
-    // is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<OpenPortLegacyIn>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_OPEN)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
 }
 
@@ -328,25 +316,18 @@ pub fn port_open_v6(
         send_buffer_length,
         receive_buffer_length,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenPortV6In>()` bytes as a slice is
-    // sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_OPEN)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
 }
 
@@ -380,25 +361,18 @@ pub fn port_open_v7(
         send_buffer_length,
         receive_buffer_length,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenPortV7In>()` bytes as a slice is
-    // sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_OPEN)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
 }
 
@@ -422,28 +396,18 @@ pub fn port_open_for_dev_legacy(
         send_buffer_length,
         receive_buffer_length,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenPortLegacyIn>()` bytes as a slice
-    // is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<OpenPortLegacyIn>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
 }
 
@@ -474,25 +438,18 @@ pub fn port_open_for_dev_v6(
         send_buffer_length,
         receive_buffer_length,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenPortV6In>()` bytes as a slice is
-    // sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV6In>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
 }
 
@@ -526,25 +483,18 @@ pub fn port_open_for_dev_v7(
         send_buffer_length,
         receive_buffer_length,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenPortV7In>()` bytes as a slice is
-    // sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenPortV7In>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_OPEN_FOR_DEV)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(send_tmem_handle)
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
         .map_err(OpenPortError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
 }
 
@@ -566,8 +516,7 @@ pub fn port_send(service: &Session, data: &[u8]) -> Result<u64, PortSendError> {
         .send(&mut buf)
         .map_err(PortSendError::Dispatch)?;
 
-    let bytes_written = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-    Ok(bytes_written)
+    Ok(*result.value::<u64>())
 }
 
 /// Gets the number of bytes available for reading.
@@ -588,8 +537,7 @@ pub fn port_receive(service: &Session, buf: &mut [u8]) -> Result<u64, PortReceiv
         .send(&mut ipc_buf)
         .map_err(PortReceiveError::Dispatch)?;
 
-    let bytes_read = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-    Ok(bytes_read)
+    Ok(*result.value::<u64>())
 }
 
 /// Binds a port event and returns (success, event_handle).
@@ -603,27 +551,17 @@ pub fn port_bind_port_event(
         pad: 0,
         threshold,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<BindPortEventIn>()` bytes as a slice
-    // is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<BindPortEventIn>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PORT_BIND_PORT_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u8>())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut buf)
         .map_err(BindPortEventError::Dispatch)?;
 
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let raw = *result.value::<u8>();
     let success = raw & 1 != 0;
 
     let Some(&event_handle) = result.copy_handles.first() else {

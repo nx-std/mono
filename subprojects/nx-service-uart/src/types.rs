@@ -40,7 +40,7 @@ pub enum UartPortEventType {
 }
 
 /// OpenPort input for pre-6.0.0 wire format.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OpenPortLegacyIn {
     pub port: u32,
@@ -54,7 +54,7 @@ pub struct OpenPortLegacyIn {
 const_assert_eq!(size_of::<OpenPortLegacyIn>(), 0x20);
 
 /// OpenPort input for 6.x wire format (adds signal inversion flags).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OpenPortV6In {
     pub is_invert_tx: u8,
@@ -71,7 +71,7 @@ pub struct OpenPortV6In {
 const_assert_eq!(size_of::<OpenPortV6In>(), 0x20);
 
 /// OpenPort input for 7.0.0+ wire format (adds device variation).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct OpenPortV7In {
     pub is_invert_tx: u8,
@@ -90,7 +90,7 @@ pub struct OpenPortV7In {
 const_assert_eq!(size_of::<OpenPortV7In>(), 0x28);
 
 /// BindPortEvent input payload.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct BindPortEventIn {
     pub port_event_type: u32,

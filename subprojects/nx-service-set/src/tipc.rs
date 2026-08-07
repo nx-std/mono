@@ -3,11 +3,6 @@
 //! This module implements set:sys commands using the TIPC (Trivial IPC) protocol,
 //! which is used on HOS 12.0.0+ and by Atmosphere.
 
-use core::{
-    mem::size_of,
-    slice,
-};
-
 use nx_sf::{
     error::{
         ResultCode,
@@ -20,6 +15,7 @@ use nx_sf::{
     service::BorrowedSessionHandle,
     tipc,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::proto::{
     CMD_GET_FIRMWARE_VERSION,
@@ -59,15 +55,8 @@ fn get_firmware_version_inner(
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `FirmwareVersion` is `#[repr(C)]` with only `u8`/byte-array fields,
-    // so it is plain-old-data and any byte pattern is a valid value. The borrow
-    // is exclusive (we hold `&mut out`) and covers the full size of the struct.
-    let out_bytes: &mut [u8] = unsafe {
-        slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<FirmwareVersion>())
-    };
-
     let req = tipc::TipcRequestBuilder::new(cmd_id)
-        .add_output_buffer(OutputBuffer::new(out_bytes, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(out.as_mut_bytes(), BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
         .map_err(GetFirmwareVersionError::SendRequest)?;

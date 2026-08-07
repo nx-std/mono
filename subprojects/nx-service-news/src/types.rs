@@ -3,8 +3,8 @@
 use static_assertions::const_assert_eq;
 
 /// News topic name (0x20 bytes, null-padded).
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub struct NewsTopicName {
     pub name: [u8; 0x20],
 }
@@ -12,8 +12,8 @@ pub struct NewsTopicName {
 const_assert_eq!(core::mem::size_of::<NewsTopicName>(), 0x20);
 
 /// News record (pre-6.0.0 wire format).
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub struct NewsRecordV1 {
     pub news_id: [u8; 0x18],
     pub user_id: [u8; 0x18],
@@ -21,13 +21,15 @@ pub struct NewsRecordV1 {
     pub read: i32,
     pub newly: i32,
     pub displayed: i32,
+    /// Trailing padding to the record's 8-byte alignment. Zero on the wire.
+    pub _pad: [u8; 4],
 }
 
 const_assert_eq!(core::mem::size_of::<NewsRecordV1>(), 0x48);
 
 /// News record (6.0.0+ wire format).
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub struct NewsRecord {
     pub news_id: [u8; 0x18],
     pub user_id: [u8; 0x18],
@@ -47,8 +49,8 @@ pub struct NewsRecord {
 const_assert_eq!(core::mem::size_of::<NewsRecord>(), 0x80);
 
 /// Output for `GetSavedataUsage`.
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub(crate) struct SavedataUsageOut {
     pub current: u64,
     pub total: u64,

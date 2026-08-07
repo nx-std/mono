@@ -22,3 +22,4 @@ nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 bitflags = "2"
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
+zerocopy = { workspace = true }

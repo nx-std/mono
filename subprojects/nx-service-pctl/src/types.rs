@@ -3,7 +3,7 @@
 use static_assertions::const_assert_eq;
 
 /// Parental controls restriction settings returned by the service.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct PctlRestrictionSettings {
     pub rating_age: u8,

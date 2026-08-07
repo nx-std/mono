@@ -7,7 +7,14 @@ use static_assertions::const_assert_eq;
 /// Opaque blob carrying service-specific error details. The `kind` field
 /// selects the interpretation; callers match on [`ErrorContextKind`] to
 /// decide how to read `data`.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct ErrorContext {
     /// Discriminant selecting the data interpretation.

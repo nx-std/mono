@@ -11,7 +11,15 @@ pub const MAX_ALARMS: usize = 8;
 /// Each entry in `settings` encodes a day-of-week alarm time as a packed
 /// `i16`: high byte = hour, low byte = minute. A value of `0xFFFF` (-1)
 /// means the day is disabled.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct WeeklyScheduleAlarmSetting {
     pub _reserved: [u8; 0xa],
@@ -21,7 +29,15 @@ pub struct WeeklyScheduleAlarmSetting {
 const_assert_eq!(size_of::<WeeklyScheduleAlarmSetting>(), 0x18);
 
 /// Alarm setting stored and returned by the notification service.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AlarmSetting {
     pub alarm_setting_id: u16,
@@ -37,7 +53,18 @@ pub struct AlarmSetting {
 const_assert_eq!(size_of::<AlarmSetting>(), 0x40);
 
 /// Account user identifier (128-bit).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],

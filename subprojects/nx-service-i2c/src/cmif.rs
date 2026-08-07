@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the I2C service.
 
-use core::mem::size_of;
-
 use nx_sf::{
     cmif,
     ipc::Handle as RawSessionHandle,
@@ -12,6 +10,7 @@ use nx_sf::{
         Session,
     },
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -57,16 +56,11 @@ pub fn send_auto(
 ) -> Result<(), SendAutoError> {
     let option_raw: u32 = option.bits();
 
-    // SAFETY: `option_raw` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SEND_AUTO)
-        .in_raw(in_bytes)
+        .in_raw(option_raw.as_bytes())
         .in_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -81,16 +75,11 @@ pub fn receive_auto(
 ) -> Result<(), ReceiveAutoError> {
     let option_raw: u32 = option.bits();
 
-    // SAFETY: `option_raw` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RECEIVE_AUTO)
-        .in_raw(in_bytes)
+        .in_raw(option_raw.as_bytes())
         .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut ipc_buf)
         .map(|_| ())

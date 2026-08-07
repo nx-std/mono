@@ -2,7 +2,17 @@
 
 /// Unique identifier for a system update task.
 #[repr(C, align(8))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 pub struct SystemUpdateTaskId {
     pub uuid: [u8; 0x10],
 }

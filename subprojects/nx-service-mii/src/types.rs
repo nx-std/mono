@@ -52,7 +52,15 @@ bitflags! {
 }
 
 /// Mii create ID (UUID).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiCreateId {
     pub uuid: [u8; 0x10],
@@ -61,7 +69,15 @@ pub struct MiiCreateId {
 const_assert_eq!(size_of::<MiiCreateId>(), 0x10);
 
 /// Mii character info data structure.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiCharInfo {
     pub create_id: MiiCreateId,
@@ -154,7 +170,7 @@ pub struct MiiNfpStoreDataExtension {
 const_assert_eq!(size_of::<MiiNfpStoreDataExtension>(), 0x08);
 
 /// Wire-layout input for `BuildRandom`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct BuildRandomIn {
     pub age: u32,

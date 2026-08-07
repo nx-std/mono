@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -25,16 +26,11 @@ use crate::{
 ///
 /// Returns the database session handle (move handle).
 pub(crate) fn open_database(service: &Session, key_code: u32) -> Result<u32, OpenDatabaseError> {
-    // SAFETY: `key_code` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const key_code).cast::<u8>(), size_of::<u32>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_DATABASE)
-        .in_raw(in_bytes)
+        .in_raw(key_code.as_bytes())
         .send(&mut buf)
         .map_err(OpenDatabaseError::Dispatch)?;
 
@@ -71,26 +67,13 @@ pub(crate) fn db_get1(
 ) -> Result<i32, DispatchError> {
     let flag_val = flag.bits();
 
-    // SAFETY: `flag_val` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const flag_val).cast::<u8>(), size_of::<u32>())
-    };
-    // SAFETY: `buffer` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `buffer`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            buffer.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(buffer),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::DB_GET1)
-        .in_raw(in_bytes)
+        .in_raw(flag_val.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(buffer.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut buf)?;
 
     Ok(i32::from_le_bytes([

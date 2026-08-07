@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the news service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -24,10 +22,6 @@ use crate::{
         SavedataUsageOut,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Creator commands (used on the creator session, 2.0.0+)
-// ---------------------------------------------------------------------------
 
 /// Creates the news service sub-object from the creator session.
 ///
@@ -55,10 +49,6 @@ pub(crate) fn create_sub_object(
     Ok(result.move_handles[0])
 }
 
-// ---------------------------------------------------------------------------
-// INewsService commands
-// ---------------------------------------------------------------------------
-
 /// Posts local news (HipcMapAlias input buffer).
 pub(crate) fn post_local_news(service: &Session, news: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
@@ -76,16 +66,11 @@ pub(crate) fn set_passphrase(
     program_id: u64,
     passphrase: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `program_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const program_id).cast::<u8>(), size_of::<u64>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_PASSPHRASE)
-        .in_raw(in_bytes)
+        .in_raw(program_id.as_bytes())
         .in_buffer(passphrase, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -104,8 +89,7 @@ pub(crate) fn get_subscription_status(
         .in_buffer(filter, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 /// Gets the topic list (3.0.0+).
@@ -114,21 +98,16 @@ pub(crate) fn get_topic_list(
     channel: u32,
     out_buf: &mut [u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `channel` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const channel).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_TOPIC_LIST)
-        .in_raw(in_bytes)
+        .in_raw(channel.as_bytes())
         .out_size(size_of::<u32>())
         .out_buffer(out_buf, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 /// Gets save data usage (6.0.0+).
@@ -167,15 +146,11 @@ pub(crate) fn set_subscription_status(
     status: u32,
     filter: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `status` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const status).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_SUBSCRIPTION_STATUS)
-        .in_raw(in_bytes)
+        .in_raw(status.as_bytes())
         .in_buffer(filter, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -204,13 +179,8 @@ pub(crate) fn get_news_database_dump(
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
-
-// ---------------------------------------------------------------------------
-// INewsNewlyArrivedEventHolder / INewsOverwriteEventHolder commands
-// ---------------------------------------------------------------------------
 
 /// Gets the event handle from an event holder sub-object (cmd 0).
 pub(crate) fn event_holder_get(service: &Session) -> Result<u32, EventHolderGetError> {
@@ -228,10 +198,6 @@ pub(crate) fn event_holder_get(service: &Session) -> Result<u32, EventHolderGetE
     Ok(result.copy_handles[0])
 }
 
-// ---------------------------------------------------------------------------
-// INewsDataService commands
-// ---------------------------------------------------------------------------
-
 /// Opens news data by file name (HipcPointer input).
 pub(crate) fn data_open(service: &Session, file_name: &[u8]) -> Result<(), DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
@@ -248,16 +214,11 @@ pub(crate) fn data_open_with_record_v1(
     service: &Session,
     record: &NewsRecordV1,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `record` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *record).cast::<u8>(), size_of::<NewsRecordV1>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::DATA_OPEN_WITH_RECORD_V1)
-        .in_raw(in_bytes)
+        .in_raw(record.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -268,21 +229,16 @@ pub(crate) fn data_read(
     offset: u64,
     out_buf: &mut [u8],
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `offset` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::DATA_READ)
-        .in_raw(in_bytes)
+        .in_raw(offset.as_bytes())
         .out_size(size_of::<u64>())
         .out_buffer(out_buf, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// Gets the size of the opened news data.
@@ -295,23 +251,14 @@ pub(crate) fn data_open_with_record(
     service: &Session,
     record: &NewsRecord,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `record` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *record).cast::<u8>(), size_of::<NewsRecord>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::DATA_OPEN_WITH_RECORD)
-        .in_raw(in_bytes)
+        .in_raw(record.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
-
-// ---------------------------------------------------------------------------
-// INewsDatabaseService commands
-// ---------------------------------------------------------------------------
 
 /// Gets a list of V1 records (pre-6.0.0).
 pub(crate) fn database_get_list_v1(
@@ -321,23 +268,18 @@ pub(crate) fn database_get_list_v1(
     where_clause: &[u8],
     order_clause: &[u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `offset` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::DATABASE_GET_LIST_V1)
-        .in_raw(in_bytes)
+        .in_raw(offset.as_bytes())
         .out_size(size_of::<u32>())
         .out_buffer(out_buf, BufferAttr::HIPC_AUTO_SELECT)
         .in_buffer(where_clause, BufferAttr::HIPC_POINTER)
         .in_buffer(order_clause, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 /// Counts records matching a filter.
@@ -350,8 +292,7 @@ pub(crate) fn database_count(service: &Session, filter: &[u8]) -> Result<u32, Di
         .in_buffer(filter, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
 
 /// Gets a list of current records (6.0.0+).
@@ -362,28 +303,19 @@ pub(crate) fn database_get_list(
     where_clause: &[u8],
     order_clause: &[u8],
 ) -> Result<u32, DispatchError> {
-    // SAFETY: `offset` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const offset).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::DATABASE_GET_LIST)
-        .in_raw(in_bytes)
+        .in_raw(offset.as_bytes())
         .out_size(size_of::<u32>())
         .out_buffer(out_buf, BufferAttr::HIPC_AUTO_SELECT)
         .in_buffer(where_clause, BufferAttr::HIPC_POINTER)
         .in_buffer(order_clause, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned when creating a sub-object from the creator service.
 #[derive(Debug, thiserror::Error)]

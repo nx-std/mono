@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -34,19 +35,11 @@ pub(crate) fn list_all_users(
     service: &Session,
     uids: &mut [AccountUid; USER_LIST_SIZE],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `uids` is a valid `&mut` array; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `uids`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            uids.as_mut_ptr().cast::<u8>(),
-            size_of::<[AccountUid; USER_LIST_SIZE]>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::LIST_ALL_USERS)
-        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(uids.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
     Ok(())
 }
@@ -58,16 +51,11 @@ pub(crate) fn get_last_opened_user(service: &Session) -> Result<AccountUid, Disp
 
 /// Gets an IProfile sub-object for a user. Returns the move handle.
 pub(crate) fn get_profile(service: &Session, uid: AccountUid) -> Result<u32, GetProfileError> {
-    // SAFETY: `uid` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<AccountUid>()` bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_PROFILE)
-        .in_raw(in_bytes)
+        .in_raw(uid.as_bytes())
         .send(&mut ipc_buf)
         .map_err(GetProfileError::Dispatch)?;
 
@@ -80,19 +68,11 @@ pub(crate) fn get_profile(service: &Session, uid: AccountUid) -> Result<u32, Get
 /// Initializes application info (pre-6.0.0). Sends PID.
 pub(crate) fn initialize_application_info_legacy(service: &Session) -> Result<(), DispatchError> {
     let input = InitializeApplicationInfoIn { pid_placeholder: 0 };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<InitializeApplicationInfoIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::INITIALIZE_APPLICATION_INFO_LEGACY)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)?;
     Ok(())
@@ -101,19 +81,11 @@ pub(crate) fn initialize_application_info_legacy(service: &Session) -> Result<()
 /// Initializes application info (6.0.0+). Sends PID.
 pub(crate) fn initialize_application_info(service: &Session) -> Result<(), DispatchError> {
     let input = InitializeApplicationInfoIn { pid_placeholder: 0 };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<InitializeApplicationInfoIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::INITIALIZE_APPLICATION_INFO)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)?;
     Ok(())
@@ -141,36 +113,23 @@ pub(crate) fn try_select_user_without_interaction(
     dispatch_in_out(service, proto::TRY_SELECT_USER_WITHOUT_INTERACTION, input)
 }
 
-// ---------------------------------------------------------------------------
-// IProfile commands
-// ---------------------------------------------------------------------------
-
 /// Gets profile data (base + optional user data).
 pub(crate) fn profile_get(
     service: &Session,
     userdata: &mut AccountUserData,
 ) -> Result<AccountProfileBase, DispatchError> {
-    // SAFETY: `userdata` is a valid `&mut`; viewing it as a byte slice for the
-    // OUT buffer is sound, and the byte slice borrows `userdata`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (userdata as *mut AccountUserData).cast::<u8>(),
-            size_of::<AccountUserData>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::PROFILE_GET)
         .out_size(size_of::<AccountProfileBase>())
         .out_buffer(
-            out_bytes,
+            userdata.as_mut_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut ipc_buf)?;
 
-    // SAFETY: the response payload is at least `size_of::<AccountProfileBase>()` bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<AccountProfileBase>()) })
+    Ok(*result.value::<AccountProfileBase>())
 }
 
 /// Gets profile base only (no user data buffer).
@@ -201,31 +160,26 @@ pub(crate) fn profile_load_image(service: &Session, buf: &mut [u8]) -> Result<u3
     ]))
 }
 
-// ---------------------------------------------------------------------------
-// Dispatch helpers
-// ---------------------------------------------------------------------------
-
 /// CMIF request with a single `Copy` input, a single `Copy` output, and PID.
 #[inline]
-fn dispatch_in_out_with_pid<I: Copy, O: Copy>(
+fn dispatch_in_out_with_pid<I, O>(
     service: &Session,
     cmd_id: u32,
     input: I,
-) -> Result<O, DispatchError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+) -> Result<O, DispatchError>
+where
+    I: zerocopy::IntoBytes + zerocopy::Immutable,
+    O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<O>())
         .send_pid()
         .send(&mut ipc_buf)?;
-    // SAFETY: the response payload is at least `size_of::<O>()` bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<O>())
 }
 
 /// Error returned by [`get_profile`].

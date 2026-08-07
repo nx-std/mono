@@ -25,6 +25,7 @@ use nx_svc::{
     sync::EventHandle,
     thread,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     AppletCommonFunctions,
@@ -132,12 +133,6 @@ pub fn open_proxy<'d>(
 
     // Input data: u64 reserved = 0
     let reserved: u64 = 0;
-    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let reserved_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
-    };
-
     let mut attempts: u32 = 0;
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
@@ -148,19 +143,11 @@ pub fn open_proxy<'d>(
             .send_pid()
             .in_handle(process_handle.to_raw())
             .out_objects(1)
-            .in_raw(reserved_bytes);
+            .in_raw(reserved.as_bytes());
 
         // Add attribute buffer for LibraryApplet with attributes
         if let Some(attr) = attr {
-            // SAFETY: `attr` is a valid `&AppletAttribute`; viewing it as a
-            // byte slice for the IN buffer is sound, and it borrows `attr`.
-            let attr_bytes = unsafe {
-                core::slice::from_raw_parts(
-                    (attr as *const AppletAttribute).cast::<u8>(),
-                    size_of::<AppletAttribute>(),
-                )
-            };
-            dispatch = dispatch.in_buffer(attr_bytes, BufferAttr::HIPC_MAP_ALIAS);
+            dispatch = dispatch.in_buffer(attr.as_bytes(), BufferAttr::HIPC_MAP_ALIAS);
         }
 
         match dispatch.send(&mut buf) {
@@ -670,8 +657,7 @@ pub fn get_applet_resource_user_id(
         return Err(GetAppletResourceUserIdError::InvalidResponse);
     }
 
-    // SAFETY: Response data contains u64 applet resource user ID.
-    let raw = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
+    let raw = *result.value::<u64>();
 
     Ok(Aruid::new(raw))
 }
@@ -805,8 +791,7 @@ pub fn create_managed_display_layer(
         return Err(CreateManagedDisplayLayerError::InvalidResponse);
     }
 
-    // SAFETY: Response data contains u64 layer ID.
-    let layer_id = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
+    let layer_id = *result.value::<u64>();
 
     Ok(layer_id)
 }
