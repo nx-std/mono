@@ -111,16 +111,23 @@ pub enum OutHandleAttr {
 }
 
 /// Builder for dispatching a single CMIF request.
+///
+/// Two lifetimes, because the builder borrows two things that live for
+/// different spans: `'s` is the session the request is sent on, and `'p` is
+/// the request and response payloads. The payloads are only read while
+/// [`send`](Self::send) runs, and `send` consumes the builder, so `'p` ends
+/// there; keeping it separate from `'s` is what lets a caller build a payload
+/// on the stack and still return something borrowed from the session.
 #[derive(Debug)]
-pub struct Dispatch<'a> {
-    session: BorrowedSessionHandle<'a>,
+pub struct Dispatch<'s, 'p> {
+    session: BorrowedSessionHandle<'s>,
     pointer_buffer_size: u16,
     object_id: Option<ObjectId>,
     request_id: u32,
     context: u32,
-    in_data: &'a [u8],
+    in_data: &'p [u8],
     out_data_size: usize,
-    buffers: [Option<(BufferAttr, BufferSlot<'a>)>; MAX_BUFFERS],
+    buffers: [Option<(BufferAttr, BufferSlot<'p>)>; MAX_BUFFERS],
     buffer_count: usize,
     in_objects: [Option<ObjectId>; MAX_IN_OBJECTS],
     in_object_count: usize,
@@ -131,11 +138,11 @@ pub struct Dispatch<'a> {
     send_pid: bool,
 }
 
-impl<'a> Dispatch<'a> {
+impl<'s, 'p> Dispatch<'s, 'p> {
     /// Creates a new dispatch builder. Used by the typed wrappers.
     #[inline]
     pub(crate) fn new(
-        session: BorrowedSessionHandle<'a>,
+        session: BorrowedSessionHandle<'s>,
         pointer_buffer_size: u16,
         object_id: Option<ObjectId>,
         request_id: u32,
@@ -170,7 +177,7 @@ impl<'a> Dispatch<'a> {
     /// Sets the input data for the request. The borrow is held until
     /// [`send`](Self::send) returns.
     #[inline]
-    pub fn in_raw(mut self, data: &'a [u8]) -> Self {
+    pub fn in_raw(mut self, data: &'p [u8]) -> Self {
         self.in_data = data;
         self
     }
@@ -188,14 +195,14 @@ impl<'a> Dispatch<'a> {
     /// [`BufferAttr::FIXED_SIZE`]). Silently ignored once [`MAX_BUFFERS`]
     /// slots are full.
     #[inline]
-    pub fn in_buffer(self, data: &'a [u8], attr: BufferAttr) -> Self {
+    pub fn in_buffer(self, data: &'p [u8], attr: BufferAttr) -> Self {
         self.push_buffer(BufferSlot::In(data), attr.or(BufferAttr::IN))
     }
 
     /// Adds an OUT buffer. [`BufferAttr::OUT`] is set automatically.
     /// Silently ignored once [`MAX_BUFFERS`] slots are full.
     #[inline]
-    pub fn out_buffer(self, data: &'a mut [u8], attr: BufferAttr) -> Self {
+    pub fn out_buffer(self, data: &'p mut [u8], attr: BufferAttr) -> Self {
         self.push_buffer(BufferSlot::Out(data), attr.or(BufferAttr::OUT))
     }
 
@@ -203,7 +210,7 @@ impl<'a> Dispatch<'a> {
     /// are set automatically. Silently ignored once [`MAX_BUFFERS`] slots
     /// are full.
     #[inline]
-    pub fn inout_buffer(self, data: &'a mut [u8], attr: BufferAttr) -> Self {
+    pub fn inout_buffer(self, data: &'p mut [u8], attr: BufferAttr) -> Self {
         self.push_buffer(
             BufferSlot::InOut(data),
             attr.or(BufferAttr::IN).or(BufferAttr::OUT),
@@ -213,7 +220,7 @@ impl<'a> Dispatch<'a> {
     /// Records a buffer slot in the internal table. Silently ignored once
     /// [`MAX_BUFFERS`] slots are full.
     #[inline]
-    fn push_buffer(mut self, slot: BufferSlot<'a>, attr: BufferAttr) -> Self {
+    fn push_buffer(mut self, slot: BufferSlot<'p>, attr: BufferAttr) -> Self {
         if self.buffer_count < MAX_BUFFERS {
             self.buffers[self.buffer_count] = Some((attr, slot));
             self.buffer_count += 1;
@@ -471,13 +478,17 @@ impl<'a> DispatchResult<'a> {
 /// instances from the server-emitted object ids in the response, so the
 /// caller never has to launder raw `u32` ids back through an unchecked
 /// constructor.
+///
+/// `'d` is the parent domain and `'p` the payloads, kept apart for the reason
+/// [`Dispatch`] states: a returned [`DomainObject<'d>`] outlives the request
+/// that produced it, while the payloads do not.
 #[derive(Debug)]
-pub struct DomainDispatch<'d> {
-    inner: Dispatch<'d>,
+pub struct DomainDispatch<'d, 'p> {
+    inner: Dispatch<'d, 'p>,
     domain: DomainRef<'d>,
 }
 
-impl<'d> DomainDispatch<'d> {
+impl<'d, 'p> DomainDispatch<'d, 'p> {
     /// Creates a new domain-dispatch builder. Used by the typed wrappers.
     ///
     /// The session handle and pointer-buffer size come from `domain`, which is
@@ -503,9 +514,9 @@ impl<'d> DomainDispatch<'d> {
     }
 
     /// Sets the input data for the request. The slice must remain valid
-    /// until [`send`](Self::send) returns; the borrow is enforced via `'d`.
+    /// until [`send`](Self::send) returns; the borrow is enforced via `'p`.
     #[inline]
-    pub fn in_raw(mut self, data: &'d [u8]) -> Self {
+    pub fn in_raw(mut self, data: &'p [u8]) -> Self {
         self.inner = self.inner.in_raw(data);
         self
     }
@@ -521,7 +532,7 @@ impl<'d> DomainDispatch<'d> {
     /// caller supplies only the transport bits. Silently ignored once
     /// [`MAX_BUFFERS`] slots are full.
     #[inline]
-    pub fn in_buffer(mut self, data: &'d [u8], attr: BufferAttr) -> Self {
+    pub fn in_buffer(mut self, data: &'p [u8], attr: BufferAttr) -> Self {
         self.inner = self.inner.in_buffer(data, attr);
         self
     }
@@ -529,7 +540,7 @@ impl<'d> DomainDispatch<'d> {
     /// Adds an OUT buffer. [`BufferAttr::OUT`] is set automatically.
     /// Silently ignored once [`MAX_BUFFERS`] slots are full.
     #[inline]
-    pub fn out_buffer(mut self, data: &'d mut [u8], attr: BufferAttr) -> Self {
+    pub fn out_buffer(mut self, data: &'p mut [u8], attr: BufferAttr) -> Self {
         self.inner = self.inner.out_buffer(data, attr);
         self
     }
@@ -538,7 +549,7 @@ impl<'d> DomainDispatch<'d> {
     /// are set automatically. Silently ignored once [`MAX_BUFFERS`] slots
     /// are full.
     #[inline]
-    pub fn inout_buffer(mut self, data: &'d mut [u8], attr: BufferAttr) -> Self {
+    pub fn inout_buffer(mut self, data: &'p mut [u8], attr: BufferAttr) -> Self {
         self.inner = self.inner.inout_buffer(data, attr);
         self
     }
