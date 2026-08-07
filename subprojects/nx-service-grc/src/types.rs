@@ -16,7 +16,14 @@ pub enum GrcStream {
 }
 
 /// Game movie identifier.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct GameMovieId {
     pub file_id: AlbumFileId,
@@ -62,7 +69,7 @@ pub struct TransferResult {
 const_assert_eq!(size_of::<TransferResult>(), 0x10);
 
 /// Input payload for IGameMovieTrimmer::BeginTrim (cmd 1).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct BeginTrimIn {
     pub start: i32,

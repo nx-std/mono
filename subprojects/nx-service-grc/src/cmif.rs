@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the GRC game recording service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_service_caps::ApplicationAlbumEntry;
 use nx_sf::service::{
@@ -41,20 +38,15 @@ pub(crate) fn begin(service: &Session) -> Result<(), DispatchError> {
 pub(crate) fn transfer(
     service: &Session,
     stream: u32,
-    buffer: *mut u8,
-    buffer_len: usize,
+    buffer: &mut [u8],
 ) -> Result<TransferResult, TransferError> {
-    // SAFETY: `buffer` is a valid pointer to `buffer_len` writable bytes for
-    // the OUT buffer; the caller guarantees its validity for the duration of
-    // the call.
-    let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_len) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::TRANSFER)
         .in_raw(stream.as_bytes())
         .out_size(size_of::<TransferResult>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map_err(TransferError)?;
 
@@ -74,16 +66,11 @@ pub(crate) fn trimmer_begin_trim(
         id: *id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<BeginTrimIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::TRIMMER_BEGIN_TRIM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -97,8 +84,7 @@ pub(crate) fn trimmer_end_trim(service: &Session) -> Result<GameMovieId, Dispatc
         .out_size(size_of::<GameMovieId>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<GameMovieId>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GameMovieId>()) })
+    Ok(*result.value::<GameMovieId>())
 }
 
 /// Gets the "not trimming" event (cmd 10, copy handle).
@@ -116,23 +102,19 @@ pub(crate) fn trimmer_get_not_trimming_event(service: &Session) -> Result<u32, D
 /// Sets the thumbnail RGBA image for the trimmed movie (cmd 20).
 pub(crate) fn trimmer_set_thumbnail_rgba(
     service: &Session,
-    buffer: *const u8,
-    buffer_len: usize,
+    buffer: &[u8],
     width: i32,
     height: i32,
 ) -> Result<(), DispatchError> {
     let input = SetThumbnailIn { width, height };
 
-    // SAFETY: `buffer` points to `buffer_len` readable bytes for the IN
-    // buffer; the caller guarantees its validity for the duration of the call.
-    let buf_bytes = unsafe { core::slice::from_raw_parts(buffer, buffer_len) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::TRIMMER_SET_THUMBNAIL_RGBA)
         .in_raw(input.as_bytes())
         .in_buffer(
-            buf_bytes,
+            buffer,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
         )
         .send(&mut ipc_buf)
@@ -227,16 +209,13 @@ pub(crate) fn maker_start_offscreen_recording(
 }
 
 /// Completes offscreen recording finish (pre-7.0.0, cmd 25).
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn maker_complete_offscreen_recording_finish_ex0(
     service: &Session,
     layer_handle: u64,
     width: i32,
     height: i32,
-    userdata: *const u8,
-    userdata_len: usize,
-    thumbnail: *const u8,
-    thumbnail_len: usize,
+    userdata: &[u8],
+    thumbnail: &[u8],
 ) -> Result<(), DispatchError> {
     let input = CompleteFinishIn {
         width,
@@ -244,34 +223,25 @@ pub(crate) fn maker_complete_offscreen_recording_finish_ex0(
         layer_handle,
     };
 
-    // SAFETY: `userdata` points to `userdata_len` readable bytes; the caller
-    // guarantees its validity for the duration of the call.
-    let userdata_bytes = unsafe { core::slice::from_raw_parts(userdata, userdata_len) };
-    // SAFETY: `thumbnail` points to `thumbnail_len` readable bytes; the caller
-    // guarantees its validity for the duration of the call.
-    let thumbnail_bytes = unsafe { core::slice::from_raw_parts(thumbnail, thumbnail_len) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX0)
         .in_raw(input.as_bytes())
-        .in_buffer(userdata_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(thumbnail_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(userdata, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(thumbnail, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 /// Completes offscreen recording finish (7.0.0+, cmd 26). Returns album entry.
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn maker_complete_offscreen_recording_finish_ex1(
     service: &Session,
     layer_handle: u64,
     width: i32,
     height: i32,
-    userdata: *const u8,
-    userdata_len: usize,
-    thumbnail: *const u8,
-    thumbnail_len: usize,
+    userdata: &[u8],
+    thumbnail: &[u8],
 ) -> Result<ApplicationAlbumEntry, CompleteFinishEx1Error> {
     let input = CompleteFinishIn {
         width,
@@ -279,25 +249,18 @@ pub(crate) fn maker_complete_offscreen_recording_finish_ex1(
         layer_handle,
     };
 
-    // SAFETY: `userdata` points to `userdata_len` readable bytes; the caller
-    // guarantees its validity for the duration of the call.
-    let userdata_bytes = unsafe { core::slice::from_raw_parts(userdata, userdata_len) };
-    // SAFETY: `thumbnail` points to `thumbnail_len` readable bytes; the caller
-    // guarantees its validity for the duration of the call.
-    let thumbnail_bytes = unsafe { core::slice::from_raw_parts(thumbnail, thumbnail_len) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX1)
         .in_raw(input.as_bytes())
         .out_size(size_of::<ApplicationAlbumEntry>())
-        .in_buffer(userdata_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(thumbnail_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(userdata, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(thumbnail, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map_err(CompleteFinishEx1Error)?;
 
-    // SAFETY: response payload is at least size_of::<ApplicationAlbumEntry>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<ApplicationAlbumEntry>()) })
+    Ok(*result.value::<ApplicationAlbumEntry>())
 }
 
 /// Gets the offscreen layer error (cmd 30).
@@ -317,19 +280,15 @@ pub(crate) fn maker_get_offscreen_layer_error(
 pub(crate) fn maker_encode_offscreen_layer_audio_sample(
     service: &Session,
     layer_handle: u64,
-    buffer: *const u8,
-    buffer_len: usize,
+    buffer: &[u8],
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `buffer` points to `buffer_len` readable bytes for the IN
-    // buffer; the caller guarantees its validity for the duration of the call.
-    let buf_bytes = unsafe { core::slice::from_raw_parts(buffer, buffer_len) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_ENCODE_OFFSCREEN_LAYER_AUDIO_SAMPLE)
         .in_raw(layer_handle.as_bytes())
         .out_size(size_of::<u64>())
-        .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
     Ok(*result.value::<u64>())
