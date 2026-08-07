@@ -290,23 +290,13 @@ pub(crate) fn get_register_info(
     handle: &NfcDeviceHandle,
     out: &mut NfpRegisterInfo,
 ) -> Result<(), DispatchError> {
-    // Still hand-rolled: `NfpRegisterInfo` embeds a `nx-service-mii` type that does
-    // not derive the `zerocopy` traits, so the struct cannot derive them either.
-    // SAFETY: `out` is a valid `&mut NfpRegisterInfo`; viewing its bytes for
-    // the OUT pointer buffer is sound.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut NfpRegisterInfo).cast::<u8>(),
-            size_of::<NfpRegisterInfo>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_REGISTER_INFO)
         .in_raw(handle.as_bytes())
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut ipc_buf)
@@ -448,23 +438,13 @@ pub(crate) fn get_register_info_private(
     handle: &NfcDeviceHandle,
     out: &mut NfpRegisterInfoPrivate,
 ) -> Result<(), DispatchError> {
-    // Still hand-rolled: `NfpRegisterInfoPrivate` embeds a `nx-service-mii` type that does
-    // not derive the `zerocopy` traits, so the struct cannot derive them either.
-    // SAFETY: `out` is a valid `&mut NfpRegisterInfoPrivate`; viewing its
-    // bytes for the OUT pointer buffer is sound.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut NfpRegisterInfoPrivate).cast::<u8>(),
-            size_of::<NfpRegisterInfoPrivate>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_REGISTER_INFO_PRIVATE)
         .in_raw(handle.as_bytes())
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut ipc_buf)
@@ -477,23 +457,13 @@ pub(crate) fn set_register_info_private(
     handle: &NfcDeviceHandle,
     info: &NfpRegisterInfoPrivate,
 ) -> Result<(), DispatchError> {
-    // Still hand-rolled: `NfpRegisterInfoPrivate` embeds a `nx-service-mii` type that does
-    // not derive the `zerocopy` traits, so the struct cannot derive them either.
-    // SAFETY: `info` is a valid reference; viewing its bytes for the IN
-    // pointer buffer is sound.
-    let info_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (info as *const NfpRegisterInfoPrivate).cast::<u8>(),
-            size_of::<NfpRegisterInfoPrivate>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_SET_REGISTER_INFO_PRIVATE)
         .in_raw(handle.as_bytes())
         .in_buffer(
-            info_bytes,
+            info.as_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut ipc_buf)
@@ -531,20 +501,13 @@ pub(crate) fn get_all(
     handle: &NfcDeviceHandle,
     out: &mut NfpData,
 ) -> Result<(), DispatchError> {
-    // Still hand-rolled: `NfpData` embeds a `nx-service-mii` type that does
-    // not derive the `zerocopy` traits, so the struct cannot derive them either.
-    // SAFETY: `out` is a valid `&mut NfpData`; viewing its bytes for the
-    // OUT pointer buffer is sound.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut((out as *mut NfpData).cast::<u8>(), size_of::<NfpData>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_GET_ALL)
         .in_raw(handle.as_bytes())
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut ipc_buf)
@@ -557,20 +520,13 @@ pub(crate) fn set_all(
     handle: &NfcDeviceHandle,
     data: &NfpData,
 ) -> Result<(), DispatchError> {
-    // Still hand-rolled: `NfpData` embeds a `nx-service-mii` type that does
-    // not derive the `zerocopy` traits, so the struct cannot derive them either.
-    // SAFETY: `data` is a valid reference; viewing its bytes for the IN
-    // pointer buffer is sound.
-    let data_bytes = unsafe {
-        core::slice::from_raw_parts((data as *const NfpData).cast::<u8>(), size_of::<NfpData>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::NFP_SET_ALL)
         .in_raw(handle.as_bytes())
         .in_buffer(
-            data_bytes,
+            data.as_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut ipc_buf)
