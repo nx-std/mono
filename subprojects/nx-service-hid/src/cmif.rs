@@ -22,6 +22,7 @@ use nx_sf::{
     },
 };
 use nx_svc::mem::shmem::Handle as ShmemHandle;
+use zerocopy::IntoBytes as _;
 
 use crate::proto::{
     applet_resource_cmds,
@@ -171,19 +172,14 @@ pub fn set_supported_npad_id_type(
     aruid: Option<Aruid>,
     ids: &[u32],
 ) -> Result<(), SetSupportedNpadIdTypeError> {
-    let buffer_size = core::mem::size_of_val(ids);
     let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `ids` is a live `&[u32]`; reinterpreting its bytes as `&[u8]`
-    // of the matching length is sound for the lifetime of the borrow, and
-    // `u32` has no padding or invalid bit patterns when read as bytes.
-    let ids_bytes = unsafe { core::slice::from_raw_parts(ids.as_ptr().cast::<u8>(), buffer_size) };
     let req = cmif::CmifRequestBuilder::new(cmds::SET_SUPPORTED_NPAD_ID_TYPE)
         .with_context(0x20)
         .with_data_value(&aruid)
-        .add_in_pointer(InPointer::new(ids_bytes))
+        .add_in_pointer(InPointer::new(ids.as_bytes()))
         .with_send_pid()
         .build();
     req.send(&mut buf, session)

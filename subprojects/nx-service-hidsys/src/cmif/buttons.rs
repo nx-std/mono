@@ -2,13 +2,12 @@
 //!
 //! All commands in this group send PID + AppletResourceUserId.
 
-use core::mem::size_of;
-
 use nx_sf::service::{
     DispatchError,
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use super::AcquireEventError;
 use crate::proto;
@@ -19,15 +18,11 @@ fn dispatch_pid_aruid_out_handle(
     cmd_id: u32,
     aruid: u64,
 ) -> Result<u32, AcquireEventError> {
-    // SAFETY: `aruid` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(aruid.as_bytes())
         .send_pid()
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
@@ -46,15 +41,11 @@ fn dispatch_pid_aruid_no_out(
     cmd_id: u32,
     aruid: u64,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `aruid` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(aruid.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)
         .map(|_| ())

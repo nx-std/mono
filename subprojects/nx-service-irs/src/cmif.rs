@@ -8,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -41,10 +42,6 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Activation / deactivation
-// ---------------------------------------------------------------------------
-
 /// ActivateIrsensor (cmd 302).
 pub(crate) fn activate_irsensor(
     service: &Session,
@@ -71,19 +68,11 @@ pub(crate) fn get_irsensor_shared_memory_handle(
     service: &Session,
     applet_resource_user_id: u64,
 ) -> Result<u32, GetSharedMemoryError> {
-    // SAFETY: `applet_resource_user_id` is a `Copy` value on the stack, valid
-    // until `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const applet_resource_user_id).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_IRSENSOR_SHARED_MEMORY_HANDLE)
-        .in_raw(in_bytes)
+        .in_raw(applet_resource_user_id.as_bytes())
         .send_pid()
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
@@ -104,10 +93,6 @@ pub enum GetSharedMemoryError {
     #[error("missing shared memory handle in response")]
     MissingHandle,
 }
-
-// ---------------------------------------------------------------------------
-// Processor control
-// ---------------------------------------------------------------------------
 
 /// StopImageProcessor (cmd 305).
 pub(crate) fn stop_image_processor(
@@ -172,19 +157,11 @@ pub(crate) fn run_image_transfer_processor(
         transfer_memory_size,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<RunImageTransferProcessorIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RUN_IMAGE_TRANSFER_PROCESSOR)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .in_handle(tmem_handle)
         .send(&mut ipc_buf)
@@ -205,30 +182,17 @@ pub(crate) fn get_image_transfer_processor_state(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<GetImageTransferProcessorStateIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_IMAGE_TRANSFER_PROCESSOR_STATE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<ImageTransferProcessorState>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least `size_of::<ImageTransferProcessorState>()`.
-    let state = unsafe {
-        core::ptr::read_unaligned(result.data.as_ptr().cast::<ImageTransferProcessorState>())
-    };
-
-    Ok(state)
+    Ok(*result.value::<ImageTransferProcessorState>())
 }
 
 /// RunTeraPluginProcessor (cmd 310).
@@ -241,6 +205,7 @@ pub(crate) fn run_tera_plugin_processor(
     let input = RunTeraPluginProcessorIn {
         handle,
         config: *config,
+        pad: 0,
         applet_resource_user_id,
     };
     dispatch_in_pid_no_out(service, proto::RUN_TERA_PLUGIN_PROCESSOR, &input)
@@ -294,6 +259,7 @@ pub(crate) fn check_firmware_version(
         handle,
         version,
         pad: 0,
+        pad2: 0,
         applet_resource_user_id,
     };
     dispatch_in_pid_no_out(service, proto::CHECK_FIRMWARE_VERSION, &input)
@@ -317,19 +283,11 @@ pub(crate) fn run_image_transfer_ex_processor(
         transfer_memory_size,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<RunImageTransferExProcessorIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RUN_IMAGE_TRANSFER_EX_PROCESSOR)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .in_handle(tmem_handle)
         .send(&mut ipc_buf)
@@ -346,6 +304,7 @@ pub(crate) fn run_ir_led_processor(
     let input = RunIrLedProcessorIn {
         handle,
         config: *config,
+        pad: 0,
         applet_resource_user_id,
     };
     dispatch_in_pid_no_out(service, proto::RUN_IR_LED_PROCESSOR, &input)

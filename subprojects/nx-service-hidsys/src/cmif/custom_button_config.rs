@@ -10,6 +10,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -29,10 +30,6 @@ use crate::{
         UniquePadId,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Query commands
-// ---------------------------------------------------------------------------
 
 /// IsCustomButtonConfigSupported (cmd 1250, 10.0.0+).
 pub(crate) fn is_custom_button_config_supported(
@@ -126,10 +123,6 @@ pub(crate) fn is_button_config_storage_right_empty(
         proto::IS_BUTTON_CONFIG_STORAGE_RIGHT_EMPTY,
     )
 }
-
-// ---------------------------------------------------------------------------
-// Deprecated storage get/set [10.0.0-12.1.0]
-// ---------------------------------------------------------------------------
 
 /// GetButtonConfigStorageEmbeddedDeprecated (cmd 1259, 10.0.0-12.1.0).
 pub(crate) fn get_button_config_storage_embedded_deprecated(
@@ -243,10 +236,6 @@ pub(crate) fn set_button_config_storage_right_deprecated(
     )
 }
 
-// ---------------------------------------------------------------------------
-// Delete storage [10.0.0+]
-// ---------------------------------------------------------------------------
-
 /// DeleteButtonConfigStorageEmbedded (cmd 1267, 10.0.0+).
 pub(crate) fn delete_button_config_storage_embedded(
     service: &Session,
@@ -295,10 +284,6 @@ pub(crate) fn delete_button_config_storage_right(
     )
 }
 
-// ---------------------------------------------------------------------------
-// Custom config control [10.0.0+]
-// ---------------------------------------------------------------------------
-
 /// IsUsingCustomButtonConfig (cmd 1271, 10.0.0+).
 pub(crate) fn is_using_custom_button_config(
     service: &Session,
@@ -346,10 +331,6 @@ pub(crate) fn set_default_button_config(
 pub(crate) fn set_all_default_button_config(service: &Session) -> Result<(), DispatchError> {
     dispatch_no_io(service, proto::SET_ALL_DEFAULT_BUTTON_CONFIG)
 }
-
-// ---------------------------------------------------------------------------
-// Hid button config (runtime per-pad) [10.0.0+]
-// ---------------------------------------------------------------------------
 
 /// SetHidButtonConfigEmbedded (cmd 1276, 10.0.0+).
 pub(crate) fn set_hid_button_config_embedded(
@@ -462,10 +443,6 @@ pub(crate) fn get_hid_button_config_right(
         proto::GET_HID_BUTTON_CONFIG_RIGHT,
     )
 }
-
-// ---------------------------------------------------------------------------
-// Named storage get/set [11.0.0+]
-// ---------------------------------------------------------------------------
 
 /// GetButtonConfigStorageEmbedded (cmd 1284, 11.0.0+).
 pub(crate) fn get_button_config_storage_embedded(
@@ -595,28 +572,23 @@ pub(crate) fn set_button_config_storage_right(
     )
 }
 
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
-
 fn dispatch_in_buf_out_bool<T>(
     service: &Session,
     buf: &T,
     cmd_id: u32,
-) -> Result<bool, DispatchError> {
-    // SAFETY: `buf` is a valid reference; viewing it as bytes is sound.
-    let buf_bytes =
-        unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+) -> Result<bool, DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_buffer(buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(buf.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u8>())
         .send(&mut ipc_buf)?;
-    // SAFETY: response payload is at least 1 byte.
-    let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
-    Ok(out & 1 != 0)
+
+    Ok(*result.value::<u8>() & 1 != 0)
 }
 
 fn dispatch_in_u32_out_bool(
@@ -633,20 +605,17 @@ fn dispatch_in_u64_in_buf_fixed<T>(
     inval: u64,
     buf: &T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `inval` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const inval).cast::<u8>(), size_of::<u64>()) };
-    // SAFETY: `buf` is a valid reference; viewing it as bytes is sound.
-    let buf_bytes =
-        unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(inval.as_bytes())
         .in_buffer(
-            buf_bytes,
+            buf.as_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -658,20 +627,17 @@ fn dispatch_in_u64_out_buf_fixed<T>(
     inval: u64,
     buf: &mut T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `inval` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const inval).cast::<u8>(), size_of::<u64>()) };
-    // SAFETY: `buf` is a valid mutable reference; viewing it as mutable bytes is sound.
-    let buf_bytes =
-        unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::FromBytes + zerocopy::IntoBytes,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(inval.as_bytes())
         .out_buffer(
-            buf_bytes,
+            buf.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -683,20 +649,17 @@ fn dispatch_in_u32_in_buf_fixed<T>(
     inval: u32,
     buf: &T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `inval` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const inval).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `buf` is a valid reference; viewing it as bytes is sound.
-    let buf_bytes =
-        unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(inval.as_bytes())
         .in_buffer(
-            buf_bytes,
+            buf.as_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -708,20 +671,17 @@ fn dispatch_in_u32_out_buf_fixed<T>(
     inval: u32,
     buf: &mut T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `inval` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const inval).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `buf` is a valid mutable reference; viewing it as mutable bytes is sound.
-    let buf_bytes =
-        unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::FromBytes + zerocopy::IntoBytes,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(inval.as_bytes())
         .out_buffer(
-            buf_bytes,
+            buf.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -734,26 +694,22 @@ fn dispatch_in_u32_out_buf_fixed_out_ptr_fixed<T, U>(
     buf0: &mut T,
     buf1: &mut U,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `inval` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const inval).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `buf0` and `buf1` are valid mutable references.
-    let buf0_bytes =
-        unsafe { core::slice::from_raw_parts_mut((buf0 as *mut T).cast::<u8>(), size_of::<T>()) };
-    let buf1_bytes =
-        unsafe { core::slice::from_raw_parts_mut((buf1 as *mut U).cast::<u8>(), size_of::<U>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::FromBytes + zerocopy::IntoBytes,
+    U: zerocopy::FromBytes + zerocopy::IntoBytes,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(inval.as_bytes())
         .out_buffer(
-            buf0_bytes,
+            buf0.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .out_buffer(
-            buf1_bytes,
+            buf1.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -766,26 +722,22 @@ fn dispatch_in_u32_in_buf_fixed_in_ptr_fixed<T, U>(
     buf0: &T,
     buf1: &U,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `inval` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const inval).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `buf0` and `buf1` are valid references.
-    let buf0_bytes =
-        unsafe { core::slice::from_raw_parts((buf0 as *const T).cast::<u8>(), size_of::<T>()) };
-    let buf1_bytes =
-        unsafe { core::slice::from_raw_parts((buf1 as *const U).cast::<u8>(), size_of::<U>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+    U: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(inval.as_bytes())
         .in_buffer(
-            buf0_bytes,
+            buf0.as_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .in_buffer(
-            buf1_bytes,
+            buf1.as_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
