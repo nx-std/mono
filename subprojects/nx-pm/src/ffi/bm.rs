@@ -64,6 +64,12 @@ pub unsafe extern "C" fn __nx_pm__pmbm_get_service_session() -> *mut Service {
 }
 
 /// `pmbmGetBootMode(PmBootMode *out)`.
+///
+/// Diverges from libnx on one point: libnx forwards whatever `u32` the server
+/// sent, while this returns an error for a value no [`BootMode`] variant
+/// names, because materialising the enum from it would be undefined behaviour.
+///
+/// [`BootMode`]: nx_service_pm::BootMode
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_pm__pmbm_get_boot_mode(out: *mut u32) -> u32 {
     if out.is_null() {

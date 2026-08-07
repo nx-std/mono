@@ -5,6 +5,7 @@ use core::mem::size_of;
 use nx_service_sm::SmService;
 use nx_sf::{
     error::{
+        GENERIC_ERROR,
         ResultCode,
         ToResultCode,
     },
@@ -65,9 +66,26 @@ impl PmShellService {
     }
 
     /// Gets the process event info.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GetProcessEventInfoError::UnknownEvent`] when the server
+    /// answers with a discriminant [`ProcessEvent`] does not define. libnx
+    /// casts the reply straight into `PmProcessEventInfo`; doing that in Rust
+    /// would build an enum out of a value it has no variant for, which is
+    /// undefined behaviour, so the value is checked instead.
     #[inline]
-    pub fn get_process_event_info(&self) -> Result<ProcessEventInfo, DispatchError> {
-        cmif::get_process_event_info(&self.0)
+    pub fn get_process_event_info(&self) -> Result<ProcessEventInfo, GetProcessEventInfoError> {
+        let out =
+            cmif::get_process_event_info(&self.0).map_err(GetProcessEventInfoError::Dispatch)?;
+
+        Ok(ProcessEventInfo {
+            event: out
+                .event
+                .try_into()
+                .map_err(GetProcessEventInfoError::UnknownEvent)?,
+            process_id: out.process_id,
+        })
     }
 
     /// Cleans up a process (pre-5.0.0 only, cmd 5).
@@ -174,6 +192,34 @@ impl PmShellService {
     }
 }
 
+/// Errors returned by [`PmShellService::get_process_event_info`].
+#[derive(Debug, thiserror::Error)]
+pub enum GetProcessEventInfoError {
+    /// The IPC dispatch failed, so no reply was decoded.
+    #[error("failed to dispatch pm:shell GetProcessEventInfo")]
+    Dispatch(#[source] DispatchError),
+
+    /// The server replied successfully with an event this crate does not
+    /// define.
+    ///
+    /// Occurs when firmware gains a process event newer than [`ProcessEvent`].
+    /// The session is unaffected and the call is safe to retry, but the event
+    /// has already been consumed from the server's queue.
+    #[error("pm:shell GetProcessEventInfo replied with an unknown event")]
+    UnknownEvent(#[source] UnknownProcessEvent),
+}
+
+impl ToResultCode for GetProcessEventInfoError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            GetProcessEventInfoError::Dispatch(err) => err.to_rc(),
+            // The server answered without error, so it assigned this failure no
+            // code of its own; it is a local decode failure like any other.
+            GetProcessEventInfoError::UnknownEvent(_) => GENERIC_ERROR,
+        }
+    }
+}
+
 #[cfg(feature = "ffi")]
 impl PmShellService {
     /// Returns the underlying session for libnx `Service*` shadow buffers.
@@ -239,6 +285,10 @@ bitflags::bitflags! {
 }
 
 /// Process event type.
+///
+/// The wire form is a bare `u32`, and only the six discriminants below are
+/// inhabited, so a reply is decoded as a `u32` and converted through
+/// [`TryFrom`] rather than read directly into this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ProcessEvent {
@@ -250,7 +300,32 @@ pub enum ProcessEvent {
     DebugBreak = 5,
 }
 
+impl TryFrom<u32> for ProcessEvent {
+    type Error = UnknownProcessEvent;
+
+    fn try_from(raw: u32) -> Result<Self, Self::Error> {
+        match raw {
+            0 => Ok(ProcessEvent::None),
+            1 => Ok(ProcessEvent::Exit),
+            2 => Ok(ProcessEvent::Start),
+            3 => Ok(ProcessEvent::Crash),
+            4 => Ok(ProcessEvent::DebugStart),
+            5 => Ok(ProcessEvent::DebugBreak),
+            _ => Err(UnknownProcessEvent(raw)),
+        }
+    }
+}
+
+/// Error returned when a `u32` names no [`ProcessEvent`] variant.
+#[derive(Debug, thiserror::Error)]
+#[error("{0} is not a known pm:shell process event")]
+pub struct UnknownProcessEvent(pub u32);
+
 /// Process event info returned by `pm:shell` `GetProcessEventInfo`.
+///
+/// The `#[repr(C)]` layout mirrors libnx's `PmProcessEventInfo` so a C caller
+/// can be handed one directly; it is no longer what the reply is decoded into,
+/// which is [`cmif::ProcessEventInfoOut`](super::cmif::ProcessEventInfoOut).
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessEventInfo {

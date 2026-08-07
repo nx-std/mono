@@ -1,6 +1,7 @@
 //! `pm:shell` service.
 
 use nx_service_pm::{
+    GetProcessEventInfoError,
     NcmProgramLocation,
     PmShellService,
     ProcessEventInfo as RawProcessEventInfo,
@@ -80,6 +81,11 @@ impl ShellService {
     }
 
     /// Reads the next [`ProcessEventInfo`].
+    ///
+    /// # Errors
+    ///
+    /// Fails when the dispatch fails, and when the server replies with an event
+    /// [`ProcessEventKind`] does not define.
     pub fn process_event_info(&self) -> Result<ProcessEventInfo, ShellGetProcessEventInfoError> {
         self.inner
             .get_process_event_info()
@@ -209,10 +215,10 @@ pub struct ShellTerminateProgramError(#[source] pub DispatchError);
 #[error("pm:shell GetProcessEventHandle IPC dispatch failed")]
 pub struct ShellGetProcessEventHandleError(#[source] pub DispatchError);
 
-/// IPC dispatch failure from `pm:shell GetProcessEventInfo`.
+/// Failure reading the next event from `pm:shell GetProcessEventInfo`.
 #[derive(Debug, thiserror::Error)]
-#[error("pm:shell GetProcessEventInfo IPC dispatch failed")]
-pub struct ShellGetProcessEventInfoError(#[source] pub DispatchError);
+#[error("pm:shell GetProcessEventInfo failed")]
+pub struct ShellGetProcessEventInfoError(#[source] pub GetProcessEventInfoError);
 
 /// IPC dispatch failure from `pm:shell CleanupProcess` (pre-5.0.0).
 #[derive(Debug, thiserror::Error)]
