@@ -136,7 +136,15 @@ pub struct MiiCharInfo {
 const_assert_eq!(size_of::<MiiCharInfo>(), 0x58);
 
 /// Mii store data.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiStoreData {
     pub data: [u8; 0x44],
@@ -145,7 +153,15 @@ pub struct MiiStoreData {
 const_assert_eq!(size_of::<MiiStoreData>(), 0x44);
 
 /// Mii format used in 3DS.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiVer3StoreData {
     pub data: [u8; 0x5C],
@@ -154,7 +170,15 @@ pub struct MiiVer3StoreData {
 const_assert_eq!(size_of::<MiiVer3StoreData>(), 0x5C);
 
 /// Original Mii colors and types before Ver3StoreData conversion.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct MiiNfpStoreDataExtension {
     pub faceline_color: u8,
