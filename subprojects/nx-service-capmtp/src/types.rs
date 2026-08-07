@@ -3,7 +3,7 @@
 use static_assertions::const_assert_eq;
 
 /// Wire-layout input for the session `Open` command.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SessionOpenIn {
     pub tmem_size: u32,

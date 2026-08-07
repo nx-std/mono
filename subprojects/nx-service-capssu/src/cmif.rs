@@ -1,7 +1,5 @@
 //! CMIF protocol operations for the screenshot upload service.
 
-use core::mem::size_of;
-
 use nx_sf::{
     cmif,
     hipc::{
@@ -10,6 +8,7 @@ use nx_sf::{
     },
     service::BorrowedSessionHandle,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -94,19 +93,10 @@ pub fn save_screen_shot_ex1(
         _pad: 0,
         applet_resource_user_id,
     };
-    // SAFETY: `appdata` is a valid `&ApplicationData` for the duration of the
-    // builder; the resulting byte slice covers exactly its `repr(C)` layout
-    // and is not retained beyond this call.
-    let appdata_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (appdata as *const ApplicationData).cast::<u8>(),
-            size_of::<ApplicationData>(),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX1)
         .with_data_value(&input)
         .with_send_pid()
-        .add_input_buffer(InputBuffer::new(appdata_bytes, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(appdata.as_bytes(), BufferMode::Normal))
         .add_input_buffer(InputBuffer::new(image, BufferMode::NonSecure))
         .build();
     req.send(&mut buf, session)
@@ -135,18 +125,9 @@ pub fn save_screen_shot_ex2(
         _pad: 0,
         applet_resource_user_id,
     };
-    // SAFETY: `list` is a valid `&UserIdList` for the duration of the
-    // builder; the resulting byte slice covers exactly its `repr(C)` layout
-    // and is not retained beyond this call.
-    let list_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (list as *const UserIdList).cast::<u8>(),
-            size_of::<UserIdList>(),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::SAVE_SCREEN_SHOT_EX2)
         .with_data_value(&input)
-        .add_input_buffer(InputBuffer::new(list_bytes, BufferMode::Normal))
+        .add_input_buffer(InputBuffer::new(list.as_bytes(), BufferMode::Normal))
         .add_input_buffer(InputBuffer::new(image, BufferMode::NonSecure))
         .build();
     req.send(&mut buf, session)

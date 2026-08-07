@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 pub const JPEG_BUFFER_SIZE: usize = 0x80000;
 
 /// Wire-layout input for [`capture_raw_image_with_timeout`](crate::cmif::capture_raw_image_with_timeout) (cmd 2).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CaptureRawImageIn {
     pub layer_stack: ViLayerStack,
@@ -23,7 +23,7 @@ const_assert_eq!(size_of::<CaptureRawImageIn>(), 0x30);
 
 /// Wire-layout input for [`open_raw_screen_shot_read_stream`](crate::cmif::open_raw_screen_shot_read_stream) (cmd 1201)
 /// and [`capture_jpeg_screen_shot`](crate::cmif::capture_jpeg_screen_shot) (cmd 1204).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct LayerStackTimeoutIn {
     pub layer_stack: ViLayerStack,

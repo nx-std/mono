@@ -43,16 +43,8 @@ pub fn capture_raw_image_with_timeout(
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
-    // completes; viewing its bytes as a slice is sound.
-    let data = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<CaptureRawImageIn>(),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_RAW_IMAGE_WITH_TIMEOUT)
-        .with_data(data)
+        .with_data_value(&input)
         .add_output_buffer(OutputBuffer::new(out_image, BufferMode::NonSecure))
         .build();
     req.send(&mut buf, session)
@@ -87,16 +79,8 @@ pub fn open_raw_screen_shot_read_stream(
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
-    // completes; viewing its bytes as a slice is sound.
-    let data = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<LayerStackTimeoutIn>(),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_RAW_SCREEN_SHOT_READ_STREAM)
-        .with_data(data)
+        .with_data_value(&input)
         .build();
     req.send(&mut buf, session)
         .map_err(OpenReadStreamError::SendRequest)?;
@@ -169,16 +153,8 @@ pub fn capture_jpeg_screen_shot(
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.write_to`
-    // completes; viewing its bytes as a slice is sound.
-    let data = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<LayerStackTimeoutIn>(),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::CAPTURE_JPEG_SCREEN_SHOT)
-        .with_data(data)
+        .with_data_value(&input)
         .add_output_buffer(OutputBuffer::new(out_jpeg, BufferMode::NonSecure))
         .build();
     req.send(&mut buf, session)

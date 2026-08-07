@@ -14,3 +14,4 @@ bench = false
 bitflags = "2"
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 static_assertions = "1"
+zerocopy = { workspace = true }

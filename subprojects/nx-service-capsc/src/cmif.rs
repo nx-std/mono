@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the album control service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_service_caps::{
     AlbumEntry,
@@ -16,6 +13,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -41,10 +39,6 @@ use crate::{
         StreamWriteDataIn,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Root service commands (IAlbumControlService)
-// ---------------------------------------------------------------------------
 
 /// Sets the shim library version (cmd 33). \[7.0.0+\]
 pub(crate) fn set_shim_library_version(
@@ -204,16 +198,11 @@ pub(crate) fn save_album_screenshot_file(
     file_id: &AlbumFileId,
     buffer: &[u8],
 ) -> Result<(), SaveScreenShotError> {
-    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE)
-        .in_raw(in_bytes)
+        .in_raw(file_id.as_bytes())
         .in_buffer(
             buffer,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
@@ -239,19 +228,11 @@ pub(crate) fn save_album_screenshot_file_ex(
         makernote_size,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<SaveScreenShotFileExIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SAVE_ALBUM_SCREENSHOT_FILE_EX)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(
             buffer,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
@@ -268,16 +249,11 @@ pub(crate) fn set_overlay_thumbnail_data(
     file_id: &AlbumFileId,
     image: &[u8],
 ) -> Result<(), SetOverlayThumbnailError> {
-    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(file_id.as_bytes())
         .in_buffer(
             image,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
@@ -296,19 +272,11 @@ pub(crate) fn open_control_session(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<OpenControlSessionIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_CONTROL_SESSION)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)
         .map_err(OpenControlSessionError::Dispatch)?;
@@ -319,10 +287,6 @@ pub(crate) fn open_control_session(
 
     Ok(result.move_handles[0])
 }
-
-// ---------------------------------------------------------------------------
-// Control session commands (IAlbumControlSession)
-// ---------------------------------------------------------------------------
 
 /// Opens an album movie read stream (ctrl cmd 2001).
 pub(crate) fn ctrl_open_album_movie_read_stream(
@@ -365,28 +329,17 @@ pub(crate) fn ctrl_read_movie_data(
 ) -> Result<u64, ReadStreamDataError> {
     let input = StreamReadDataIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<StreamReadDataIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_READ_MOVIE_DATA_FROM_READ_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(actual_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Gets the broken reason for a read stream (ctrl cmd 2005).
@@ -422,28 +375,17 @@ pub(crate) fn ctrl_read_image_data(
 ) -> Result<u64, ReadStreamDataError> {
     let input = StreamReadDataIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<StreamReadDataIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_READ_IMAGE_DATA_FROM_READ_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(actual_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Reads file attribute from a read stream (ctrl cmd 2008).
@@ -551,28 +493,17 @@ pub(crate) fn ctrl_read_data_from_write_stream(
 ) -> Result<u64, ReadStreamDataError> {
     let input = StreamReadDataIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<StreamReadDataIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_READ_DATA_FROM_WRITE_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(actual_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Writes data to a write stream (ctrl cmd 2422).
@@ -584,19 +515,11 @@ pub(crate) fn ctrl_write_data_to_write_stream(
 ) -> Result<(), WriteStreamDataError> {
     let input = StreamWriteDataIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<StreamWriteDataIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CTRL_WRITE_DATA_TO_WRITE_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -612,19 +535,11 @@ pub(crate) fn ctrl_write_meta_to_write_stream(
 ) -> Result<(), WriteStreamDataError> {
     let input = StreamWriteDataIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<StreamWriteDataIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CTRL_WRITE_META_TO_WRITE_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -656,10 +571,6 @@ pub(crate) fn ctrl_set_write_stream_data_size(
     let input = SetStreamDataSizeIn { stream, size };
     dispatch_in_no_out(service, proto::CTRL_SET_WRITE_STREAM_DATA_SIZE, &input)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by save-screenshot operations.
 #[derive(Debug, thiserror::Error)]
