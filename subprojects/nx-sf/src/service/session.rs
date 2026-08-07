@@ -124,7 +124,7 @@ impl Session {
 
     /// Starts a [`Dispatch`] builder for `request_id`.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> Dispatch<'_> {
+    pub fn dispatch<'p>(&self, request_id: u32) -> Dispatch<'_, 'p> {
         Dispatch::new(
             self.handle.as_borrowed(),
             self.pointer_buffer_size,

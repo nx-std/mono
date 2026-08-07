@@ -147,7 +147,7 @@ impl Domain {
     /// itself. Domain-object requests should go through
     /// [`DomainObjectRef::dispatch`] instead.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'_> {
+    pub fn dispatch<'p>(&self, request_id: u32) -> DomainDispatch<'_, 'p> {
         self.as_borrowed().dispatch(request_id)
     }
 }
@@ -198,7 +198,7 @@ impl<'d> DomainRef<'d> {
     /// receives, including the ones aimed at the original interface - sending
     /// one without is how a converted session starts answering errors.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
+    pub fn dispatch<'p>(&self, request_id: u32) -> DomainDispatch<'d, 'p> {
         DomainDispatch::new(*self, Some(self.object_id), request_id)
     }
 
@@ -280,7 +280,7 @@ impl<'d> DomainObject<'d> {
 
     /// Starts a [`DomainDispatch`] builder addressing this object.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'_> {
+    pub fn dispatch<'p>(&self, request_id: u32) -> DomainDispatch<'_, 'p> {
         self.as_borrowed().dispatch(request_id)
     }
 }
@@ -340,7 +340,7 @@ impl<'d> DomainObjectRef<'d> {
 
     /// Starts a [`DomainDispatch`] builder addressing this object.
     #[inline]
-    pub fn dispatch(&self, request_id: u32) -> DomainDispatch<'d> {
+    pub fn dispatch<'p>(&self, request_id: u32) -> DomainDispatch<'d, 'p> {
         DomainDispatch::new(self.domain, Some(self.object_id), request_id)
     }
 }
