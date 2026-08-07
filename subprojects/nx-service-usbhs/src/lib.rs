@@ -6,10 +6,10 @@
 //!
 //! The service is domain-mode. Three object levels exist:
 //!
-//! - [`UsbHsService`] — root service (IUsbHsService)
-//! - [`UsbHsClientIf`] — interface session (IClientIfSession), obtained via
+//! - [`UsbHsService`]: root service (IUsbHsService)
+//! - [`UsbHsClientIf`]: interface session (IClientIfSession), obtained via
 //!   [`UsbHsService::acquire_usb_if`] or [`UsbHsService::acquire_usb_if_legacy`]
-//! - [`UsbHsClientEp`] — endpoint session (IClientEpSession), obtained via
+//! - [`UsbHsClientEp`]: endpoint session (IClientEpSession), obtained via
 //!   [`UsbHsClientIf::open_usb_ep`] or [`UsbHsClientIf::open_usb_ep_legacy`]
 //!
 //! ## Divergence from libnx
@@ -21,7 +21,7 @@
 //! their target firmware.
 //!
 //! The pre-8.0.0 INPUT/OUTPUT endpoint descriptor swap
-//! (`_usbHsConvertInterfaceInfoToV8`) is not performed — callers targeting
+//! (`_usbHsConvertInterfaceInfoToV8`) is not performed; callers targeting
 //! pre-8.0.0 must swap the arrays themselves.
 
 #![no_std]
@@ -67,10 +67,6 @@ pub use self::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// UsbHsService — root session
-// ---------------------------------------------------------------------------
-
 /// USB host stack (`usb:hs`) root session wrapper (IUsbHsService).
 #[repr(transparent)]
 pub struct UsbHsService(Session);
@@ -100,13 +96,7 @@ impl UsbHsService {
         filter: &UsbHsInterfaceFilter,
         interfaces: &mut [UsbHsInterface],
     ) -> Result<i32, DispatchError> {
-        cmif::query_interfaces_with_filter(
-            &self.0,
-            proto::QUERY_ALL_INTERFACES,
-            filter,
-            interfaces.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(interfaces),
-        )
+        cmif::query_interfaces_with_filter(&self.0, proto::QUERY_ALL_INTERFACES, filter, interfaces)
     }
 
     /// QueryAvailableInterfaces (2.0.0+, cmd 2).
@@ -122,8 +112,7 @@ impl UsbHsService {
             &self.0,
             proto::QUERY_AVAILABLE_INTERFACES,
             filter,
-            interfaces.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(interfaces),
+            interfaces,
         )
     }
 
@@ -135,12 +124,7 @@ impl UsbHsService {
         &self,
         interfaces: &mut [UsbHsInterface],
     ) -> Result<i32, DispatchError> {
-        cmif::query_acquired_interfaces(
-            &self.0,
-            proto::QUERY_ACQUIRED_INTERFACES,
-            interfaces.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(interfaces),
-        )
+        cmif::query_acquired_interfaces(&self.0, proto::QUERY_ACQUIRED_INTERFACES, interfaces)
     }
 
     /// CreateInterfaceAvailableEvent (2.0.0+, cmd 4).
@@ -188,16 +172,7 @@ impl UsbHsService {
         interface_id: i32,
         intf_out: &mut UsbHsInterface,
     ) -> Result<UsbHsClientIf, AcquireIfError> {
-        let intf_data_size =
-            core::mem::size_of::<UsbHsInterface>() - core::mem::size_of::<UsbHsInterfaceInfo>();
-
-        let raw_handle = cmif::acquire_usb_if(
-            &self.0,
-            interface_id,
-            (&raw mut intf_out.pathstr).cast::<u8>(),
-            intf_data_size,
-            &raw mut intf_out.inf,
-        )?;
+        let raw_handle = cmif::acquire_usb_if(&self.0, interface_id, intf_out)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
         let handle = OwnedSessionHandle::from_handle_unchecked(
@@ -220,8 +195,7 @@ impl UsbHsService {
             &self.0,
             proto::QUERY_ALL_INTERFACES_LEGACY,
             filter,
-            interfaces.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(interfaces),
+            interfaces,
         )
     }
 
@@ -236,8 +210,7 @@ impl UsbHsService {
             &self.0,
             proto::QUERY_AVAILABLE_INTERFACES_LEGACY,
             filter,
-            interfaces.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(interfaces),
+            interfaces,
         )
     }
 
@@ -250,8 +223,7 @@ impl UsbHsService {
         cmif::query_acquired_interfaces(
             &self.0,
             proto::QUERY_ACQUIRED_INTERFACES_LEGACY,
-            interfaces.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(interfaces),
+            interfaces,
         )
     }
 
@@ -297,7 +269,7 @@ impl UsbHsService {
         interface_id: i32,
         info_out: &mut UsbHsInterfaceInfo,
     ) -> Result<UsbHsClientIf, AcquireIfError> {
-        let raw_handle = cmif::acquire_usb_if_legacy(&self.0, interface_id, &raw mut *info_out)?;
+        let raw_handle = cmif::acquire_usb_if_legacy(&self.0, interface_id, info_out)?;
 
         // SAFETY: the kernel returned a valid move handle for the domain object.
         let handle = OwnedSessionHandle::from_handle_unchecked(
@@ -306,10 +278,6 @@ impl UsbHsService {
         Ok(UsbHsClientIf(Session::new(handle, 0)))
     }
 }
-
-// ---------------------------------------------------------------------------
-// UsbHsClientIf — interface session
-// ---------------------------------------------------------------------------
 
 /// USB host interface session (IClientIfSession).
 ///
@@ -341,13 +309,13 @@ impl UsbHsClientIf {
         id: u8,
         info_out: &mut UsbHsInterfaceInfo,
     ) -> Result<(), DispatchError> {
-        cmif::if_set_interface(&self.0, id, &raw mut *info_out)
+        cmif::if_set_interface(&self.0, id, info_out)
     }
 
     /// GetInterface (cmd 2). Writes output to `info_out`.
     #[inline]
     pub fn get_interface(&self, info_out: &mut UsbHsInterfaceInfo) -> Result<(), DispatchError> {
-        cmif::if_get_interface(&self.0, &raw mut *info_out)
+        cmif::if_get_interface(&self.0, info_out)
     }
 
     /// GetAlternateInterface (cmd 3). Writes output to `info_out`.
@@ -357,7 +325,7 @@ impl UsbHsClientIf {
         id: u8,
         info_out: &mut UsbHsInterfaceInfo,
     ) -> Result<(), DispatchError> {
-        cmif::if_get_alternate_interface(&self.0, id, &raw mut *info_out)
+        cmif::if_get_alternate_interface(&self.0, id, info_out)
     }
 
     /// ResetDevice (cmd 8).
@@ -391,16 +359,14 @@ impl UsbHsClientIf {
         buffer: &mut [u8],
         timeout_in_ms: u32,
     ) -> Result<u32, DispatchError> {
-        cmif::if_submit_control_request(
+        cmif::if_submit_control_request_in(
             &self.0,
-            proto::IF_SUBMIT_CONTROL_REQUEST_IN,
             b_request,
             bm_request_type,
             w_value,
             w_index,
             w_length,
-            buffer.as_mut_ptr(),
-            buffer.len(),
+            buffer,
             timeout_in_ms,
         )
     }
@@ -421,16 +387,14 @@ impl UsbHsClientIf {
         buffer: &[u8],
         timeout_in_ms: u32,
     ) -> Result<u32, DispatchError> {
-        cmif::if_submit_control_request(
+        cmif::if_submit_control_request_out(
             &self.0,
-            proto::IF_SUBMIT_CONTROL_REQUEST_OUT,
             b_request,
             bm_request_type,
             w_value,
             w_index,
             w_length,
-            buffer.as_ptr().cast_mut(),
-            buffer.len(),
+            buffer,
             timeout_in_ms,
         )
     }
@@ -512,7 +476,7 @@ impl UsbHsClientIf {
         &self,
         report_out: &mut UsbHsXferReport,
     ) -> Result<(), DispatchError> {
-        cmif::if_get_ctrl_xfer_report(&self.0, &raw mut *report_out)
+        cmif::if_get_ctrl_xfer_report(&self.0, report_out)
     }
 
     /// OpenUsbEp (2.0.0+, cmd 9).
@@ -545,10 +509,6 @@ impl UsbHsClientIf {
     }
 }
 
-// ---------------------------------------------------------------------------
-// UsbHsClientEp — endpoint session
-// ---------------------------------------------------------------------------
-
 /// USB host endpoint session (IClientEpSession).
 ///
 /// Obtained via [`UsbHsClientIf::open_usb_ep`] or
@@ -576,14 +536,7 @@ impl UsbHsClientEp {
         timeout_in_ms: u32,
         buffer: &[u8],
     ) -> Result<u32, DispatchError> {
-        cmif::ep_submit_request(
-            &self.0,
-            proto::EP_SUBMIT_REQUEST_OUT,
-            size,
-            timeout_in_ms,
-            buffer.as_ptr().cast_mut(),
-            buffer.len(),
-        )
+        cmif::ep_submit_request_out(&self.0, size, timeout_in_ms, buffer)
     }
 
     /// SubmitRequest IN (pre-2.0.0, cmd 1). Blocking receive transfer.
@@ -596,14 +549,7 @@ impl UsbHsClientEp {
         timeout_in_ms: u32,
         buffer: &mut [u8],
     ) -> Result<u32, DispatchError> {
-        cmif::ep_submit_request(
-            &self.0,
-            proto::EP_SUBMIT_REQUEST_IN,
-            size,
-            timeout_in_ms,
-            buffer.as_mut_ptr(),
-            buffer.len(),
-        )
+        cmif::ep_submit_request_in(&self.0, size, timeout_in_ms, buffer)
     }
 
     /// Close (pre-2.0.0, cmd 3). Notifies the server before session teardown.
@@ -655,8 +601,7 @@ impl UsbHsClientEp {
         cmif::ep_get_xfer_report(
             &self.0,
             reports.len() as u32,
-            reports.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(reports),
+            reports,
             BufferAttr::OUT.or(BufferAttr::HIPC_MAP_ALIAS),
         )
     }
@@ -669,8 +614,7 @@ impl UsbHsClientEp {
         cmif::ep_get_xfer_report(
             &self.0,
             reports.len() as u32,
-            reports.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(reports),
+            reports,
             BufferAttr::OUT.or(BufferAttr::HIPC_AUTO_SELECT),
         )
     }
@@ -694,8 +638,7 @@ impl UsbHsClientEp {
             unk2,
             buffer,
             id,
-            urbs.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(urbs),
+            urbs,
             BufferAttr::IN.or(BufferAttr::HIPC_MAP_ALIAS),
         )
     }
@@ -719,8 +662,7 @@ impl UsbHsClientEp {
             unk2,
             buffer,
             id,
-            urbs.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(urbs),
+            urbs,
             BufferAttr::IN.or(BufferAttr::HIPC_AUTO_SELECT),
         )
     }
@@ -743,10 +685,6 @@ impl UsbHsClientEp {
         cmif::ep_share_report_ring(&self.0, size, tmem_handle)
     }
 }
-
-// ---------------------------------------------------------------------------
-// connect_cmif
-// ---------------------------------------------------------------------------
 
 /// Connects to the `usb:hs` service using CMIF.
 ///

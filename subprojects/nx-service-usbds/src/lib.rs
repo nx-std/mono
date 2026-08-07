@@ -8,11 +8,11 @@
 //! IDsService domain object via cmd 0; on pre-11.0.0 the root session is used
 //! directly. Three object levels exist:
 //!
-//! - [`UsbDsService`] — root service (IDsService)
-//! - [`UsbDsInterface`] — interface sub-object (IDsInterface), obtained via
+//! - [`UsbDsService`]: root service (IDsService)
+//! - [`UsbDsInterface`]: interface sub-object (IDsInterface), obtained via
 //!   [`UsbDsService::register_interface`] (5.0.0+) or
 //!   [`UsbDsService::get_ds_interface_legacy`] (pre-5.0.0)
-//! - [`UsbDsEndpoint`] — endpoint sub-object (IDsEndpoint), obtained via
+//! - [`UsbDsEndpoint`]: endpoint sub-object (IDsEndpoint), obtained via
 //!   [`UsbDsInterface::register_endpoint`] (5.0.0+) or
 //!   [`UsbDsInterface::get_ds_endpoint_legacy`] (pre-5.0.0)
 //!
@@ -24,7 +24,7 @@
 //! initialization sequence for their target firmware.
 //!
 //! The convenience helpers `usbDsWaitReady` and `usbDsParseReportData` are
-//! not replicated — callers use the raw commands and types directly.
+//! not replicated; callers use the raw commands and types directly.
 
 #![no_std]
 
@@ -565,7 +565,7 @@ impl UsbDsEndpoint {
         cmif::ep_stall(&self.0)
     }
 
-    /// SetZlt — sets zero-length termination (cmd 5).
+    /// SetZlt: sets zero-length termination (cmd 5).
     #[inline]
     pub fn set_zlt(&self, zlt: bool) -> Result<(), DispatchError> {
         cmif::ep_set_zlt(&self.0, zlt)
