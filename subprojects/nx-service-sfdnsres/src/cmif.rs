@@ -72,9 +72,7 @@ pub fn get_host_by_name(
 
     let name_slice = name.unwrap_or(&[]);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_NAME)
         .with_data_value(&input)
@@ -135,9 +133,7 @@ pub fn get_host_by_addr(
         pid_placeholder: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_HOST_BY_ADDR)
         .with_data_value(&input)
@@ -250,9 +246,7 @@ pub fn get_addr_info(
     let svc_slice = service.unwrap_or(&[]);
     let hints_slice = hints.unwrap_or(&[]);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_ADDR_INFO)
         .with_data_value(&input)
@@ -312,9 +306,7 @@ pub fn get_name_info(
         pid_placeholder: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_NAME_INFO)
         .with_data_value(&input)
@@ -356,7 +348,7 @@ pub fn get_cancel_handle(
     // carries an 8-byte payload alongside the send-PID flag.
     // SAFETY: IPC operations are serialized on this thread, so no other
     // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let pid_placeholder: u64 = 0;
     let req = cmif::CmifRequestBuilder::new(CMD_GET_CANCEL_HANDLE)
@@ -392,9 +384,7 @@ pub fn cancel(session: BorrowedSessionHandle<'_>, handle: CancelHandle) -> Resul
         pid_placeholder: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_CANCEL)
         .with_data_value(&input)
@@ -438,9 +428,7 @@ fn string_error_impl(
     err: u32,
     out_str: &mut [u8],
 ) -> Result<(), StringErrorError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(&err)

@@ -52,7 +52,7 @@ pub(crate) fn open_audio_renderer(
             size_of::<OpenAudioRendererIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_AUDIO_RENDERER)
@@ -83,7 +83,7 @@ pub(crate) fn get_work_buffer_size(
             size_of::<AudioRendererParameter>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE)
@@ -104,7 +104,7 @@ pub(crate) fn get_work_buffer_size(
 
 /// Gets the current renderer state (cmd 3).
 pub(crate) fn renderer_get_state(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::RENDERER_GET_STATE)
@@ -159,7 +159,7 @@ fn renderer_request_update_impl(
     perf_buf: &mut [u8],
     transfer_attr: BufferAttr,
 ) -> Result<(), RequestUpdateError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -183,7 +183,7 @@ pub(crate) fn renderer_stop(service: &Session) -> Result<(), DispatchError> {
 
 /// Queries the system event (cmd 7, copy handle output).
 pub(crate) fn renderer_query_system_event(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::RENDERER_QUERY_SYSTEM_EVENT)
@@ -202,7 +202,7 @@ pub(crate) fn renderer_set_rendering_time_limit(
     // returns; viewing its `size_of::<i32>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const percent).cast::<u8>(), size_of::<i32>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RENDERER_SET_RENDERING_TIME_LIMIT)

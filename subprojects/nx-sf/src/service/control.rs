@@ -49,8 +49,7 @@ const CTRL_CLONE_OBJECT_EX: u32 = 4;
 pub fn query_pointer_buffer_size(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<u16, QueryPointerBufferSizeError> {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     CmifControlRequestBuilder::new(CTRL_QUERY_POINTER_BUFFER_SIZE)
         .build()
@@ -87,8 +86,7 @@ impl ToResultCode for QueryPointerBufferSizeError {
 pub fn clone_current_object(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<OwnedSessionHandle, CloneObjectError> {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     CmifControlRequestBuilder::new(CTRL_CLONE_OBJECT)
         .build()
@@ -140,8 +138,7 @@ pub fn clone_current_object_ex(
     session: BorrowedSessionHandle<'_>,
     tag: u32,
 ) -> Result<OwnedSessionHandle, CloneObjectExError> {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = tag.to_le_bytes();
     CmifControlRequestBuilder::new(CTRL_CLONE_OBJECT_EX)
@@ -194,8 +191,7 @@ impl ToResultCode for CloneObjectExError {
 pub fn convert_current_object_to_domain(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<ObjectId, ConvertToDomainError> {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     CmifControlRequestBuilder::new(CTRL_CONVERT_TO_DOMAIN)
         .build()
@@ -233,8 +229,7 @@ pub fn copy_from_current_domain(
     session: BorrowedSessionHandle<'_>,
     object_id: ObjectId,
 ) -> Result<OwnedSessionHandle, CopyFromDomainError> {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = object_id.to_raw().to_le_bytes();
     CmifControlRequestBuilder::new(CTRL_COPY_FROM_DOMAIN)
@@ -288,8 +283,7 @@ impl ToResultCode for CopyFromDomainError {
 /// Errors from either step are deliberately swallowed: a peer that has gone
 /// away must not block the local side from releasing its kernel handle.
 pub(crate) fn close_session(handle: BorrowedSessionHandle<'_>) {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let _ = CmifCloseRequest::session().send(&mut buf, handle);
     let _ = ipc::close_handle(handle.to_handle());
@@ -301,8 +295,7 @@ pub(crate) fn close_session(handle: BorrowedSessionHandle<'_>) {
 /// domain. Errors are deliberately swallowed for the same reason as
 /// [`close_session`].
 pub(crate) fn close_object(session: BorrowedSessionHandle<'_>, object_id: ObjectId) {
-    // SAFETY: IPC operations are serialized on this thread.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let _ = CmifCloseRequest::domain_object(object_id).send(&mut buf, session);
 }

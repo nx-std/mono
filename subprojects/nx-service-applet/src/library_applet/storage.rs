@@ -55,7 +55,7 @@ impl<'d> Storage<'d> {
     /// Each accessor is a distinct server-side object; the convenience methods
     /// below open one, use it, and close it again.
     pub fn open(&self) -> Result<StorageAccessor<'_>, OpenStorageError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         let mut result = self
             .object
@@ -134,7 +134,7 @@ impl<'d> StorageAccessor<'d> {
 
     /// Returns the size of the underlying storage in bytes (cmd 0).
     pub fn size(&self) -> Result<i64, GetSizeError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         let result = self
             .object
@@ -152,7 +152,7 @@ impl<'d> StorageAccessor<'d> {
 
     /// Writes `data` into the storage at `offset` (cmd 10).
     pub fn write(&self, offset: i64, data: &[u8]) -> Result<(), WriteStorageError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         self.object
             .dispatch(CMD_STORAGE_ACCESSOR_WRITE)
@@ -166,7 +166,7 @@ impl<'d> StorageAccessor<'d> {
 
     /// Reads from the storage at `offset` into `data` (cmd 11).
     pub fn read(&self, offset: i64, data: &mut [u8]) -> Result<(), ReadStorageError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         self.object
             .dispatch(CMD_STORAGE_ACCESSOR_READ)

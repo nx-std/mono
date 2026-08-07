@@ -57,7 +57,7 @@ pub(crate) fn get_result(object: DomainObjectRef<'_>) -> Result<(), DispatchErro
 pub(crate) fn get_system_event_readable_handles(
     object: DomainObjectRef<'_>,
 ) -> Result<(EventHandle, EventHandle), GetSystemEventHandlesError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_REQ_GET_SYSTEM_EVENT_READABLE_HANDLES)
@@ -126,7 +126,7 @@ pub(crate) fn get_applet_info(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const theme_color).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_REQ_GET_APPLET_INFO)

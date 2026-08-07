@@ -582,7 +582,7 @@ pub(crate) fn list_application_record(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const entry_offset).cast::<u8>(), size_of::<i32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_APPLICATION_RECORD)
@@ -599,7 +599,7 @@ pub(crate) fn get_application_view_deprecated(
     views: &mut [u8],
     app_ids: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_GET_APPLICATION_VIEW_DEPRECATED)
@@ -614,7 +614,7 @@ pub(crate) fn get_application_view(
     views: &mut [u8],
     app_ids: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_GET_APPLICATION_VIEW)
@@ -629,7 +629,7 @@ pub(crate) fn get_application_view_with_promotion_info(
     views: &mut [u8],
     app_ids: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_GET_APPLICATION_VIEW_WITH_PROMOTION_INFO)
@@ -647,7 +647,7 @@ pub(crate) fn get_application_view_download_error_context(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_GET_APPLICATION_VIEW_DOWNLOAD_ERROR_CONTEXT)
@@ -665,7 +665,7 @@ pub(crate) fn calculate_application_occupied_size(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const application_id).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_CALCULATE_APPLICATION_OCCUPIED_SIZE)
@@ -686,7 +686,7 @@ pub(crate) fn list_application_content_meta_status(
             size_of::<ContentMetaStatusIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_APPLICATION_CONTENT_META_STATUS)
@@ -702,7 +702,7 @@ pub(crate) fn list_download_task_status(
     service: &Session,
     out: &mut [u8],
 ) -> Result<i32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_DOWNLOAD_TASK_STATUS)
@@ -717,7 +717,7 @@ pub(crate) fn list_application_id_on_game_card(
     service: &Session,
     out: &mut [u8],
 ) -> Result<i32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_APPLICATION_ID_ON_GAME_CARD)
@@ -732,7 +732,7 @@ pub(crate) fn get_system_delivery_info(
     service: &Session,
     out: &mut [u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_GET_SYSTEM_DELIVERY_INFO)
@@ -745,7 +745,7 @@ pub(crate) fn verify_delivery_protocol_version(
     service: &Session,
     info: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_VERIFY_DELIVERY_PROTOCOL_VERSION)
@@ -765,7 +765,7 @@ pub(crate) fn get_application_delivery_info(
             size_of::<GetApplicationDeliveryInfoIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_GET_APPLICATION_DELIVERY_INFO)
@@ -781,7 +781,7 @@ pub(crate) fn has_all_contents_to_deliver(
     service: &Session,
     delivery_info: &[u8],
 ) -> Result<bool, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_HAS_ALL_CONTENTS_TO_DELIVER)
@@ -798,7 +798,7 @@ pub(crate) fn compare_application_delivery_info(
     info_a: &[u8],
     info_b: &[u8],
 ) -> Result<i32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_COMPARE_APPLICATION_DELIVERY_INFO)
@@ -815,7 +815,7 @@ pub(crate) fn can_deliver_application(
     info_a: &[u8],
     info_b: &[u8],
 ) -> Result<bool, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_CAN_DELIVER_APPLICATION)
@@ -837,7 +837,7 @@ pub(crate) fn list_content_meta_key_to_deliver_application(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const meta_index).cast::<u8>(), size_of::<i32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_CONTENT_META_KEY_TO_DELIVER_APPLICATION)
@@ -855,7 +855,7 @@ pub(crate) fn needs_system_update_to_deliver_application(
     system_info: &[u8],
     app_info: &[u8],
 ) -> Result<bool, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_NEEDS_SYSTEM_UPDATE_TO_DELIVER_APPLICATION)
@@ -872,7 +872,7 @@ pub(crate) fn estimate_required_size(
     service: &Session,
     content_meta_keys: &[u8],
 ) -> Result<i64, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_ESTIMATE_REQUIRED_SIZE)
@@ -894,7 +894,7 @@ pub(crate) fn request_receive_application(
             size_of::<RequestReceiveApplicationIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_REQUEST_RECEIVE_APPLICATION)
@@ -928,7 +928,7 @@ pub(crate) fn request_send_application(
             size_of::<RequestSendApplicationIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_REQUEST_SEND_APPLICATION)
@@ -956,7 +956,7 @@ pub(crate) fn compare_system_delivery_info(
     info_a: &[u8],
     info_b: &[u8],
 ) -> Result<i32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_COMPARE_SYSTEM_DELIVERY_INFO)
@@ -979,7 +979,7 @@ pub(crate) fn list_not_committed_content_meta(
             size_of::<ListNotCommittedContentMetaIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_NOT_COMMITTED_CONTENT_META)
@@ -995,7 +995,7 @@ pub(crate) fn get_application_delivery_info_hash(
     service: &Session,
     delivery_info: &[u8],
 ) -> Result<[u8; 0x20], DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_GET_APPLICATION_DELIVERY_INFO_HASH)
@@ -1019,7 +1019,7 @@ pub(crate) fn get_application_rights_on_client(
             size_of::<GetApplicationRightsOnClientIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_GET_APPLICATION_RIGHTS_ON_CLIENT)
@@ -1037,7 +1037,7 @@ pub(crate) fn get_promotion_info(
     app_id: &[u8],
     uid: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::APPMGR_GET_PROMOTION_INFO)
@@ -1054,7 +1054,7 @@ pub(crate) fn select_latest_system_delivery_info(
     info_b: &[u8],
     info_c: &[u8],
 ) -> Result<i32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_SELECT_LATEST_SYSTEM_DELIVERY_INFO)
@@ -1078,7 +1078,7 @@ pub(crate) fn estimate_size_to_move(
             size_of::<EstimateSizeToMoveIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_ESTIMATE_SIZE_TO_MOVE)
@@ -1095,7 +1095,7 @@ pub(crate) fn estimate_size_to_move(
 // ---------------------------------------------------------------------------
 
 pub(crate) fn get_request_server_stopper(service: &Session) -> Result<u32, GetSubObjectError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_GET_REQUEST_SERVER_STOPPER)
@@ -1116,7 +1116,7 @@ pub(crate) fn delete_user_save_data_all(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_DELETE_USER_SAVE_DATA_ALL)
@@ -1264,7 +1264,7 @@ pub(crate) fn request_verify_application_deprecated(
             size_of::<VerifyApplicationDeprecatedIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_REQUEST_VERIFY_APPLICATION_DEPRECATED)
@@ -1288,7 +1288,7 @@ pub(crate) fn request_verify_application(
             size_of::<VerifyApplicationIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_REQUEST_VERIFY_APPLICATION)
@@ -1314,7 +1314,7 @@ pub(crate) fn list_application_title(
             size_of::<ListApplicationTitleIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_APPLICATION_TITLE)
@@ -1341,7 +1341,7 @@ pub(crate) fn list_application_icon(
             size_of::<ListApplicationTitleIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::APPMGR_LIST_APPLICATION_ICON)
@@ -1361,7 +1361,7 @@ pub(crate) fn list_application_icon(
 
 /// Dispatches a command that returns a copy handle for an event.
 fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1378,7 +1378,7 @@ fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventErro
 
 /// Dispatches an async command with no input.
 fn dispatch_async_no_in(service: &Session, cmd_id: u32) -> Result<AsyncOut, AsyncCommandError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1397,7 +1397,7 @@ fn dispatch_async_u64_in(
 ) -> Result<AsyncOut, AsyncCommandError> {
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u64>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1417,7 +1417,7 @@ fn dispatch_async_in<I: Copy>(
 ) -> Result<AsyncOut, AsyncCommandError> {
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

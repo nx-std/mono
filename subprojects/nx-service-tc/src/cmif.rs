@@ -9,9 +9,7 @@ use crate::proto;
 
 /// Enables fan control.
 pub fn enable_fan_control(session: BorrowedSessionHandle<'_>) -> Result<(), EnableFanControlError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::ENABLE_FAN_CONTROL).build();
     req.send(&mut buf, session)
@@ -26,9 +24,7 @@ pub fn enable_fan_control(session: BorrowedSessionHandle<'_>) -> Result<(), Enab
 pub fn disable_fan_control(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<(), DisableFanControlError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::DISABLE_FAN_CONTROL).build();
     req.send(&mut buf, session)
@@ -43,9 +39,7 @@ pub fn disable_fan_control(
 pub fn is_fan_control_enabled(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<bool, IsFanControlEnabledError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::IS_FAN_CONTROL_ENABLED).build();
     req.send(&mut buf, session)
@@ -61,9 +55,7 @@ pub fn is_fan_control_enabled(
 pub fn get_skin_temperature_milli_c(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<i32, GetSkinTemperatureMilliCError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SKIN_TEMPERATURE_MILLI_C).build();
     req.send(&mut buf, session)

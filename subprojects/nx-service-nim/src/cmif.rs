@@ -19,9 +19,7 @@ pub fn destroy_system_update_task(
     session: BorrowedSessionHandle<'_>,
     task_id: &SystemUpdateTaskId,
 ) -> Result<(), DestroySystemUpdateTaskError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::DESTROY_SYSTEM_UPDATE_TASK)
         .with_data_value(task_id)
@@ -42,9 +40,7 @@ pub fn list_system_update_task(
     session: BorrowedSessionHandle<'_>,
     out: &mut [SystemUpdateTaskId],
 ) -> Result<i32, ListSystemUpdateTaskError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // SAFETY: `out` is a valid `&mut` slice; viewing it as a byte slice
     // for the OUT buffer is sound, and the byte slice borrows `out`.

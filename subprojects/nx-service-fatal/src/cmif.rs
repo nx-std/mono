@@ -30,9 +30,7 @@ pub fn throw_fatal_with_policy(
         pid_placeholder: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_POLICY)
         .with_data_value(&input)
@@ -59,9 +57,7 @@ pub fn throw_fatal_with_context(
         pid_placeholder: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::THROW_FATAL_WITH_CONTEXT)
         .with_data_value(&input)

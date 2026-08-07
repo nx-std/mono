@@ -21,7 +21,7 @@ pub(crate) fn dispatch_in_pid_no_out<T>(
     // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -42,7 +42,7 @@ pub(crate) fn dispatch_in_pid_out_u64<T>(
     // returns; viewing its `size_of::<T>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const *input).cast::<u8>(), size_of::<T>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -68,7 +68,7 @@ pub(crate) fn dispatch_in_u64_no_out(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u64>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -88,7 +88,7 @@ pub(crate) fn dispatch_in_u64_out_u64(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<u64>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

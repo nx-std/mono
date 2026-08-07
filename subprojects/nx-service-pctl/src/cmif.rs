@@ -41,7 +41,7 @@ fn create_service_at(domain: DomainRef<'_>, cmd_id: u32) -> Result<u32, CreateSe
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(cmd_id)
@@ -121,7 +121,7 @@ pub(crate) fn is_pairing_active(object: DomainObjectRef<'_>) -> Result<u8, Dispa
 
 /// Gets an event copy handle for the given command.
 pub(crate) fn get_event(object: DomainObjectRef<'_>, cmd_id: u32) -> Result<u32, GetEventError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)

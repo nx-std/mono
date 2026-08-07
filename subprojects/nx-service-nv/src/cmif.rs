@@ -40,9 +40,7 @@ use crate::{
 ///
 /// This is INvDrvServices command 0.
 pub fn open(session: BorrowedSessionHandle<'_>, device_path: &[u8]) -> Result<Fd, OpenError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::OPEN)
         .add_input_buffer(InputBuffer::new(device_path, BufferMode::Normal))
@@ -93,9 +91,7 @@ pub fn ioctl(
         request,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // Both halves target the same `argp` region when in_size == out_size and both are
     // requested - the nv ioctl ABI never mixes an in-only and an out-only size over
@@ -166,9 +162,7 @@ pub fn ioctl2(
         request,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // Auto buffers in order: argp in (if applicable), extra in, argp out (if
     // applicable). The in/out descriptor lists are tracked independently by the
@@ -244,9 +238,7 @@ pub fn ioctl3(
         request,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     // Auto buffers in order: argp in (if applicable), argp out (if applicable), extra
     // out. The in/out descriptor lists are tracked independently by the builder, so
@@ -299,9 +291,7 @@ pub fn ioctl3(
 ///
 /// This is INvDrvServices command 2.
 pub fn close(session: BorrowedSessionHandle<'_>, fd: Fd) -> Result<(), CloseError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let fd_raw = fd.to_raw();
     let req = cmif::CmifRequestBuilder::new(nv_cmds::CLOSE)
@@ -329,9 +319,7 @@ pub fn initialize(
     tmem_handle: TmemHandle,
     tmem_size: u32,
 ) -> Result<(), InitializeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::INITIALIZE)
         .with_data_value(&tmem_size)
@@ -367,9 +355,7 @@ pub fn query_event(
         event_id,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(nv_cmds::QUERY_EVENT)
         .with_data_value(&input)
@@ -399,9 +385,7 @@ pub fn set_client_pid(
     session: BorrowedSessionHandle<'_>,
     aruid: Aruid,
 ) -> Result<(), SetClientPidError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let aruid_raw = aruid.to_raw();
     let req = cmif::CmifRequestBuilder::new(nv_cmds::SET_CLIENT_PID)

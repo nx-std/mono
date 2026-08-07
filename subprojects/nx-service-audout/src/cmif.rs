@@ -60,7 +60,7 @@ fn list_audio_outs_impl(
     device_names_buf: &mut [u8],
     buffer_attr: BufferAttr,
 ) -> Result<u32, ListAudioOutsError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -125,7 +125,7 @@ fn open_audio_out_impl(
             size_of::<OpenAudioOutIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -154,7 +154,7 @@ fn open_audio_out_impl(
 
 /// Gets the current audio output state.
 pub(crate) fn audio_out_get_state(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_GET_STATE)
@@ -179,7 +179,7 @@ pub(crate) fn audio_out_stop(service: &Session) -> Result<(), DispatchError> {
 
 /// Registers the buffer event (returns copy handle).
 pub(crate) fn audio_out_register_buffer_event(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_REGISTER_BUFFER_EVENT)
@@ -242,7 +242,7 @@ fn append_buffer_impl(
             size_of::<AudioOutBuffer>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -290,7 +290,7 @@ fn get_released_buffer_impl(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut((out_buffer_ptr as *mut u64).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -318,7 +318,7 @@ pub(crate) fn audio_out_contains_buffer(
             size_of::<u64>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_CONTAINS_BUFFER)
@@ -335,7 +335,7 @@ pub(crate) fn audio_out_contains_buffer(
 
 /// Gets the number of queued audio output buffers. \[4.0.0+\]
 pub(crate) fn audio_out_get_buffer_count(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_GET_BUFFER_COUNT)
@@ -350,7 +350,7 @@ pub(crate) fn audio_out_get_buffer_count(service: &Session) -> Result<u32, Dispa
 
 /// Gets the total number of played samples. \[4.0.0+\]
 pub(crate) fn audio_out_get_played_sample_count(service: &Session) -> Result<u64, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_GET_PLAYED_SAMPLE_COUNT)
@@ -365,7 +365,7 @@ pub(crate) fn audio_out_get_played_sample_count(service: &Session) -> Result<u64
 
 /// Flushes all queued audio output buffers. \[4.0.0+\]
 pub(crate) fn audio_out_flush_buffers(service: &Session) -> Result<bool, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_FLUSH_BUFFERS)
@@ -384,7 +384,7 @@ pub(crate) fn audio_out_set_volume(service: &Session, volume: f32) -> Result<(),
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const volume).cast::<u8>(), size_of::<f32>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::AUDIO_OUT_SET_VOLUME)
@@ -396,7 +396,7 @@ pub(crate) fn audio_out_set_volume(service: &Session, volume: f32) -> Result<(),
 
 /// Gets the audio output volume. \[6.0.0+\]
 pub(crate) fn audio_out_get_volume(service: &Session) -> Result<f32, GetVolumeError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::AUDIO_OUT_GET_VOLUME)
@@ -523,7 +523,7 @@ fn dispatch_pid_delay(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<PidDelayIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -538,7 +538,7 @@ fn dispatch_get_volume(service: &Session, cmd_id: u32, pid: u64) -> Result<f32, 
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const pid).cast::<u8>(), size_of::<u64>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -571,7 +571,7 @@ fn dispatch_set_volume(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SetVolumeIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)

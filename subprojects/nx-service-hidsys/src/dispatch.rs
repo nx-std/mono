@@ -13,8 +13,7 @@ use nx_sf::service::{
 /// CMIF request with no input payload and no output payload.
 #[inline]
 pub(crate) fn dispatch_no_io(service: &Session, cmd_id: u32) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
-
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
     service.dispatch(cmd_id).send(&mut ipc_buf).map(|_| ())
 }
 
@@ -29,7 +28,7 @@ pub(crate) fn dispatch_in<I: Copy>(
     // bytes as a slice is sound, and the slice lives until `.send()` returns.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((input as *const I).cast::<u8>(), size_of::<I>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -41,7 +40,7 @@ pub(crate) fn dispatch_in<I: Copy>(
 /// CMIF request with no input and a single `Copy` output.
 #[inline]
 pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -62,7 +61,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
     // bytes as a slice is sound, and the slice lives until `.send()` returns.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((input as *const I).cast::<u8>(), size_of::<I>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

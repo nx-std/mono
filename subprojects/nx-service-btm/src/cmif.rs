@@ -139,7 +139,7 @@ pub(crate) fn get_device_condition(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_DEVICE_CONDITION)
@@ -220,7 +220,7 @@ pub(crate) fn get_device_info(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_DEVICE_INFO)
@@ -321,7 +321,7 @@ pub(crate) fn hid_set_retransmission_mode(
             size_of::<BtmZeroRetransmissionList>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::HID_SET_RETRANSMISSION_MODE)
@@ -625,7 +625,7 @@ pub(crate) fn ble_get_paired_addresses(
             core::mem::size_of_val(addrs),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::BLE_GET_PAIRED_ADDRESSES)
@@ -1028,7 +1028,7 @@ fn dispatch_in_buf_ptr_fixed<T>(
     // the IN buffer is sound, and the byte slice borrows `buf`.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((buf as *const T).cast::<u8>(), size_of::<T>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -1050,7 +1050,7 @@ fn dispatch_out_buf_ptr_fixed<T>(
     // for the OUT buffer is sound, and the byte slice borrows `buf`.
     let out_bytes =
         unsafe { core::slice::from_raw_parts_mut((buf as *mut T).cast::<u8>(), size_of::<T>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -1076,7 +1076,7 @@ fn get_ble_scan_results(
             core::mem::size_of_val(results),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1102,7 +1102,7 @@ fn ble_get_connection_state_impl(
             core::mem::size_of_val(info),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1137,7 +1137,7 @@ fn get_gatt_services_impl(
             core::mem::size_of_val(services),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1179,7 +1179,7 @@ fn get_gatt_service_impl(
             size_of::<BtmGattService>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1226,7 +1226,7 @@ fn get_gatt_service_data<T>(
             core::mem::size_of_val(buffer),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1269,7 +1269,7 @@ fn get_belonging_service_impl(
             size_of::<BtmGattService>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1288,7 +1288,7 @@ fn get_belonging_service_impl(
 
 /// Dispatches a command that returns a copy handle for an event.
 fn acquire_event(service: &Session, cmd_id: u32) -> Result<u32, AcquireEventError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -1308,7 +1308,7 @@ fn acquire_event_with_flag(
     service: &Session,
     cmd_id: u32,
 ) -> Result<u32, AcquireEventWithFlagError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

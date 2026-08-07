@@ -38,7 +38,7 @@ pub fn create_library_applet<'d>(
     applet_id: AppletId,
     mode: LibraryAppletMode,
 ) -> Result<LibraryAppletAccessor<'d>, CreateLibraryAppletError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let request = CreateLibraryAppletIn {
         applet_id: applet_id.as_raw(),
@@ -101,7 +101,7 @@ pub fn create_storage<'d>(
     creator: DomainObjectRef<'d>,
     size: i64,
 ) -> Result<Storage<'d>, CreateStorageError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = creator
         .dispatch(CMD_LAC_CREATE_STORAGE)

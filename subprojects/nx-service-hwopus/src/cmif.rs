@@ -45,7 +45,7 @@ pub(crate) fn open_hardware_opus_decoder(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<OpenDecoderIn>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER)
@@ -72,7 +72,7 @@ pub(crate) fn get_work_buffer_size(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u64>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE)
@@ -108,7 +108,7 @@ pub(crate) fn open_hardware_opus_decoder_for_multi_stream(
             size_of::<HwopusMultistreamState>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_HARDWARE_OPUS_DECODER_FOR_MULTI_STREAM)
@@ -137,7 +137,7 @@ pub(crate) fn get_work_buffer_size_for_multi_stream(
             size_of::<HwopusMultistreamState>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE_FOR_MULTI_STREAM)
@@ -167,7 +167,7 @@ pub(crate) fn decode_interleaved_legacy(
     let pcm_bytes = unsafe {
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -194,7 +194,7 @@ pub(crate) fn decode_interleaved_with_perf(
     let pcm_bytes = unsafe {
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -233,7 +233,7 @@ pub(crate) fn decode_interleaved_ex(
     let pcm_bytes = unsafe {
         core::slice::from_raw_parts_mut(pcmbuf.as_mut_ptr().cast::<u8>(), size_of_val(pcmbuf))
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

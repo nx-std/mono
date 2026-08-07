@@ -73,9 +73,7 @@ pub(crate) fn register_client(
         tmem_size,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::REGISTER_CLIENT)
         .with_data_value(&payload)
@@ -98,9 +96,7 @@ pub(crate) fn start_monitoring(
     monitor_session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<(), StartMonitoringError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::START_MONITORING)
         .with_data_value(&pid)
@@ -189,9 +185,7 @@ pub(crate) fn socket(
         type_,
         protocol,
     };
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmds::SOCKET)
         .with_data_value(&payload)
@@ -209,9 +203,7 @@ pub(crate) fn socket(
 
 /// `bsdClose` (cmd 26).
 pub(crate) fn close(session: BorrowedSessionHandle<'_>, fd: BsdSockFd) -> Result<(), CloseError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::CLOSE)
@@ -276,9 +268,7 @@ fn bsd_send_recv_no_buffer_in<E>(
     mk_parse: fn(ParseError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<i32, E> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let sockfd_raw = sockfd.raw();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
@@ -307,9 +297,7 @@ fn bsd_cmd_in_sockfd_out_sockaddr<E>(
     mk_parse: fn(ParseError) -> E,
     mk_service: fn(i32, i32) -> E,
 ) -> Result<(i32, u32), E> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let sockfd_raw = sockfd.raw();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
@@ -389,9 +377,7 @@ pub(crate) fn listen(
     sockfd: BsdSockFd,
     backlog: i32,
 ) -> Result<(), ListenError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = ListenIn {
         sockfd: sockfd.raw(),
@@ -417,9 +403,7 @@ pub(crate) fn shutdown(
     sockfd: BsdSockFd,
     how: i32,
 ) -> Result<(), ShutdownError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = ShutdownIn {
         sockfd: sockfd.raw(),
@@ -446,9 +430,7 @@ pub(crate) fn recv(
     buf: &mut [u8],
     flags: i32,
 ) -> Result<usize, RecvError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = SockfdFlagsIn {
         sockfd: sockfd.raw(),
@@ -477,9 +459,7 @@ pub(crate) fn recv_from(
     flags: i32,
     src_addr: &mut [u8],
 ) -> Result<(usize, u32), RecvFromError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = SockfdFlagsIn {
         sockfd: sockfd.raw(),
@@ -509,9 +489,7 @@ pub(crate) fn send(
     buf: &[u8],
     flags: i32,
 ) -> Result<usize, SendError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = SockfdFlagsIn {
         sockfd: sockfd.raw(),
@@ -540,9 +518,7 @@ pub(crate) fn send_to(
     flags: i32,
     dest_addr: &[u8],
 ) -> Result<usize, SendToError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = SockfdFlagsIn {
         sockfd: sockfd.raw(),
@@ -570,9 +546,7 @@ pub(crate) fn read(
     fd: BsdSockFd,
     buf: &mut [u8],
 ) -> Result<usize, ReadError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::READ)
@@ -596,9 +570,7 @@ pub(crate) fn write(
     fd: BsdSockFd,
     buf: &[u8],
 ) -> Result<usize, WriteError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let fd_raw = fd.raw();
     let req = cmif::CmifRequestBuilder::new(cmds::WRITE)
@@ -624,9 +596,7 @@ pub(crate) fn get_sock_opt(
     optname: i32,
     optval: &mut [u8],
 ) -> Result<u32, GetSockOptError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = SockOptIn {
         sockfd: sockfd.raw(),
@@ -657,9 +627,7 @@ pub(crate) fn set_sock_opt(
     optname: i32,
     optval: &[u8],
 ) -> Result<(), SetSockOptError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = SockOptIn {
         sockfd: sockfd.raw(),
@@ -690,9 +658,7 @@ pub(crate) fn fcntl(
     cmd: i32,
     flags: i32,
 ) -> Result<i32, FcntlError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = FcntlIn {
         fd: fd.raw(),
@@ -742,9 +708,7 @@ pub(crate) fn ioctl(
         0
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = IoctlIn {
         fd: fd.raw(),
@@ -830,9 +794,7 @@ pub(crate) fn select(
         timeout: select_timeout,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     // Each fd_set is both read and written by the kernel - libnx's
     // `bsdSelect` wire shape - so each is attached once through
@@ -868,9 +830,7 @@ pub(crate) fn poll(
     timeout: i32,
 ) -> Result<i32, PollError> {
     {
-        // SAFETY: IPC operations are serialized on this thread, so no other
-        // borrow of the TLS IPC buffer is live.
-        let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
         let payload = PollIn {
             nfds,

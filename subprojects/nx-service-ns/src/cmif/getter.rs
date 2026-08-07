@@ -9,7 +9,7 @@ use crate::proto;
 
 /// Dispatches a getter command that returns a move handle for a sub-interface.
 fn get_interface(service: &Session, cmd_id: u32) -> Result<u32, GetInterfaceError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

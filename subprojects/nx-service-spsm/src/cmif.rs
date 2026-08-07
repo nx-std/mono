@@ -11,9 +11,7 @@ use crate::proto;
 pub fn shutdown(session: BorrowedSessionHandle<'_>, reboot: bool) -> Result<(), ShutdownError> {
     let in_data: u8 = u8::from(reboot);
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SHUTDOWN)
         .with_data_value(&in_data)
@@ -28,9 +26,7 @@ pub fn shutdown(session: BorrowedSessionHandle<'_>, reboot: bool) -> Result<(), 
 
 /// Puts the system into an error state.
 pub fn put_error_state(session: BorrowedSessionHandle<'_>) -> Result<(), PutErrorStateError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::PUT_ERROR_STATE).build();
     req.send(&mut buf, session)

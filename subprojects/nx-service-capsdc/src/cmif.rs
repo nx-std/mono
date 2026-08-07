@@ -28,9 +28,7 @@ pub fn decode_jpeg(
     jpeg: &[u8],
     out_image: &mut [u8],
 ) -> Result<(), DecodeJpegError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = DecodeJpegIn {
         width,
@@ -59,9 +57,7 @@ pub fn shrink_jpeg(
     jpeg: &[u8],
     out_jpeg: &mut [u8],
 ) -> Result<u64, ShrinkJpegError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = DecodeJpegIn {
         width,
@@ -93,9 +89,7 @@ pub fn shrink_jpeg_ex(
     jpeg: &[u8],
     out_jpeg: &mut [u8],
 ) -> Result<u64, ShrinkJpegExError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = ShrinkJpegExIn {
         scaled_width,

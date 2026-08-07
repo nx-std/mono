@@ -139,7 +139,7 @@ pub fn open_proxy<'d>(
     };
 
     let mut attempts: u32 = 0;
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = loop {
         // Dispatch builders are consumed by send(); rebuild each iteration.
@@ -222,7 +222,7 @@ impl ToResultCode for OpenProxyError {
 pub fn get_common_state_getter<'d>(
     proxy: DomainObjectRef<'d>,
 ) -> Result<CommonStateGetter<'d>, GetCommonStateGetterError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = proxy
         .dispatch(CMD_GET_COMMON_STATE_GETTER)
@@ -269,7 +269,7 @@ impl ToResultCode for GetCommonStateGetterError {
 pub fn get_self_controller<'d>(
     proxy: DomainObjectRef<'d>,
 ) -> Result<SelfController<'d>, GetSelfControllerError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = proxy
         .dispatch(CMD_GET_SELF_CONTROLLER)
@@ -316,7 +316,7 @@ impl ToResultCode for GetSelfControllerError {
 pub fn get_window_controller<'d>(
     proxy: DomainObjectRef<'d>,
 ) -> Result<WindowController<'d>, GetWindowControllerError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = proxy
         .dispatch(CMD_GET_WINDOW_CONTROLLER)
@@ -363,7 +363,7 @@ impl ToResultCode for GetWindowControllerError {
 pub fn acquire_foreground_rights(
     window_controller: DomainObjectRef<'_>,
 ) -> Result<(), AcquireForegroundRightsError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     window_controller
         .dispatch(CMD_WC_ACQUIRE_FOREGROUND_RIGHTS)
@@ -427,7 +427,7 @@ pub fn set_focus_handling_mode(
         suspend_on_background as u8,
     ];
 
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     self_controller
         .dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE)
@@ -457,7 +457,7 @@ pub fn set_focus_handling_mode(
 pub fn get_library_applet_launchable_event(
     self_controller: DomainObjectRef<'_>,
 ) -> Result<EventHandle, GetLibraryAppletLaunchableEventError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = self_controller
         .dispatch(CMD_SC_GET_LIBRARY_APPLET_LAUNCHABLE_EVENT)
@@ -522,7 +522,7 @@ pub fn set_out_of_focus_suspending_enabled(
 ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
     let input: u8 = enabled as u8;
 
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     self_controller
         .dispatch(CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED)
@@ -579,7 +579,7 @@ pub fn set_operation_mode_changed_notification(
 ) -> Result<(), SetOperationModeChangedNotificationError> {
     let input: u8 = enabled as u8;
 
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     self_controller
         .dispatch(CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION)
@@ -616,7 +616,7 @@ pub fn set_performance_mode_changed_notification(
 ) -> Result<(), SetPerformanceModeChangedNotificationError> {
     let input: u8 = enabled as u8;
 
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     self_controller
         .dispatch(CMD_SC_SET_PERFORMANCE_MODE_CHANGED_NOTIFICATION)
@@ -652,7 +652,7 @@ impl ToResultCode for SetPerformanceModeChangedNotificationError {
 pub fn get_applet_resource_user_id(
     window_controller: DomainObjectRef<'_>,
 ) -> Result<Option<Aruid>, GetAppletResourceUserIdError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = window_controller
         .dispatch(CMD_WC_GET_APPLET_RESOURCE_USER_ID)
@@ -696,7 +696,7 @@ impl ToResultCode for GetAppletResourceUserIdError {
 pub fn get_application_functions<'d>(
     proxy: DomainObjectRef<'d>,
 ) -> Result<ApplicationFunctions<'d>, GetApplicationFunctionsError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = proxy
         .dispatch(CMD_GET_APPLICATION_FUNCTIONS)
@@ -744,7 +744,7 @@ impl ToResultCode for GetApplicationFunctionsError {
 /// This should be called after waiting for InFocus state, acquiring foreground rights,
 /// and setting up focus handling mode.
 pub fn notify_running(app_funcs: DomainObjectRef<'_>) -> Result<bool, NotifyRunningError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = app_funcs
         .dispatch(CMD_AF_NOTIFY_RUNNING)
@@ -787,7 +787,7 @@ impl ToResultCode for NotifyRunningError {
 pub fn create_managed_display_layer(
     self_controller: DomainObjectRef<'_>,
 ) -> Result<u64, CreateManagedDisplayLayerError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = self_controller
         .dispatch(CMD_SC_CREATE_MANAGED_DISPLAY_LAYER)
@@ -862,7 +862,7 @@ fn get_sub_interface_object_id(
     proxy: DomainObjectRef<'_>,
     cmd_id: u32,
 ) -> Result<u32, GetSubInterfaceError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = proxy
         .dispatch(cmd_id)

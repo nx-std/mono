@@ -35,9 +35,7 @@ pub fn request_initialize(
     unk: u32,
     autoclear: bool,
 ) -> Result<u32, RequestInitializeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = InitializeIn {
         module: module.as_raw(),
@@ -74,9 +72,7 @@ pub fn request_initialize_legacy(
     unk: u32,
     autoclear: bool,
 ) -> Result<u32, RequestInitializeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = InitializeIn {
         module: module.as_raw(),
@@ -100,9 +96,7 @@ pub fn request_finalize(
     session: BorrowedSessionHandle<'_>,
     request_id: u32,
 ) -> Result<(), RequestFinalizeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::FINALIZE)
         .with_data_value(&request_id)
@@ -129,9 +123,7 @@ pub fn request_finalize_legacy(
     session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
 ) -> Result<(), RequestFinalizeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let module_raw = module.as_raw();
     let req = cmif::CmifRequestBuilder::new(proto::FINALIZE_OLD)
@@ -152,9 +144,7 @@ pub fn request_set_and_wait(
     freq_hz: u32,
     timeout: i32,
 ) -> Result<(), RequestSetAndWaitError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = SetAndWaitIn {
         key: request_id,
@@ -188,9 +178,7 @@ pub fn request_set_and_wait_legacy(
     freq_hz: u32,
     timeout: i32,
 ) -> Result<(), RequestSetAndWaitError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let input = SetAndWaitIn {
         key: module.as_raw(),
@@ -213,9 +201,7 @@ pub fn request_get(
     session: BorrowedSessionHandle<'_>,
     request_id: u32,
 ) -> Result<u32, RequestGetError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET)
         .with_data_value(&request_id)
@@ -243,9 +229,7 @@ pub fn request_get_legacy(
     session: BorrowedSessionHandle<'_>,
     module: MmuModuleId,
 ) -> Result<u32, RequestGetError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let module_raw = module.as_raw();
     let req = cmif::CmifRequestBuilder::new(proto::GET_OLD)

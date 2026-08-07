@@ -34,7 +34,7 @@ use crate::{
 pub(crate) fn acquire_unique_pad_connection_event_handle(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::ACQUIRE_UNIQUE_PAD_CONNECTION_EVENT_HANDLE)
@@ -62,7 +62,7 @@ pub(crate) fn get_unique_pad_ids(
             core::mem::size_of_val(out_pads),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_UNIQUE_PAD_IDS)
@@ -83,7 +83,7 @@ pub(crate) fn acquire_joy_detach_on_bluetooth_off_event_handle(
     // SAFETY: `aruid` is a `Copy` value on the stack, valid until `.send()`.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::ACQUIRE_JOY_DETACH_ON_BLUETOOTH_OFF_EVENT_HANDLE)

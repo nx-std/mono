@@ -37,9 +37,7 @@ fn dispatch_in_u64(
     cmd_id: u32,
     value: u64,
 ) -> Result<(), DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<u64>()];
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
@@ -60,9 +58,7 @@ fn dispatch_in_bool(
     cmd_id: u32,
     value: bool,
 ) -> Result<(), DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<u8>()];
     // SAFETY: `payload` is exactly `size_of::<u8>()` bytes.
@@ -79,9 +75,7 @@ fn dispatch_in_bool(
 }
 
 fn dispatch_out_u64(session: BorrowedSessionHandle<'_>, cmd_id: u32) -> Result<u64, DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     tipc::TipcRequestBuilder::new(cmd_id)
         .build()
@@ -99,9 +93,7 @@ fn dispatch_out_bool(
     session: BorrowedSessionHandle<'_>,
     cmd_id: u32,
 ) -> Result<bool, DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     tipc::TipcRequestBuilder::new(cmd_id)
         .build()
@@ -135,9 +127,7 @@ pub fn launch_program(
         pad: [0; 3],
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<LaunchProgramTipcIn>()];
     // SAFETY: `payload` is exactly `size_of::<LaunchProgramTipcIn>()` bytes.
@@ -169,9 +159,7 @@ pub fn launch_program_from_host(
     content_path: &[u8],
     pm_launch_flags: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<u32>()];
     // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
@@ -195,9 +183,7 @@ pub fn get_host_content_meta_info(
     session: BorrowedSessionHandle<'_>,
     content_path: &[u8],
 ) -> Result<ContentMetaInfo, DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = tipc::TipcRequestBuilder::new(proto::GET_HOST_CONTENT_META_INFO)
         .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
@@ -233,9 +219,7 @@ pub fn is_process_tracked(
     session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<bool, DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<u64>()];
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
@@ -282,9 +266,7 @@ pub fn enable_application_all_thread_dump_on_crash(
 pub fn get_event_observer(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<Session, GetEventObserverError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     tipc::TipcRequestBuilder::new(proto::GET_EVENT_OBSERVER)
         .build()
@@ -321,9 +303,7 @@ pub enum GetEventObserverError {
 pub fn observer_get_process_event(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, GetProcessEventError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     tipc::TipcRequestBuilder::new(proto::OBSERVER_GET_PROCESS_EVENT)
         .build()
@@ -355,9 +335,7 @@ pub enum GetProcessEventError {
 pub fn observer_get_process_event_info(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<ProcessEventInfo, DispatchError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     tipc::TipcRequestBuilder::new(proto::OBSERVER_GET_PROCESS_EVENT_INFO)
         .build()

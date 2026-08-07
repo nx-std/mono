@@ -32,9 +32,7 @@ pub fn register_process(
     acid_sac: &[u8],
     aci0_sac: &[u8],
 ) -> Result<(), RegisterProcessError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<u64>()];
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
@@ -69,9 +67,7 @@ pub fn unregister_process(
     session: BorrowedSessionHandle<'_>,
     pid: u64,
 ) -> Result<(), UnregisterProcessError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut payload = [0u8; size_of::<u64>()];
     // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.

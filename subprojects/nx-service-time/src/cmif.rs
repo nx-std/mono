@@ -56,9 +56,7 @@ pub fn get_standard_network_system_clock(
 pub fn get_standard_steady_clock(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<OwnedSessionHandle, GetSteadyClockError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(static_service_cmds::GET_STANDARD_STEADY_CLOCK).build();
     req.send(&mut buf, session)
@@ -82,9 +80,7 @@ pub fn get_standard_steady_clock(
 pub fn get_time_zone_service(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<OwnedSessionHandle, GetTimeZoneServiceError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(static_service_cmds::GET_TIME_ZONE_SERVICE).build();
     req.send(&mut buf, session)
@@ -108,9 +104,7 @@ pub fn get_time_zone_service(
 pub fn get_shared_memory_native_handle(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<nx_svc::mem::shmem::Handle, GetSharedMemoryError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req =
         cmif::CmifRequestBuilder::new(static_service_cmds::GET_SHARED_MEMORY_NATIVE_HANDLE).build();
@@ -131,9 +125,7 @@ pub fn get_shared_memory_native_handle(
 ///
 /// This is ISystemClock command 0.
 pub fn get_current_time(session: BorrowedSessionHandle<'_>) -> Result<u64, GetCurrentTimeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(system_clock_cmds::GET_CURRENT_TIME).build();
     req.send(&mut buf, session)
@@ -151,9 +143,7 @@ pub fn to_calendar_time_with_my_rule(
     session: BorrowedSessionHandle<'_>,
     timestamp: u64,
 ) -> Result<(TimeCalendarTime, TimeCalendarAdditionalInfo), ToCalendarTimeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(timezone_service_cmds::TO_CALENDAR_TIME_WITH_MY_RULE)
         .with_data_value(&timestamp)
@@ -178,9 +168,7 @@ fn get_clock_session(
     session: BorrowedSessionHandle<'_>,
     command_id: u32,
 ) -> Result<OwnedSessionHandle, GetSystemClockError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(command_id).build();
     req.send(&mut buf, session)

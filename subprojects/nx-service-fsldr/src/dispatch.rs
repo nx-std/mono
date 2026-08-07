@@ -21,7 +21,7 @@ pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
     // returns; viewing its `size_of::<I>()` bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(cmd_id)

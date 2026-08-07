@@ -32,9 +32,7 @@ pub fn create_managed_layer(
     display_id: DisplayId,
     aruid: u64,
 ) -> Result<LayerId, CreateManagedLayerError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -71,9 +69,7 @@ pub fn destroy_managed_layer(
     session: BorrowedSessionHandle<'_>,
     layer_id: LayerId,
 ) -> Result<(), DestroyManagedLayerError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let layer_id_raw = layer_id.to_raw();
     let req = cmif::CmifRequestBuilder::new(manager_cmds::DESTROY_MANAGED_LAYER)
@@ -107,9 +103,7 @@ pub fn set_display_alpha(
     display_id: DisplayId,
     alpha: f32,
 ) -> Result<(), SetDisplayAlphaError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -142,9 +136,7 @@ pub fn set_display_layer_stack(
     display_id: DisplayId,
     layer_stack: ViLayerStack,
 ) -> Result<(), SetDisplayLayerStackError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -177,9 +169,7 @@ pub fn set_display_power_state(
     display_id: DisplayId,
     power_state: ViPowerState,
 ) -> Result<(), SetDisplayPowerStateError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -213,9 +203,7 @@ pub fn add_to_layer_stack(
     layer_stack: ViLayerStack,
     layer_id: LayerId,
 ) -> Result<(), AddToLayerStackError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     #[repr(C)]
     #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
@@ -247,9 +235,7 @@ pub fn set_content_visibility(
     session: BorrowedSessionHandle<'_>,
     visible: bool,
 ) -> Result<(), SetContentVisibilityError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let visible_u8: u8 = visible as u8;
     let req = cmif::CmifRequestBuilder::new(manager_cmds::SET_CONTENT_VISIBILITY)

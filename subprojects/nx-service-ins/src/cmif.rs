@@ -9,9 +9,7 @@ use crate::proto;
 
 /// Gets the last system tick an event was signaled at.
 pub fn get_last_tick(session: BorrowedSessionHandle<'_>, id: u32) -> Result<u64, GetLastTickError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_LAST_TICK)
         .with_data_value(&id)
@@ -46,9 +44,7 @@ pub fn get_readable_event(
         unk: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_READABLE_EVENT)
         .with_data_value(&input)
@@ -79,9 +75,7 @@ pub fn get_writable_event(
         unk: 0,
     };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_WRITABLE_EVENT)
         .with_data_value(&input)

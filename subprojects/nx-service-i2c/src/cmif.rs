@@ -25,9 +25,7 @@ pub fn open_session(
     session: BorrowedSessionHandle<'_>,
     device: u32,
 ) -> Result<Session, OpenSessionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::OPEN_SESSION)
         .with_data_value(&device)
@@ -64,7 +62,7 @@ pub fn send_auto(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SEND_AUTO)
@@ -88,7 +86,7 @@ pub fn receive_auto(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const option_raw).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RECEIVE_AUTO)
@@ -105,7 +103,7 @@ pub fn execute_command_list(
     dst: &mut [u8],
     cmd_list: &[u8],
 ) -> Result<(), ExecuteCommandListError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::EXECUTE_COMMAND_LIST)

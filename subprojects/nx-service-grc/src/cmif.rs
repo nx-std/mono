@@ -55,7 +55,7 @@ pub(crate) fn transfer(
     // the OUT buffer; the caller guarantees its validity for the duration of
     // the call.
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_len) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::TRANSFER)
@@ -91,7 +91,7 @@ pub(crate) fn trimmer_begin_trim(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<BeginTrimIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::TRIMMER_BEGIN_TRIM)
@@ -102,7 +102,7 @@ pub(crate) fn trimmer_begin_trim(
 
 /// Ends trimming and retrieves the output movie ID (cmd 2).
 pub(crate) fn trimmer_end_trim(service: &Session) -> Result<GameMovieId, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::TRIMMER_END_TRIM)
@@ -115,7 +115,7 @@ pub(crate) fn trimmer_end_trim(service: &Session) -> Result<GameMovieId, Dispatc
 
 /// Gets the "not trimming" event (cmd 10, copy handle).
 pub(crate) fn trimmer_get_not_trimming_event(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::TRIMMER_GET_NOT_TRIMMING_EVENT)
@@ -143,7 +143,7 @@ pub(crate) fn trimmer_set_thumbnail_rgba(
     // SAFETY: `buffer` points to `buffer_len` readable bytes for the IN
     // buffer; the caller guarantees its validity for the duration of the call.
     let buf_bytes = unsafe { core::slice::from_raw_parts(buffer, buffer_len) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::TRIMMER_SET_THUMBNAIL_RGBA)
@@ -162,7 +162,7 @@ pub(crate) fn trimmer_set_thumbnail_rgba(
 
 /// Creates a video proxy sub-object (cmd 2). Returns the move handle.
 pub(crate) fn maker_create_video_proxy(service: &Session) -> Result<u32, CreateVideoProxyError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_CREATE_VIDEO_PROXY)
@@ -247,7 +247,7 @@ pub(crate) fn maker_start_offscreen_recording(
             size_of::<StartRecordingIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::MAKER_START_OFFSCREEN_RECORDING)
@@ -288,7 +288,7 @@ pub(crate) fn maker_complete_offscreen_recording_finish_ex0(
     // SAFETY: `thumbnail` points to `thumbnail_len` readable bytes; the caller
     // guarantees its validity for the duration of the call.
     let thumbnail_bytes = unsafe { core::slice::from_raw_parts(thumbnail, thumbnail_len) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX0)
@@ -331,7 +331,7 @@ pub(crate) fn maker_complete_offscreen_recording_finish_ex1(
     // SAFETY: `thumbnail` points to `thumbnail_len` readable bytes; the caller
     // guarantees its validity for the duration of the call.
     let thumbnail_bytes = unsafe { core::slice::from_raw_parts(thumbnail, thumbnail_len) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_COMPLETE_OFFSCREEN_RECORDING_FINISH_EX1)
@@ -374,7 +374,7 @@ pub(crate) fn maker_encode_offscreen_layer_audio_sample(
     // SAFETY: `buffer` points to `buffer_len` readable bytes for the IN
     // buffer; the caller guarantees its validity for the duration of the call.
     let buf_bytes = unsafe { core::slice::from_raw_parts(buffer, buffer_len) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_ENCODE_OFFSCREEN_LAYER_AUDIO_SAMPLE)
@@ -397,7 +397,7 @@ pub(crate) fn maker_get_offscreen_layer_recording_finish_ready_event(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_GET_OFFSCREEN_LAYER_RECORDING_FINISH_READY_EVENT)
@@ -418,7 +418,7 @@ pub(crate) fn maker_get_offscreen_layer_audio_encode_ready_event(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const layer_handle).cast::<u8>(), size_of::<u64>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::MAKER_GET_OFFSCREEN_LAYER_AUDIO_ENCODE_READY_EVENT)

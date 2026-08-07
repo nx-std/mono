@@ -34,7 +34,7 @@ pub(crate) fn get_application_control_data(
             size_of::<ControlDataSourceAppIdIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_DATA_GET_APPLICATION_CONTROL_DATA)
@@ -54,7 +54,7 @@ pub(crate) fn get_application_desired_language(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const lang_bitmask).cast::<u8>(), size_of::<u8>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_DATA_GET_APPLICATION_DESIRED_LANGUAGE)
@@ -74,7 +74,7 @@ pub(crate) fn get_application_control_data2(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ControlData2In>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_DATA_GET_APPLICATION_CONTROL_DATA2)
@@ -99,7 +99,7 @@ pub(crate) fn list_application_title2(
             size_of::<ListApplicationTitleIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CTRL_DATA_LIST_APPLICATION_TITLE2)

@@ -60,7 +60,7 @@ impl<'d> LibraryAppletAccessor<'d> {
     pub fn get_applet_state_changed_event(
         &self,
     ) -> Result<EventHandle, GetAppletStateChangedEventError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         let result = self
             .object
@@ -82,7 +82,7 @@ impl<'d> LibraryAppletAccessor<'d> {
     /// Returns as soon as the system accepts the request; the applet runs
     /// concurrently until [`join`](Self::join).
     pub fn start(&self) -> Result<(), StartError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         self.object
             .dispatch(CMD_LAA_START)
@@ -97,7 +97,7 @@ impl<'d> LibraryAppletAccessor<'d> {
     /// A success reply means the applet exited normally; a service error is the
     /// applet's own result, which [`LibraryAppletExitReason`] classifies.
     pub fn get_result(&self) -> Result<LibraryAppletExitReason, GetResultError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         match self.object.dispatch(CMD_LAA_GET_RESULT).send(&mut buf) {
             Ok(_) => Ok(LibraryAppletExitReason::Normal),
@@ -127,7 +127,7 @@ impl<'d> LibraryAppletAccessor<'d> {
     /// Order matters: every library applet reads its common arguments as the
     /// first storage pushed.
     pub fn push_in_data(&self, storage: &Storage<'_>) -> Result<(), PushInDataError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         self.object
             .dispatch(CMD_LAA_PUSH_IN_DATA)
@@ -140,7 +140,7 @@ impl<'d> LibraryAppletAccessor<'d> {
 
     /// Pops the applet's reply storage (cmd 101).
     pub fn pop_out_data(&self) -> Result<Storage<'d>, PopOutDataError> {
-        let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
         let mut result = self
             .object

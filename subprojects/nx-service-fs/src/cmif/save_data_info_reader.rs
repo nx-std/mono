@@ -18,7 +18,7 @@ pub(crate) fn read(
     buf: &mut [SaveDataInfo],
 ) -> Result<i64, DispatchError> {
     let buf_bytes = buf.as_mut_bytes();
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SAVE_DATA_INFO_READER_READ)

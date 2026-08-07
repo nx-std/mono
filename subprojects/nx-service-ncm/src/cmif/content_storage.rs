@@ -119,7 +119,7 @@ pub(crate) fn write_placeholder(
             size_of::<WritePlaceHolderIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_WRITE_PLACEHOLDER)
@@ -186,7 +186,7 @@ pub(crate) fn get_path(
             size_of::<NcmContentId>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_GET_PATH)
@@ -213,7 +213,7 @@ pub(crate) fn get_placeholder_path(
             size_of::<NcmPlaceHolderId>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_GET_PLACEHOLDER_PATH)
@@ -244,7 +244,7 @@ pub(crate) fn list_placeholder(
             core::mem::size_of_val(out_ids),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CS_LIST_PLACEHOLDER)
@@ -279,7 +279,7 @@ pub(crate) fn list_content_id(
             core::mem::size_of_val(out_ids),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CS_LIST_CONTENT_ID)
@@ -375,7 +375,7 @@ pub(crate) fn read_content_id_file(
             size_of::<ReadContentIdFileIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_READ_CONTENT_ID_FILE)
@@ -458,7 +458,7 @@ pub(crate) fn write_content_for_debug(
             size_of::<WriteContentForDebugIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_WRITE_CONTENT_FOR_DEBUG)
@@ -548,7 +548,7 @@ pub(crate) fn register_path(
             size_of::<NcmContentId>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_REGISTER_PATH)

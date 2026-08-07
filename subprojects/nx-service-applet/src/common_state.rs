@@ -49,7 +49,7 @@ use crate::proto::{
 /// the signal manually (e.g. via [`nx_svc::sync::reset_signal`]) or subsequent
 /// waits will return immediately and busy-loop.
 pub fn get_event_handle(csg: DomainObjectRef<'_>) -> Result<EventHandle, GetEventHandleError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = csg
         .dispatch(CMD_CSG_GET_EVENT_HANDLE)
@@ -93,7 +93,7 @@ impl ToResultCode for GetEventHandleError {
 pub fn receive_message(
     csg: DomainObjectRef<'_>,
 ) -> Result<Option<AppletMessage>, ReceiveMessageError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = csg
         .dispatch(CMD_CSG_RECEIVE_MESSAGE)
@@ -152,7 +152,7 @@ impl ToResultCode for ReceiveMessageError {
 pub fn get_operation_mode(
     csg: DomainObjectRef<'_>,
 ) -> Result<AppletOperationMode, GetOperationModeError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = csg
         .dispatch(CMD_CSG_GET_OPERATION_MODE)
@@ -197,7 +197,7 @@ impl ToResultCode for GetOperationModeError {
 pub fn get_performance_mode(
     csg: DomainObjectRef<'_>,
 ) -> Result<AppletPerformanceMode, GetPerformanceModeError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = csg
         .dispatch(CMD_CSG_GET_PERFORMANCE_MODE)
@@ -243,7 +243,7 @@ impl ToResultCode for GetPerformanceModeError {
 pub fn get_current_focus_state(
     csg: DomainObjectRef<'_>,
 ) -> Result<AppletFocusState, GetCurrentFocusStateError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = csg
         .dispatch(CMD_CSG_GET_CURRENT_FOCUS_STATE)

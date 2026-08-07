@@ -33,7 +33,7 @@ pub(crate) fn create_file(
         _pad: 0,
         size,
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::FS_CREATE_FILE)
@@ -50,7 +50,7 @@ pub(crate) fn cmd_with_path(
     cmd_id: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(cmd_id)
@@ -67,7 +67,7 @@ pub(crate) fn cmd_with_two_paths(
     cur_path: &[u8; FS_MAX_PATH],
     new_path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(cmd_id)
@@ -83,7 +83,7 @@ pub(crate) fn get_entry_type(
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::FS_GET_ENTRY_TYPE)
@@ -100,7 +100,7 @@ pub(crate) fn open_file(
     path: &[u8; FS_MAX_PATH],
     mode: u32,
 ) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(proto::FS_OPEN_FILE)
@@ -119,7 +119,7 @@ pub(crate) fn open_directory(
     path: &[u8; FS_MAX_PATH],
     mode: u32,
 ) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(proto::FS_OPEN_DIRECTORY)
@@ -144,7 +144,7 @@ pub(crate) fn get_space(
     cmd_id: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<i64, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
@@ -160,7 +160,7 @@ pub(crate) fn get_file_time_stamp_raw(
     ctx: u32,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<TimeStampRaw, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::FS_GET_FILE_TIME_STAMP_RAW)
@@ -179,7 +179,7 @@ pub(crate) fn query_entry(
     in_buf: &[u8],
     out_buf: &mut [u8],
 ) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::FS_QUERY_ENTRY)

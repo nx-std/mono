@@ -53,7 +53,7 @@ pub(crate) fn create_network_service(
             size_of::<CreateNetworkServiceIn>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::CREATE_NETWORK_SERVICE)
@@ -80,7 +80,7 @@ pub(crate) fn create_network_service_monitor(session: &Session) -> Result<u32, C
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::CREATE_NETWORK_SERVICE_MONITOR)
@@ -115,7 +115,7 @@ pub(crate) fn scan(
             core::mem::size_of_val(results),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SCAN)
@@ -142,7 +142,7 @@ pub(crate) fn create_group(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::CREATE_GROUP)
@@ -156,7 +156,7 @@ pub(crate) fn create_group(
 
 /// Destroys the current group (cmd 776).
 pub(crate) fn destroy_group(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::DESTROY_GROUP)
@@ -169,7 +169,7 @@ pub(crate) fn set_advertise_data(
     object: DomainObjectRef<'_>,
     data: &[u8],
 ) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::SET_ADVERTISE_DATA)
@@ -205,7 +205,7 @@ pub(crate) fn send_to_other_group(
             size_of::<SendToOtherGroupIn>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::SEND_TO_OTHER_GROUP)
@@ -225,7 +225,7 @@ pub(crate) fn recv_from_other_group(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::RECV_FROM_OTHER_GROUP)
@@ -249,7 +249,7 @@ pub(crate) fn add_acceptable_group_id(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const group_id).cast::<u8>(), size_of::<Lp2pGroupId>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::ADD_ACCEPTABLE_GROUP_ID)
@@ -260,7 +260,7 @@ pub(crate) fn add_acceptable_group_id(
 
 /// Removes the acceptable group ID (cmd 1560).
 pub(crate) fn remove_acceptable_group_id(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::REMOVE_ACCEPTABLE_GROUP_ID)
@@ -272,7 +272,7 @@ pub(crate) fn remove_acceptable_group_id(object: DomainObjectRef<'_>) -> Result<
 pub(crate) fn attach_network_interface_state_change_event(
     session: &Session,
 ) -> Result<u32, AttachEventError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::ATTACH_NETWORK_INTERFACE_STATE_CHANGE_EVENT)
@@ -289,7 +289,7 @@ pub(crate) fn attach_network_interface_state_change_event(
 
 /// Gets the last network interface error (cmd 264).
 pub(crate) fn get_network_interface_last_error(session: &Session) -> Result<(), DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::GET_NETWORK_INTERFACE_LAST_ERROR)
@@ -299,7 +299,7 @@ pub(crate) fn get_network_interface_last_error(session: &Session) -> Result<(), 
 
 /// Gets the current role (cmd 272).
 pub(crate) fn get_role(session: &Session) -> Result<u8, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::GET_ROLE)
@@ -317,7 +317,7 @@ pub(crate) fn get_advertise_data(
     cmd_id: u32,
     buffer: &mut [u8],
 ) -> Result<GetAdvertiseDataOut, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(cmd_id)
@@ -343,7 +343,7 @@ pub(crate) fn get_group_info(
             size_of::<Lp2pGroupInfo>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::GET_GROUP_INFO)
@@ -374,7 +374,7 @@ pub(crate) fn join(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::JOIN)
@@ -392,7 +392,7 @@ pub(crate) fn join(
 
 /// Gets the group owner (cmd 304).
 pub(crate) fn get_group_owner(session: &Session) -> Result<Lp2pNodeInfo, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::GET_GROUP_OWNER)
@@ -417,7 +417,7 @@ pub(crate) fn get_ip_config(
             size_of::<Lp2pIpConfig>(),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::GET_IP_CONFIG)
@@ -431,7 +431,7 @@ pub(crate) fn get_ip_config(
 
 /// Leaves the current group (cmd 320).
 pub(crate) fn leave(session: &Session) -> Result<u32, DispatchError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::LEAVE)
@@ -445,7 +445,7 @@ pub(crate) fn leave(session: &Session) -> Result<u32, DispatchError> {
 
 /// Attaches the join event (cmd 328).
 pub(crate) fn attach_join_event(session: &Session) -> Result<u32, AttachEventError> {
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::ATTACH_JOIN_EVENT)
@@ -473,7 +473,7 @@ pub(crate) fn get_members(
             core::mem::size_of_val(members),
         )
     };
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::GET_MEMBERS)

@@ -50,7 +50,7 @@ use crate::{
 
 /// Gets the IBtmUserCore sub-object (cmd 0).
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_CORE)
@@ -231,7 +231,7 @@ pub(crate) fn ble_get_connection_state(
             core::mem::size_of_val(info),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::BLE_GET_CONNECTION_STATE)
@@ -317,7 +317,7 @@ pub(crate) fn ble_get_paired_devices(
             core::mem::size_of_val(addrs),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::BLE_GET_PAIRED_DEVICES)
@@ -370,7 +370,7 @@ pub(crate) fn get_gatt_services(
             core::mem::size_of_val(services),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_GATT_SERVICES)
@@ -414,7 +414,7 @@ pub(crate) fn get_gatt_service(
             size_of::<BtmGattService>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_GATT_SERVICE)
@@ -482,7 +482,7 @@ pub(crate) fn get_belonging_gatt_service(
             size_of::<BtmGattService>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_BELONGING_GATT_SERVICE)
@@ -582,7 +582,7 @@ pub(crate) fn get_ble_mtu(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetBleMtuIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_BLE_MTU)
@@ -653,7 +653,7 @@ fn get_ble_scan_results(
             core::mem::size_of_val(results),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -696,7 +696,7 @@ fn get_gatt_service_data(
     // SAFETY: `buffer` is a valid pointer to `buffer_size` writable bytes,
     // exclusively borrowed for the duration of this call.
     let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -716,7 +716,7 @@ fn acquire_event_with_flag(
     service: &Session,
     cmd_id: u32,
 ) -> Result<u32, AcquireEventWithFlagError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

@@ -66,7 +66,7 @@ pub(crate) fn get_album_file_list(
     // returns; viewing its 1 byte as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST)
@@ -93,7 +93,7 @@ pub(crate) fn load_album_file(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::LOAD_ALBUM_FILE)
@@ -164,7 +164,7 @@ pub(crate) fn load_album_file_thumbnail(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::LOAD_ALBUM_FILE_THUMBNAIL)
@@ -193,7 +193,7 @@ pub(crate) fn load_album_screen_shot_image(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -252,7 +252,7 @@ pub(crate) fn load_album_screen_shot_image_ex(
             size_of::<LoadScreenShotExIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -294,7 +294,7 @@ pub(crate) fn load_album_screen_shot_image_ex0(
             size_of::<LoadScreenShotExIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -354,7 +354,7 @@ pub(crate) fn get_album_usage16(
             size_of::<AlbumUsage16>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::GET_ALBUM_USAGE16)
@@ -378,7 +378,7 @@ pub(crate) fn get_min_max_applet_id(
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut(app_ids.as_mut_ptr().cast::<u8>(), size_of::<[u64; 2]>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_MIN_MAX_APPLET_ID)
@@ -430,7 +430,7 @@ pub(crate) fn get_album_file_list_ex0(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<StorageFlagsIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST_EX0)
@@ -452,7 +452,7 @@ pub(crate) fn get_last_overlay_thumbnail(
     cmd_id: u32,
     image: &mut [u8],
 ) -> Result<GetLastOverlayThumbnailOut, GetOverlayThumbnailError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
@@ -521,7 +521,7 @@ pub(crate) fn load_album_screen_shot_image_ex1(
             size_of::<LoadAlbumScreenShotImageOutput>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
@@ -599,7 +599,7 @@ pub(crate) fn open_accessor_session(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_ACCESSOR_SESSION)
@@ -657,7 +657,7 @@ pub(crate) fn read_movie_data_from_stream(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ReadStreamIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
@@ -711,7 +711,7 @@ pub(crate) fn read_image_data_from_stream(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ReadStreamIn>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::READ_IMAGE_DATA_FROM_STREAM)

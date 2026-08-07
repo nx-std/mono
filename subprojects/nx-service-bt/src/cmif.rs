@@ -33,9 +33,7 @@ fn dispatch_in_with_pid<T>(
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
@@ -58,9 +56,7 @@ fn dispatch_in_with_pid_and_pointer<T>(
 where
     T: zerocopy::IntoBytes + zerocopy::Immutable,
 {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(cmd_id)
         .with_data_value(value)
@@ -285,9 +281,7 @@ pub fn get_le_event_info(
     buffer: &mut [u8],
     applet_resource_user_id: u64,
 ) -> Result<BtdrvBleEventType, GetLeEventInfoError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_LE_EVENT_INFO)
         .with_data_value(&applet_resource_user_id)
@@ -336,9 +330,7 @@ pub fn register_ble_event(
     session: BorrowedSessionHandle<'_>,
     applet_resource_user_id: u64,
 ) -> Result<u32, RegisterBleEventError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_BLE_EVENT)
         .with_data_value(&applet_resource_user_id)

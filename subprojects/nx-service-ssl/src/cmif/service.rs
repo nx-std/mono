@@ -40,7 +40,7 @@ pub(crate) fn create_context(
             size_of::<CreateContextIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(cmd_id)
@@ -68,7 +68,7 @@ pub enum CreateContextError {
 
 /// Gets the context count.
 pub(crate) fn get_context_count(domain: DomainRef<'_>) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_CONTEXT_COUNT)
@@ -96,7 +96,7 @@ pub(crate) fn get_certificates_legacy(
             core::mem::size_of_val(ca_cert_ids),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::GET_CERTIFICATES)
@@ -120,7 +120,7 @@ pub(crate) fn get_certificates(
             core::mem::size_of_val(ca_cert_ids),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_CERTIFICATES)
@@ -149,7 +149,7 @@ pub(crate) fn get_certificate_buf_size(
             core::mem::size_of_val(ca_cert_ids),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_CERTIFICATE_BUF_SIZE)
@@ -173,7 +173,7 @@ pub(crate) fn set_interface_version(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const version).cast::<u8>(), size_of::<u32>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::SET_INTERFACE_VERSION)
@@ -193,7 +193,7 @@ pub(crate) fn flush_session_cache(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const option_type).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::FLUSH_SESSION_CACHE)
@@ -220,7 +220,7 @@ pub(crate) fn set_debug_option(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::SET_DEBUG_OPTION)
@@ -241,7 +241,7 @@ pub(crate) fn get_debug_option(
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const debug_type).cast::<u8>(), size_of::<u32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::GET_DEBUG_OPTION)
@@ -253,7 +253,7 @@ pub(crate) fn get_debug_option(
 
 /// Clears TLS 1.2 fallback flag (14.0.0+).
 pub(crate) fn clear_tls12_fallback_flag(domain: DomainRef<'_>) -> Result<(), DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::CLEAR_TLS12_FALLBACK_FLAG)
@@ -267,7 +267,7 @@ pub(crate) fn set_thread_core_mask(domain: DomainRef<'_>, mask: u64) -> Result<(
     // returns; viewing its bytes as a slice is sound.
     let in_bytes =
         unsafe { core::slice::from_raw_parts((&raw const mask).cast::<u8>(), size_of::<u64>()) };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::SET_THREAD_CORE_MASK)
@@ -278,7 +278,7 @@ pub(crate) fn set_thread_core_mask(domain: DomainRef<'_>, mask: u64) -> Result<(
 
 /// Gets the thread core mask (15.0.0+, system only).
 pub(crate) fn get_thread_core_mask(domain: DomainRef<'_>) -> Result<u64, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::GET_THREAD_CORE_MASK)

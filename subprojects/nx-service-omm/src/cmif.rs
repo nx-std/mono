@@ -12,9 +12,7 @@ use crate::proto;
 /// Returns the raw `u8` value; the caller should convert via
 /// [`OperationMode::from_raw`](crate::OperationMode::from_raw).
 pub fn get_operation_mode(session: BorrowedSessionHandle<'_>) -> Result<u8, GetOperationModeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_OPERATION_MODE).build();
     req.send(&mut buf, session)
@@ -41,9 +39,7 @@ pub fn set_operation_mode_policy(
     session: BorrowedSessionHandle<'_>,
     policy: u8,
 ) -> Result<(), SetOperationModePolicyError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::SET_OPERATION_MODE_POLICY)
         .with_data_value(&policy)
@@ -73,9 +69,7 @@ pub enum SetOperationModePolicyError {
 pub fn get_default_display_resolution(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<(i32, i32), GetDefaultDisplayResolutionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_DEFAULT_DISPLAY_RESOLUTION).build();
     req.send(&mut buf, session)

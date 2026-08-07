@@ -20,9 +20,7 @@ pub fn request_load(
     session: BorrowedSessionHandle<'_>,
     font_type: u32,
 ) -> Result<(), RequestLoadError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::REQUEST_LOAD)
         .with_data_value(&font_type)
@@ -42,9 +40,7 @@ pub fn get_load_state(
     session: BorrowedSessionHandle<'_>,
     font_type: u32,
 ) -> Result<u32, GetLoadStateError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_LOAD_STATE)
         .with_data_value(&font_type)
@@ -61,9 +57,7 @@ pub fn get_load_state(
 
 /// Gets the size of a shared font in bytes.
 pub fn get_size(session: BorrowedSessionHandle<'_>, font_type: u32) -> Result<u32, GetSizeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SIZE)
         .with_data_value(&font_type)
@@ -83,9 +77,7 @@ pub fn get_shared_memory_address_offset(
     session: BorrowedSessionHandle<'_>,
     font_type: u32,
 ) -> Result<u32, GetSharedMemoryAddressOffsetError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_ADDRESS_OFFSET)
         .with_data_value(&font_type)
@@ -105,9 +97,7 @@ pub fn get_shared_memory_address_offset(
 pub fn get_shared_memory_native_handle(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<u32, GetSharedMemoryNativeHandleError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_MEMORY_NATIVE_HANDLE).build();
     req.send(&mut buf, session)
@@ -140,9 +130,7 @@ pub fn get_shared_font(
     offsets: &mut [u32],
     sizes: &mut [u32],
 ) -> Result<GetSharedFontOut, GetSharedFontError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_SHARED_FONT)
         .with_data_value(&language_code)

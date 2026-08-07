@@ -31,9 +31,7 @@ use crate::proto::{
 pub fn open_session(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<OwnedSessionHandle, OpenSessionError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_OPEN_SESSION).build();
     req.send(&mut buf, session)
@@ -57,9 +55,7 @@ pub fn open_session(
 pub fn get_performance_mode(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<PerformanceMode, GetPerformanceModeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_MODE).build();
     req.send(&mut buf, session)
@@ -89,9 +85,7 @@ pub fn set_performance_configuration(
 
     let in_data = InData { mode, config };
 
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_SET_PERFORMANCE_CONFIGURATION)
         .with_data_value(&in_data)
@@ -111,9 +105,7 @@ pub fn get_performance_configuration(
     session: BorrowedSessionHandle<'_>,
     mode: PerformanceMode,
 ) -> Result<u32, GetPerformanceConfigurationError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(CMD_GET_PERFORMANCE_CONFIGURATION)
         .with_data_value(&mode)

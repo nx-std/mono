@@ -39,7 +39,7 @@ pub(crate) fn open_final_output_recorder(
             size_of::<OpenRecorderIn>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_FINAL_OUTPUT_RECORDER)
@@ -78,7 +78,7 @@ pub(crate) fn recorder_stop(service: &Session) -> Result<(), DispatchError> {
 
 /// Registers the buffer event (returns copy handle).
 pub(crate) fn recorder_register_buffer_event(service: &Session) -> Result<u32, DispatchError> {
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::RECORDER_REGISTER_BUFFER_EVENT)
@@ -110,7 +110,7 @@ pub(crate) fn recorder_append_buffer(
             size_of::<FinalOutputRecorderBuffer>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RECORDER_APPEND_BUFFER)
@@ -143,7 +143,7 @@ pub(crate) fn recorder_append_buffer_legacy(
             size_of::<FinalOutputRecorderBuffer>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RECORDER_APPEND_BUFFER_LEGACY)
@@ -201,7 +201,7 @@ fn get_released_impl(
         )
     };
 
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)

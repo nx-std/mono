@@ -18,9 +18,7 @@ use crate::{
 ///
 /// Sends a `u8` mode value and returns a `u8` result.
 pub fn initialize(session: BorrowedSessionHandle<'_>, mode: u8) -> Result<u8, InitializeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::INITIALIZE)
         .with_data_value(&mode)
@@ -36,9 +34,7 @@ pub fn initialize(session: BorrowedSessionHandle<'_>, mode: u8) -> Result<u8, In
 
 /// Reloads the image database.
 pub fn reload(session: BorrowedSessionHandle<'_>) -> Result<(), ReloadError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::RELOAD).build();
     req.send(&mut buf, session)
@@ -51,9 +47,7 @@ pub fn reload(session: BorrowedSessionHandle<'_>) -> Result<(), ReloadError> {
 
 /// Gets the number of mii images in the database.
 pub fn get_count(session: BorrowedSessionHandle<'_>) -> Result<i32, GetCountError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_COUNT).build();
     req.send(&mut buf, session)
@@ -67,9 +61,7 @@ pub fn get_count(session: BorrowedSessionHandle<'_>) -> Result<i32, GetCountErro
 
 /// Gets whether the image database is empty.
 pub fn is_empty(session: BorrowedSessionHandle<'_>) -> Result<bool, IsEmptyError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::IS_EMPTY).build();
     req.send(&mut buf, session)
@@ -83,9 +75,7 @@ pub fn is_empty(session: BorrowedSessionHandle<'_>) -> Result<bool, IsEmptyError
 
 /// Gets whether the image database is full.
 pub fn is_full(session: BorrowedSessionHandle<'_>) -> Result<bool, IsFullError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::IS_FULL).build();
     req.send(&mut buf, session)
@@ -102,9 +92,7 @@ pub fn get_attribute(
     session: BorrowedSessionHandle<'_>,
     index: i32,
 ) -> Result<MiiimgImageAttribute, GetAttributeError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::GET_ATTRIBUTE)
         .with_data_value(&index)
@@ -125,9 +113,7 @@ pub fn load_image(
     id: crate::types::MiiimgImageId,
     dst: &mut [u8],
 ) -> Result<(), LoadImageError> {
-    // SAFETY: IPC operations are serialized on this thread, so no other
-    // borrow of the TLS IPC buffer is live.
-    let mut buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let req = cmif::CmifRequestBuilder::new(proto::LOAD_IMAGE)
         .with_data_value(&id)

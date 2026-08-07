@@ -67,7 +67,7 @@ pub(crate) fn get_client_id(object: DomainObjectRef<'_>) -> Result<NifmClientId,
     let out_bytes = unsafe {
         core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<NifmClientId>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_IGS_GET_CLIENT_ID)
@@ -90,7 +90,7 @@ pub(crate) fn create_request(object: DomainObjectRef<'_>) -> Result<u32, CreateR
     let in_bytes = unsafe {
         core::slice::from_raw_parts((&raw const selector).cast::<u8>(), size_of::<i32>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(CMD_IGS_CREATE_REQUEST)
@@ -131,7 +131,7 @@ pub(crate) fn get_current_network_profile(
             size_of::<NifmSfNetworkProfileData>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_IGS_GET_CURRENT_NETWORK_PROFILE)
@@ -165,7 +165,7 @@ pub(crate) fn enumerate_network_profiles(
             size_of::<NifmSfNetworkProfileBasicInfo>() * buffer.len(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_IGS_ENUMERATE_NETWORK_PROFILES)
@@ -229,7 +229,7 @@ pub(crate) fn get_network_profile(
             size_of::<NifmSfNetworkProfileData>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_IGS_GET_NETWORK_PROFILE)
@@ -259,7 +259,7 @@ pub(crate) fn set_network_profile(
             size_of::<NifmSfNetworkProfileData>(),
         )
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_IGS_SET_NETWORK_PROFILE)
@@ -381,7 +381,7 @@ pub(crate) fn is_any_internet_request_accepted(
     let id_bytes = unsafe {
         core::slice::from_raw_parts((&raw const id).cast::<u8>(), size_of::<NifmClientId>())
     };
-    let mut ipc_buf = unsafe { nx_sys_thread_tls::ipc_buffer() };
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_IGS_IS_ANY_INTERNET_REQUEST_ACCEPTED)
