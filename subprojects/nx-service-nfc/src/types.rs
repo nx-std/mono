@@ -260,7 +260,15 @@ pub struct NfpModelInfo {
 const_assert_eq!(size_of::<NfpModelInfo>(), 0x40);
 
 /// NFP register info (requires Ram mount).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpRegisterInfo {
     pub mii: MiiCharInfo,
@@ -273,7 +281,15 @@ pub struct NfpRegisterInfo {
 const_assert_eq!(size_of::<NfpRegisterInfo>(), 0x100);
 
 /// NFP register info private (system/debug only, requires Ram mount).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpRegisterInfoPrivate {
     pub mii_store_data: MiiStoreData,
@@ -309,7 +325,15 @@ pub struct NfpAdminInfo {
 const_assert_eq!(size_of::<NfpAdminInfo>(), 0x40);
 
 /// Full NFP data (debug only, requires Ram mount).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpData {
     pub tag_magic: u8,
