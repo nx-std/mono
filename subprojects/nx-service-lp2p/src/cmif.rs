@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the LP2P service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -13,6 +10,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -44,20 +42,11 @@ pub(crate) fn create_network_service(
         _pad: 0,
         pid_placeholder: 0,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<CreateNetworkServiceIn>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(proto::CREATE_NETWORK_SERVICE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .out_objects(1)
         .send(&mut buf)
@@ -74,17 +63,11 @@ pub(crate) fn create_network_service(
 /// Returns the monitor's session handle (move handle).
 pub(crate) fn create_network_service_monitor(session: &Session) -> Result<u32, CreateMonitorError> {
     let pid_placeholder: u64 = 0;
-
-    // SAFETY: `pid_placeholder` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const pid_placeholder).cast::<u8>(), size_of::<u64>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::CREATE_NETWORK_SERVICE_MONITOR)
-        .in_raw(in_bytes)
+        .in_raw(pid_placeholder.as_bytes())
         .send_pid()
         .send(&mut buf)
         .map_err(CreateMonitorError::Dispatch)?;
@@ -102,34 +85,19 @@ pub(crate) fn scan(
     info: &Lp2pGroupInfo,
     results: &mut [Lp2pScanResult],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `info` is a valid `&Lp2pGroupInfo`; viewing its bytes as a slice
-    // for the IN buffer is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
-    };
-    // SAFETY: `results` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `results`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            results.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(results),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::SCAN)
         .out_size(size_of::<i32>())
         .in_buffer(
-            in_bytes,
+            info.as_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .out_buffer(out_bytes, BufferAttr::HIPC_AUTO_SELECT)
+        .out_buffer(results.as_mut_bytes(), BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<i32>().
-    let total_out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
-    Ok(total_out)
+    Ok(*result.value::<i32>())
 }
 
 /// Creates a group (cmd 768).
@@ -137,17 +105,12 @@ pub(crate) fn create_group(
     object: DomainObjectRef<'_>,
     info: &Lp2pGroupInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `info` is a valid `&Lp2pGroupInfo`; viewing its bytes as a slice
-    // for the IN buffer is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::CREATE_GROUP)
         .in_buffer(
-            in_bytes,
+            info.as_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_AUTO_SELECT),
         )
         .send(&mut buf)
@@ -196,20 +159,11 @@ pub(crate) fn send_to_other_group(
         channel,
         flags,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<SendToOtherGroupIn>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::SEND_TO_OTHER_GROUP)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)
         .map(|_| ())
@@ -221,22 +175,16 @@ pub(crate) fn recv_from_other_group(
     flags: u32,
     buffer: &mut [u8],
 ) -> Result<RecvFromOtherGroupOut, DispatchError> {
-    // SAFETY: `flags` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::RECV_FROM_OTHER_GROUP)
-        .in_raw(in_bytes)
+        .in_raw(flags.as_bytes())
         .out_size(size_of::<RecvFromOtherGroupOut>())
         .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<RecvFromOtherGroupOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<RecvFromOtherGroupOut>()) };
-    Ok(out)
+    Ok(*result.value::<RecvFromOtherGroupOut>())
 }
 
 /// Adds an acceptable group ID (cmd 1552).
@@ -244,16 +192,11 @@ pub(crate) fn add_acceptable_group_id(
     object: DomainObjectRef<'_>,
     group_id: Lp2pGroupId,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `group_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const group_id).cast::<u8>(), size_of::<Lp2pGroupId>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::ADD_ACCEPTABLE_GROUP_ID)
-        .in_raw(in_bytes)
+        .in_raw(group_id.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
@@ -306,9 +249,7 @@ pub(crate) fn get_role(session: &Session) -> Result<u8, DispatchError> {
         .out_size(size_of::<u8>())
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<u8>().
-    let role = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
-    Ok(role)
+    Ok(*result.value::<u8>())
 }
 
 /// Gets advertise data (shared for cmds 280/281).
@@ -325,9 +266,7 @@ pub(crate) fn get_advertise_data(
         .out_buffer(buffer, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<GetAdvertiseDataOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetAdvertiseDataOut>()) };
-    Ok(out)
+    Ok(*result.value::<GetAdvertiseDataOut>())
 }
 
 /// Gets the current group info (cmd 288).
@@ -335,20 +274,12 @@ pub(crate) fn get_group_info(
     session: &Session,
     out: &mut Lp2pGroupInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid `&mut Lp2pGroupInfo`; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut Lp2pGroupInfo).cast::<u8>(),
-            size_of::<Lp2pGroupInfo>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::GET_GROUP_INFO)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_AUTO_SELECT),
         )
         .send(&mut buf)
@@ -361,29 +292,16 @@ pub(crate) fn join(
     out: &mut Lp2pGroupInfo,
     info: &Lp2pGroupInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid `&mut Lp2pGroupInfo`; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut Lp2pGroupInfo).cast::<u8>(),
-            size_of::<Lp2pGroupInfo>(),
-        )
-    };
-    // SAFETY: `info` is a valid `&Lp2pGroupInfo`; viewing it as bytes for the
-    // IN buffer is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *info).cast::<u8>(), size_of::<Lp2pGroupInfo>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::JOIN)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::FIXED_SIZE),
         )
         .in_buffer(
-            in_bytes,
+            info.as_bytes(),
             BufferAttr::HIPC_AUTO_SELECT.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut buf)
@@ -399,9 +317,7 @@ pub(crate) fn get_group_owner(session: &Session) -> Result<Lp2pNodeInfo, Dispatc
         .out_size(size_of::<Lp2pNodeInfo>())
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<Lp2pNodeInfo>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<Lp2pNodeInfo>()) };
-    Ok(out)
+    Ok(*result.value::<Lp2pNodeInfo>())
 }
 
 /// Gets the IP configuration (cmd 312).
@@ -409,20 +325,12 @@ pub(crate) fn get_ip_config(
     session: &Session,
     out: &mut Lp2pIpConfig,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid `&mut Lp2pIpConfig`; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut Lp2pIpConfig).cast::<u8>(),
-            size_of::<Lp2pIpConfig>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(proto::GET_IP_CONFIG)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::FIXED_SIZE.or(BufferAttr::HIPC_POINTER),
         )
         .send(&mut buf)
@@ -438,9 +346,7 @@ pub(crate) fn leave(session: &Session) -> Result<u32, DispatchError> {
         .out_size(size_of::<u32>())
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-    Ok(out)
+    Ok(*result.value::<u32>())
 }
 
 /// Attaches the join event (cmd 328).
@@ -465,25 +371,15 @@ pub(crate) fn get_members(
     session: &Session,
     members: &mut [Lp2pNodeInfo],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `members` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `members`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            members.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(members),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = session
         .dispatch(proto::GET_MEMBERS)
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_AUTO_SELECT)
+        .out_buffer(members.as_mut_bytes(), BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<i32>().
-    let total_out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) };
-    Ok(total_out)
+    Ok(*result.value::<i32>())
 }
 
 /// Errors from [`create_network_service`].

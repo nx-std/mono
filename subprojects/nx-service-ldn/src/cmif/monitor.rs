@@ -3,13 +3,12 @@
 //! Mirrors libnx's `ldnm*` calls. The crate is hosversion-unaware; every
 //! command is exposed regardless of HOS version.
 
-use core::mem::size_of;
-
 use nx_sf::service::{
     BufferAttr,
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -65,20 +64,12 @@ pub(crate) fn get_network_info(
     session: &Session,
     out: &mut LdnNetworkInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid `&mut LdnNetworkInfo`; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut LdnNetworkInfo).cast::<u8>(),
-            size_of::<LdnNetworkInfo>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     session
         .dispatch(CMD_MON_GET_NETWORK_INFO)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut buf)
@@ -89,7 +80,7 @@ pub(crate) fn get_network_info(
 pub(crate) fn get_ipv4_address(
     session: &Session,
 ) -> Result<(LdnIpv4Address, LdnSubnetMask), DispatchError> {
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
     struct Out {
         addr: LdnIpv4Address,

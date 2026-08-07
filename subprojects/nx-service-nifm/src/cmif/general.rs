@@ -12,6 +12,11 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
+use zerocopy::{
+    FromBytes as _,
+    FromZeros as _,
+    IntoBytes as _,
+};
 
 use crate::{
     dispatch::{
@@ -62,17 +67,12 @@ use crate::{
 /// dispatch error instead.
 pub(crate) fn get_client_id(object: DomainObjectRef<'_>) -> Result<NifmClientId, DispatchError> {
     let mut out = NifmClientId::default();
-    // SAFETY: `out` is a valid `&mut` value; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<NifmClientId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_IGS_GET_CLIENT_ID)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -85,16 +85,11 @@ pub(crate) fn get_client_id(object: DomainObjectRef<'_>) -> Result<NifmClientId,
 /// the id per request.
 pub(crate) fn create_request(object: DomainObjectRef<'_>) -> Result<u32, CreateRequestError> {
     let selector: i32 = 0x2;
-    // SAFETY: `selector` is a `Copy` value on the stack, valid until `send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const selector).cast::<u8>(), size_of::<i32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
         .dispatch(CMD_IGS_CREATE_REQUEST)
-        .in_raw(in_bytes)
+        .in_raw(selector.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)
         .map_err(CreateRequestError::Dispatch)?;
@@ -122,21 +117,13 @@ pub(crate) fn get_current_network_profile(
     object: DomainObjectRef<'_>,
     out: &mut NifmNetworkProfileData,
 ) -> Result<(), DispatchError> {
-    let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
-    // SAFETY: `sf` is a valid `&mut` value; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `sf`.
-    let sf_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (&raw mut sf).cast::<u8>(),
-            size_of::<NifmSfNetworkProfileData>(),
-        )
-    };
+    let mut sf = NifmSfNetworkProfileData::new_zeroed();
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_IGS_GET_CURRENT_NETWORK_PROFILE)
         .out_buffer(
-            sf_bytes,
+            sf.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)?;
@@ -153,23 +140,16 @@ pub(crate) fn enumerate_network_profiles(
     buffer: &mut [NifmNetworkProfileBasicInfo],
 ) -> Result<i32, DispatchError> {
     let in_kind: u8 = kind.as_raw();
-    // SAFETY: `in_kind` is a `Copy` value on the stack, valid until `send()`
-    // returns; viewing its single byte as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const in_kind).cast::<u8>(), size_of::<u8>()) };
-    // SAFETY: `buffer` is exposed to the kernel via HipcMapAlias; the byte
-    // slice borrows `buffer` for the duration of the call.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            buffer.as_mut_ptr().cast::<u8>(),
-            size_of::<NifmSfNetworkProfileBasicInfo>() * buffer.len(),
-        )
-    };
+    // The server writes wire-side entries, which are narrower than the
+    // app-side slots they land in, so the buffer it sees is only the first
+    // `buffer.len()` wire-side entries' worth of bytes.
+    let out_len = size_of::<NifmSfNetworkProfileBasicInfo>() * buffer.len();
+    let out_bytes = &mut buffer.as_mut_bytes()[..out_len];
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_IGS_ENUMERATE_NETWORK_PROFILES)
-        .in_raw(in_bytes)
+        .in_raw(in_kind.as_bytes())
         .out_size(size_of::<i32>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
@@ -192,19 +172,10 @@ pub(crate) fn enumerate_network_profiles(
     // wire-side entries before they are read; we do the same.
     for i in (0..returned).rev() {
         let idx = i as usize;
-        // SAFETY: at this point `buffer[idx]` still holds the wire-side bytes
-        // (`NifmSfNetworkProfileBasicInfo`, 0x75 bytes), which fit within the
-        // app-side slot (`NifmNetworkProfileBasicInfo`, 0x78 bytes). We read
-        // the wire-side struct out and then overwrite the slot with the
-        // converted app-side struct.
-        let sf: NifmSfNetworkProfileBasicInfo = unsafe {
-            core::ptr::read_unaligned(
-                buffer
-                    .as_ptr()
-                    .add(idx)
-                    .cast::<NifmSfNetworkProfileBasicInfo>(),
-            )
-        };
+        // The slot still holds the wire-side bytes the server wrote; read them
+        // out before overwriting the slot with the converted app-side struct.
+        let (sf, _) = NifmSfNetworkProfileBasicInfo::read_from_prefix(buffer[idx].as_bytes())
+            .expect("the app-side slot is wider than the wire-side entry");
         sf_to_network_profile_basic_info(&sf, &mut buffer[idx]);
     }
     Ok(total_entries)
@@ -216,26 +187,14 @@ pub(crate) fn get_network_profile(
     uuid: Uuid,
     out: &mut NifmNetworkProfileData,
 ) -> Result<(), DispatchError> {
-    let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
-    // SAFETY: `uuid` is a `Copy` value on the stack, valid until `send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const uuid).cast::<u8>(), size_of::<Uuid>()) };
-    // SAFETY: `sf` is a valid `&mut` value; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `sf`.
-    let sf_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (&raw mut sf).cast::<u8>(),
-            size_of::<NifmSfNetworkProfileData>(),
-        )
-    };
+    let mut sf = NifmSfNetworkProfileData::new_zeroed();
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_IGS_GET_NETWORK_PROFILE)
-        .in_raw(in_bytes)
+        .in_raw(uuid.as_bytes())
         .out_buffer(
-            sf_bytes,
+            sf.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)?;
@@ -249,29 +208,20 @@ pub(crate) fn set_network_profile(
     object: DomainObjectRef<'_>,
     profile: &NifmNetworkProfileData,
 ) -> Result<Uuid, DispatchError> {
-    let mut sf: NifmSfNetworkProfileData = unsafe { core::mem::zeroed() };
+    let mut sf = NifmSfNetworkProfileData::new_zeroed();
     sf_from_network_profile_data(profile, &mut sf);
-    // SAFETY: `sf` is a valid value; viewing it as a byte slice for the IN
-    // buffer is sound, and the byte slice borrows `sf`.
-    let sf_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const sf).cast::<u8>(),
-            size_of::<NifmSfNetworkProfileData>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_IGS_SET_NETWORK_PROFILE)
         .in_buffer(
-            sf_bytes,
+            sf.as_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_size(size_of::<Uuid>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<Uuid>() bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<Uuid>()) })
+    Ok(*result.value::<Uuid>())
 }
 
 /// `GetCurrentIpAddress` (cmd 12). Returns the IPv4 address as a 4-byte payload.
@@ -287,8 +237,8 @@ pub(crate) fn get_current_ip_address(
 pub(crate) fn get_current_ip_config_info(
     object: DomainObjectRef<'_>,
 ) -> Result<IpConfigInfo, DispatchError> {
+    #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct Out {
         ip_setting: NifmIpAddressSetting,
         dns_setting: crate::types::NifmDnsSetting,
@@ -326,8 +276,8 @@ pub(crate) fn is_wireless_communication_enabled(
 pub(crate) fn get_internet_connection_status(
     object: DomainObjectRef<'_>,
 ) -> Result<InternetConnection, GetInternetConnectionStatusError> {
+    #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct Out {
         connection_type: u8,
         wifi_strength: u8,
@@ -376,17 +326,12 @@ pub(crate) fn is_any_internet_request_accepted(
     object: DomainObjectRef<'_>,
     id: NifmClientId,
 ) -> Result<bool, DispatchError> {
-    // SAFETY: `id` is a `Copy` value on the stack, valid until `send()`
-    // returns; viewing its bytes as a slice is sound.
-    let id_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const id).cast::<u8>(), size_of::<NifmClientId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_IGS_IS_ANY_INTERNET_REQUEST_ACCEPTED)
         .in_buffer(
-            id_bytes,
+            id.as_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .out_size(size_of::<u8>())

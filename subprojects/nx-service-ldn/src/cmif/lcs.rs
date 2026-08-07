@@ -18,6 +18,7 @@ use nx_sf::{
         OwnedSessionHandle,
     },
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -125,17 +126,12 @@ pub fn channel_band_to_channel(val: u16) -> i16 {
 /// `Initialize` (cmd 400) — pre-`[7.0.0]` path. `send_pid` + zero payload.
 pub(crate) fn initialize_legacy(object: DomainObjectRef<'_>) -> Result<(), DispatchError> {
     let reserved: u64 = 0;
-    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_INITIALIZE_LEGACY)
         .send_pid()
-        .in_raw(in_bytes)
+        .in_raw(reserved.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
@@ -146,8 +142,8 @@ pub(crate) fn initialize_with_version(
     kind: LdnServiceType,
     version: i32,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         version: i32,
         _pad: u32,
@@ -162,16 +158,12 @@ pub(crate) fn initialize_with_version(
         _pad: 0,
         _reserved: 0,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(cmd)
         .send_pid()
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
@@ -183,8 +175,8 @@ pub(crate) fn initialize_with_priority(
     version: i32,
     priority: i32,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         version: i32,
         priority: i32,
@@ -195,16 +187,12 @@ pub(crate) fn initialize_with_priority(
         priority,
         _reserved: 0,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_INITIALIZE_WITH_PRIORITY)
         .send_pid()
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
@@ -247,20 +235,12 @@ pub(crate) fn get_network_info(
     object: DomainObjectRef<'_>,
     out: &mut LdnNetworkInfo,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid `&mut LdnNetworkInfo`; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut LdnNetworkInfo).cast::<u8>(),
-            size_of::<LdnNetworkInfo>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_GET_NETWORK_INFO)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut buf)
@@ -271,8 +251,8 @@ pub(crate) fn get_network_info(
 pub(crate) fn get_ipv4_address(
     object: DomainObjectRef<'_>,
 ) -> Result<(LdnIpv4Address, LdnSubnetMask), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct Out {
         addr: LdnIpv4Address,
         mask: LdnSubnetMask,
@@ -350,29 +330,15 @@ pub(crate) fn get_network_info_and_history(
     network_info: &mut LdnNetworkInfo,
     nodes: &mut [LdnNodeLatestUpdate],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `network_info` is a valid `&mut`; viewing it as bytes for OUT is sound.
-    let net_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (network_info as *mut LdnNetworkInfo).cast::<u8>(),
-            size_of::<LdnNetworkInfo>(),
-        )
-    };
-    // SAFETY: `nodes` is a valid `&mut` slice; viewing it as bytes for OUT is sound.
-    let nodes_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            nodes.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(nodes),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_GET_NETWORK_INFO_AND_HISTORY)
         .out_buffer(
-            net_bytes,
+            network_info.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
-        .out_buffer(nodes_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(nodes.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .send(&mut buf)
         .map(|_| ())
 }
@@ -409,8 +375,8 @@ fn scan_inner(
     filter: &LdnScanFilter,
     out_buf: &mut [LdnNetworkInfo],
 ) -> Result<i32, DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         channel: i16,
         pad: [u8; 6],
@@ -421,25 +387,13 @@ fn scan_inner(
         pad: [0; 6],
         filter: *filter,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
-    // SAFETY: `out_buf` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            out_buf.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out_buf),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i16>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_AUTO_SELECT)
+        .out_buffer(out_buf.as_mut_bytes(), BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)?;
 
     let total: i16 = if result.data.len() >= 2 {
@@ -585,8 +539,8 @@ pub(crate) fn create_network(
     user_config: &LdnUserConfig,
     network_config: &LdnNetworkConfig,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         sec_config: LdnSecurityConfig,
         user_config: LdnUserConfig,
@@ -599,15 +553,11 @@ pub(crate) fn create_network(
         _pad: 0,
         network_config: sanitize_network_config(network_config),
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_CREATE_NETWORK)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
@@ -622,8 +572,8 @@ pub(crate) fn create_network_private(
     network_config: &LdnNetworkConfig,
     addrs: &[LdnAddressEntry],
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         sec_config: LdnSecurityConfig,
         sec_param: LdnSecurityParameter,
@@ -638,21 +588,12 @@ pub(crate) fn create_network_private(
         _pad: 0,
         network_config: sanitize_network_config(network_config),
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
-    // SAFETY: `addrs` is a valid `&[LdnAddressEntry]`; viewing it as bytes for
-    // the IN buffer is sound.
-    let addr_bytes = unsafe {
-        core::slice::from_raw_parts(addrs.as_ptr().cast::<u8>(), core::mem::size_of_val(addrs))
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_CREATE_NETWORK_PRIVATE)
-        .in_raw(in_bytes)
-        .in_buffer(addr_bytes, BufferAttr::HIPC_POINTER)
+        .in_raw(input.as_bytes())
+        .in_buffer(addrs.as_bytes(), BufferAttr::HIPC_POINTER)
         .send(&mut buf)
         .map(|_| ())
 }
@@ -666,8 +607,8 @@ pub(crate) fn connect(
     option: u32,
     network_info: &LdnNetworkInfo,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         sec_config: LdnSecurityConfig,
         user_config: LdnUserConfig,
@@ -680,25 +621,13 @@ pub(crate) fn connect(
         version,
         option,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
-    // SAFETY: `network_info` is a valid `&LdnNetworkInfo`; viewing it as bytes
-    // for the IN buffer is sound.
-    let net_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (network_info as *const LdnNetworkInfo).cast::<u8>(),
-            size_of::<LdnNetworkInfo>(),
-        )
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_CONNECT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(
-            net_bytes,
+            network_info.as_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut buf)
@@ -715,8 +644,8 @@ pub(crate) fn connect_private(
     option: u32,
     network_config: &LdnNetworkConfig,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         sec_config: LdnSecurityConfig,
         sec_param: LdnSecurityParameter,
@@ -735,15 +664,11 @@ pub(crate) fn connect_private(
         _pad: 0,
         network_config: sanitize_network_config(network_config),
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_CONNECT_PRIVATE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut buf)
         .map(|_| ())
 }
@@ -812,8 +737,8 @@ fn send_action_frame_inner(
     channel: i16,
     flags: u32,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         destination: LdnMacAddress,
         bssid: LdnMacAddress,
@@ -828,15 +753,11 @@ fn send_action_frame_inner(
         channel,
         flags,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<In>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(CMD_LCS_SEND_ACTION_FRAME)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)
         .map(|_| ())
@@ -886,8 +807,8 @@ pub(crate) fn recv_action_frame(
     })
 }
 
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 struct RecvActionFrameRaw {
     addr0: LdnMacAddress,
     addr1: LdnMacAddress,
@@ -902,21 +823,15 @@ fn recv_action_frame_inner(
     data: &mut [u8],
     flags: u32,
 ) -> Result<RecvActionFrameRaw, DispatchError> {
-    // SAFETY: `flags` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_LCS_RECV_ACTION_FRAME)
-        .in_raw(in_bytes)
+        .in_raw(flags.as_bytes())
         .out_size(size_of::<RecvActionFrameRaw>())
         .out_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut buf)?;
-    // SAFETY: response payload is at least size_of::<RecvActionFrameRaw>() by
-    // virtue of `out_size`; parse_response would have errored otherwise.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<RecvActionFrameRaw>()) })
+    Ok(*result.value::<RecvActionFrameRaw>())
 }
 
 /// `SetHomeChannel` (cmd 505, `[18.0.0+]`) — pre-20.0.0 ABI: `{band, channel}`
@@ -925,8 +840,8 @@ pub(crate) fn set_home_channel_legacy(
     object: DomainObjectRef<'_>,
     channel: i16,
 ) -> Result<(), DispatchError> {
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct In {
         band: i16,
         channel: i16,

@@ -14,6 +14,7 @@ use nx_sf::service::{
     OutHandleAttr,
 };
 use nx_svc::sync::EventHandle;
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -114,28 +115,23 @@ pub(crate) fn get_applet_info(
     theme_color: u32,
     buffer: &mut [u8],
 ) -> Result<AppletInfo, DispatchError> {
+    #[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
     #[repr(C)]
-    #[derive(Clone, Copy)]
     struct Out {
         applet_id: u32,
         mode: u32,
         out_size: u32,
     }
-    // SAFETY: `theme_color` is a `Copy` value on the stack, valid until `send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const theme_color).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(CMD_REQ_GET_APPLET_INFO)
-        .in_raw(in_bytes)
+        .in_raw(theme_color.as_bytes())
         .out_size(size_of::<Out>())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<Out>()) };
+    let out = result.value::<Out>();
     Ok(AppletInfo {
         applet_id: out.applet_id,
         mode: out.mode,

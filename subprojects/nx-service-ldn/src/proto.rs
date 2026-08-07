@@ -235,7 +235,7 @@ pub enum LdnProtocol {
 ///
 /// Hand-rolled newtype — no `bitflags` crate dependency, matching the rest of
 /// the workspace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(transparent)]
 pub struct LdnScanFilterFlag(pub u32);
 

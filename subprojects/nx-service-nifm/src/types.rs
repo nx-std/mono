@@ -10,10 +10,21 @@ use core::mem::{
 };
 
 use static_assertions::const_assert_eq;
+use zerocopy::FromZeros as _;
 
 /// 128-bit UUID — wire-equivalent to libnx's `typedef struct { u8 uuid[0x10]; } Uuid;`.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Uuid {
     pub bytes: [u8; 16],
 }
@@ -21,8 +32,18 @@ pub struct Uuid {
 const_assert_eq!(size_of::<Uuid>(), 0x10);
 
 /// IPv4 address as a 4-byte big-endian payload (`struct in_addr`).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NifmIpV4Address {
     pub addr: [u8; 4],
 }
@@ -39,8 +60,18 @@ impl NifmIpV4Address {
 }
 
 /// IPv4 settings (current address + subnet + gateway).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NifmIpAddressSetting {
     pub is_automatic: u8,
     pub current_addr: NifmIpV4Address,
@@ -51,8 +82,18 @@ pub struct NifmIpAddressSetting {
 const_assert_eq!(size_of::<NifmIpAddressSetting>(), 0xD);
 
 /// DNS settings (primary + secondary).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NifmDnsSetting {
     pub is_automatic: u8,
     pub primary_dns_server: NifmIpV4Address,
@@ -62,8 +103,16 @@ pub struct NifmDnsSetting {
 const_assert_eq!(size_of::<NifmDnsSetting>(), 0x9);
 
 /// HTTP proxy settings.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmProxySetting {
     pub enabled: u8,
     pub pad: u8,
@@ -78,8 +127,16 @@ pub struct NifmProxySetting {
 const_assert_eq!(size_of::<NifmProxySetting>(), 0xAA);
 
 /// Full IP settings bundle.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmIpSettingData {
     pub ip_address_setting: NifmIpAddressSetting,
     pub dns_setting: NifmDnsSetting,
@@ -91,8 +148,16 @@ pub struct NifmIpSettingData {
 const_assert_eq!(size_of::<NifmIpSettingData>(), 0xC2);
 
 /// Wire-side wireless-settings payload as serialized by `IGeneralService`.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmSfWirelessSettingData {
     pub ssid_len: u8,
     pub ssid: [u8; 0x20],
@@ -106,8 +171,16 @@ const_assert_eq!(size_of::<NifmSfWirelessSettingData>(), 0x65);
 
 /// Application-side wireless-settings payload as exposed by libnx's
 /// `NifmNetworkProfileData`. Wider SSID column + reshuffled fields.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmWirelessSettingData {
     pub ssid_len: u8,
     pub ssid: [u8; 0x21],
@@ -123,8 +196,16 @@ const_assert_eq!(size_of::<NifmWirelessSettingData>(), 0x70);
 
 /// Wire-side network-profile record returned by `GetCurrentNetworkProfile` /
 /// `GetNetworkProfile` and accepted by `SetNetworkProfile`.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmSfNetworkProfileData {
     pub ip_setting_data: NifmIpSettingData,
     pub uuid: Uuid,
@@ -146,8 +227,8 @@ const_assert_eq!(offset_of!(NifmSfNetworkProfileData, unk_x112), 0x112);
 /// Application-side network-profile record. Layout matches libnx's
 /// `NifmNetworkProfileData` exactly so it can be filled in by the SF→App
 /// conversion routines in [`crate::cmif::general`].
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmNetworkProfileData {
     pub uuid: Uuid,
     pub network_name: [u8; 0x40],
@@ -171,8 +252,8 @@ const_assert_eq!(
 const_assert_eq!(offset_of!(NifmNetworkProfileData, ip_setting_data), 0xCC);
 
 /// Wire-side basic-info record returned by `EnumerateNetworkProfiles`.
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmSfNetworkProfileBasicInfo {
     pub uuid: Uuid,
     pub network_name: [u8; 0x40],
@@ -189,8 +270,16 @@ const_assert_eq!(size_of::<NifmSfNetworkProfileBasicInfo>(), 0x75);
 
 /// Application-side basic-info record. libnx widens the enum fields to `u8`-typed
 /// enums, pads to align, and re-uses the wire layout otherwise.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NifmNetworkProfileBasicInfo {
     pub uuid: Uuid,
     pub network_name: [u8; 0x40],
@@ -207,8 +296,19 @@ pub struct NifmNetworkProfileBasicInfo {
 const_assert_eq!(size_of::<NifmNetworkProfileBasicInfo>(), 0x78);
 
 /// `ClientId` returned by `GetClientId` (cmd 1).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct NifmClientId {
     pub id: u32,
 }
@@ -245,17 +345,13 @@ pub struct AppletInfo {
     pub out_size: u32,
 }
 
-//
-// SF ↔ App conversion helpers.
-//
-
 /// Mirrors libnx's `_nifmConvertSfToNetworkProfileData`.
 pub fn sf_to_network_profile_data(
     input: &NifmSfNetworkProfileData,
     output: &mut NifmNetworkProfileData,
 ) {
     // Zero-initialise the output to match libnx's `memset(out, 0, sizeof(*out));`.
-    *output = unsafe { core::mem::zeroed() };
+    *output = NifmNetworkProfileData::new_zeroed();
 
     output.uuid = input.uuid;
     output.network_name.copy_from_slice(&input.network_name);
@@ -291,7 +387,7 @@ pub fn sf_from_network_profile_data(
     input: &NifmNetworkProfileData,
     output: &mut NifmSfNetworkProfileData,
 ) {
-    *output = unsafe { core::mem::zeroed() };
+    *output = NifmSfNetworkProfileData::new_zeroed();
 
     output.uuid = input.uuid;
     output.network_name.copy_from_slice(&input.network_name);
@@ -323,7 +419,7 @@ pub fn sf_to_network_profile_basic_info(
     input: &NifmSfNetworkProfileBasicInfo,
     output: &mut NifmNetworkProfileBasicInfo,
 ) {
-    *output = unsafe { core::mem::zeroed() };
+    *output = NifmNetworkProfileBasicInfo::new_zeroed();
 
     output.uuid = input.uuid;
     output.network_name.copy_from_slice(&input.network_name);

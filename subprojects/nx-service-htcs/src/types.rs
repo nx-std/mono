@@ -2,10 +2,6 @@
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /// Maximum length of a peer name.
 pub const PEER_NAME_MAX: usize = 32;
 
@@ -21,12 +17,15 @@ pub const FD_SET_SIZE: usize = SOCKET_COUNT_MAX;
 /// Maximum session count for the HTCS session pool.
 pub const SESSION_COUNT_MAX: usize = 0x10;
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs
-// ---------------------------------------------------------------------------
-
 /// HTC peer name (32-byte fixed string).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HtcsPeerName {
     pub name: [u8; PEER_NAME_MAX],
@@ -35,7 +34,14 @@ pub struct HtcsPeerName {
 const_assert_eq!(size_of::<HtcsPeerName>(), 0x20);
 
 /// HTC port name (32-byte fixed string).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HtcsPortName {
     pub name: [u8; PORT_NAME_MAX],
@@ -44,7 +50,14 @@ pub struct HtcsPortName {
 const_assert_eq!(size_of::<HtcsPortName>(), 0x20);
 
 /// HTC socket address.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HtcsSockAddr {
     pub family: u16,
@@ -55,7 +68,7 @@ pub struct HtcsSockAddr {
 const_assert_eq!(size_of::<HtcsSockAddr>(), 0x42);
 
 /// Time value for select operations.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HtcsTimeVal {
     pub tv_sec: i64,
@@ -72,10 +85,6 @@ pub struct HtcsFdSet {
 }
 
 const_assert_eq!(size_of::<HtcsFdSet>(), 0xA0);
-
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
 
 /// HTCS socket error codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,12 +169,8 @@ bitflags::bitflags! {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Result types
-// ---------------------------------------------------------------------------
-
 /// Result of a socket operation returning an error code and a result value.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct SocketResult {
     pub err: i32,
@@ -175,7 +180,7 @@ pub struct SocketResult {
 const_assert_eq!(size_of::<SocketResult>(), 0x08);
 
 /// Result of a transfer operation returning an error code and byte count.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct TransferResult {
     pub err: i32,
@@ -184,12 +189,8 @@ pub struct TransferResult {
 
 const_assert_eq!(size_of::<TransferResult>(), 0x10);
 
-// ---------------------------------------------------------------------------
-// Internal IPC wire types
-// ---------------------------------------------------------------------------
-
 /// Input for fcntl (cmd 8).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct FcntlIn {
     pub command: i32,
@@ -199,7 +200,7 @@ pub(crate) struct FcntlIn {
 const_assert_eq!(size_of::<FcntlIn>(), 0x08);
 
 /// Input for recv_start (cmd 11).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RecvStartIn {
     pub mem_size: i32,
@@ -209,7 +210,7 @@ pub(crate) struct RecvStartIn {
 const_assert_eq!(size_of::<RecvStartIn>(), 0x08);
 
 /// Input for start_send (cmd 17) and start_recv (cmd 20).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct StartTransferIn {
     pub flags: i32,
@@ -230,7 +231,7 @@ impl StartTransferIn {
 }
 
 /// Output for start_send (cmd 17).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct StartSendOut {
     pub task_id: u32,
@@ -241,7 +242,7 @@ pub(crate) struct StartSendOut {
 const_assert_eq!(size_of::<StartSendOut>(), 0x10);
 
 /// Output for continue_send (cmd 23).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct ContinueSendOut {
     pub wait: u8,
@@ -252,7 +253,7 @@ pub(crate) struct ContinueSendOut {
 const_assert_eq!(size_of::<ContinueSendOut>(), 0x10);
 
 /// Output for accept_results (cmd 10).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct AcceptResultsOut {
     pub address: HtcsSockAddr,
@@ -263,7 +264,7 @@ pub(crate) struct AcceptResultsOut {
 const_assert_eq!(size_of::<AcceptResultsOut>(), 0x48);
 
 /// Output for end_select (cmd 131).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct EndSelectOut {
     pub err: i32,
