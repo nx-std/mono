@@ -3,11 +3,6 @@
 //! This module implements `sm:m` commands using the TIPC (Tiny IPC)
 //! protocol, which is used on HOS 12.0.0+ and Atmosphere.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
-
 use nx_sf::{
     hipc::{
         BufferMode,
@@ -16,6 +11,7 @@ use nx_sf::{
     service::BorrowedSessionHandle,
     tipc,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::proto;
 
@@ -35,11 +31,8 @@ pub fn register_process(
 ) -> Result<(), RegisterProcessError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u64>()];
-    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = tipc::TipcRequestBuilder::new(proto::REGISTER_PROCESS)
-        .with_data(&payload)
+        .with_data(pid.as_bytes())
         .add_input_buffer(InputBuffer::new(acid_sac, BufferMode::Normal))
         .add_input_buffer(InputBuffer::new(aci0_sac, BufferMode::Normal))
         .build();
@@ -72,11 +65,8 @@ pub fn unregister_process(
 ) -> Result<(), UnregisterProcessError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u64>()];
-    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_PROCESS)
-        .with_data(&payload)
+        .with_data(pid.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(UnregisterProcessError::SendRequest)?;
