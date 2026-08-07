@@ -1,9 +1,6 @@
 //! CMIF dispatch helpers shared across the `cmif` module.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     DispatchError,
@@ -22,16 +19,15 @@ pub(crate) fn dispatch_no_io(
 
 /// CMIF request with no input and a single `Copy` output.
 #[inline]
-pub(crate) fn dispatch_out<O: Copy>(
-    object: DomainObjectRef<'_>,
-    cmd_id: u32,
-) -> Result<O, DispatchError> {
+pub(crate) fn dispatch_out<O>(object: DomainObjectRef<'_>, cmd_id: u32) -> Result<O, DispatchError>
+where
+    O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(cmd_id)
         .out_size(size_of::<O>())
         .send(&mut buf)?;
-    // SAFETY: the response payload is at least `size_of::<O>()` bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<O>())
 }

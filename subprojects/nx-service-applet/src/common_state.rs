@@ -4,10 +4,7 @@
 //! which provides access to applet state information like focus, operation mode,
 //! and message events.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::{
     error::{
@@ -106,8 +103,7 @@ pub fn receive_message(
                 return Err(ReceiveMessageError::InvalidResponse);
             }
 
-            // SAFETY: Response data contains u32 message type.
-            let raw = unsafe { ptr::read_unaligned(resp.data.as_ptr().cast::<u32>()) };
+            let raw = *resp.value::<u32>();
 
             Ok(AppletMessage::from_raw(raw))
         }
@@ -209,8 +205,7 @@ pub fn get_performance_mode(
         return Err(GetPerformanceModeError::InvalidResponse);
     }
 
-    // SAFETY: Response data contains u32 performance mode.
-    let raw = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
+    let raw = *result.value::<u32>();
     AppletPerformanceMode::from_raw(raw).ok_or(GetPerformanceModeError::InvalidValue(raw))
 }
 

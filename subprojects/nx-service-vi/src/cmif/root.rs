@@ -18,6 +18,7 @@ use nx_sf::{
         Session,
     },
 };
+use zerocopy::IntoBytes as _;
 
 use crate::proto::root_cmds;
 
@@ -182,21 +183,10 @@ pub fn draw_fatal_text32(
         initial_advance,
     };
 
-    // Add buffer (UTF-32 codepoints as bytes)
-    // SAFETY: `utf32_codepoints` is a valid &[u32] slice; reinterpreting its bytes
-    // as a u8 slice for the IN buffer is sound (u32 has no padding, any bit pattern
-    // is valid as bytes).
-    let codepoints_bytes = unsafe {
-        core::slice::from_raw_parts(
-            utf32_codepoints.as_ptr().cast::<u8>(),
-            utf32_codepoints.len() * 4,
-        )
-    };
-
     let req = cmif::CmifRequestBuilder::new(root_cmds::DRAW_FATAL_TEXT32)
         .with_data_value(&input)
         .add_input_buffer(InputBuffer::new(
-            codepoints_bytes,
+            utf32_codepoints.as_bytes(),
             nx_sf::hipc::BufferMode::Normal,
         ))
         .build();

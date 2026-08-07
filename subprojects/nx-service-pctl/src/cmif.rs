@@ -1,13 +1,12 @@
 //! CMIF protocol operations for the parental controls service.
 
-use core::mem::size_of;
-
 use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
     DomainRef,
     OutHandleAttr,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -36,16 +35,11 @@ pub(crate) fn create_service(domain: DomainRef<'_>) -> Result<u32, CreateService
 
 fn create_service_at(domain: DomainRef<'_>, cmd_id: u32) -> Result<u32, CreateServiceError> {
     let pid_reserved: u64 = 0;
-    // SAFETY: `pid_reserved` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const pid_reserved).cast::<u8>(), size_of::<u64>())
-    };
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = domain
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(pid_reserved.as_bytes())
         .send_pid()
         .out_objects(1)
         .send(&mut buf)

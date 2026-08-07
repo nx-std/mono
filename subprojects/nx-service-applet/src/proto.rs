@@ -396,7 +396,7 @@ pub enum AppletFocusHandlingMode {
 /// Applet attribute for LibraryApplet proxy (3.0.0+).
 ///
 /// Used with `OpenLibraryAppletProxyOld` (cmd 201).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AppletAttribute {
     /// Flag. When non-zero, two state fields are set to 1.

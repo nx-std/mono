@@ -5,7 +5,17 @@ use static_assertions::const_assert_eq;
 /// Account user ID.
 ///
 /// A 128-bit identifier for a user account. All-zero is invalid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
@@ -22,7 +32,15 @@ impl AccountUid {
 }
 
 /// User data associated with a profile.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountUserData {
     pub unk_x0: u32,
@@ -36,7 +54,7 @@ pub struct AccountUserData {
 const_assert_eq!(size_of::<AccountUserData>(), 0x80);
 
 /// Profile base information.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct AccountProfileBase {
     pub uid: AccountUid,
@@ -59,7 +77,7 @@ const_assert_eq!(size_of::<AccountNetworkServiceAccountId>(), 0x08);
 pub const USER_LIST_SIZE: usize = 8;
 
 /// Wire-layout input for `InitializeApplicationInfo` (sends PID).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct InitializeApplicationInfoIn {
     pub pid_placeholder: u64,
@@ -68,7 +86,7 @@ pub(crate) struct InitializeApplicationInfoIn {
 const_assert_eq!(size_of::<InitializeApplicationInfoIn>(), 0x08);
 
 /// Wire-layout input for `IsUserRegistrationRequestPermitted` (sends PID).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct IsUserRegistrationPermittedIn {
     pub pid_placeholder: u64,

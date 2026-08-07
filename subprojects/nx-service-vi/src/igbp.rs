@@ -25,6 +25,10 @@ use nx_sf::{
     },
     service::Session,
 };
+use zerocopy::{
+    FromBytes as _,
+    IntoBytes as _,
+};
 
 use crate::{
     binder::{
@@ -62,7 +66,16 @@ pub mod code {
 }
 
 /// `BqRect` — rectangle used in `BqBufferInput.crop`.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BqRect {
     pub left: i32,
@@ -72,7 +85,16 @@ pub struct BqRect {
 }
 
 /// `BqFence` — single GPU fence (mirrors libnx `NvFence`).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BqFence {
     pub id: u32,
@@ -83,7 +105,16 @@ pub struct BqFence {
 ///
 /// Used by `dequeue_buffer`, `queue_buffer`, and `cancel_buffer` to propagate
 /// GPU synchronization back to/from the IGBP server.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BqMultiFence {
     pub num_fences: u32,
@@ -106,7 +137,7 @@ impl BqMultiFence {
 /// `BqBufferInput` — packed flat object passed to `queueBuffer`.
 ///
 /// Wire-layout must match libnx `BqBufferInput` (`buffer_producer.h`).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C, packed)]
 pub struct BqBufferInput {
     /// Frame timestamp (ns), or 0 if `is_auto_timestamp` is set.
@@ -131,7 +162,16 @@ pub struct BqBufferInput {
 
 /// `BqBufferOutput` — wire-format struct returned by `queueBuffer` and
 /// `connect`. Must match libnx `BqBufferOutput` layout byte-for-byte.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BqBufferOutput {
     pub width: u32,
@@ -139,10 +179,6 @@ pub struct BqBufferOutput {
     pub transform_hint: u32,
     pub num_pending_buffers: u32,
 }
-
-// =====================================================================
-// IGBP operations
-// =====================================================================
 
 /// Performs the standard "write interface token, transact, propagate
 /// `binderConvertErrorCode`" envelope shared by most IGBP calls.
@@ -258,13 +294,8 @@ pub fn dequeue_buffer(
                 let bytes = reply
                     .read_flattened_object()
                     .ok_or(DequeueBufferError::Malformed)?;
-                if bytes.len() != core::mem::size_of::<BqMultiFence>() {
-                    return Err(DequeueBufferError::Malformed);
-                }
-                // SAFETY: BqMultiFence is `repr(C)` and we just checked the
-                // size; `read_unaligned` handles any alignment mismatch.
-                let fence =
-                    unsafe { core::ptr::read_unaligned(bytes.as_ptr().cast::<BqMultiFence>()) };
+                let fence = BqMultiFence::read_from_bytes(bytes)
+                    .map_err(|_| DequeueBufferError::Malformed)?;
                 Some(fence)
             } else {
                 None
@@ -303,27 +334,20 @@ pub fn queue_buffer(
     slot: i32,
     input: &BqBufferInput,
 ) -> Result<BqBufferOutput, QueueBufferError> {
-    let input_bytes = bq_buffer_input_bytes(input);
-
     igbp_transact(
         binder,
         relay,
         code::QUEUE_BUFFER,
         |req| {
             req.write_i32(slot);
-            req.write_flattened_object(&input_bytes);
+            req.write_flattened_object(input.as_bytes());
         },
         |reply| {
-            let mut output = BqBufferOutput::default();
-            let dst = bq_buffer_output_bytes_mut(&mut output);
-            let ptr = reply
-                .read_data(dst.len())
+            let bytes = reply
+                .read_data(core::mem::size_of::<BqBufferOutput>())
                 .ok_or(QueueBufferError::Malformed)?;
-            // SAFETY: read_data returned a pointer to at least `dst.len()`
-            // bytes inside the parcel payload.
-            unsafe {
-                core::ptr::copy_nonoverlapping(ptr, dst.as_mut_ptr(), dst.len());
-            }
+            let output =
+                BqBufferOutput::read_from_bytes(bytes).map_err(|_| QueueBufferError::Malformed)?;
             let rc = reply.read_i32().ok_or(QueueBufferError::Malformed)?;
             BinderError::from_code(rc).map_err(QueueBufferError::Binder)?;
             Ok(output)
@@ -338,15 +362,13 @@ pub fn cancel_buffer(
     slot: i32,
     fence: &BqMultiFence,
 ) -> Result<(), CancelBufferError> {
-    let fence_bytes = bq_multi_fence_bytes(fence);
-
     igbp_transact(
         binder,
         relay,
         code::CANCEL_BUFFER,
         |req| {
             req.write_i32(slot);
-            req.write_flattened_object(&fence_bytes);
+            req.write_flattened_object(fence.as_bytes());
         },
         |_reply| {
             // libnx: reply parcel has no content.
@@ -394,13 +416,11 @@ pub fn connect(
             req.write_i32(producer_controlled_by_app as i32);
         },
         |reply| {
-            let mut output = BqBufferOutput::default();
-            let dst = bq_buffer_output_bytes_mut(&mut output);
-            let ptr = reply.read_data(dst.len()).ok_or(ConnectError::Malformed)?;
-            // SAFETY: read_data guarantees `dst.len()` bytes are available.
-            unsafe {
-                core::ptr::copy_nonoverlapping(ptr, dst.as_mut_ptr(), dst.len());
-            }
+            let bytes = reply
+                .read_data(core::mem::size_of::<BqBufferOutput>())
+                .ok_or(ConnectError::Malformed)?;
+            let output =
+                BqBufferOutput::read_from_bytes(bytes).map_err(|_| ConnectError::Malformed)?;
             let rc = reply.read_i32().ok_or(ConnectError::Malformed)?;
             BinderError::from_code(rc).map_err(ConnectError::Binder)?;
             Ok(output)
@@ -488,10 +508,6 @@ pub fn set_preallocated_buffer(
     )
 }
 
-// =====================================================================
-// Wire-format helpers
-// =====================================================================
-
 /// Magic value at the start of the serialized GraphicBuffer flat object.
 /// `'GBFR'` in little-endian (matches libnx).
 const GRAPHIC_BUFFER_MAGIC: u32 = 0x4742_4652;
@@ -520,57 +536,8 @@ fn serialize_graphic_buffer_into(emit: &mut dyn FnMut(&[u8]), input: &BqGraphicB
         [GRAPHIC_BUFFER_HEADER_U32S..GRAPHIC_BUFFER_HEADER_U32S + input.native_handle_ints.len()]
         .copy_from_slice(input.native_handle_ints);
 
-    // SAFETY: `[u32; N]` is `repr(transparent)` over its bit pattern; we want
-    // the underlying bytes for the flat object.
-    let bytes =
-        unsafe { core::slice::from_raw_parts(scratch.as_ptr().cast::<u8>(), total_words * 4) };
-    emit(bytes);
+    emit(scratch[..total_words].as_bytes());
 }
-
-#[inline]
-fn bq_buffer_input_bytes(input: &BqBufferInput) -> [u8; core::mem::size_of::<BqBufferInput>()] {
-    let mut bytes = [0u8; core::mem::size_of::<BqBufferInput>()];
-    // SAFETY: BqBufferInput is `repr(C, packed)`; copying its byte pattern is
-    // safe and matches libnx's `parcelWriteFlattenedObject(.., sizeof(*input))`.
-    unsafe {
-        core::ptr::copy_nonoverlapping(
-            (input as *const BqBufferInput).cast::<u8>(),
-            bytes.as_mut_ptr(),
-            bytes.len(),
-        );
-    }
-    bytes
-}
-
-#[inline]
-fn bq_multi_fence_bytes(fence: &BqMultiFence) -> [u8; core::mem::size_of::<BqMultiFence>()] {
-    let mut bytes = [0u8; core::mem::size_of::<BqMultiFence>()];
-    // SAFETY: BqMultiFence is `repr(C)` and we copy its full size.
-    unsafe {
-        core::ptr::copy_nonoverlapping(
-            (fence as *const BqMultiFence).cast::<u8>(),
-            bytes.as_mut_ptr(),
-            bytes.len(),
-        );
-    }
-    bytes
-}
-
-#[inline]
-fn bq_buffer_output_bytes_mut(output: &mut BqBufferOutput) -> &mut [u8] {
-    // SAFETY: BqBufferOutput is `repr(C)` and the returned slice covers its
-    // full byte pattern.
-    unsafe {
-        core::slice::from_raw_parts_mut(
-            (output as *mut BqBufferOutput).cast::<u8>(),
-            core::mem::size_of::<BqBufferOutput>(),
-        )
-    }
-}
-
-// =====================================================================
-// Public output / error types
-// =====================================================================
 
 /// Result of [`dequeue_buffer`].
 #[derive(Debug, Clone, Copy)]

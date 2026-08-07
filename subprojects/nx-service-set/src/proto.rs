@@ -27,7 +27,14 @@ pub const CMD_GET_FIRMWARE_VERSION_2: u32 = 4;
 ///
 /// This structure is exactly 0x100 bytes (256 bytes) to match the IPC buffer
 /// requirements of the `GetFirmwareVersion` command.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct FirmwareVersion {
     /// Major version number (e.g., 18 for firmware 18.1.0)

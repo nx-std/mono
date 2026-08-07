@@ -4,11 +4,15 @@
 //! This implementation follows the Android Parcel format used by
 //! IGraphicBufferProducer.
 
+use zerocopy::FromBytes as _;
+
 /// Maximum parcel payload size.
 pub const PARCEL_MAX_PAYLOAD: usize = 0x400;
 
 /// Parcel header structure.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct ParcelHeader {
     /// Size of the payload data.
@@ -134,10 +138,11 @@ impl Parcel {
         Some(&mut self.payload[start..start + size])
     }
 
-    /// Reads raw data from the parcel, aligned to 4 bytes.
+    /// Reads `size` bytes from the parcel, advancing the cursor to the next
+    /// 4-byte boundary.
     ///
-    /// Returns a pointer to the data, or `None` if there's not enough data.
-    pub fn read_data(&mut self, size: usize) -> Option<*const u8> {
+    /// Returns `None` if fewer than `size` bytes remain.
+    pub fn read_data(&mut self, size: usize) -> Option<&[u8]> {
         if size > i32::MAX as usize {
             return None;
         }
@@ -148,9 +153,9 @@ impl Parcel {
             return None;
         }
 
-        let ptr = self.payload[self.pos..].as_ptr();
+        let start = self.pos;
         self.pos += aligned_size;
-        Some(ptr)
+        Some(&self.payload[start..start + size])
     }
 
     /// Writes a 32-bit signed integer.
@@ -175,30 +180,22 @@ impl Parcel {
 
     /// Reads a 32-bit signed integer.
     pub fn read_i32(&mut self) -> Option<i32> {
-        let ptr = self.read_data(4)?;
-        // SAFETY: We have at least 4 bytes available.
-        Some(i32::from_ne_bytes(unsafe { *(ptr as *const [u8; 4]) }))
+        i32::read_from_bytes(self.read_data(4)?).ok()
     }
 
     /// Reads a 32-bit unsigned integer.
     pub fn read_u32(&mut self) -> Option<u32> {
-        let ptr = self.read_data(4)?;
-        // SAFETY: We have at least 4 bytes available.
-        Some(u32::from_ne_bytes(unsafe { *(ptr as *const [u8; 4]) }))
+        u32::read_from_bytes(self.read_data(4)?).ok()
     }
 
     /// Reads a 64-bit signed integer.
     pub fn read_i64(&mut self) -> Option<i64> {
-        let ptr = self.read_data(8)?;
-        // SAFETY: We have at least 8 bytes available.
-        Some(i64::from_ne_bytes(unsafe { *(ptr as *const [u8; 8]) }))
+        i64::read_from_bytes(self.read_data(8)?).ok()
     }
 
     /// Reads a 64-bit unsigned integer.
     pub fn read_u64(&mut self) -> Option<u64> {
-        let ptr = self.read_data(8)?;
-        // SAFETY: We have at least 8 bytes available.
-        Some(u64::from_ne_bytes(unsafe { *(ptr as *const [u8; 8]) }))
+        u64::read_from_bytes(self.read_data(8)?).ok()
     }
 
     /// Writes a UTF-16 string (from ASCII).
@@ -253,9 +250,7 @@ impl Parcel {
             return None;
         }
 
-        let ptr = self.read_data(len as usize)?;
-        // SAFETY: We just read this data successfully.
-        Some(unsafe { core::slice::from_raw_parts(ptr, len as usize) })
+        self.read_data(len as usize)
     }
 
     /// Writes a flattened object to the parcel.

@@ -11,7 +11,20 @@
 /// not be fabricated into a `ProcessId`; doing so leads to spurious kernel
 /// errors on dispatch and silently confuses any code that pattern-matches on
 /// well-known PIDs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(transparent)]
 pub struct ProcessId(u64);
 
@@ -42,7 +55,20 @@ impl ProcessId {
 /// a fabricated constant. `pm:*` commands dispatched with an invalid program
 /// id surface kernel-level errors that are easy to misdiagnose; constructing
 /// a `ProgramId` from an arbitrary `u64` defeats the type's purpose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(transparent)]
 pub struct ProgramId(u64);
 

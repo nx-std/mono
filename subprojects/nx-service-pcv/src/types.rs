@@ -242,7 +242,7 @@ impl PcvClockRatesListType {
 }
 
 /// Wire-layout input for `SetClockRate` (cmd 2).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetClockRateIn {
     pub module: u32,
@@ -250,7 +250,7 @@ pub(crate) struct SetClockRateIn {
 }
 
 /// Wire-layout input for `GetPossibleClockRates` (cmd 5).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetPossibleClockRatesIn {
     pub module: u32,
@@ -258,7 +258,7 @@ pub(crate) struct GetPossibleClockRatesIn {
 }
 
 /// Wire-layout output for `GetPossibleClockRates` (cmd 5).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetPossibleClockRatesOut {
     pub list_type: i32,
@@ -266,7 +266,7 @@ pub(crate) struct GetPossibleClockRatesOut {
 }
 
 /// Wire-layout input for `SetVoltageEnabled` (cmd 8).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetVoltageEnabledIn {
     pub state: u8,

@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the power state controller service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -12,6 +9,7 @@ use nx_sf::service::{
     DomainObject,
     OutHandleAttr,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -43,26 +41,12 @@ pub(crate) fn module_initialize(
     module_id: u32,
     dependencies: &[u32],
 ) -> Result<u32, ModuleInitializeError> {
-    // SAFETY: `module_id` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its `size_of::<u32>()` bytes as a slice is
-    // sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const module_id).cast::<u8>(), size_of::<u32>())
-    };
-    // SAFETY: `dependencies` is a valid `&` slice; viewing it as a byte slice
-    // for the IN buffer is sound.
-    let dep_bytes = unsafe {
-        core::slice::from_raw_parts(
-            dependencies.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(dependencies),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::MODULE_INITIALIZE)
-        .in_raw(in_bytes)
-        .in_buffer(dep_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_raw(module_id.as_bytes())
+        .in_buffer(dependencies.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
         .map_err(ModuleInitializeError::Dispatch)?;
@@ -84,8 +68,7 @@ pub(crate) fn module_get_request(
         .out_size(size_of::<GetRequestOut>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<GetRequestOut>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetRequestOut>()) })
+    Ok(*result.value::<GetRequestOut>())
 }
 
 /// Acknowledges a PM state transition (legacy, pre-5.1.0).

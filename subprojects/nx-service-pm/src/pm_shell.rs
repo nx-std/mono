@@ -261,8 +261,8 @@ pub struct ProcessEventInfo {
 const_assert_eq!(size_of::<ProcessEventInfo>(), 0x10);
 
 /// Program location identifying a program by ID and storage.
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct NcmProgramLocation {
     pub program_id: ProgramId,
     pub storage_id: u8,

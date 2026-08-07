@@ -12,7 +12,7 @@ pub enum FatalPolicy {
 }
 
 /// AArch64 CPU context for fatal errors.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct FatalAarch64Context {
     pub x: [u64; 32],
@@ -25,12 +25,14 @@ pub struct FatalAarch64Context {
     pub start_address: u64,
     pub register_set_flags: u64,
     pub stack_trace_size: u32,
+    /// Trailing padding to the context's 8-byte alignment. Zero on the wire.
+    pub _pad: u32,
 }
 
 const_assert_eq!(size_of::<FatalAarch64Context>(), 0x240);
 
 /// AArch32 CPU context for fatal errors.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct FatalAarch32Context {
     pub r: [u32; 16],

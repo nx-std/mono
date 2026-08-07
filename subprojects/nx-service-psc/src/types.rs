@@ -89,8 +89,8 @@ pub enum PmModuleId {
 }
 
 /// Output of `IPmModule::GetRequest` (cmd 1).
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub(crate) struct GetRequestOut {
     pub state: u32,
     pub flags: u32,
