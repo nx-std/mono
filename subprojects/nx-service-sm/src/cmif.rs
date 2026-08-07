@@ -3,11 +3,6 @@
 //! This module implements SM commands using the CMIF (Common Message Interface
 //! Format) protocol, which is the standard IPC protocol on Horizon OS.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
-
 use nx_sf::{
     ServiceName,
     cmif,
@@ -22,6 +17,7 @@ use nx_sf::{
     },
 };
 use nx_svc::error::ResultCode;
+use zerocopy::IntoBytes as _;
 
 use crate::proto;
 
@@ -33,11 +29,8 @@ pub fn get_service_handle(
 ) -> Result<OwnedSessionHandle, GetServiceError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<ServiceName>()];
-    // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = cmif::CmifRequestBuilder::new(proto::GET_SERVICE_HANDLE)
-        .with_data(&payload)
+        .with_data(name.as_bytes_raw())
         .build();
     req.send(&mut buf, session)
         .map_err(GetServiceError::SendRequest)?;
@@ -89,6 +82,7 @@ pub fn register_service(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<OwnedSessionHandle, RegisterServiceError> {
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
     struct RegisterServiceIn {
         name: ServiceName,
@@ -106,11 +100,8 @@ pub fn register_service(
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<RegisterServiceIn>()];
-    // SAFETY: `payload` is exactly `size_of::<RegisterServiceIn>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<RegisterServiceIn>(), input) };
     let req = cmif::CmifRequestBuilder::new(proto::REGISTER_SERVICE)
-        .with_data(&payload)
+        .with_data(input.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(RegisterServiceError::SendRequest)?;
@@ -162,11 +153,8 @@ pub fn unregister_service(
 ) -> Result<(), UnregisterServiceError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<ServiceName>()];
-    // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = cmif::CmifRequestBuilder::new(proto::UNREGISTER_SERVICE)
-        .with_data(&payload)
+        .with_data(name.as_bytes_raw())
         .build();
     req.send(&mut buf, session)
         .map_err(UnregisterServiceError::SendRequest)?;

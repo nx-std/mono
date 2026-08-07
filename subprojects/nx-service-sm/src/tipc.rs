@@ -3,11 +3,6 @@
 //! This module implements SM commands using the TIPC (Tiny IPC) protocol,
 //! which is used on HOS 12.0.0+ and Atmosphere for certain operations.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
-
 use nx_sf::{
     ServiceName,
     error::{
@@ -22,6 +17,7 @@ use nx_sf::{
     tipc,
 };
 use nx_svc::error::ResultCode;
+use zerocopy::IntoBytes as _;
 
 use crate::proto;
 
@@ -35,11 +31,8 @@ pub fn get_service_handle(
 ) -> Result<OwnedSessionHandle, GetServiceError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<ServiceName>()];
-    // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = tipc::TipcRequestBuilder::new(proto::GET_SERVICE_HANDLE)
-        .with_data(&payload)
+        .with_data(name.as_bytes_raw())
         .build();
     req.send(&mut buf, session)
         .map_err(GetServiceError::SendRequest)?;
@@ -93,26 +86,30 @@ pub fn register_service(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<OwnedSessionHandle, RegisterServiceError> {
+    // `is_light` ends the struct one byte into its final 4-byte word, so the encoder used to
+    // copy three trailing padding bytes it had never written, publishing whatever the stack
+    // held to `sm`. `_pad` gives those bytes a name and a zero, which is also what lets
+    // `IntoBytes` accept the type at all.
+    #[derive(zerocopy::IntoBytes, zerocopy::Immutable)]
     #[repr(C)]
     struct RegisterServiceTipcIn {
         name: ServiceName,
         max_sessions: i32,
         is_light: u8,
+        _pad: [u8; 3],
     }
 
     let input = RegisterServiceTipcIn {
         name,
         max_sessions,
         is_light: u8::from(is_light),
+        _pad: [0; 3],
     };
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<RegisterServiceTipcIn>()];
-    // SAFETY: `payload` is exactly `size_of::<RegisterServiceTipcIn>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<RegisterServiceTipcIn>(), input) };
     let req = tipc::TipcRequestBuilder::new(proto::REGISTER_SERVICE)
-        .with_data(&payload)
+        .with_data(input.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(RegisterServiceError::SendRequest)?;
@@ -166,11 +163,8 @@ pub fn unregister_service(
 ) -> Result<(), UnregisterServiceError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<ServiceName>()];
-    // SAFETY: `payload` is exactly `size_of::<ServiceName>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<ServiceName>(), name) };
     let req = tipc::TipcRequestBuilder::new(proto::UNREGISTER_SERVICE)
-        .with_data(&payload)
+        .with_data(name.as_bytes_raw())
         .build();
     req.send(&mut buf, session)
         .map_err(UnregisterServiceError::SendRequest)?;
