@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the Bluetooth Manager User service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -44,10 +42,6 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Root service commands
-// ---------------------------------------------------------------------------
-
 /// Gets the IBtmUserCore sub-object (cmd 0).
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
@@ -63,10 +57,6 @@ pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
 
     Ok(result.move_handles[0])
 }
-
-// ---------------------------------------------------------------------------
-// BLE scan commands
-// ---------------------------------------------------------------------------
 
 /// AcquireBleScanEvent (cmd 0).
 pub(crate) fn acquire_ble_scan_event(service: &Session) -> Result<u32, AcquireEventWithFlagError> {
@@ -176,10 +166,6 @@ pub(crate) fn get_ble_scan_results_for_smart_device(
     )
 }
 
-// ---------------------------------------------------------------------------
-// BLE connection commands
-// ---------------------------------------------------------------------------
-
 /// AcquireBleConnectionEvent (cmd 17).
 pub(crate) fn acquire_ble_connection_event(
     service: &Session,
@@ -215,39 +201,18 @@ pub(crate) fn ble_get_connection_state(
     info: &mut [BtdrvBleConnectionInfo],
     applet_resource_user_id: u64,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `applet_resource_user_id` is a `Copy` value on the stack, valid
-    // until `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const applet_resource_user_id).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
-    // SAFETY: `info` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `info`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            info.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(info),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::BLE_GET_CONNECTION_STATE)
-        .in_raw(in_bytes)
+        .in_raw(applet_resource_user_id.as_bytes())
         .out_size(size_of::<u8>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(info.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
+    Ok(*result.value::<u8>())
 }
-
-// ---------------------------------------------------------------------------
-// BLE pairing commands
-// ---------------------------------------------------------------------------
 
 /// AcquireBlePairingEvent (cmd 21).
 pub(crate) fn acquire_ble_pairing_event(
@@ -301,38 +266,17 @@ pub(crate) fn ble_get_paired_devices(
     param: &BtdrvBleAdvertisePacketParameter,
     addrs: &mut [BtdrvAddress],
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `param` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (param as *const BtdrvBleAdvertisePacketParameter).cast::<u8>(),
-            size_of::<BtdrvBleAdvertisePacketParameter>(),
-        )
-    };
-    // SAFETY: `addrs` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `addrs`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            addrs.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(addrs),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::BLE_GET_PAIRED_DEVICES)
-        .in_raw(in_bytes)
+        .in_raw(param.as_bytes())
         .out_size(size_of::<u8>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(addrs.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
+    Ok(*result.value::<u8>())
 }
-
-// ---------------------------------------------------------------------------
-// GATT service discovery commands
-// ---------------------------------------------------------------------------
 
 /// AcquireBleServiceDiscoveryEvent (cmd 26).
 pub(crate) fn acquire_ble_service_discovery_event(
@@ -354,34 +298,17 @@ pub(crate) fn get_gatt_services(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<GetGattServicesIn>(),
-        )
-    };
-    // SAFETY: `services` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `services`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            services.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(services),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_GATT_SERVICES)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u8>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(services.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
+    Ok(*result.value::<u8>())
 }
 
 /// GetGattService (cmd 28).
@@ -398,37 +325,20 @@ pub(crate) fn get_gatt_service(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<GetGattServiceIn>(),
-        )
-    };
-    // SAFETY: `out_service` is a valid exclusive reference; viewing it as
-    // bytes for the OUT buffer is sound, and the byte slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out_service as *mut BtmGattService).cast::<u8>(),
-            size_of::<BtmGattService>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_GATT_SERVICE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u8>())
         .out_buffer(
-            out_bytes,
+            out_service.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let flag = *result.value::<u8>();
     Ok(flag & 1 != 0)
 }
 
@@ -444,8 +354,7 @@ pub(crate) fn get_gatt_included_services(
         service,
         connection_handle,
         service_handle,
-        services.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(services),
+        services.as_mut_bytes(),
         applet_resource_user_id,
         proto::GET_GATT_INCLUDED_SERVICES,
     )
@@ -466,37 +375,20 @@ pub(crate) fn get_belonging_gatt_service(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<GattServiceDataIn>(),
-        )
-    };
-    // SAFETY: `out_service` is a valid exclusive reference; viewing it as
-    // bytes for the OUT buffer is sound, and the byte slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out_service as *mut BtmGattService).cast::<u8>(),
-            size_of::<BtmGattService>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_BELONGING_GATT_SERVICE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u8>())
         .out_buffer(
-            out_bytes,
+            out_service.as_mut_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let flag = *result.value::<u8>();
     Ok(flag & 1 != 0)
 }
 
@@ -512,8 +404,7 @@ pub(crate) fn get_gatt_characteristics(
         service,
         connection_handle,
         service_handle,
-        characteristics.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(characteristics),
+        characteristics.as_mut_bytes(),
         applet_resource_user_id,
         proto::GET_GATT_CHARACTERISTICS,
     )
@@ -531,16 +422,11 @@ pub(crate) fn get_gatt_descriptors(
         service,
         connection_handle,
         char_handle,
-        descriptors.as_mut_ptr().cast::<u8>(),
-        core::mem::size_of_val(descriptors),
+        descriptors.as_mut_bytes(),
         applet_resource_user_id,
         proto::GET_GATT_DESCRIPTORS,
     )
 }
-
-// ---------------------------------------------------------------------------
-// BLE MTU commands
-// ---------------------------------------------------------------------------
 
 /// AcquireBleMtuConfigEvent (cmd 33).
 pub(crate) fn acquire_ble_mtu_config_event(
@@ -577,27 +463,17 @@ pub(crate) fn get_ble_mtu(
         applet_resource_user_id,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<GetBleMtuIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_BLE_MTU)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u16>())
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u16>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u16>()) })
+    Ok(*result.value::<u16>())
 }
-
-// ---------------------------------------------------------------------------
-// GATT data path commands
-// ---------------------------------------------------------------------------
 
 /// RegisterBleGattDataPath (cmd 36).
 pub(crate) fn register_ble_gatt_data_path(
@@ -625,10 +501,6 @@ pub(crate) fn unregister_ble_gatt_data_path(
     dispatch_in_pid(service, proto::UNREGISTER_BLE_GATT_DATA_PATH, &input)
 }
 
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
-
 /// Dispatches a command that returns BLE scan results via HipcMapAlias output
 /// buffer, sending PID and an applet resource user ID.
 fn get_ble_scan_results(
@@ -637,34 +509,17 @@ fn get_ble_scan_results(
     applet_resource_user_id: u64,
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `applet_resource_user_id` is a `Copy` value on the stack, valid
-    // until `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const applet_resource_user_id).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
-    // SAFETY: `results` is a valid `&mut` slice; viewing it as bytes for the
-    // OUT buffer is sound, and the byte slice borrows `results`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            results.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(results),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(applet_resource_user_id.as_bytes())
         .out_size(size_of::<u8>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(results.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
+    Ok(*result.value::<u8>())
 }
 
 /// Dispatches a GATT service data query (cmds 29, 31, 32) with a handle,
@@ -673,8 +528,7 @@ fn get_gatt_service_data(
     service: &Session,
     connection_handle: u32,
     handle: u16,
-    buffer: *mut u8,
-    buffer_size: usize,
+    out_bytes: &mut [u8],
     applet_resource_user_id: u64,
     cmd_id: u32,
 ) -> Result<u8, DispatchError> {
@@ -684,30 +538,17 @@ fn get_gatt_service_data(
         connection_handle,
         applet_resource_user_id,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<GattServiceDataIn>(),
-        )
-    };
-    // SAFETY: `buffer` is a valid pointer to `buffer_size` writable bytes,
-    // exclusively borrowed for the duration of this call.
-    let out_bytes = unsafe { core::slice::from_raw_parts_mut(buffer, buffer_size) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<u8>())
         .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
         .send_pid()
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) })
+    Ok(*result.value::<u8>())
 }
 
 /// Dispatches a command that returns a copy handle for an event plus an out
@@ -725,8 +566,7 @@ fn acquire_event_with_flag(
         .send(&mut ipc_buf)
         .map_err(AcquireEventWithFlagError::Dispatch)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let flag = *result.value::<u8>();
 
     if flag == 0 {
         return Err(AcquireEventWithFlagError::FlagNotSet);
@@ -738,10 +578,6 @@ fn acquire_event_with_flag(
 
     Ok(result.copy_handles[0])
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`get_core`].
 #[derive(Debug, thiserror::Error)]

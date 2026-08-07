@@ -2,12 +2,18 @@
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Shared btdrv types (duplicated per crate, per SPEC decision §1)
-// ---------------------------------------------------------------------------
-
 /// Bluetooth device address (6-byte MAC).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvAddress {
     pub address: [u8; 6],
@@ -18,7 +24,17 @@ const_assert_eq!(size_of::<BtdrvAddress>(), 0x6);
 /// GATT attribute UUID.
 ///
 /// Size field indicates UUID length: 0x2, 0x4, or 0x10 bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvGattAttributeUuid {
     pub size: u32,
@@ -28,7 +44,17 @@ pub struct BtdrvGattAttributeUuid {
 const_assert_eq!(size_of::<BtdrvGattAttributeUuid>(), 0x14);
 
 /// BLE advertise packet parameter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvBleAdvertisePacketParameter {
     pub company_id: u16,
@@ -38,7 +64,14 @@ pub struct BtdrvBleAdvertisePacketParameter {
 const_assert_eq!(size_of::<BtdrvBleAdvertisePacketParameter>(), 0x8);
 
 /// BLE scan result.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvBleScanResult {
     pub unk_x0: u8,
@@ -51,7 +84,17 @@ pub struct BtdrvBleScanResult {
 const_assert_eq!(size_of::<BtdrvBleScanResult>(), 0x148);
 
 /// BLE connection info.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvBleConnectionInfo {
     pub connection_handle: u32,
@@ -60,10 +103,6 @@ pub struct BtdrvBleConnectionInfo {
 }
 
 const_assert_eq!(size_of::<BtdrvBleConnectionInfo>(), 0xC);
-
-// ---------------------------------------------------------------------------
-// BTM enums
-// ---------------------------------------------------------------------------
 
 /// Bluetooth Manager state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -133,12 +172,15 @@ pub enum BtmProfile {
     Audio = 2,
 }
 
-// ---------------------------------------------------------------------------
-// BTM compound types
-// ---------------------------------------------------------------------------
-
 /// Bluetooth device name (32 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmBdName {
     pub name: [u8; 0x20],
@@ -147,7 +189,17 @@ pub struct BtmBdName {
 const_assert_eq!(size_of::<BtmBdName>(), 0x20);
 
 /// Bluetooth Class of Device (3 bytes).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmClassOfDevice {
     pub class_of_device: [u8; 3],
@@ -156,7 +208,14 @@ pub struct BtmClassOfDevice {
 const_assert_eq!(size_of::<BtmClassOfDevice>(), 0x3);
 
 /// Bluetooth link key (16 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmLinkKey {
     pub link_key: [u8; 0x10],
@@ -165,7 +224,17 @@ pub struct BtmLinkKey {
 const_assert_eq!(size_of::<BtmLinkKey>(), 0x10);
 
 /// HID device info (VID/PID pair).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmHidDeviceInfo {
     pub vid: u16,
@@ -175,7 +244,7 @@ pub struct BtmHidDeviceInfo {
 const_assert_eq!(size_of::<BtmHidDeviceInfo>(), 0x4);
 
 /// Host device property \[1.0.0-12.1.0\].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct BtmHostDevicePropertyV1 {
     pub addr: BtdrvAddress,
@@ -187,7 +256,14 @@ pub struct BtmHostDevicePropertyV1 {
 const_assert_eq!(size_of::<BtmHostDevicePropertyV1>(), 0x2A);
 
 /// Host device property \[13.0.0+\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmHostDevicePropertyV13 {
     pub addr: BtdrvAddress,
@@ -199,7 +275,14 @@ pub struct BtmHostDevicePropertyV13 {
 const_assert_eq!(size_of::<BtmHostDevicePropertyV13>(), 0x103);
 
 /// Connected device entry \[1.0.0-12.1.0\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmConnectedDeviceV1 {
     pub address: BtdrvAddress,
@@ -215,7 +298,14 @@ pub struct BtmConnectedDeviceV1 {
 const_assert_eq!(size_of::<BtmConnectedDeviceV1>(), 0x6C);
 
 /// Connected device entry \[13.0.0+\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmConnectedDeviceV13 {
     pub address: BtdrvAddress,
@@ -230,7 +320,14 @@ pub struct BtmConnectedDeviceV13 {
 const_assert_eq!(size_of::<BtmConnectedDeviceV13>(), 0x148);
 
 /// Device condition \[1.0.0-5.0.2\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceConditionV100 {
     pub unk_x0: u32,
@@ -245,7 +342,14 @@ pub struct BtmDeviceConditionV100 {
 const_assert_eq!(size_of::<BtmDeviceConditionV100>(), 0x36C);
 
 /// Device condition \[5.1.0-7.0.1\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceConditionV510 {
     pub unk_x0: u32,
@@ -261,7 +365,14 @@ pub struct BtmDeviceConditionV510 {
 const_assert_eq!(size_of::<BtmDeviceConditionV510>(), 0x370);
 
 /// Device condition \[8.0.0-8.1.1\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceConditionV800 {
     pub unk_x0: u32,
@@ -276,7 +387,14 @@ pub struct BtmDeviceConditionV800 {
 const_assert_eq!(size_of::<BtmDeviceConditionV800>(), 0x36C);
 
 /// Device condition \[9.0.0-12.1.0\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceConditionV900 {
     pub unk_x0: u32,
@@ -290,7 +408,15 @@ pub struct BtmDeviceConditionV900 {
 const_assert_eq!(size_of::<BtmDeviceConditionV900>(), 0x368);
 
 /// Device slot mode entry.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceSlotMode {
     pub addr: BtdrvAddress,
@@ -301,7 +427,14 @@ pub struct BtmDeviceSlotMode {
 const_assert_eq!(size_of::<BtmDeviceSlotMode>(), 0xC);
 
 /// Device slot mode list.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceSlotModeList {
     pub device_count: u8,
@@ -312,7 +445,14 @@ pub struct BtmDeviceSlotModeList {
 const_assert_eq!(size_of::<BtmDeviceSlotModeList>(), 0x64);
 
 /// Device info \[1.0.0-12.1.0\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceInfoV1 {
     pub addr: BtdrvAddress,
@@ -328,7 +468,14 @@ pub struct BtmDeviceInfoV1 {
 const_assert_eq!(size_of::<BtmDeviceInfoV1>(), 0x60);
 
 /// Device info \[13.0.0+\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceInfoV13 {
     pub addr: BtdrvAddress,
@@ -345,7 +492,14 @@ pub struct BtmDeviceInfoV13 {
 const_assert_eq!(size_of::<BtmDeviceInfoV13>(), 0x13C);
 
 /// Device info list \[1.0.0-12.1.0\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceInfoList {
     pub device_count: u8,
@@ -356,7 +510,14 @@ pub struct BtmDeviceInfoList {
 const_assert_eq!(size_of::<BtmDeviceInfoList>(), 0x3C4);
 
 /// Device property.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDeviceProperty {
     pub addr: BtdrvAddress,
@@ -367,7 +528,14 @@ pub struct BtmDeviceProperty {
 const_assert_eq!(size_of::<BtmDeviceProperty>(), 0x29);
 
 /// Device property list.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmDevicePropertyList {
     pub device_count: u8,
@@ -377,7 +545,14 @@ pub struct BtmDevicePropertyList {
 const_assert_eq!(size_of::<BtmDevicePropertyList>(), 0x268);
 
 /// Zero retransmission list.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmZeroRetransmissionList {
     pub enabled_report_id_count: u8,
@@ -387,7 +562,14 @@ pub struct BtmZeroRetransmissionList {
 const_assert_eq!(size_of::<BtmZeroRetransmissionList>(), 0x11);
 
 /// GATT client condition list (opaque).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmGattClientConditionList {
     pub data: [u8; 0x74],
@@ -396,7 +578,14 @@ pub struct BtmGattClientConditionList {
 const_assert_eq!(size_of::<BtmGattClientConditionList>(), 0x74);
 
 /// GATT service.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmGattService {
     pub unk_x0: [u8; 4],
@@ -412,7 +601,14 @@ pub struct BtmGattService {
 const_assert_eq!(size_of::<BtmGattService>(), 0x24);
 
 /// GATT characteristic.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmGattCharacteristic {
     pub unk_x0: [u8; 4],
@@ -427,7 +623,14 @@ pub struct BtmGattCharacteristic {
 const_assert_eq!(size_of::<BtmGattCharacteristic>(), 0x24);
 
 /// GATT descriptor.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmGattDescriptor {
     pub unk_x0: [u8; 4],
@@ -439,7 +642,7 @@ pub struct BtmGattDescriptor {
 const_assert_eq!(size_of::<BtmGattDescriptor>(), 0x20);
 
 /// BLE data path configuration.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct BtmBleDataPath {
     pub unk_x0: u8,
@@ -450,7 +653,14 @@ pub struct BtmBleDataPath {
 const_assert_eq!(size_of::<BtmBleDataPath>(), 0x18);
 
 /// Audio device information returned by discovery/connection queries.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmAudioDevice {
     pub addr: BtdrvAddress,
@@ -459,12 +669,8 @@ pub struct BtmAudioDevice {
 
 const_assert_eq!(size_of::<BtmAudioDevice>(), 0xFF);
 
-// ---------------------------------------------------------------------------
-// Wire input structs for IPC commands
-// ---------------------------------------------------------------------------
-
 /// Input for SetBurstMode (cmd 4): address + bool flag.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct AddrBoolIn {
     pub addr: BtdrvAddress,
@@ -474,7 +680,7 @@ pub(crate) struct AddrBoolIn {
 const_assert_eq!(size_of::<AddrBoolIn>(), 0x7);
 
 /// Input for LlrNotify 9.0.0+ (cmd 13): address + pad + i32.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct LlrNotifyIn {
     pub addr: BtdrvAddress,
@@ -485,7 +691,7 @@ pub(crate) struct LlrNotifyIn {
 const_assert_eq!(size_of::<LlrNotifyIn>(), 0xC);
 
 /// Input for BlePairDevice / BleUnpairDeviceOnBoth (cmds 41/42): param + connection_handle.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct BlePairDeviceIn {
     pub param: BtdrvBleAdvertisePacketParameter,
@@ -495,7 +701,7 @@ pub(crate) struct BlePairDeviceIn {
 const_assert_eq!(size_of::<BlePairDeviceIn>(), 0xC);
 
 /// Input for BleUnPairDevice (cmd 43): address + param.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct BleUnpairDeviceIn {
     pub addr: BtdrvAddress,
@@ -505,7 +711,7 @@ pub(crate) struct BleUnpairDeviceIn {
 const_assert_eq!(size_of::<BleUnpairDeviceIn>(), 0xE);
 
 /// Input for GetGattService / GetBelongingService: handle + pad + connection_handle.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct HandleConnectionIn {
     pub handle: u16,
@@ -516,7 +722,7 @@ pub(crate) struct HandleConnectionIn {
 const_assert_eq!(size_of::<HandleConnectionIn>(), 0x8);
 
 /// Input for GetGattService (cmd 47): connection_handle + uuid.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetGattServiceIn {
     pub connection_handle: u32,
@@ -526,7 +732,7 @@ pub(crate) struct GetGattServiceIn {
 const_assert_eq!(size_of::<GetGattServiceIn>(), 0x18);
 
 /// Input for ConfigureBleMtu (cmd 53): mtu + pad + connection_handle.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ConfigureBleMtuIn {
     pub mtu: u16,
@@ -536,11 +742,15 @@ pub(crate) struct ConfigureBleMtuIn {
 
 const_assert_eq!(size_of::<ConfigureBleMtuIn>(), 0x8);
 
-/// Input for RegisterAppletResourceUserId (cmd 57): unk + aruid.
-#[derive(Clone, Copy)]
+/// Input for RegisterAppletResourceUserId (cmd 57): unk + pad + aruid.
+///
+/// The `u64` forces 8-byte alignment, so the wire layout has four bytes
+/// between `unk` and the ARUID; `_pad` names them so they are sent zeroed.
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RegisterAruidIn {
     pub unk: u32,
+    pub _pad: u32,
     pub applet_resource_user_id: u64,
 }
 

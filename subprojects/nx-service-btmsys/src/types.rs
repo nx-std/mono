@@ -3,7 +3,17 @@
 use static_assertions::const_assert_eq;
 
 /// Bluetooth device address (6-byte MAC).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvAddress {
     pub address: [u8; 6],
@@ -12,7 +22,14 @@ pub struct BtdrvAddress {
 const_assert_eq!(size_of::<BtdrvAddress>(), 0x6);
 
 /// Audio device information returned by discovery/connection queries.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtmAudioDevice {
     pub addr: BtdrvAddress,
