@@ -218,28 +218,26 @@ subprojects/nx-rt-nro/
         └── libnx/                        # FFI symbols grouped by the same target
 ```
 
-The Meson wiring conditionally appends fragments based on setup-time options and exposes them as a list:
+The Meson wiring exports **every fragment unconditionally, one path variable per fragment** — the owning crate decides nothing (see [meson-options-features](meson-options-features.md)):
 
 ```meson
-ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_core.ld']
+overrides_dir = meson.current_source_dir() / 'overrides'
 
-if get_option('use_nx_service_apm').enabled()
-    # ... subproject + deps wiring ...
-    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_apm.ld'
+nx_rt_nro_ld_override = overrides_dir / 'rt_nro_libnx_core.ld'
+nx_rt_nro_service_apm_ld_override = overrides_dir / 'rt_nro_libnx_service_apm.ld'
+# ... one variable per fragment ...
+```
+
+The feature resolver picks which fragments to link inside its own per-feature blocks:
+
+```meson
+deps_override_link_args += ['-T', nx_rt_nro_proj.get_variable('nx_rt_nro_ld_override')]
+if nx_features['service_apm']
+    deps_override_link_args += ['-T', nx_rt_nro_proj.get_variable('nx_rt_nro_service_apm_ld_override')]
 endif
-
-# ... one block per service feature ...
-
-nx_rt_nro_ld_overrides = ld_overrides   # plural variable: list of paths
 ```
 
-Downstream consumers iterate the list when building `-T` arguments:
-
-```meson
-foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
-    deps_override_link_args += ['-T', script]
-endforeach
-```
+A plural `<crate>_ld_overrides` list is exported only when every fragment in it is genuinely unconditional — a set that is always linked together — and consumers then iterate it with `foreach`.
 
 Use this layout only when fragments are genuinely independent. If overrides simply grow large, a single well-sectioned `<aspect>_override.ld` remains preferable — it is easier to audit and less error-prone than a sprawl of `.ld` files.
 
@@ -264,10 +262,12 @@ Before committing changes to an `<aspect>_override.ld` or its Meson wiring, veri
 - [ ] `nx_<aspect>_ld_override = meson.current_source_dir() / '<aspect>_override.ld'` is declared as a sibling variable to `<crate>_dep`, NOT inside `declare_dependency()`.
 - [ ] The variable is placed immediately above `declare_dependency(...)`, preceded by a one-line descriptive comment.
 - [ ] The override is NOT added to `link_args` or `link_with` inside the producer's own `declare_dependency()`.
-- [ ] Multi-fragment crates expose a plural `<crate>_ld_overrides` list and conditionally append per-feature fragments.
+- [ ] Multi-fragment crates export one unconditional path variable per fragment (`<crate>_<axis>_ld_override`); a plural `<crate>_ld_overrides` list appears only for fragments that are always linked together.
+- [ ] The fragment-owning crate reads no `use_nx_*` features; which fragments are linked is decided by the feature resolver (see [meson-options-features](meson-options-features.md)).
 
 ## References
 
 - [rust-ffi](rust-ffi.md) - Related: The `ffi` Cargo feature that defines the `__nx_<aspect>__*` symbols this script targets
+- [meson-options-features](meson-options-features.md) - Related: the feature resolver that decides which fragments are linked
 - [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
 - [meson-subproject](meson-subproject.md) - Related: Generic Meson subproject conventions

@@ -1,14 +1,39 @@
+# Every option this subproject reads, declared here so the `meson.build` beside
+# it stands on its own. The `use_nx*` declarations are copied verbatim from the
+# workspace root; `yield : true` is what makes the root's value the one that
+# arrives here.
+
 option(
     'use_libnx_dkp',
     type : 'feature', value : 'disabled',
     description : 'Use pre-built devkitPro libnx',
-    yield : true
+    yield : true,
+)
+
+option(
+    'use_nx',
+    type : 'feature', value : 'disabled',
+    description : 'Override all libnx functions with nx- functions',
+    yield : true,
 )
 
 option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
-    description : 'Required: tests link against nx-std-sync FFI exports',
-    yield : true
+    description : 'Override all libnx functions with nx-std-sync functions',
+    yield : true,
 )
 
+option(
+    'use_nx_rt',
+    type : 'feature', value : 'auto',
+    description : 'Override libnx runtime functions with the nx-rt runtime (nx-rt-core + the nx_rt_kind entry crate)',
+    yield : true,
+)
+
+option(
+    'nx_rt_kind',
+    type : 'combo', choices : ['nro', 'nso'], value : 'nro',
+    description : 'Select the nx-rt entry crate: nro builds the homebrew-loader runtime, nso the pm-launched process runtime',
+    yield : true,
+)

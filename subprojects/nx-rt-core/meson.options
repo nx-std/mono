@@ -1,6 +1,0 @@
-option(
-    'use_nx_service_applet',
-    type : 'feature', value : 'auto',
-    description : 'Enable the nx-rt-core `service-applet` feature',
-    yield : true
-)

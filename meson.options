@@ -3,119 +3,119 @@ option(
     'devkitpro',
     type : 'string', value : '/opt/devkitpro',
     description : 'Path to devkitPro directory',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_libnx_dkp',
     type : 'feature', value : 'disabled',
     description : 'Use pre-built devkitPro libnx',
-    yield : true
+    yield : true,
 )
 
 option(
     'link_pipeline',
     type : 'combo', choices : ['gcc', 'rustc'], value : 'gcc',
     description : 'Select the final-link pipeline: gcc drives the link via devkitA64, rustc drives it via the opt-in rustc-link pipeline',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx',
     type : 'feature', value : 'disabled',
     description : 'Override all libnx functions with nx- functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_alloc',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-alloc functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_fsdev',
     type : 'feature', value : 'auto',
     description : 'Override all libnx fsdev functions with nx-fsdev functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_rand',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-rand functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-std-sync functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_svc',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-svc functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_sys_fd',
     type : 'feature', value : 'auto',
     description : 'Override all libsysbase functions with nx-sys-fd functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_sys_mem',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-sys-mem functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_sys_sync',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-sys-sync functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_sys_thread',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-sys-thread functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_sys_thread_tls',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-sys-thread-tls functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_time',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-time functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_rt',
     type : 'feature', value : 'auto',
     description : 'Override libnx runtime functions with the nx-rt runtime (nx-rt-core + the nx_rt_kind entry crate)',
-    yield : true
+    yield : true,
 )
 
 option(
     'nx_rt_kind',
     type : 'combo', choices : ['nro', 'nso'], value : 'nro',
     description : 'Select the nx-rt entry crate: nro builds the homebrew-loader runtime, nso the pm-launched process runtime',
-    yield : true
+    yield : true,
 )
 
 option(
@@ -124,28 +124,28 @@ option(
     choices : ['application', 'system-applet', 'library-applet', 'overlay-applet', 'system-application', 'none'],
     value : 'application',
     description : 'Application Manager identity the nx-rt-nso NSO process registers as',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_sf',
     type : 'feature', value : 'auto',
     description : 'Override libnx functions with nx-sf (Service Framework) functions',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_apm',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-apm (Application Performance Management)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_applet',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-applet (Applet Manager service)',
-    yield : true
+    yield : true,
 )
 
 option(
@@ -155,7 +155,7 @@ option(
     # use_nx_service_applet.
     type : 'feature', value : 'disabled',
     description : 'Enable nx-service-applet-err (error library applet)',
-    yield : true
+    yield : true,
 )
 
 option(
@@ -166,75 +166,75 @@ option(
     # panic naming themselves, which is diagnosable rather than a hang.
     type : 'feature', value : 'auto',
     description : 'Enable nx-service-fs (Filesystem service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_hid',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-hid (Human Input Device service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_set',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-set (System Settings service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_sfdnsres',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-sfdnsres (DNS resolver service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_sm',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-sm (Service Manager protocol)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_time',
     type : 'feature', value : 'disabled', # Disable by default, unstable
     description : 'Enable nx-service-time (Time service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_vi',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-vi (Visual Interface service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_display',
     type : 'feature', value : 'disabled', # Disable by default, WIP (framebuffer port pending)
     description : 'Enable nx-display (NativeWindow + Framebuffer; implies use_nx_service_vi)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_pm',
     type : 'feature', value : 'disabled',
     description : 'Enable nx-pm (idiomatic Process Manager API; implies use_nx_service_pm)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_service_nv',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-nv (NVIDIA Driver service)',
-    yield : true
+    yield : true,
 )
 
 option(
     'use_nx_wlaninf',
     type : 'feature', value : 'disabled',
     description : 'Enable nx-wlaninf (idiomatic WLAN InfraManager API; implies use_nx_service_wlaninf)',
-    yield : true
+    yield : true,
 )

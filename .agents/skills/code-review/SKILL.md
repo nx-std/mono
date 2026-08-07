@@ -66,6 +66,7 @@ Verify backwards compatibility is maintained:
 - FFI surface (`__nx_*`): existing function signatures, calling convention, and ABI must not silently change — downstream homebrew links against these symbols
 - Renamed/removed FFI symbols must be reflected in the corresponding `*_override.ld` linker script and `nx-std/src/ffi.rs` re-exports
 - Cargo `[features]`: removing or renaming a feature breaks consumers; verify `meson.options` `use_nx*` switches still wire correctly to feature names
+- `use_nx_*` feature resolution: the dependency table and resolution live only in `nx-std`'s `meson.build`; crates below it export fragment paths unconditionally and read no features (`docs/code/meson-options-features.md`) — a second resolution copy or a feature read below the resolver is a finding
 - Changes to `#[repr(C)]` types crossing the FFI boundary: layout/size/alignment must remain compatible
 
 ### 6. Code Rules Compliance

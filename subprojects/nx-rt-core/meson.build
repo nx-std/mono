@@ -78,18 +78,20 @@ nx_rt_core_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Linker-script override fragments, named `<crate>_<override-target>`: the
 # `rt_core_` prefix marks the owning crate, the `libnx` segment the override
-# target (only `libnx` today). The kind-agnostic core fragment
-# (`rt_core_libnx_core.ld` — libnx C runtime + Service Manager) is always
-# present; the applet-accessor fragment (`rt_core_libnx_service_applet.ld`) is
-# appended when `use_nx_service_applet` is enabled, because its
-# `__nx_rt_core__libnx_applet_*` symbols exist only with the `service-applet`
-# Cargo feature. Consumers read the list via
-# `nx_rt_core_proj.get_variable('nx_rt_core_ld_overrides')`.
-ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_core_libnx_core.ld']
-if get_option('use_nx_service_applet').enabled()
-    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_core_libnx_service_applet.ld'
-endif
-nx_rt_core_ld_overrides = ld_overrides
+# target (only `libnx` today).
+#
+# Both fragments are exported unconditionally: this file decides nothing. Which
+# fragments are linked is resolved by `nx-std`, the one place the `use_nx_*`
+# feature set is resolved. The applet-accessor fragment binds
+# `__nx_rt_core__libnx_applet_*` symbols that exist only under the
+# `service-applet` Cargo feature, so `nx-std` links it only when that feature is
+# on - the same answer that selects the Cargo feature.
+overrides_dir = meson.current_source_dir() / 'overrides'
+
+# The kind-agnostic core fragment: libnx C runtime + Service Manager
+nx_rt_core_ld_override = overrides_dir / 'rt_core_libnx_core.ld'
+# The shared `applet*` accessor surface (incl. `appletExit`)
+nx_rt_core_service_applet_ld_override = overrides_dir / 'rt_core_libnx_service_applet.ld'
 
 nx_rt_core_dep = declare_dependency(
     sources : nx_rt_core_tgt,
