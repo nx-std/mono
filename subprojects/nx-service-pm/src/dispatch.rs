@@ -52,15 +52,22 @@ where
 }
 
 /// CMIF request with no input and a single `Copy` output.
+///
+/// `T` is decoded from the response bytes, so it must accept every bit
+/// pattern the server can send. A type whose validity depends on its value -
+/// an enum with a fixed set of discriminants, say - does not qualify: decode
+/// its wire form here and validate it into the domain type at the call site.
 #[inline]
-pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O, DispatchError> {
+pub(crate) fn dispatch_out<T>(service: &Session, cmd_id: u32) -> Result<T, DispatchError>
+where
+    T: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .out_size(size_of::<O>())
+        .out_size(size_of::<T>())
         .send(&mut buf)?;
 
-    // SAFETY: response payload is at least size_of::<O>() bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<T>())
 }

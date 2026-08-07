@@ -1,7 +1,10 @@
 //! `pm:bm` (boot mode) service.
 
 pub use nx_service_pm::BootMode;
-use nx_service_pm::PmBmService;
+use nx_service_pm::{
+    GetBootModeError,
+    PmBmService,
+};
 use nx_sf::service::DispatchError;
 
 /// Connected `pm:bm` (boot mode) service.
@@ -15,6 +18,11 @@ impl BootModeService {
     }
 
     /// Returns the current [`BootMode`].
+    ///
+    /// # Errors
+    ///
+    /// Fails when the dispatch fails, and when the server replies with a boot
+    /// mode [`BootMode`] does not define.
     pub fn get(&self) -> Result<BootMode, BmGetBootModeError> {
         self.inner.get_boot_mode().map_err(BmGetBootModeError)
     }
@@ -27,10 +35,10 @@ impl BootModeService {
     }
 }
 
-/// IPC dispatch failure from `pm:bm GetBootMode`.
+/// Failure reading the boot mode from `pm:bm GetBootMode`.
 #[derive(Debug, thiserror::Error)]
-#[error("pm:bm GetBootMode IPC dispatch failed")]
-pub struct BmGetBootModeError(#[source] pub DispatchError);
+#[error("pm:bm GetBootMode failed")]
+pub struct BmGetBootModeError(#[source] pub GetBootModeError);
 
 /// IPC dispatch failure from `pm:bm SetMaintenanceBoot`.
 #[derive(Debug, thiserror::Error)]

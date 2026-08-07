@@ -39,7 +39,9 @@ pub use self::{
     pm_bm::{
         BootMode,
         ConnectBmCmifError,
+        GetBootModeError,
         PmBmService,
+        UnknownBootMode,
         connect_bm_cmif,
     },
     pm_dmnt::{
@@ -55,12 +57,14 @@ pub use self::{
     },
     pm_shell::{
         ConnectShellCmifError,
+        GetProcessEventInfoError,
         LaunchFlag,
         LaunchFlagOld,
         NcmProgramLocation,
         PmShellService,
         ProcessEvent,
         ProcessEventInfo,
+        UnknownProcessEvent,
         connect_shell_cmif,
     },
     types::{

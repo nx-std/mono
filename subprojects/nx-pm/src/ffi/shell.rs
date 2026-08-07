@@ -161,6 +161,13 @@ pub unsafe extern "C" fn __nx_pm__pmshell_get_process_event_handle(out: *mut Lib
 }
 
 /// `pmshellGetProcessEventInfo(PmProcessEventInfo *out)`.
+///
+/// Diverges from libnx on one point: libnx forwards whatever `u32` the server
+/// sent in the event field, while this returns an error for a value no
+/// [`ProcessEvent`] variant names, because materialising the enum from it
+/// would be undefined behaviour.
+///
+/// [`ProcessEvent`]: nx_service_pm::ProcessEvent
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_pm__pmshell_get_process_event_info(
     out: *mut ProcessEventInfo,

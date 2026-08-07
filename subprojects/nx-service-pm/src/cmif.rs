@@ -18,10 +18,7 @@ use super::{
         dispatch_no_io,
         dispatch_out,
     },
-    pm_bm::{
-        BootMode,
-        proto as bm_proto,
-    },
+    pm_bm::proto as bm_proto,
     pm_dmnt::proto as dmnt_proto,
     pm_info::{
         ResourceLimitValues,
@@ -29,7 +26,6 @@ use super::{
     },
     pm_shell::{
         NcmProgramLocation,
-        ProcessEventInfo,
         proto as shell_proto,
     },
     types::{
@@ -51,8 +47,26 @@ struct LaunchProgramIn {
 
 const_assert_eq!(size_of::<LaunchProgramIn>(), 0x18);
 
-/// Gets the current boot mode.
-pub(crate) fn get_boot_mode(service: &Session) -> Result<BootMode, DispatchError> {
+/// Reply of `pm:shell` `GetProcessEventInfo`.
+///
+/// Wire layout: `{ u32 event, u32 pad, u64 process_id }`. The padding is left
+/// to `#[repr(C)]` rather than spelled as a field: nothing is ever encoded
+/// from this type, so no uninitialised byte can escape through it.
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
+#[repr(C)]
+pub(crate) struct ProcessEventInfoOut {
+    /// Raw `ProcessEvent` discriminant, as sent.
+    pub event: u32,
+    pub process_id: ProcessId,
+}
+
+const_assert_eq!(size_of::<ProcessEventInfoOut>(), 0x10);
+
+/// Gets the current boot mode, as the raw `u32` the server sent.
+///
+/// The caller converts it into a [`BootMode`](super::pm_bm::BootMode); see
+/// [`dispatch_out`] for why the enum is not decoded here.
+pub(crate) fn get_boot_mode(service: &Session) -> Result<u32, DispatchError> {
     dispatch_out(service, bm_proto::GET_BOOT_MODE)
 }
 
@@ -233,8 +247,14 @@ pub(crate) fn get_process_event_handle(service: &Session) -> Result<u32, Dispatc
     Ok(result.copy_handles[0])
 }
 
-/// Gets the process event info.
-pub(crate) fn get_process_event_info(service: &Session) -> Result<ProcessEventInfo, DispatchError> {
+/// Gets the process event info, still in its wire form.
+///
+/// The caller validates `event` into a
+/// [`ProcessEvent`](super::pm_shell::ProcessEvent); see [`dispatch_out`] for
+/// why the enum is not decoded here.
+pub(crate) fn get_process_event_info(
+    service: &Session,
+) -> Result<ProcessEventInfoOut, DispatchError> {
     dispatch_out(service, shell_proto::GET_PROCESS_EVENT_INFO)
 }
 

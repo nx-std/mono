@@ -91,8 +91,8 @@ impl ToResultCode for ConnectInfoCmifError {
 }
 
 /// Resource limit values returned by `pm:info` `GetApplet*ResourceLimitValues`.
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct ResourceLimitValues {
     pub physical_memory: u64,
     pub thread_count: u32,
