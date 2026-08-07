@@ -1228,6 +1228,7 @@ dependencies = [
  "nx-sf",
  "nx-sys-thread-tls",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
