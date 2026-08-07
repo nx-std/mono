@@ -9,7 +9,17 @@ pub const RSA_BUFFER_SIZE: usize = 0x100;
 pub const SHA256_HASH_SIZE: usize = 0x20;
 
 /// 128-bit key used in SPL key operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct SplKey {
     pub key: [u8; 0x10],
@@ -48,10 +58,8 @@ pub enum RsaKeyVersion {
     Extended = 1,
 }
 
-// --- Wire input structs for IPC commands ---
-
 /// Input for GetConfig (cmd 0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetConfigIn {
     pub config_item: u32,
@@ -60,7 +68,7 @@ pub(crate) struct GetConfigIn {
 const_assert_eq!(size_of::<GetConfigIn>(), 0x4);
 
 /// Input for SetConfig (cmd 5).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetConfigIn {
     pub config_item: u32,
@@ -71,7 +79,7 @@ pub(crate) struct SetConfigIn {
 const_assert_eq!(size_of::<SetConfigIn>(), 0x10);
 
 /// Input for GenerateAesKek (cmd 2) and DecryptAesKey (cmd 14).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct KeyGenOptionIn {
     pub key: SplKey,
@@ -82,7 +90,7 @@ pub(crate) struct KeyGenOptionIn {
 const_assert_eq!(size_of::<KeyGenOptionIn>(), 0x18);
 
 /// Input for LoadAesKey (cmd 3).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct LoadAesKeyIn {
     pub sealed_kek: SplKey,
@@ -93,7 +101,7 @@ pub(crate) struct LoadAesKeyIn {
 const_assert_eq!(size_of::<LoadAesKeyIn>(), 0x24);
 
 /// Input for GenerateAesKey (cmd 4).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct TwoKeyIn {
     pub sealed_kek: SplKey,
@@ -103,7 +111,7 @@ pub(crate) struct TwoKeyIn {
 const_assert_eq!(size_of::<TwoKeyIn>(), 0x20);
 
 /// Input for CryptAesCtr (cmd 15).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CryptAesCtrIn {
     pub ctr: SplKey,
@@ -113,7 +121,7 @@ pub(crate) struct CryptAesCtrIn {
 const_assert_eq!(size_of::<CryptAesCtrIn>(), 0x14);
 
 /// Input for LoadTitlekey / LoadElicenseKey / LoadContentKey.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct LoadContentKeyIn {
     pub sealed_key: SplKey,
@@ -123,7 +131,7 @@ pub(crate) struct LoadContentKeyIn {
 const_assert_eq!(size_of::<LoadContentKeyIn>(), 0x14);
 
 /// Input for UnwrapAesWrappedTitlekey (cmd 20).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct UnwrapAesTitlekeyIn {
     pub aes_wrapped_titlekey: SplKey,
@@ -133,7 +141,7 @@ pub(crate) struct UnwrapAesTitlekeyIn {
 const_assert_eq!(size_of::<UnwrapAesTitlekeyIn>(), 0x14);
 
 /// Input for DecryptRsaPrivateKey legacy (pre-5.0.0, cmd 13).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DecryptRsaPrivateKeyLegacyIn {
     pub sealed_kek: SplKey,
@@ -144,7 +152,7 @@ pub(crate) struct DecryptRsaPrivateKeyLegacyIn {
 const_assert_eq!(size_of::<DecryptRsaPrivateKeyLegacyIn>(), 0x24);
 
 /// Input for ImportSecureExpModKey legacy (pre-5.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ImportSecureExpModKeyLegacyIn {
     pub sealed_kek: SplKey,
@@ -155,7 +163,7 @@ pub(crate) struct ImportSecureExpModKeyLegacyIn {
 const_assert_eq!(size_of::<ImportSecureExpModKeyLegacyIn>(), 0x24);
 
 /// Input for GenerateSpecificAesKey (cmd 12).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GenerateSpecificAesKeyIn {
     pub wrapped_key: SplKey,
@@ -166,7 +174,7 @@ pub(crate) struct GenerateSpecificAesKeyIn {
 const_assert_eq!(size_of::<GenerateSpecificAesKeyIn>(), 0x18);
 
 /// Input for EncryptRsaKeyForImport (cmd 30).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EncryptRsaKeyForImportIn {
     pub sealed_kek_pre: SplKey,

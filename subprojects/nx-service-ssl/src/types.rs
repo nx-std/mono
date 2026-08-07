@@ -2,10 +2,6 @@
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
-
 /// Controls which SSL service to initialize.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -228,10 +224,6 @@ pub enum AlpnProtoState {
     EarlyValue = 4,
 }
 
-// ---------------------------------------------------------------------------
-// Bitflags
-// ---------------------------------------------------------------------------
-
 bitflags::bitflags! {
     /// TLS version bitmask controlling min/max TLS versions.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -276,13 +268,9 @@ bitflags::bitflags! {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs
-// ---------------------------------------------------------------------------
-
 /// Server certificate detail header (output from `DoHandshakeGetServerCert`
 /// when `GetServerCertChain` option is set).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ServerCertDetailHeader {
     /// Magic number (`CertChMN` = 0x4E4D684374726543).
@@ -295,7 +283,7 @@ pub struct ServerCertDetailHeader {
 const_assert_eq!(core::mem::size_of::<ServerCertDetailHeader>(), 0x10);
 
 /// Server certificate detail entry.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ServerCertDetailEntry {
     /// Size of the certificate data.
@@ -307,7 +295,15 @@ pub struct ServerCertDetailEntry {
 const_assert_eq!(core::mem::size_of::<ServerCertDetailEntry>(), 0x08);
 
 /// Cipher information returned by `GetCipherInfo`.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct CipherInfo {
     /// Cipher suite name string.
@@ -319,7 +315,11 @@ pub struct CipherInfo {
 const_assert_eq!(core::mem::size_of::<CipherInfo>(), 0x48);
 
 /// Parameters for `GeneratePrivateKeyAndCert` (16.0.0+).
-#[derive(Debug, Clone, Copy)]
+///
+/// The struct is sent whole, so the trailing padding the ABI leaves after
+/// `common_name_len` is a named field: without it those four bytes reach the
+/// service uninitialised.
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct KeyAndCertParams {
     /// Must be value 1.
@@ -332,16 +332,13 @@ pub struct KeyAndCertParams {
     pub common_name: [u8; 0x40],
     /// Length of common_name excluding NUL-terminator. Must be 0x1-0x3F.
     pub common_name_len: u32,
+    pub _pad: u32,
 }
 
 const_assert_eq!(core::mem::size_of::<KeyAndCertParams>(), 0x58);
 
-// ---------------------------------------------------------------------------
-// IPC payload structs (crate-private)
-// ---------------------------------------------------------------------------
-
 /// Input payload for `CreateContext`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CreateContextIn {
     pub ssl_version: u32,
@@ -352,7 +349,7 @@ pub(crate) struct CreateContextIn {
 const_assert_eq!(core::mem::size_of::<CreateContextIn>(), 0x10);
 
 /// Input payload for context `SetOption`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CtxSetOptionIn {
     pub option: u32,
@@ -362,7 +359,7 @@ pub(crate) struct CtxSetOptionIn {
 const_assert_eq!(core::mem::size_of::<CtxSetOptionIn>(), 0x08);
 
 /// Input payload for connection `SetOption`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ConnSetOptionIn {
     pub flag: u8,
@@ -373,7 +370,7 @@ pub(crate) struct ConnSetOptionIn {
 const_assert_eq!(core::mem::size_of::<ConnSetOptionIn>(), 0x08);
 
 /// Input payload for connection `Poll`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct PollIn {
     pub in_pollevent: u32,
@@ -383,7 +380,7 @@ pub(crate) struct PollIn {
 const_assert_eq!(core::mem::size_of::<PollIn>(), 0x08);
 
 /// Output payload for handshake with server cert.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct HandshakeServerCertOut {
     pub data_size: u32,
@@ -393,7 +390,7 @@ pub(crate) struct HandshakeServerCertOut {
 const_assert_eq!(core::mem::size_of::<HandshakeServerCertOut>(), 0x08);
 
 /// Output payload for `GeneratePrivateKeyAndCert`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GenerateKeyAndCertOut {
     pub cert_size: u32,
@@ -403,7 +400,7 @@ pub(crate) struct GenerateKeyAndCertOut {
 const_assert_eq!(core::mem::size_of::<GenerateKeyAndCertOut>(), 0x08);
 
 /// Input payload for `SetPrivateOption` (pre-17.0.0 layout).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetPrivateOptionLegacyIn {
     pub value: u8,
@@ -414,7 +411,7 @@ pub(crate) struct SetPrivateOptionLegacyIn {
 const_assert_eq!(core::mem::size_of::<SetPrivateOptionLegacyIn>(), 0x08);
 
 /// Input payload for `SetPrivateOption` (17.0.0+ layout).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetPrivateOptionIn {
     pub option: u32,
@@ -424,7 +421,7 @@ pub(crate) struct SetPrivateOptionIn {
 const_assert_eq!(core::mem::size_of::<SetPrivateOptionIn>(), 0x08);
 
 /// Output payload for `GetNextAlpnProto`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetNextAlpnProtoOut {
     pub state: u32,

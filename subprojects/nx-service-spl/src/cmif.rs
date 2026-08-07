@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the Security Processor Liaison service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -38,10 +36,6 @@ use crate::{
         UnwrapAesTitlekeyIn,
     },
 };
-
-// ---------------------------------------------------------------------------
-// IGeneralInterface commands
-// ---------------------------------------------------------------------------
 
 /// GetConfig (cmd 0).
 pub(crate) fn get_config(service: &Session, config_item: u32) -> Result<u64, DispatchError> {
@@ -110,10 +104,6 @@ pub(crate) fn get_boot_reason(service: &Session) -> Result<u32, DispatchError> {
     dispatch_out(service, proto::GET_BOOT_REASON)
 }
 
-// ---------------------------------------------------------------------------
-// ICryptoInterface commands
-// ---------------------------------------------------------------------------
-
 /// GenerateAesKek (cmd 2).
 pub(crate) fn generate_aes_kek(
     service: &Session,
@@ -181,17 +171,11 @@ pub(crate) fn crypt_aes_ctr(
     ctr: &SplKey,
 ) -> Result<(), DispatchError> {
     let input = CryptAesCtrIn { ctr: *ctr, keyslot };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<CryptAesCtrIn>()` bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<CryptAesCtrIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CRYPT_AES_CTR)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(
             output,
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
@@ -210,21 +194,16 @@ pub(crate) fn compute_cmac(
     input_data: &[u8],
     keyslot: u32,
 ) -> Result<SplKey, DispatchError> {
-    // SAFETY: `keyslot` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<u32>()` bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const keyslot).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::COMPUTE_CMAC)
-        .in_raw(in_bytes)
+        .in_raw(keyslot.as_bytes())
         .out_size(size_of::<SplKey>())
         .in_buffer(input_data, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<SplKey>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SplKey>()) })
+    Ok(*result.value::<SplKey>())
 }
 
 /// LockAesEngine (cmd 21, 2.0.0+).
@@ -256,10 +235,6 @@ pub(crate) fn get_security_engine_event(
     Ok(result.copy_handles[0])
 }
 
-// ---------------------------------------------------------------------------
-// IRsaService commands (available on crypto/ssl/es/fs services)
-// ---------------------------------------------------------------------------
-
 /// DecryptRsaPrivateKey legacy (pre-5.0.0, cmd 13).
 pub(crate) fn decrypt_rsa_private_key_legacy(
     service: &Session,
@@ -274,20 +249,11 @@ pub(crate) fn decrypt_rsa_private_key_legacy(
         wrapped_key: *wrapped_key,
         version: version as u32,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<DecryptRsaPrivateKeyLegacyIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(dst, BufferAttr::HIPC_POINTER)
         .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
@@ -306,26 +272,16 @@ pub(crate) fn decrypt_rsa_private_key(
         sealed_kek: *sealed_kek,
         wrapped_key: *wrapped_key,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::DECRYPT_RSA_PRIVATE_KEY)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(dst, BufferAttr::HIPC_POINTER)
         .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
-
-// ---------------------------------------------------------------------------
-// ISslInterface commands
-// ---------------------------------------------------------------------------
 
 /// LoadSecureExpModKey for SSL (cmd 26, 5.0.0+).
 pub(crate) fn ssl_load_secure_exp_mod_key(
@@ -352,10 +308,6 @@ pub(crate) fn ssl_secure_exp_mod(
 ) -> Result<(), DispatchError> {
     secure_exp_mod(service, proto::SSL_SECURE_EXP_MOD, input, modulus, dst)
 }
-
-// ---------------------------------------------------------------------------
-// IEsInterface commands
-// ---------------------------------------------------------------------------
 
 /// LoadRsaOaepKey legacy (pre-5.0.0, cmd 17).
 pub(crate) fn es_load_rsa_oaep_key_legacy(
@@ -479,10 +431,6 @@ pub(crate) fn es_load_elicense_key(
     dispatch_in(service, proto::ES_LOAD_ELICENSE_KEY, &input)
 }
 
-// ---------------------------------------------------------------------------
-// IFsInterface commands
-// ---------------------------------------------------------------------------
-
 /// LoadSecureExpModKey for FS legacy (pre-5.0.0, cmd 9).
 pub(crate) fn fs_load_secure_exp_mod_key_legacy(
     service: &Session,
@@ -569,10 +517,6 @@ pub(crate) fn fs_get_package2_hash(
         .map(|_| ())
 }
 
-// ---------------------------------------------------------------------------
-// IManuInterface commands
-// ---------------------------------------------------------------------------
-
 /// EncryptRsaKeyForImport (cmd 30, 5.0.0+).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn manu_encrypt_rsa_key_for_import(
@@ -592,29 +536,16 @@ pub(crate) fn manu_encrypt_rsa_key_for_import(
         wrapped_kek_post: *wrapped_kek_post,
         option,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<EncryptRsaKeyForImportIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::MANU_ENCRYPT_RSA_KEY_FOR_IMPORT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(out_wrapped_rsa_key, BufferAttr::HIPC_POINTER)
         .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
-
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
 
 /// SecureExpMod dispatch (used by SSL cmd 27, ES cmd 29, FS cmd 10).
 fn secure_exp_mod(
@@ -647,17 +578,11 @@ fn import_secure_exp_mod_key(
         sealed_kek: *sealed_kek,
         wrapped_key: *wrapped_key,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<TwoKeyIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -677,20 +602,11 @@ fn import_secure_exp_mod_key_legacy(
         wrapped_key: *wrapped_key,
         version: version as u32,
     };
-
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<ImportSecureExpModKeyLegacyIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(wrapped_rsa_key, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -705,29 +621,19 @@ fn unwrap_rsa_oaep_wrapped_key(
     label_hash: &[u8],
     key_generation: u32,
 ) -> Result<SplKey, DispatchError> {
-    // SAFETY: `key_generation` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const key_generation).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(key_generation.as_bytes())
         .out_size(size_of::<SplKey>())
         .in_buffer(rsa_wrapped_key, BufferAttr::HIPC_POINTER)
         .in_buffer(modulus, BufferAttr::HIPC_POINTER)
         .in_buffer(label_hash, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<SplKey>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<SplKey>()) })
+    Ok(*result.value::<SplKey>())
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`get_security_engine_event`].
 #[derive(Debug, thiserror::Error)]

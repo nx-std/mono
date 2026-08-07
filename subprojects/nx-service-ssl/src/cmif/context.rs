@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -18,6 +19,7 @@ use crate::{
     types::{
         CtxSetOptionIn,
         GenerateKeyAndCertOut,
+        KeyAndCertParams,
     },
 };
 
@@ -97,28 +99,15 @@ pub(crate) fn import_server_pki(
     cert_data: &[u8],
     format: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `format` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const format).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_IMPORT_SERVER_PKI)
-        .in_raw(in_bytes)
+        .in_raw(format.as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(cert_data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u64::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-        result.data[4],
-        result.data[5],
-        result.data[6],
-        result.data[7],
-    ]))
+    Ok(*result.value::<u64>())
 }
 
 /// Imports a client PKI (PKCS#12). Returns the assigned ID.
@@ -135,16 +124,7 @@ pub(crate) fn import_client_pki(
         .in_buffer(pkcs12, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(password, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u64::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-        result.data[4],
-        result.data[5],
-        result.data[6],
-        result.data[7],
-    ]))
+    Ok(*result.value::<u64>())
 }
 
 /// Removes a PKI or CRL by ID, attempting RemoveServerPki, RemoveClientPki,
@@ -207,28 +187,14 @@ pub(crate) fn register_internal_pki(
     object: DomainObjectRef<'_>,
     internal_pki: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `internal_pki` is a `Copy` value on the stack, valid until
-    // `.send(&mut ipc_buf)` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const internal_pki).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_REGISTER_INTERNAL_PKI)
-        .in_raw(in_bytes)
+        .in_raw(internal_pki.as_bytes())
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)?;
-    Ok(u64::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-        result.data[4],
-        result.data[5],
-        result.data[6],
-        result.data[7],
-    ]))
+    Ok(*result.value::<u64>())
 }
 
 /// Adds a policy OID string.
@@ -254,16 +220,7 @@ pub(crate) fn import_crl(
         .out_size(size_of::<u64>())
         .in_buffer(crl_data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u64::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-        result.data[4],
-        result.data[5],
-        result.data[6],
-        result.data[7],
-    ]))
+    Ok(*result.value::<u64>())
 }
 
 /// Imports client cert and key PKI (16.0.0+). Returns the assigned ID.
@@ -273,29 +230,16 @@ pub(crate) fn import_client_cert_key_pki(
     key: &[u8],
     format: u32,
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `format` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const format).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_IMPORT_CLIENT_CERT_KEY_PKI)
-        .in_raw(in_bytes)
+        .in_raw(format.as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(cert, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(key, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u64::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-        result.data[4],
-        result.data[5],
-        result.data[6],
-        result.data[7],
-    ]))
+    Ok(*result.value::<u64>())
 }
 
 /// Generates a private key and certificate (16.0.0+).
@@ -304,36 +248,25 @@ pub(crate) fn generate_private_key_and_cert(
     cert_buf: &mut [u8],
     key_buf: &mut [u8],
     val: u32,
-    params: &crate::types::KeyAndCertParams,
+    params: &KeyAndCertParams,
 ) -> Result<GenerateKeyAndCertOut, GenerateKeyAndCertError> {
-    // SAFETY: `val` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `params` is a valid reference; viewing its bytes for the IN buffer
-    // is sound.
-    let params_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (params as *const crate::types::KeyAndCertParams).cast::<u8>(),
-            size_of::<crate::types::KeyAndCertParams>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CTX_GENERATE_PRIVATE_KEY_AND_CERT)
-        .in_raw(in_bytes)
+        .in_raw(val.as_bytes())
         .out_size(size_of::<GenerateKeyAndCertOut>())
         .out_buffer(cert_buf, BufferAttr::HIPC_MAP_ALIAS)
         .out_buffer(key_buf, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(params_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(params.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map_err(GenerateKeyAndCertError::Dispatch)?;
+    // Checked here rather than left to `value`, which panics on a short
+    // payload; this command reports the truncation to the caller instead.
     if result.data.len() < size_of::<GenerateKeyAndCertOut>() {
         return Err(GenerateKeyAndCertError::ShortResponse);
     }
-    // SAFETY: response data is at least `size_of::<GenerateKeyAndCertOut>()` bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<GenerateKeyAndCertOut>()) })
+    Ok(*result.value::<GenerateKeyAndCertOut>())
 }
 
 /// Error returned by [`generate_private_key_and_cert`].
