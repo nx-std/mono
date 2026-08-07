@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the album accessor service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_service_caps::{
     AlbumCache,
@@ -22,6 +19,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -47,10 +45,6 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Root service commands (IAlbumAccessorService)
-// ---------------------------------------------------------------------------
-
 /// Gets the number of album files in a storage (cmd 0).
 pub(crate) fn get_album_file_count(service: &Session, storage: u8) -> Result<u64, DispatchError> {
     dispatch_in_out::<u8, u64>(service, proto::GET_ALBUM_FILE_COUNT, &storage)
@@ -62,24 +56,17 @@ pub(crate) fn get_album_file_list(
     storage: u8,
     entries: &mut [u8],
 ) -> Result<u64, GetAlbumFileListError> {
-    // SAFETY: `storage` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its 1 byte as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST)
-        .in_raw(in_bytes)
+        .in_raw(storage.as_bytes())
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(GetAlbumFileListError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let total = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(total)
+    Ok(*result.value::<u64>())
 }
 
 /// Loads an album file into a buffer (cmd 2).
@@ -88,25 +75,17 @@ pub(crate) fn load_album_file(
     file_id: &AlbumFileId,
     filebuf: &mut [u8],
 ) -> Result<u64, LoadAlbumFileError> {
-    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::LOAD_ALBUM_FILE)
-        .in_raw(in_bytes)
+        .in_raw(file_id.as_bytes())
         .out_buffer(filebuf, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(LoadAlbumFileError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let out_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(out_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Deletes an album file (cmd 3).
@@ -159,25 +138,17 @@ pub(crate) fn load_album_file_thumbnail(
     file_id: &AlbumFileId,
     image: &mut [u8],
 ) -> Result<u64, LoadAlbumFileError> {
-    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::LOAD_ALBUM_FILE_THUMBNAIL)
-        .in_raw(in_bytes)
+        .in_raw(file_id.as_bytes())
         .out_buffer(image, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(LoadAlbumFileError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let out_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(out_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Loads a screenshot image (cmds 9, 10). \[2.0.0+\]
@@ -188,16 +159,11 @@ pub(crate) fn load_album_screen_shot_image(
     image: &mut [u8],
     workbuf: &mut [u8],
 ) -> Result<LoadScreenShotOut, LoadScreenShotError> {
-    // SAFETY: `file_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const *file_id).cast::<u8>(), size_of::<AlbumFileId>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(file_id.as_bytes())
         .out_buffer(
             image,
             BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE.or(BufferAttr::HIPC_MAP_ALIAS),
@@ -207,10 +173,7 @@ pub(crate) fn load_album_screen_shot_image(
         .send(&mut ipc_buf)
         .map_err(LoadScreenShotError)?;
 
-    // SAFETY: response payload is at least size_of::<LoadScreenShotOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<LoadScreenShotOut>()) };
-
-    Ok(out)
+    Ok(*result.value::<LoadScreenShotOut>())
 }
 
 /// Gets an AlbumEntry from an ApplicationAlbumEntry (cmd 11). \[2.0.0+\]
@@ -244,6 +207,8 @@ pub(crate) fn load_album_screen_shot_image_ex(
         opts: *opts,
     };
 
+    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
+    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
     // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes = unsafe {
@@ -266,10 +231,7 @@ pub(crate) fn load_album_screen_shot_image_ex(
         .send(&mut ipc_buf)
         .map_err(LoadScreenShotError)?;
 
-    // SAFETY: response payload is at least size_of::<LoadScreenShotOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<LoadScreenShotOut>()) };
-
-    Ok(out)
+    Ok(*result.value::<LoadScreenShotOut>())
 }
 
 /// Loads a screenshot image with decode options and attributes (cmds 14, 1001). \[3.0.0+\]
@@ -286,6 +248,8 @@ pub(crate) fn load_album_screen_shot_image_ex0(
         opts: *opts,
     };
 
+    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
+    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
     // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes = unsafe {
@@ -308,10 +272,7 @@ pub(crate) fn load_album_screen_shot_image_ex0(
         .send(&mut ipc_buf)
         .map_err(LoadScreenShotError)?;
 
-    // SAFETY: response payload is at least size_of::<LoadScreenShotEx0Out>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<LoadScreenShotEx0Out>()) };
-
-    Ok(out)
+    Ok(*result.value::<LoadScreenShotEx0Out>())
 }
 
 /// Gets album usage statistics, 3-slot (cmd 15). \[4.0.0+\]
@@ -341,26 +302,13 @@ pub(crate) fn get_album_usage16(
         _pad2: [0; 7],
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<StorageFlagsIn>())
-    };
-    // SAFETY: `out` is a valid exclusive reference; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut AlbumUsage16).cast::<u8>(),
-            size_of::<AlbumUsage16>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::GET_ALBUM_USAGE16)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -373,27 +321,19 @@ pub(crate) fn get_min_max_applet_id(
     service: &Session,
     app_ids: &mut [u64; 2],
 ) -> Result<GetMinMaxAppletIdOut, GetMinMaxAppletIdError> {
-    // SAFETY: `app_ids` is a valid `&mut [u64; 2]`; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(app_ids.as_mut_ptr().cast::<u8>(), size_of::<[u64; 2]>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_MIN_MAX_APPLET_ID)
         .out_buffer(
-            out_bytes,
+            app_ids.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::MAP_TRANSFER_ALLOWS_NON_SECURE),
         )
         .out_size(size_of::<GetMinMaxAppletIdOut>())
         .send(&mut ipc_buf)
         .map_err(GetMinMaxAppletIdError)?;
 
-    // SAFETY: response payload is at least size_of::<GetMinMaxAppletIdOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetMinMaxAppletIdOut>()) };
-
-    Ok(out)
+    Ok(*result.value::<GetMinMaxAppletIdOut>())
 }
 
 /// Gets album file count filtered by type (cmd 100). \[5.0.0+\]
@@ -425,25 +365,17 @@ pub(crate) fn get_album_file_list_ex0(
         _pad2: [0; 7],
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<StorageFlagsIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_ALBUM_FILE_LIST_EX0)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(entries, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(GetAlbumFileListError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let total = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(total)
+    Ok(*result.value::<u64>())
 }
 
 /// Gets the last overlay thumbnail (cmds 301, 302).
@@ -461,11 +393,7 @@ pub(crate) fn get_last_overlay_thumbnail(
         .send(&mut ipc_buf)
         .map_err(GetOverlayThumbnailError)?;
 
-    // SAFETY: response payload is at least size_of::<GetLastOverlayThumbnailOut>().
-    let out =
-        unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetLastOverlayThumbnailOut>()) };
-
-    Ok(out)
+    Ok(*result.value::<GetLastOverlayThumbnailOut>())
 }
 
 /// Gets the auto-saving storage (cmd 401).
@@ -505,6 +433,8 @@ pub(crate) fn load_album_screen_shot_image_ex1(
         opts: *opts,
     };
 
+    // `ScreenShotDecodeOption` holds a `bitflags` type, whose generated inner type
+    // implements no zerocopy trait, so this payload keeps the hand-rolled encoding.
     // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
     // returns; viewing its bytes as a slice is sound.
     let in_bytes = unsafe {
@@ -513,21 +443,13 @@ pub(crate) fn load_album_screen_shot_image_ex1(
             size_of::<LoadScreenShotExIn>(),
         )
     };
-    // SAFETY: `out` is a valid exclusive reference; viewing it as bytes for
-    // the OUT buffer is sound, and the byte slice borrows it.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut LoadAlbumScreenShotImageOutput).cast::<u8>(),
-            size_of::<LoadAlbumScreenShotImageOutput>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
         .in_raw(in_bytes)
         .out_buffer(
-            out_bytes,
+            out.as_mut_bytes(),
             BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
         )
         .out_buffer(
@@ -595,15 +517,11 @@ pub(crate) fn open_accessor_session(
     service: &Session,
     aruid: u64,
 ) -> Result<u32, OpenAccessorSessionError> {
-    // SAFETY: `aruid` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const aruid).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_ACCESSOR_SESSION)
-        .in_raw(in_bytes)
+        .in_raw(aruid.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)
         .map_err(OpenAccessorSessionError::Dispatch)?;
@@ -614,10 +532,6 @@ pub(crate) fn open_accessor_session(
 
     Ok(result.move_handles[0])
 }
-
-// ---------------------------------------------------------------------------
-// Accessor session commands (IAlbumAccessorSession)
-// ---------------------------------------------------------------------------
 
 /// Opens an album movie read stream (cmd 2001).
 pub(crate) fn open_album_movie_read_stream(
@@ -652,25 +566,17 @@ pub(crate) fn read_movie_data_from_stream(
 ) -> Result<u64, ReadStreamDataError> {
     let input = ReadStreamIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ReadStreamIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::READ_MOVIE_DATA_FROM_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(actual_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Gets the broken reason for a read stream (cmd 2005).
@@ -706,25 +612,17 @@ pub(crate) fn read_image_data_from_stream(
 ) -> Result<u64, ReadStreamDataError> {
     let input = ReadStreamIn { stream, offset };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<ReadStreamIn>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::READ_IMAGE_DATA_FROM_STREAM)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(ReadStreamDataError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let actual_size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(actual_size)
+    Ok(*result.value::<u64>())
 }
 
 /// Reads file attributes from a read stream (cmd 2008).
@@ -738,10 +636,6 @@ pub(crate) fn read_file_attribute_from_stream(
         &stream,
     )
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by album file list operations.
 #[derive(Debug, thiserror::Error)]

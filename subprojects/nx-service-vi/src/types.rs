@@ -220,7 +220,7 @@ pub enum ViPowerState {
 }
 
 /// Layer stack selection for captures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(u32)]
 pub enum ViLayerStack {
     /// Default layer stack, includes all layers.

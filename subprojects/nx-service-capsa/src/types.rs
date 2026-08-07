@@ -9,7 +9,7 @@ use nx_service_caps::{
 use static_assertions::const_assert_eq;
 
 /// Wire-layout input for [`storage_copy_album_file`](crate::cmif::storage_copy_album_file) (cmd 4).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct StorageCopyAlbumFileIn {
     pub storage: u8,
@@ -20,7 +20,7 @@ pub(crate) struct StorageCopyAlbumFileIn {
 const_assert_eq!(size_of::<StorageCopyAlbumFileIn>(), 0x20);
 
 /// Wire-layout output for screenshot load commands returning width/height (cmds 9, 10).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct LoadScreenShotOut {
     pub width: u64,
@@ -30,7 +30,7 @@ pub(crate) struct LoadScreenShotOut {
 const_assert_eq!(size_of::<LoadScreenShotOut>(), 0x10);
 
 /// Wire-layout input for [`get_album_entry_from_app_album_entry`](crate::cmif::get_album_entry_from_app_album_entry) (cmd 11).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetAlbumEntryFromAppEntryIn {
     pub application_entry: ApplicationAlbumEntry,
@@ -50,7 +50,7 @@ pub(crate) struct LoadScreenShotExIn {
 const_assert_eq!(size_of::<LoadScreenShotExIn>(), 0x38);
 
 /// Wire-layout output for screenshot commands returning attributes + dimensions (cmds 14, 1001).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct LoadScreenShotEx0Out {
     pub attr: ScreenShotAttribute,
@@ -61,7 +61,7 @@ pub(crate) struct LoadScreenShotEx0Out {
 const_assert_eq!(size_of::<LoadScreenShotEx0Out>(), 0x50);
 
 /// Wire-layout input for storage+flags commands (cmds 17, 100, 101).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct StorageFlagsIn {
     pub storage: u8,
@@ -73,7 +73,7 @@ pub(crate) struct StorageFlagsIn {
 const_assert_eq!(size_of::<StorageFlagsIn>(), 0x10);
 
 /// Wire-layout output for [`get_min_max_applet_id`](crate::cmif::get_min_max_applet_id) (cmd 18).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetMinMaxAppletIdOut {
     pub success: u8,
@@ -83,7 +83,7 @@ pub(crate) struct GetMinMaxAppletIdOut {
 const_assert_eq!(size_of::<GetMinMaxAppletIdOut>(), 0x4);
 
 /// Wire-layout output for overlay thumbnail commands (cmds 301, 302).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetLastOverlayThumbnailOut {
     pub file_id: AlbumFileId,
@@ -93,7 +93,7 @@ pub(crate) struct GetLastOverlayThumbnailOut {
 const_assert_eq!(size_of::<GetLastOverlayThumbnailOut>(), 0x20);
 
 /// Wire-layout input for [`get_required_storage_space_size_to_copy_all`](crate::cmif::get_required_storage_space_size_to_copy_all) (cmd 501).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetRequiredStorageSizeIn {
     pub dst_storage: u8,
@@ -103,7 +103,7 @@ pub(crate) struct GetRequiredStorageSizeIn {
 const_assert_eq!(size_of::<GetRequiredStorageSizeIn>(), 0x2);
 
 /// Wire-layout input for [`get_album_cache_ex`](crate::cmif::get_album_cache_ex) (cmd 8013).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetAlbumCacheExIn {
     pub storage: u8,
@@ -113,7 +113,7 @@ pub(crate) struct GetAlbumCacheExIn {
 const_assert_eq!(size_of::<GetAlbumCacheExIn>(), 0x2);
 
 /// Wire-layout input for [`get_album_entry_from_app_album_entry_aruid`](crate::cmif::get_album_entry_from_app_album_entry_aruid) (cmd 8021).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetAlbumEntryFromAppEntryAruidIn {
     pub application_entry: ApplicationAlbumEntry,
@@ -123,7 +123,7 @@ pub(crate) struct GetAlbumEntryFromAppEntryAruidIn {
 const_assert_eq!(size_of::<GetAlbumEntryFromAppEntryAruidIn>(), 0x28);
 
 /// Wire-layout input for stream read commands (cmds 2004, 2007).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ReadStreamIn {
     pub stream: u64,

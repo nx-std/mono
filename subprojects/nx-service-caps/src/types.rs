@@ -6,7 +6,7 @@ use static_assertions::const_assert_eq;
 pub const USER_LIST_SIZE: usize = 8;
 
 /// Account user ID (128-bit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
@@ -98,7 +98,15 @@ bitflags::bitflags! {
 }
 
 /// Screenshot attributes for album save operations.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct ScreenShotAttribute {
     pub unk_x0: u32,
@@ -125,7 +133,15 @@ impl ScreenShotAttribute {
 }
 
 /// Screenshot attributes for application use.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct ScreenShotAttributeForApplication {
     pub unk_x0: u32,
@@ -160,7 +176,17 @@ const_assert_eq!(size_of::<ScreenShotDecodeOption>(), 0x20);
 
 /// Album file date-time. Corresponds to each field in the album entry
 /// filename prior to the "-": "YYYYMMDDHHMMSSII".
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AlbumFileDateTime {
     pub year: u16,
@@ -203,7 +229,17 @@ impl AlbumFileDateTime {
 }
 
 /// Album file identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AlbumFileId {
     pub application_id: u64,
@@ -218,7 +254,15 @@ pub struct AlbumFileId {
 const_assert_eq!(size_of::<AlbumFileId>(), 0x18);
 
 /// Album entry with file size and identifier.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AlbumEntry {
     pub size: u64,
@@ -228,7 +272,15 @@ pub struct AlbumEntry {
 const_assert_eq!(size_of::<AlbumEntry>(), 0x20);
 
 /// Opaque application album entry returned by save operations.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct ApplicationAlbumEntry {
     pub data: [u8; 0x20],
@@ -237,7 +289,7 @@ pub struct ApplicationAlbumEntry {
 const_assert_eq!(size_of::<ApplicationAlbumEntry>(), 0x20);
 
 /// Application album file entry.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct ApplicationAlbumFileEntry {
     pub entry: ApplicationAlbumEntry,
@@ -248,7 +300,14 @@ pub struct ApplicationAlbumFileEntry {
 const_assert_eq!(size_of::<ApplicationAlbumFileEntry>(), 0x30);
 
 /// Application user data attached to a screenshot.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct ApplicationData {
     pub userdata: [u8; 0x400],
@@ -258,7 +317,15 @@ pub struct ApplicationData {
 const_assert_eq!(size_of::<ApplicationData>(), 0x404);
 
 /// Album contents usage statistics.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AlbumContentsUsage {
     pub count: i64,
@@ -271,7 +338,7 @@ pub struct AlbumContentsUsage {
 const_assert_eq!(size_of::<AlbumContentsUsage>(), 0x18);
 
 /// Album usage with 2 content-type slots.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct AlbumUsage2 {
     pub usages: [AlbumContentsUsage; 2],
@@ -280,7 +347,7 @@ pub struct AlbumUsage2 {
 const_assert_eq!(size_of::<AlbumUsage2>(), 0x30);
 
 /// Album usage with 3 content-type slots.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct AlbumUsage3 {
     pub usages: [AlbumContentsUsage; 3],
@@ -289,7 +356,15 @@ pub struct AlbumUsage3 {
 const_assert_eq!(size_of::<AlbumUsage3>(), 0x48);
 
 /// Album usage with 16 content-type slots.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AlbumUsage16 {
     pub usages: [AlbumContentsUsage; 16],
@@ -309,7 +384,14 @@ pub struct UserIdList {
 const_assert_eq!(size_of::<UserIdList>(), 0x88);
 
 /// Output from loading an album screenshot image for application use.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LoadAlbumScreenShotImageOutputForApplication {
     pub width: i64,
@@ -325,7 +407,14 @@ const_assert_eq!(
 );
 
 /// Output from loading an album screenshot image.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LoadAlbumScreenShotImageOutput {
     pub width: i64,
@@ -337,7 +426,7 @@ pub struct LoadAlbumScreenShotImageOutput {
 const_assert_eq!(size_of::<LoadAlbumScreenShotImageOutput>(), 0x450);
 
 /// Album cache information.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct AlbumCache {
     pub count: u64,

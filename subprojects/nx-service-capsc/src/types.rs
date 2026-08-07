@@ -10,7 +10,14 @@ use static_assertions::const_assert_eq;
 ///
 /// On 19.0.0+, the full struct is sent on the wire. On older firmware,
 /// only the `application_id` field is sent as a bare `u64`.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct CapsApplicationId {
     pub application_id: u64,
@@ -22,7 +29,7 @@ pub struct CapsApplicationId {
 const_assert_eq!(size_of::<CapsApplicationId>(), 0x10);
 
 /// Wire-layout input for [`set_shim_library_version`](crate::cmif::set_shim_library_version) (cmd 33).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetShimVersionIn {
     pub version: u64,
@@ -32,7 +39,7 @@ pub(crate) struct SetShimVersionIn {
 const_assert_eq!(size_of::<SetShimVersionIn>(), 0x10);
 
 /// Wire-layout input for `register`/`unregister_applet_resource_user_id` legacy (pre-19.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RegisterAruidLegacyIn {
     pub applet_resource_user_id: u64,
@@ -42,7 +49,7 @@ pub(crate) struct RegisterAruidLegacyIn {
 const_assert_eq!(size_of::<RegisterAruidLegacyIn>(), 0x10);
 
 /// Wire-layout input for `register`/`unregister_applet_resource_user_id` (19.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RegisterAruidIn {
     pub applet_resource_user_id: u64,
@@ -52,7 +59,7 @@ pub(crate) struct RegisterAruidIn {
 const_assert_eq!(size_of::<RegisterAruidIn>(), 0x18);
 
 /// Wire-layout input for `generate_current_album_file_id` legacy (pre-19.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GenerateFileIdLegacyIn {
     pub contents: u8,
@@ -63,7 +70,7 @@ pub(crate) struct GenerateFileIdLegacyIn {
 const_assert_eq!(size_of::<GenerateFileIdLegacyIn>(), 0x10);
 
 /// Wire-layout input for `generate_current_album_file_id` (19.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GenerateFileIdIn {
     pub contents: u8,
@@ -74,7 +81,7 @@ pub(crate) struct GenerateFileIdIn {
 const_assert_eq!(size_of::<GenerateFileIdIn>(), 0x18);
 
 /// Wire-layout input for `generate_application_album_entry` (cmd 2102).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GenerateAppAlbumEntryIn {
     pub entry: AlbumEntry,
@@ -84,7 +91,7 @@ pub(crate) struct GenerateAppAlbumEntryIn {
 const_assert_eq!(size_of::<GenerateAppAlbumEntryIn>(), 0x28);
 
 /// Wire-layout input for `save_album_screenshot_file_ex` (cmd 2202).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SaveScreenShotFileExIn {
     pub file_id: AlbumFileId,
@@ -96,7 +103,7 @@ pub(crate) struct SaveScreenShotFileExIn {
 const_assert_eq!(size_of::<SaveScreenShotFileExIn>(), 0x30);
 
 /// Wire-layout input for `open_control_session` (cmd 60001).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenControlSessionIn {
     pub applet_resource_user_id: u64,
@@ -105,7 +112,7 @@ pub(crate) struct OpenControlSessionIn {
 const_assert_eq!(size_of::<OpenControlSessionIn>(), 0x08);
 
 /// Wire-layout input for stream read-data / read-image-data commands.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct StreamReadDataIn {
     pub stream: u64,
@@ -115,7 +122,7 @@ pub(crate) struct StreamReadDataIn {
 const_assert_eq!(size_of::<StreamReadDataIn>(), 0x10);
 
 /// Wire-layout input for stream write-data / write-meta commands.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct StreamWriteDataIn {
     pub stream: u64,
@@ -125,7 +132,7 @@ pub(crate) struct StreamWriteDataIn {
 const_assert_eq!(size_of::<StreamWriteDataIn>(), 0x10);
 
 /// Wire-layout input for `set_album_movie_write_stream_data_size` (cmd 2434).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetStreamDataSizeIn {
     pub stream: u64,

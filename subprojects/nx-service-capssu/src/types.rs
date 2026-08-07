@@ -6,7 +6,7 @@ use static_assertions::const_assert_eq;
 pub const USER_LIST_SIZE: usize = 8;
 
 /// Account user ID (128-bit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
@@ -69,7 +69,7 @@ pub struct ApplicationAlbumEntry {
 const_assert_eq!(size_of::<ApplicationAlbumEntry>(), 0x20);
 
 /// Application user data attached to a screenshot.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct ApplicationData {
     pub userdata: [u8; 0x400],
@@ -79,7 +79,7 @@ pub struct ApplicationData {
 const_assert_eq!(size_of::<ApplicationData>(), 0x404);
 
 /// List of user IDs attached to a screenshot.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct UserIdList {
     pub uids: [AccountUid; USER_LIST_SIZE],
