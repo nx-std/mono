@@ -1,9 +1,6 @@
 //! ns:dev CMIF commands.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -50,7 +48,7 @@ pub(crate) fn terminate_program(service: &Session, tid: u64) -> Result<(), Dispa
     dispatch_in(service, proto::NSDEV_TERMINATE_PROGRAM, tid)
 }
 
-/// GetShellEvent (cmd 4) — returns copy handle.
+/// GetShellEvent (cmd 4): returns copy handle.
 pub(crate) fn get_shell_event(service: &Session) -> Result<u32, AcquireEventError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
@@ -92,7 +90,7 @@ pub(crate) fn prepare_launch_program_from_host(
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<LaunchProperties>()) })
+    Ok(*result.value::<LaunchProperties>())
 }
 
 /// LaunchApplicationForDevelop (cmd 8).
@@ -104,24 +102,22 @@ pub(crate) fn launch_application_for_develop(
     dispatch_in_out(service, proto::NSDEV_LAUNCH_APPLICATION_FOR_DEVELOP, input)
 }
 
-/// LaunchApplicationFromHost (cmd 8) — uses u32 flags + MapAlias-In path.
+/// LaunchApplicationFromHost (cmd 8): uses u32 flags + MapAlias-In path.
 pub(crate) fn launch_application_from_host(
     service: &Session,
     flags: u32,
     path: &[u8],
 ) -> Result<u64, DispatchError> {
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const flags).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::NSDEV_LAUNCH_APPLICATION_FROM_HOST)
-        .in_raw(in_bytes)
+        .in_raw(flags.as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// LaunchApplicationWithStorageIdForDevelop (cmd 9).

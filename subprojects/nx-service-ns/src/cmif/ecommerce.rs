@@ -1,11 +1,10 @@
 //! IECommerceInterface CMIF commands.
 
-use core::mem::size_of;
-
 use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use super::app_manager::{
     AsyncCommandError,
@@ -21,14 +20,11 @@ pub(crate) fn request_link_device(
     service: &Session,
     uid: AccountUid,
 ) -> Result<AsyncOut, AsyncCommandError> {
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::ECOMMERCE_REQUEST_LINK_DEVICE)
-        .in_raw(in_bytes)
+        .in_raw(uid.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
         .map_err(AsyncCommandError::Dispatch)?;
@@ -54,14 +50,11 @@ pub(crate) fn request_unlink_device(
     service: &Session,
     uid: AccountUid,
 ) -> Result<AsyncOut, AsyncCommandError> {
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const uid).cast::<u8>(), size_of::<AccountUid>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::ECOMMERCE_REQUEST_UNLINK_DEVICE)
-        .in_raw(in_bytes)
+        .in_raw(uid.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
         .map_err(AsyncCommandError::Dispatch)?;

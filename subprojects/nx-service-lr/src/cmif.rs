@@ -1,11 +1,10 @@
 //! CMIF protocol operations for the location resolver service.
 
-use core::mem::size_of;
-
 use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch,
@@ -20,15 +19,11 @@ pub(crate) fn open_location_resolver(
     service: &Session,
     storage: u8,
 ) -> Result<u32, OpenLocationResolverError> {
-    // SAFETY: `storage` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const storage).cast::<u8>(), size_of::<u8>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_LOCATION_RESOLVER)
-        .in_raw(in_bytes)
+        .in_raw(storage.as_bytes())
         .send(&mut ipc_buf)
         .map_err(OpenLocationResolverError::Dispatch)?;
 
@@ -56,8 +51,6 @@ pub(crate) fn open_registered_location_resolver(
     }
     Ok(result.move_handles[0])
 }
-
-// -- ILocationResolver commands --
 
 pub(crate) fn resolve_program_path(
     service: &Session,
@@ -203,8 +196,6 @@ pub(crate) fn refresh(service: &Session) -> Result<(), DispatchError> {
 pub(crate) fn erase_program_redirection(service: &Session, tid: u64) -> Result<(), DispatchError> {
     dispatch::dispatch_in_u64(service, proto::ERASE_PROGRAM_REDIRECTION, tid)
 }
-
-// -- IRegisteredLocationResolver commands --
 
 pub(crate) fn reg_resolve_program_path(
     service: &Session,

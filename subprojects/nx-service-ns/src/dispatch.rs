@@ -1,9 +1,6 @@
 //! CMIF dispatch helpers shared across the `cmif` module.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     DispatchError,
@@ -17,7 +14,10 @@ pub(crate) fn dispatch_no_io(service: &Session, cmd_id: u32) -> Result<(), Dispa
 }
 
 #[inline]
-pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O, DispatchError> {
+pub(crate) fn dispatch_out<O>(service: &Session, cmd_id: u32) -> Result<O, DispatchError>
+where
+    O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
@@ -25,41 +25,40 @@ pub(crate) fn dispatch_out<O: Copy>(service: &Session, cmd_id: u32) -> Result<O,
         .out_size(size_of::<O>())
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<O>())
 }
 
 #[inline]
-pub(crate) fn dispatch_in<I: Copy>(
-    service: &Session,
-    cmd_id: u32,
-    input: I,
-) -> Result<(), DispatchError> {
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+pub(crate) fn dispatch_in<I>(service: &Session, cmd_id: u32, input: I) -> Result<(), DispatchError>
+where
+    I: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 #[inline]
-pub(crate) fn dispatch_in_out<I: Copy, O: Copy>(
+pub(crate) fn dispatch_in_out<I, O>(
     service: &Session,
     cmd_id: u32,
     input: I,
-) -> Result<O, DispatchError> {
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<I>()) };
+) -> Result<O, DispatchError>
+where
+    I: zerocopy::IntoBytes + zerocopy::Immutable,
+    O: Copy + zerocopy::FromBytes + zerocopy::Immutable + zerocopy::KnownLayout,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<O>())
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<O>()) })
+    Ok(*result.value::<O>())
 }

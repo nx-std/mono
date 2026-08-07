@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -111,19 +112,11 @@ pub(crate) fn write_placeholder(
         placeholder_id: *placeholder_id,
         offset,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<WritePlaceHolderIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_WRITE_PLACEHOLDER)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
     Ok(())
@@ -178,19 +171,11 @@ pub(crate) fn get_path(
     content_id: &NcmContentId,
     out_path: &mut [u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `content_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const *content_id).cast::<u8>(),
-            size_of::<NcmContentId>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_GET_PATH)
-        .in_raw(in_bytes)
+        .in_raw(content_id.as_bytes())
         .out_buffer(
             out_path.as_mut_slice(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
@@ -205,19 +190,11 @@ pub(crate) fn get_placeholder_path(
     placeholder_id: &NcmPlaceHolderId,
     out_path: &mut [u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `placeholder_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const *placeholder_id).cast::<u8>(),
-            size_of::<NcmPlaceHolderId>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_GET_PLACEHOLDER_PATH)
-        .in_raw(in_bytes)
+        .in_raw(placeholder_id.as_bytes())
         .out_buffer(
             out_path.as_mut_slice(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
@@ -236,23 +213,14 @@ pub(crate) fn list_placeholder(
     service: &Session,
     out_ids: &mut [NcmPlaceHolderId],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `out_ids` is a valid `&mut` slice; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `out_ids`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            out_ids.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out_ids),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CS_LIST_PLACEHOLDER)
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(out_ids.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    // SAFETY: response payload is at least size_of::<i32>() bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
+    Ok(*result.value::<i32>())
 }
 
 /// Gets the content count (cmd 12).
@@ -266,29 +234,15 @@ pub(crate) fn list_content_id(
     out_ids: &mut [NcmContentId],
     start_offset: i32,
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `start_offset` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const start_offset).cast::<u8>(), size_of::<i32>())
-    };
-    // SAFETY: `out_ids` is a valid `&mut` slice; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `out_ids`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            out_ids.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out_ids),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::CS_LIST_CONTENT_ID)
-        .in_raw(in_bytes)
+        .in_raw(start_offset.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(out_ids.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    // SAFETY: response payload is at least size_of::<i32>() bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
+    Ok(*result.value::<i32>())
 }
 
 /// Gets the size of a content ID (cmd 14).
@@ -367,19 +321,11 @@ pub(crate) fn read_content_id_file(
         content_id: *content_id,
         offset,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<ReadContentIdFileIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_READ_CONTENT_ID_FILE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_buffer(out_data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
     Ok(())
@@ -450,19 +396,11 @@ pub(crate) fn write_content_for_debug(
         content_id: *content_id,
         offset,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<WriteContentForDebugIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_WRITE_CONTENT_FOR_DEBUG)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
     Ok(())
@@ -540,19 +478,11 @@ pub(crate) fn register_path(
     content_id: &NcmContentId,
     path: &[u8; FS_MAX_PATH],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `content_id` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const *content_id).cast::<u8>(),
-            size_of::<NcmContentId>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CS_REGISTER_PATH)
-        .in_raw(in_bytes)
+        .in_raw(content_id.as_bytes())
         .in_buffer(path.as_slice(), BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
     Ok(())
