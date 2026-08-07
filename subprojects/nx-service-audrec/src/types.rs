@@ -5,7 +5,7 @@ use static_assertions::const_assert_eq;
 /// Buffer metadata for a final output recorder buffer.
 ///
 /// Describes a sample buffer's layout and timing information.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct FinalOutputRecorderBuffer {
     /// Timestamp (in nanoseconds) when this buffer was released.
@@ -25,7 +25,7 @@ pub struct FinalOutputRecorderBuffer {
 const_assert_eq!(size_of::<FinalOutputRecorderBuffer>(), 0x30);
 
 /// Input parameters for opening a final output recorder.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct FinalOutputRecorderParameter {
     /// Sample rate in Hz (e.g. 48000).
@@ -37,7 +37,7 @@ pub struct FinalOutputRecorderParameter {
 const_assert_eq!(size_of::<FinalOutputRecorderParameter>(), 0x08);
 
 /// Output parameters returned when opening a final output recorder.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct FinalOutputRecorderParameterInternal {
     /// Actual sample rate in Hz.
@@ -54,7 +54,7 @@ const_assert_eq!(size_of::<FinalOutputRecorderParameterInternal>(), 0x10);
 
 /// Wire-layout input for `OpenFinalOutputRecorder`:
 /// `{ FinalOutputRecorderParameter param, u64 aruid }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenRecorderIn {
     pub param: FinalOutputRecorderParameter,
@@ -65,7 +65,7 @@ const_assert_eq!(size_of::<OpenRecorderIn>(), 0x10);
 
 /// Wire-layout output for `GetReleasedFinalOutputRecorderBuffers`:
 /// `{ u32 count, u32 _pad, u64 released }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetReleasedBuffersOut {
     pub count: u32,

@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the audio renderer service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::dispatch_no_io,
@@ -20,10 +18,6 @@ use crate::{
         OpenAudioRendererIn,
     },
 };
-
-// ---------------------------------------------------------------------------
-// IAudioRendererManager commands
-// ---------------------------------------------------------------------------
 
 /// Opens an audio renderer (cmd 0).
 ///
@@ -44,19 +38,11 @@ pub(crate) fn open_audio_renderer(
         aruid,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<OpenAudioRendererIn>()` bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<OpenAudioRendererIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_AUDIO_RENDERER)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .in_handle(tmem_handle)
         .in_handle(process_handle)
@@ -75,32 +61,17 @@ pub(crate) fn get_work_buffer_size(
     service: &Session,
     param: &AudioRendererParameter,
 ) -> Result<u64, GetWorkBufferSizeError> {
-    // SAFETY: `param` is a valid `&AudioRendererParameter`; viewing its bytes
-    // as a slice is sound, and the slice borrows `param`.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (param as *const AudioRendererParameter).cast::<u8>(),
-            size_of::<AudioRendererParameter>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_WORK_BUFFER_SIZE)
-        .in_raw(in_bytes)
+        .in_raw(param.as_bytes())
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
         .map_err(GetWorkBufferSizeError)?;
 
-    // SAFETY: response payload is at least size_of::<u64>().
-    let size = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) };
-
-    Ok(size)
+    Ok(*result.value::<u64>())
 }
-
-// ---------------------------------------------------------------------------
-// IAudioRenderer commands
-// ---------------------------------------------------------------------------
 
 /// Gets the current renderer state (cmd 3).
 pub(crate) fn renderer_get_state(service: &Session) -> Result<u32, DispatchError> {
@@ -111,10 +82,7 @@ pub(crate) fn renderer_get_state(service: &Session) -> Result<u32, DispatchError
         .out_size(size_of::<u32>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>().
-    let state = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) };
-
-    Ok(state)
+    Ok(*result.value::<u32>())
 }
 
 /// Requests update of the audio renderer (auto-select). \[3.0.0+\]
@@ -198,22 +166,14 @@ pub(crate) fn renderer_set_rendering_time_limit(
     service: &Session,
     percent: i32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `percent` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its `size_of::<i32>()` bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const percent).cast::<u8>(), size_of::<i32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RENDERER_SET_RENDERING_TIME_LIMIT)
-        .in_raw(in_bytes)
+        .in_raw(percent.as_bytes())
         .send(&mut ipc_buf)
         .map(|_| ())
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`open_audio_renderer`].
 #[derive(Debug, thiserror::Error)]

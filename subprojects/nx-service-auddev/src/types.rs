@@ -3,8 +3,15 @@
 use static_assertions::const_assert_eq;
 
 /// Audio device name — a fixed-size 0x100-byte string buffer.
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub struct AudioDeviceName {
     pub name: [u8; 0x100],
 }

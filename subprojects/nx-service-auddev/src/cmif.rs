@@ -13,6 +13,7 @@ use nx_sf::{
         OwnedSessionHandle,
     },
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
@@ -67,16 +68,8 @@ pub fn list_audio_device_name(
 ) -> Result<i32, ListAudioDeviceNameError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `AudioDeviceName` is `#[repr(C)]` wrapping `[u8; 0x100]`, so the
-    // typed slice can be reinterpreted as a byte slice for the call duration.
-    let names_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            names.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(names),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME)
-        .add_out_auto_buffer(OutputBuffer::new(names_bytes, BufferMode::Normal));
+        .add_out_auto_buffer(OutputBuffer::new(names.as_mut_bytes(), BufferMode::Normal));
     req.build()
         .send(&mut buf, session)
         .map_err(ListAudioDeviceNameError::SendRequest)?;
@@ -98,16 +91,8 @@ pub fn list_audio_device_name_legacy(
 ) -> Result<i32, ListAudioDeviceNameError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    // SAFETY: `AudioDeviceName` is `#[repr(C)]` wrapping `[u8; 0x100]`, so the
-    // typed slice can be reinterpreted as a byte slice for the call duration.
-    let names_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            names.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(names),
-        )
-    };
     let req = cmif::CmifRequestBuilder::new(proto::LIST_AUDIO_DEVICE_NAME_OLD)
-        .add_output_buffer(OutputBuffer::new(names_bytes, BufferMode::Normal))
+        .add_output_buffer(OutputBuffer::new(names.as_mut_bytes(), BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
         .map_err(ListAudioDeviceNameError::SendRequest)?;

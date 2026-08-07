@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the audio recorder service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::dispatch_no_io,
@@ -31,19 +29,11 @@ pub(crate) fn open_final_output_recorder(
     service: &Session,
     input: &OpenRecorderIn,
 ) -> Result<(u32, FinalOutputRecorderParameterInternal), OpenRecorderError> {
-    // SAFETY: `input` is a valid `&OpenRecorderIn`; viewing its bytes as a
-    // slice is sound, and the slice borrows `input` for the lifetime of the call.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (input as *const OpenRecorderIn).cast::<u8>(),
-            size_of::<OpenRecorderIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::OPEN_FINAL_OUTPUT_RECORDER)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_handle(nx_svc::raw::CUR_PROCESS_HANDLE)
         .out_size(size_of::<FinalOutputRecorderParameterInternal>())
         .send(&mut ipc_buf)
@@ -53,17 +43,10 @@ pub(crate) fn open_final_output_recorder(
         return Err(OpenRecorderError::MissingHandle);
     }
 
-    // SAFETY: response payload is at least size_of::<FinalOutputRecorderParameterInternal>().
-    let param_out = unsafe {
-        ptr::read_unaligned(
-            result
-                .data
-                .as_ptr()
-                .cast::<FinalOutputRecorderParameterInternal>(),
-        )
-    };
-
-    Ok((result.move_handles[0], param_out))
+    Ok((
+        result.move_handles[0],
+        *result.value::<FinalOutputRecorderParameterInternal>(),
+    ))
 }
 
 /// Starts the recorder.
@@ -94,28 +77,12 @@ pub(crate) fn recorder_append_buffer(
     buffer_client_ptr: u64,
     param: &FinalOutputRecorderBuffer,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const buffer_client_ptr).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
-    // SAFETY: `param` is a valid `&FinalOutputRecorderBuffer`; viewing its bytes as
-    // an IN buffer slice is sound, and the slice borrows `param`.
-    let param_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (param as *const FinalOutputRecorderBuffer).cast::<u8>(),
-            size_of::<FinalOutputRecorderBuffer>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RECORDER_APPEND_BUFFER)
-        .in_raw(in_bytes)
-        .in_buffer(param_bytes, BufferAttr::HIPC_AUTO_SELECT)
+        .in_raw(buffer_client_ptr.as_bytes())
+        .in_buffer(param.as_bytes(), BufferAttr::HIPC_AUTO_SELECT)
         .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(AppendBufferError)
@@ -127,28 +94,12 @@ pub(crate) fn recorder_append_buffer_legacy(
     buffer_client_ptr: u64,
     param: &FinalOutputRecorderBuffer,
 ) -> Result<(), AppendBufferError> {
-    // SAFETY: `buffer_client_ptr` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const buffer_client_ptr).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
-    // SAFETY: `param` is a valid `&FinalOutputRecorderBuffer`; viewing its bytes as
-    // an IN buffer slice is sound, and the slice borrows `param`.
-    let param_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (param as *const FinalOutputRecorderBuffer).cast::<u8>(),
-            size_of::<FinalOutputRecorderBuffer>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::RECORDER_APPEND_BUFFER_LEGACY)
-        .in_raw(in_bytes)
-        .in_buffer(param_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_raw(buffer_client_ptr.as_bytes())
+        .in_buffer(param.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
         .map_err(AppendBufferError)
@@ -192,33 +143,19 @@ fn get_released_impl(
     out_buffers: &mut [u64],
     transfer_attr: BufferAttr,
 ) -> Result<(u32, u64), GetReleasedBuffersError> {
-    // SAFETY: `out_buffers` is a valid `&mut [u64]`; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `out_buffers`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            out_buffers.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out_buffers),
-        )
-    };
-
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<GetReleasedBuffersOut>())
-        .out_buffer(out_bytes, transfer_attr)
+        .out_buffer(out_buffers.as_mut_bytes(), transfer_attr)
         .send(&mut ipc_buf)
         .map_err(GetReleasedBuffersError)?;
 
-    // SAFETY: response payload is at least size_of::<GetReleasedBuffersOut>().
-    let out = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<GetReleasedBuffersOut>()) };
+    let out = result.value::<GetReleasedBuffersOut>();
 
     Ok((out.count, out.released))
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`open_final_output_recorder`].
 #[derive(Debug, thiserror::Error)]

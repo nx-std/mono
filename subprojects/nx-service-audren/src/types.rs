@@ -2,10 +2,6 @@
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /// Audio renderer revision 1 ("REV1"). \[1.0.0+\]
 pub const REVISION_1: u32 = 0x3156_4552;
 
@@ -56,10 +52,6 @@ pub const UNUSED_MIX_ID: u32 = 0x7FFF_FFFF;
 
 /// Sentinel for an unused splitter ID.
 pub const UNUSED_SPLITTER_ID: u32 = 0xFFFF_FFFF;
-
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
 
 /// Audio renderer output sample rate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,13 +107,9 @@ pub enum SinkType {
     CircularBuffer = 2,
 }
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs: IPC parameter
-// ---------------------------------------------------------------------------
-
 /// Wire-layout parameter struct sent to `OpenAudioRenderer` and
 /// `GetWorkBufferSize`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AudioRendererParameter {
     pub sample_rate: i32,
@@ -144,7 +132,7 @@ const_assert_eq!(size_of::<AudioRendererParameter>(), 0x34);
 
 /// Wire-layout input for `OpenAudioRenderer` (cmd 0):
 /// `{ AudioRendererParameter, u32 pad, u64 work_buffer_size, u64 aruid }`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenAudioRendererIn {
     pub param: AudioRendererParameter,
@@ -154,10 +142,6 @@ pub(crate) struct OpenAudioRendererIn {
 }
 
 const_assert_eq!(size_of::<OpenAudioRendererIn>(), 0x48);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: update data header
-// ---------------------------------------------------------------------------
 
 /// Header for both input and output update data buffers.
 #[derive(Clone, Copy)]
@@ -177,10 +161,6 @@ pub struct UpdateDataHeader {
 }
 
 const_assert_eq!(size_of::<UpdateDataHeader>(), 0x40);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: behavior info
-// ---------------------------------------------------------------------------
 
 /// Behavior info (input direction).
 #[derive(Clone, Copy)]
@@ -202,10 +182,6 @@ pub struct BehaviorInfoOut {
 }
 
 const_assert_eq!(size_of::<BehaviorInfoOut>(), 0xB0);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: memory pool
-// ---------------------------------------------------------------------------
 
 /// Memory pool info (input direction).
 #[derive(Clone, Copy)]
@@ -229,10 +205,6 @@ pub struct MemPoolInfoOut {
 
 const_assert_eq!(size_of::<MemPoolInfoOut>(), 0x10);
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs: channel
-// ---------------------------------------------------------------------------
-
 /// Channel info (input direction).
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -244,10 +216,6 @@ pub struct ChannelInfoIn {
 }
 
 const_assert_eq!(size_of::<ChannelInfoIn>(), 0x70);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: biquad filter / ADPCM
-// ---------------------------------------------------------------------------
 
 /// Biquad filter parameters for a voice.
 #[derive(Clone, Copy)]
@@ -281,10 +249,6 @@ pub struct AdpcmContext {
 
 const_assert_eq!(size_of::<AdpcmContext>(), 0x06);
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs: wave buffer
-// ---------------------------------------------------------------------------
-
 /// Wave buffer descriptor for a voice.
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -303,10 +267,6 @@ pub struct WaveBuf {
 }
 
 const_assert_eq!(size_of::<WaveBuf>(), 0x38);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: voice
-// ---------------------------------------------------------------------------
 
 /// Voice info (input direction).
 #[derive(Clone, Copy)]
@@ -351,10 +311,6 @@ pub struct VoiceInfoOut {
 
 const_assert_eq!(size_of::<VoiceInfoOut>(), 0x10);
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs: mix
-// ---------------------------------------------------------------------------
-
 /// Mix info (input direction).
 ///
 /// Contains a 24×24 float mixing matrix (`mix[src_index][dest_index]`).
@@ -377,10 +333,6 @@ pub struct MixInfoIn {
 }
 
 const_assert_eq!(size_of::<MixInfoIn>(), 0x930);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: sink
-// ---------------------------------------------------------------------------
 
 /// Down-mix parameter coefficients.
 #[derive(Clone, Copy)]
@@ -450,10 +402,6 @@ pub struct SinkInfoOut {
 }
 
 const_assert_eq!(size_of::<SinkInfoOut>(), 0x20);
-
-// ---------------------------------------------------------------------------
-// Wire-layout structs: performance buffer
-// ---------------------------------------------------------------------------
 
 /// Performance buffer info (input direction).
 #[derive(Clone, Copy)]
