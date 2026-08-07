@@ -1,23 +1,46 @@
 //! Wire-layout types for the PGL service.
 
-use core::mem::size_of;
+#![expect(
+    unused_parens,
+    clippy::identity_op,
+    reason = "the `#[bitfield]` accessors compute each field's bit offset as a parenthesised `0 + ..` sum, \
+              so both lints fire inside generated code this module does not write"
+)]
 
+use modular_bitfield::specifiers::B5;
 use static_assertions::const_assert_eq;
 
-bitflags::bitflags! {
-    /// PGL launch flags controlling crash report behavior.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    #[repr(transparent)]
-    pub struct PglLaunchFlag: u8 {
-        const NONE = 0;
-        const ENABLE_DETAILED_CRASH_REPORT = 1 << 0;
-        const ENABLE_CRASH_REPORT_SCREENSHOT_FOR_PRODUCTION = 1 << 1;
-        const ENABLE_CRASH_REPORT_SCREENSHOT_FOR_DEVELOP = 1 << 2;
-    }
+/// PGL launch flags controlling crash report behavior.
+///
+/// A default value has every flag clear, which is what the service treats as
+/// "no special crash-report handling".
+#[modular_bitfield::bitfield]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(C)]
+pub struct PglLaunchFlag {
+    /// Collect a detailed crash report for the launched program.
+    pub enable_detailed_crash_report: bool,
+    /// Capture a crash-report screenshot on retail units.
+    pub enable_crash_report_screenshot_for_production: bool,
+    /// Capture a crash-report screenshot on development units.
+    pub enable_crash_report_screenshot_for_develop: bool,
+    #[skip]
+    __: B5,
 }
 
+const_assert_eq!(size_of::<PglLaunchFlag>(), 0x1);
+
 /// Snapshot dump type for `trigger_application_snapshot_dumper`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(u32)]
 pub enum SnapShotDumpType {
     None = 0,
@@ -40,7 +63,7 @@ const_assert_eq!(size_of::<ContentMetaInfo>(), 0x10);
 
 /// Program location identifying a program by ID and storage.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 pub struct NcmProgramLocation {
     pub program_id: u64,
     pub storage_id: u8,
@@ -78,6 +101,11 @@ impl ProcessEvent {
 }
 
 /// Process event info returned by the event observer.
+///
+/// Wire layout: `{ u32 event, u32 pad, u64 process_id }`.
+// The padding is left to `#[repr(C)]` rather than spelled as a field: this type
+// is only ever decoded from a response, so no uninitialised byte can escape
+// through it. Do not add `IntoBytes` here without first giving the gap a field.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 pub struct ProcessEventInfo {
@@ -86,29 +114,3 @@ pub struct ProcessEventInfo {
 }
 
 const_assert_eq!(size_of::<ProcessEventInfo>(), 0x10);
-
-// CMIF-specific input layout for LaunchProgram (cmd 0).
-// Field order differs from TIPC: pgl_flags first, then pm_flags, then loc.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(crate) struct LaunchProgramCmifIn {
-    pub pgl_flags: PglLaunchFlag,
-    pub pad: [u8; 3],
-    pub pm_flags: u32,
-    pub loc: NcmProgramLocation,
-}
-
-const_assert_eq!(size_of::<LaunchProgramCmifIn>(), 0x18);
-
-// TIPC-specific input layout for LaunchProgram (cmd 0).
-// Field order differs from CMIF: loc first, then pm_flags, then pgl_flags.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(crate) struct LaunchProgramTipcIn {
-    pub loc: NcmProgramLocation,
-    pub pm_flags: u32,
-    pub pgl_flags: PglLaunchFlag,
-    pub pad: [u8; 3],
-}
-
-const_assert_eq!(size_of::<LaunchProgramTipcIn>(), 0x18);

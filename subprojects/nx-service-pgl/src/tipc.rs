@@ -2,11 +2,6 @@
 //!
 //! Used on HOS 12.0.0+.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
-
 use nx_sf::{
     hipc::{
         BufferMode,
@@ -20,12 +15,13 @@ use nx_sf::{
     },
     tipc,
 };
+use static_assertions::const_assert_eq;
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
     types::{
         ContentMetaInfo,
-        LaunchProgramTipcIn,
         NcmProgramLocation,
         PglLaunchFlag,
         ProcessEventInfo,
@@ -39,11 +35,8 @@ fn dispatch_in_u64(
 ) -> Result<(), DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u64>()];
-    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), value) };
     let req = tipc::TipcRequestBuilder::new(cmd_id)
-        .with_data(&payload)
+        .with_data(value.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -60,11 +53,8 @@ fn dispatch_in_bool(
 ) -> Result<(), DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u8>()];
-    // SAFETY: `payload` is exactly `size_of::<u8>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u8>(), value as u8) };
     let req = tipc::TipcRequestBuilder::new(cmd_id)
-        .with_data(&payload)
+        .with_data(value.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -120,20 +110,31 @@ pub fn launch_program(
     pm_launch_flags: u32,
     pgl_launch_flags: PglLaunchFlag,
 ) -> Result<u64, DispatchError> {
-    let input = LaunchProgramTipcIn {
+    // Wire layout: `{ NcmProgramLocation, u32 pm_flags, u8 pgl_flags, u8[3] pad }`.
+    // The field order is TIPC's own: CMIF sends the same three values with `loc`
+    // last, so the two layouts are not interchangeable.
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+    #[repr(C)]
+    struct LaunchProgramIn {
+        loc: NcmProgramLocation,
+        pm_flags: u32,
+        pgl_flags: PglLaunchFlag,
+        _pad: [u8; 3],
+    }
+
+    const_assert_eq!(size_of::<LaunchProgramIn>(), 0x18);
+
+    let input = LaunchProgramIn {
         loc: *loc,
         pm_flags: pm_launch_flags,
         pgl_flags: pgl_launch_flags,
-        pad: [0; 3],
+        _pad: [0; 3],
     };
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<LaunchProgramTipcIn>()];
-    // SAFETY: `payload` is exactly `size_of::<LaunchProgramTipcIn>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<LaunchProgramTipcIn>(), input) };
     let req = tipc::TipcRequestBuilder::new(proto::LAUNCH_PROGRAM)
-        .with_data(&payload)
+        .with_data(input.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -161,11 +162,8 @@ pub fn launch_program_from_host(
 ) -> Result<u64, DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u32>()];
-    // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), pm_launch_flags) };
     let req = tipc::TipcRequestBuilder::new(proto::LAUNCH_PROGRAM_FROM_HOST)
-        .with_data(&payload)
+        .with_data(pm_launch_flags.as_bytes())
         .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
@@ -221,11 +219,8 @@ pub fn is_process_tracked(
 ) -> Result<bool, DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u64>()];
-    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = tipc::TipcRequestBuilder::new(proto::IS_PROCESS_TRACKED)
-        .with_data(&payload)
+        .with_data(pid.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;

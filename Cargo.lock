@@ -1107,7 +1107,7 @@ dependencies = [
 name = "nx-service-pgl"
 version = "0.1.0"
 dependencies = [
- "bitflags",
+ "modular-bitfield",
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
