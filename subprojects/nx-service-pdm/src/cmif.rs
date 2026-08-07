@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -41,10 +42,6 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// QueryAppletEvent (cmd 0)
-// ---------------------------------------------------------------------------
-
 /// Queries applet events (pre-10.0.0).
 ///
 /// Returns V1 wire-format entries in the provided buffer (timestamps are
@@ -56,36 +53,15 @@ pub(crate) fn query_applet_event_v1_legacy(
     events: &mut [AppletEventV1],
 ) -> Result<i32, DispatchError> {
     let input = QueryAppletEventLegacyIn { entry_index };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryAppletEventLegacyIn>(),
-        )
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_APPLET_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
 
 /// Queries applet events (10.0.0–15.0.1).
@@ -102,36 +78,15 @@ pub(crate) fn query_applet_event_v1(
         pad: [0; 3],
         entry_index,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryAppletEventIn>(),
-        )
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_APPLET_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
 
 /// Queries applet events (16.0.0+).
@@ -148,41 +103,16 @@ pub(crate) fn query_applet_event(
         pad: [0; 3],
         entry_index,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryAppletEventIn>(),
-        )
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_APPLET_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
-
-// ---------------------------------------------------------------------------
-// QueryPlayStatisticsByApplicationId (cmd 4)
-// ---------------------------------------------------------------------------
 
 /// Queries play statistics by application ID (pre-10.0.0). Returns V1 format.
 pub(crate) fn query_play_statistics_by_app_id_v1_legacy(
@@ -232,10 +162,6 @@ pub(crate) fn query_play_statistics_by_app_id(
         input,
     )
 }
-
-// ---------------------------------------------------------------------------
-// QueryPlayStatisticsByApplicationIdAndUserAccountId (cmd 5)
-// ---------------------------------------------------------------------------
 
 /// Queries play statistics by application ID and user (pre-10.0.0). Returns V1 format.
 pub(crate) fn query_play_statistics_by_app_id_and_user_v1_legacy(
@@ -294,10 +220,6 @@ pub(crate) fn query_play_statistics_by_app_id_and_user(
     )
 }
 
-// ---------------------------------------------------------------------------
-// QueryLastPlayTime (cmd 7 / cmd 17)
-// ---------------------------------------------------------------------------
-
 /// Queries last play time (pre-10.0.0, cmd 7).
 pub(crate) fn query_last_play_time_legacy(
     service: &Session,
@@ -305,36 +227,21 @@ pub(crate) fn query_last_play_time_legacy(
     application_ids: &[u64],
 ) -> Result<i32, DispatchError> {
     let count = playtimes.len().min(application_ids.len());
-    // SAFETY: `playtimes` is a valid `&mut` slice; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `playtimes`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            playtimes.as_mut_ptr().cast::<u8>(),
-            count * size_of::<LastPlayTime>(),
-        )
-    };
-    // SAFETY: `application_ids` is a valid `&` slice; viewing it as a byte
-    // slice for the IN buffer is sound.
-    let in_buf_bytes = unsafe {
-        core::slice::from_raw_parts(
-            application_ids.as_ptr().cast::<u8>(),
-            count * size_of::<u64>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_LAST_PLAY_TIME_LEGACY)
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(in_buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(
+            playtimes[..count].as_mut_bytes(),
+            BufferAttr::HIPC_MAP_ALIAS,
+        )
+        .in_buffer(
+            application_ids[..count].as_bytes(),
+            BufferAttr::HIPC_MAP_ALIAS,
+        )
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
 
 /// Queries last play time (10.0.0+, cmd 17).
@@ -348,50 +255,23 @@ pub(crate) fn query_last_play_time(
     let input = QueryLastPlayTimeIn {
         flag: u8::from(flag),
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryLastPlayTimeIn>(),
-        )
-    };
-    // SAFETY: `playtimes` is a valid `&mut` slice; viewing it as a byte slice
-    // for the OUT buffer is sound, and the byte slice borrows `playtimes`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            playtimes.as_mut_ptr().cast::<u8>(),
-            count * size_of::<LastPlayTime>(),
-        )
-    };
-    // SAFETY: `application_ids` is a valid `&` slice; viewing it as a byte
-    // slice for the IN buffer is sound.
-    let in_buf_bytes = unsafe {
-        core::slice::from_raw_parts(
-            application_ids.as_ptr().cast::<u8>(),
-            count * size_of::<u64>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_LAST_PLAY_TIME)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
-        .in_buffer(in_buf_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(
+            playtimes[..count].as_mut_bytes(),
+            BufferAttr::HIPC_MAP_ALIAS,
+        )
+        .in_buffer(
+            application_ids[..count].as_bytes(),
+            BufferAttr::HIPC_MAP_ALIAS,
+        )
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
-
-// ---------------------------------------------------------------------------
-// QueryPlayEvent (cmd 8)
-// ---------------------------------------------------------------------------
 
 /// Queries raw play events.
 pub(crate) fn query_play_event(
@@ -399,38 +279,16 @@ pub(crate) fn query_play_event(
     entry_index: i32,
     events: &mut [PlayEvent],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_PLAY_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(entry_index.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
-
-// ---------------------------------------------------------------------------
-// GetAvailablePlayEventRange (cmd 9)
-// ---------------------------------------------------------------------------
 
 /// Gets the available play event range.
 pub(crate) fn get_available_play_event_range(
@@ -444,43 +302,21 @@ pub(crate) fn get_available_play_event_range(
     })
 }
 
-// ---------------------------------------------------------------------------
-// QueryAccountEvent (cmd 10)
-// ---------------------------------------------------------------------------
-
 /// Queries account events returning V3 wire format (3.0.0–9.2.0).
 pub(crate) fn query_account_event_v3(
     service: &Session,
     entry_index: i32,
     events: &mut [AccountEventV3],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(entry_index.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
 
 /// Queries account events returning V10 wire format (10.0.0–15.0.1).
@@ -489,33 +325,15 @@ pub(crate) fn query_account_event_v10(
     entry_index: i32,
     events: &mut [AccountEventV10],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(entry_index.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
 
 /// Queries account events returning latest wire format (16.0.0+).
@@ -524,38 +342,16 @@ pub(crate) fn query_account_event(
     entry_index: i32,
     events: &mut [AccountEvent],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `entry_index` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const entry_index).cast::<u8>(), size_of::<i32>())
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(entry_index.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
-
-// ---------------------------------------------------------------------------
-// QueryAccountPlayEvent (cmd 11)
-// ---------------------------------------------------------------------------
 
 /// Queries account play events (4.0.0+).
 pub(crate) fn query_account_play_event(
@@ -569,41 +365,16 @@ pub(crate) fn query_account_play_event(
         pad: 0,
         uid,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryAccountPlayEventIn>(),
-        )
-    };
-    // SAFETY: `events` is a valid `&mut` slice; viewing it as a byte slice for
-    // the OUT buffer is sound, and the byte slice borrows `events`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            events.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(events),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_ACCOUNT_PLAY_EVENT)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(events.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
-
-// ---------------------------------------------------------------------------
-// GetAvailableAccountPlayEventRange (cmd 12)
-// ---------------------------------------------------------------------------
 
 /// Gets the available account play event range (4.0.0+).
 pub(crate) fn get_available_account_play_event_range(
@@ -619,10 +390,6 @@ pub(crate) fn get_available_account_play_event_range(
     })
 }
 
-// ---------------------------------------------------------------------------
-// QueryRecentlyPlayedApplication (cmd 14)
-// ---------------------------------------------------------------------------
-
 /// Queries recently played applications (6.0.0–9.2.0).
 pub(crate) fn query_recently_played_application_legacy(
     service: &Session,
@@ -630,37 +397,15 @@ pub(crate) fn query_recently_played_application_legacy(
     application_ids: &mut [u64],
 ) -> Result<i32, DispatchError> {
     let input = QueryRecentlyPlayedAppLegacyIn { uid };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryRecentlyPlayedAppLegacyIn>(),
-        )
-    };
-    // SAFETY: `application_ids` is a valid `&mut` slice; viewing it as a byte
-    // slice for the OUT buffer is sound, and the byte slice borrows
-    // `application_ids`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            application_ids.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(application_ids),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(application_ids.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
 
 /// Queries recently played applications (10.0.0–14.1.2).
@@ -675,42 +420,16 @@ pub(crate) fn query_recently_played_application(
         pad: [0; 7],
         uid,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<QueryRecentlyPlayedAppIn>(),
-        )
-    };
-    // SAFETY: `application_ids` is a valid `&mut` slice; viewing it as a byte
-    // slice for the OUT buffer is sound, and the byte slice borrows
-    // `application_ids`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            application_ids.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(application_ids),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::QUERY_RECENTLY_PLAYED_APPLICATION)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(application_ids.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(i32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<i32>())
 }
-
-// ---------------------------------------------------------------------------
-// GetRecentlyPlayedApplicationUpdateEvent (cmd 15)
-// ---------------------------------------------------------------------------
 
 /// Gets the event for recently-played application updates (6.0.0–14.1.2).
 ///

@@ -2,10 +2,6 @@
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
-
 /// Play event type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -40,15 +36,19 @@ pub enum PlayLogPolicy {
     Unknown3 = 3,
 }
 
-// ---------------------------------------------------------------------------
-// Applet event structs
-// ---------------------------------------------------------------------------
-
 /// Applet event for 1.0.0–15.0.1.
 ///
 /// Timestamps are total minutes since epoch UTC 1999/12/31 00:00:00.
 /// Use [`play_timestamp_to_posix`] to convert.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AppletEventV1 {
     pub program_id: u64,
@@ -62,7 +62,15 @@ pub struct AppletEventV1 {
 const_assert_eq!(size_of::<AppletEventV1>(), 0x18);
 
 /// Applet event for 16.0.0+.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AppletEvent {
     pub program_id: u64,
@@ -76,14 +84,10 @@ pub struct AppletEvent {
 
 const_assert_eq!(size_of::<AppletEvent>(), 0x28);
 
-// ---------------------------------------------------------------------------
-// Play statistics structs
-// ---------------------------------------------------------------------------
-
 /// Play statistics for 1.0.0–15.0.1.
 ///
 /// Timestamps use the same minute-based format as [`AppletEventV1`].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct PlayStatisticsV1 {
     pub program_id: u64,
@@ -100,7 +104,7 @@ pub struct PlayStatisticsV1 {
 const_assert_eq!(size_of::<PlayStatisticsV1>(), 0x28);
 
 /// Play statistics for 16.0.0+.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct PlayStatistics {
     pub program_id: u64,
@@ -119,12 +123,16 @@ pub struct PlayStatistics {
 
 const_assert_eq!(size_of::<PlayStatistics>(), 0x48);
 
-// ---------------------------------------------------------------------------
-// Last play time
-// ---------------------------------------------------------------------------
-
 /// Last play time for an application.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LastPlayTime {
     pub application_id: u64,
@@ -137,15 +145,18 @@ pub struct LastPlayTime {
 
 const_assert_eq!(size_of::<LastPlayTime>(), 0x18);
 
-// ---------------------------------------------------------------------------
-// Play event (raw)
-// ---------------------------------------------------------------------------
-
 /// Raw play event entry read from FS.
 ///
 /// The `event_data` union is 0x1C bytes. The `play_event_type` field
 /// determines which variant is active.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct PlayEvent {
     pub event_data: [u8; 0x1C],
@@ -158,12 +169,18 @@ pub struct PlayEvent {
 
 const_assert_eq!(size_of::<PlayEvent>(), 0x38);
 
-// ---------------------------------------------------------------------------
-// Account event structs
-// ---------------------------------------------------------------------------
-
 /// Account user ID (matches libnx `AccountUid`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
@@ -172,7 +189,15 @@ pub struct AccountUid {
 const_assert_eq!(size_of::<AccountUid>(), 0x10);
 
 /// Account event for 3.0.0–9.2.0.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountEventV3 {
     pub uid: AccountUid,
@@ -188,7 +213,15 @@ pub struct AccountEventV3 {
 const_assert_eq!(size_of::<AccountEventV3>(), 0x38);
 
 /// Account event for 10.0.0–15.0.1.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountEventV10 {
     pub uid: AccountUid,
@@ -205,7 +238,15 @@ pub struct AccountEventV10 {
 const_assert_eq!(size_of::<AccountEventV10>(), 0x40);
 
 /// Account event for 16.0.0+.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountEvent {
     pub uid: AccountUid,
@@ -220,12 +261,16 @@ pub struct AccountEvent {
 
 const_assert_eq!(size_of::<AccountEvent>(), 0x38);
 
-// ---------------------------------------------------------------------------
-// Account play event (raw)
-// ---------------------------------------------------------------------------
-
 /// Raw account play event entry (4.0.0+).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountPlayEvent {
     pub unk_x0: [u8; 4],
@@ -248,12 +293,8 @@ pub struct ApplicationPlayStatistics {
 
 const_assert_eq!(size_of::<ApplicationPlayStatistics>(), 0x18);
 
-// ---------------------------------------------------------------------------
-// Wire-layout input structs
-// ---------------------------------------------------------------------------
-
 /// Input for `QueryAppletEvent` (pre-10.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryAppletEventLegacyIn {
     pub entry_index: i32,
@@ -262,7 +303,7 @@ pub(crate) struct QueryAppletEventLegacyIn {
 const_assert_eq!(size_of::<QueryAppletEventLegacyIn>(), 0x04);
 
 /// Input for `QueryAppletEvent` (10.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryAppletEventIn {
     pub flag: u8,
@@ -273,7 +314,7 @@ pub(crate) struct QueryAppletEventIn {
 const_assert_eq!(size_of::<QueryAppletEventIn>(), 0x08);
 
 /// Input for `QueryPlayStatisticsByApplicationId` (pre-10.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryPlayStatsByAppIdLegacyIn {
     pub application_id: u64,
@@ -282,7 +323,7 @@ pub(crate) struct QueryPlayStatsByAppIdLegacyIn {
 const_assert_eq!(size_of::<QueryPlayStatsByAppIdLegacyIn>(), 0x08);
 
 /// Input for `QueryPlayStatisticsByApplicationId` (10.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryPlayStatsByAppIdIn {
     pub flag: u8,
@@ -293,7 +334,7 @@ pub(crate) struct QueryPlayStatsByAppIdIn {
 const_assert_eq!(size_of::<QueryPlayStatsByAppIdIn>(), 0x10);
 
 /// Input for `QueryPlayStatisticsByApplicationIdAndUserAccountId` (pre-10.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryPlayStatsByAppIdAndUserLegacyIn {
     pub application_id: u64,
@@ -303,7 +344,7 @@ pub(crate) struct QueryPlayStatsByAppIdAndUserLegacyIn {
 const_assert_eq!(size_of::<QueryPlayStatsByAppIdAndUserLegacyIn>(), 0x18);
 
 /// Input for `QueryPlayStatisticsByApplicationIdAndUserAccountId` (10.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryPlayStatsByAppIdAndUserIn {
     pub flag: u8,
@@ -315,7 +356,7 @@ pub(crate) struct QueryPlayStatsByAppIdAndUserIn {
 const_assert_eq!(size_of::<QueryPlayStatsByAppIdAndUserIn>(), 0x20);
 
 /// Input for `QueryLastPlayTime` (10.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryLastPlayTimeIn {
     pub flag: u8,
@@ -324,7 +365,7 @@ pub(crate) struct QueryLastPlayTimeIn {
 const_assert_eq!(size_of::<QueryLastPlayTimeIn>(), 0x01);
 
 /// Input for `QueryAccountPlayEvent` (4.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryAccountPlayEventIn {
     pub entry_index: i32,
@@ -335,7 +376,7 @@ pub(crate) struct QueryAccountPlayEventIn {
 const_assert_eq!(size_of::<QueryAccountPlayEventIn>(), 0x18);
 
 /// Input for `QueryRecentlyPlayedApplication` (pre-10.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryRecentlyPlayedAppLegacyIn {
     pub uid: AccountUid,
@@ -344,7 +385,7 @@ pub(crate) struct QueryRecentlyPlayedAppLegacyIn {
 const_assert_eq!(size_of::<QueryRecentlyPlayedAppLegacyIn>(), 0x10);
 
 /// Input for `QueryRecentlyPlayedApplication` (10.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct QueryRecentlyPlayedAppIn {
     pub flag: u8,
@@ -355,7 +396,7 @@ pub(crate) struct QueryRecentlyPlayedAppIn {
 const_assert_eq!(size_of::<QueryRecentlyPlayedAppIn>(), 0x18);
 
 /// Output for `GetAvailablePlayEventRange` / `GetAvailableAccountPlayEventRange`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct PlayEventRangeOut {
     pub total_entries: i32,
@@ -364,10 +405,6 @@ pub(crate) struct PlayEventRangeOut {
 }
 
 const_assert_eq!(size_of::<PlayEventRangeOut>(), 0x0C);
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /// Converts a Play timestamp (total minutes since 1999/12/31 00:00:00 UTC) to
 /// POSIX seconds.

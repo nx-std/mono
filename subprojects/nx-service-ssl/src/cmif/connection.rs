@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     DomainObjectRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -77,12 +78,7 @@ pub(crate) fn get_host_name(
         .out_size(size_of::<u32>())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<u32>())
 }
 
 /// Gets the verify option bitmask.
@@ -112,8 +108,7 @@ pub(crate) fn do_handshake_get_server_cert(
         .out_size(size_of::<HandshakeServerCertOut>())
         .out_buffer(server_certbuf, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    // SAFETY: response data is at least `size_of::<HandshakeServerCertOut>()` bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<HandshakeServerCertOut>()) })
+    Ok(*result.value::<HandshakeServerCertOut>())
 }
 
 /// Reads data from the TLS connection.
@@ -125,12 +120,7 @@ pub(crate) fn read(object: DomainObjectRef<'_>, buffer: &mut [u8]) -> Result<u32
         .out_size(size_of::<u32>())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<u32>())
 }
 
 /// Writes data to the TLS connection.
@@ -142,12 +132,7 @@ pub(crate) fn write(object: DomainObjectRef<'_>, buffer: &[u8]) -> Result<u32, D
         .out_size(size_of::<u32>())
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<u32>())
 }
 
 /// Gets the number of pending bytes.
@@ -164,12 +149,7 @@ pub(crate) fn peek(object: DomainObjectRef<'_>, buffer: &mut [u8]) -> Result<u32
         .out_size(size_of::<u32>())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(u32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]))
+    Ok(*result.value::<u32>())
 }
 
 /// Polls the connection for events.
@@ -244,18 +224,14 @@ pub(crate) fn set_option(
 
 /// Gets a connection option.
 pub(crate) fn get_option(object: DomainObjectRef<'_>, option: u32) -> Result<bool, DispatchError> {
-    // SAFETY: `option` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const option).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CONN_GET_OPTION)
-        .in_raw(in_bytes)
+        .in_raw(option.as_bytes())
         .out_size(size_of::<u8>())
         .send(&mut ipc_buf)?;
-    Ok(result.data[0] & 1 != 0)
+    Ok(*result.value::<u8>() & 1 != 0)
 }
 
 /// Gets verify cert errors into a buffer.
@@ -263,33 +239,14 @@ pub(crate) fn get_verify_cert_errors(
     object: DomainObjectRef<'_>,
     errors: &mut [u32],
 ) -> Result<(u32, u32), DispatchError> {
-    // SAFETY: `errors` is a valid `&mut [u32]` slice; viewing it as bytes for
-    // the OUT buffer is sound.
-    let errors_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            errors.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(errors),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CONN_GET_VERIFY_CERT_ERRORS)
         .out_size(size_of::<u32>() * 2)
-        .out_buffer(errors_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(errors.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    let out0 = u32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]);
-    let out1 = u32::from_le_bytes([
-        result.data[4],
-        result.data[5],
-        result.data[6],
-        result.data[7],
-    ]);
+    let [out0, out1] = *result.value::<[u32; 2]>();
     Ok((out0, out1))
 }
 
@@ -299,24 +256,12 @@ pub(crate) fn get_cipher_info(
     out: &mut CipherInfo,
 ) -> Result<(), DispatchError> {
     let val: u32 = 1;
-    // SAFETY: `val` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const val).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `out` is a valid `&mut CipherInfo`; viewing its bytes for the
-    // OUT buffer is sound.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut CipherInfo).cast::<u8>(),
-            size_of::<CipherInfo>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::CONN_GET_CIPHER_INFO)
-        .in_raw(in_bytes)
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_raw(val.as_bytes())
+        .out_buffer(out.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -347,8 +292,7 @@ pub(crate) fn get_next_alpn_proto(
         .out_size(size_of::<GetNextAlpnProtoOut>())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    // SAFETY: response data is at least `size_of::<GetNextAlpnProtoOut>()` bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<GetNextAlpnProtoOut>()) })
+    Ok(*result.value::<GetNextAlpnProtoOut>())
 }
 
 /// Sets DTLS socket descriptor (16.0.0+).
@@ -357,25 +301,15 @@ pub(crate) fn set_dtls_socket_descriptor(
     sockfd: i32,
     sockaddr: &[u8],
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `sockfd` is a `Copy` value on the stack, valid until `.send(&mut ipc_buf)`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const sockfd).cast::<u8>(), size_of::<i32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
         .dispatch(proto::CONN_SET_DTLS_SOCKET_DESCRIPTOR)
-        .in_raw(in_bytes)
+        .in_raw(sockfd.as_bytes())
         .out_size(size_of::<i32>())
         .in_buffer(sockaddr, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    let raw = u32::from_le_bytes([
-        result.data[0],
-        result.data[1],
-        result.data[2],
-        result.data[3],
-    ]);
-    Ok(raw as i32)
+    Ok(*result.value::<i32>())
 }
 
 /// Gets DTLS handshake timeout in nanoseconds (16.0.0+).
@@ -383,15 +317,11 @@ pub(crate) fn get_dtls_handshake_timeout(
     object: DomainObjectRef<'_>,
 ) -> Result<u64, DispatchError> {
     let mut out: u64 = 0;
-    // SAFETY: `out` is a valid local u64; viewing its bytes for the OUT buffer
-    // is sound, and the slice borrows `out`.
-    let out_bytes =
-        unsafe { core::slice::from_raw_parts_mut((&raw mut out).cast::<u8>(), size_of::<u64>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::CONN_GET_DTLS_HANDSHAKE_TIMEOUT)
-        .out_buffer(out_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .out_buffer(out.as_mut_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
     Ok(out)
 }
@@ -425,19 +355,11 @@ pub(crate) fn set_srtp_ciphers(
     object: DomainObjectRef<'_>,
     ciphers: &[u16],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `ciphers` is a valid `&[u16]` slice; viewing it as bytes for
-    // the IN buffer is sound.
-    let cipher_bytes = unsafe {
-        core::slice::from_raw_parts(
-            ciphers.as_ptr().cast::<u8>(),
-            core::mem::size_of_val(ciphers),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
         .dispatch(proto::CONN_SET_SRTP_CIPHERS)
-        .in_buffer(cipher_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(ciphers.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -450,7 +372,7 @@ pub(crate) fn get_srtp_cipher(object: DomainObjectRef<'_>) -> Result<u16, Dispat
         .dispatch(proto::CONN_GET_SRTP_CIPHER)
         .out_size(size_of::<u16>())
         .send(&mut ipc_buf)?;
-    Ok(u16::from_le_bytes([result.data[0], result.data[1]]))
+    Ok(*result.value::<u16>())
 }
 
 /// Exports keying material (16.0.0+).
