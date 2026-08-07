@@ -2,12 +2,15 @@
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Shared HID types (from hid.h, duplicated per-crate)
-// ---------------------------------------------------------------------------
-
 /// Analog stick state (from HidAnalogStickState).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidAnalogStickState {
     pub x: i32,
@@ -17,7 +20,7 @@ pub struct HidAnalogStickState {
 const_assert_eq!(size_of::<HidAnalogStickState>(), 0x8);
 
 /// 3D vector (from HidVector).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HidVector {
     pub x: f32,
@@ -28,7 +31,7 @@ pub struct HidVector {
 const_assert_eq!(size_of::<HidVector>(), 0xC);
 
 /// Touch screen state (from HidTouchState).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HidTouchState {
     pub delta_time: u64,
@@ -45,7 +48,7 @@ pub struct HidTouchState {
 const_assert_eq!(size_of::<HidTouchState>(), 0x28);
 
 /// Unique pad identifier (from HidsysUniquePadId).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct UniquePadId {
     pub id: u64,
@@ -53,12 +56,8 @@ pub struct UniquePadId {
 
 const_assert_eq!(size_of::<UniquePadId>(), 0x8);
 
-// ---------------------------------------------------------------------------
-// AutoPilot state types
-// ---------------------------------------------------------------------------
-
 /// State for overriding DebugPad input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct DebugPadAutoPilotState {
     pub attributes: u32,
@@ -70,7 +69,7 @@ pub struct DebugPadAutoPilotState {
 const_assert_eq!(size_of::<DebugPadAutoPilotState>(), 0x18);
 
 /// State for overriding Mouse input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct MouseAutoPilotState {
     pub x: i32,
@@ -85,7 +84,7 @@ pub struct MouseAutoPilotState {
 const_assert_eq!(size_of::<MouseAutoPilotState>(), 0x1C);
 
 /// State for overriding Keyboard input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct KeyboardAutoPilotState {
     pub modifiers: u64,
@@ -95,7 +94,7 @@ pub struct KeyboardAutoPilotState {
 const_assert_eq!(size_of::<KeyboardAutoPilotState>(), 0x28);
 
 /// State for overriding the Sleep button.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct SleepButtonAutoPilotState {
     pub buttons: u64,
@@ -103,12 +102,15 @@ pub struct SleepButtonAutoPilotState {
 
 const_assert_eq!(size_of::<SleepButtonAutoPilotState>(), 0x8);
 
-// ---------------------------------------------------------------------------
-// HDLS types
-// ---------------------------------------------------------------------------
-
 /// HDLS handle identifying a virtual controller.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HdlsHandle {
     pub handle: u64,
@@ -117,7 +119,7 @@ pub struct HdlsHandle {
 const_assert_eq!(size_of::<HdlsHandle>(), 0x8);
 
 /// HDLS session identifier (returned by AttachHdlsWorkBuffer on 13.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HdlsSessionId {
     pub id: u64,
@@ -126,7 +128,7 @@ pub struct HdlsSessionId {
 const_assert_eq!(size_of::<HdlsSessionId>(), 0x8);
 
 /// HDLS device info for \[7.0.0-8.1.0\].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HdlsDeviceInfoV7 {
     pub device_type_internal: u32,
@@ -139,7 +141,7 @@ pub struct HdlsDeviceInfoV7 {
 const_assert_eq!(size_of::<HdlsDeviceInfoV7>(), 0x10);
 
 /// HDLS device info for \[9.0.0+\].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HdlsDeviceInfo {
     pub device_type: u8,
@@ -154,7 +156,14 @@ pub struct HdlsDeviceInfo {
 const_assert_eq!(size_of::<HdlsDeviceInfo>(), 0x14);
 
 /// HDLS state for \[7.0.0-8.1.0\].
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HdlsStateV7 {
     pub is_powered: u8,
@@ -171,7 +180,7 @@ pub struct HdlsStateV7 {
 const_assert_eq!(size_of::<HdlsStateV7>(), 0x24);
 
 /// HDLS state for \[9.0.0-11.0.1\].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HdlsStateV9 {
     pub battery_level: u32,
@@ -180,13 +189,15 @@ pub struct HdlsStateV9 {
     pub analog_stick_l: HidAnalogStickState,
     pub analog_stick_r: HidAnalogStickState,
     pub indicator: u8,
-    pub padding: [u8; 3],
+    /// Trailing slack: three bytes the wire format names, plus the four the
+    /// 8-byte alignment adds.
+    pub padding: [u8; 7],
 }
 
 const_assert_eq!(size_of::<HdlsStateV9>(), 0x28);
 
 /// HDLS state for \[12.0.0+\].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct HdlsState {
     pub battery_level: u32,
@@ -294,12 +305,15 @@ pub struct HdlsStateList {
 
 const_assert_eq!(size_of::<HdlsStateList>(), 0x608);
 
-// ---------------------------------------------------------------------------
-// AbstractedPad types (5.0.0-8.1.0)
-// ---------------------------------------------------------------------------
-
 /// Abstracted pad handle.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AbstractedPadHandle {
     pub handle: u64,
@@ -308,7 +322,14 @@ pub struct AbstractedPadHandle {
 const_assert_eq!(size_of::<AbstractedPadHandle>(), 0x8);
 
 /// Abstracted pad state.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AbstractedPadState {
     pub kind: u32,
@@ -324,12 +345,8 @@ pub struct AbstractedPadState {
 
 const_assert_eq!(size_of::<AbstractedPadState>(), 0x98);
 
-// ---------------------------------------------------------------------------
-// IPC input structs (pub(crate) — not part of public API)
-// ---------------------------------------------------------------------------
-
 /// Input for UpdateControllerColor (cmd 221).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct UpdateControllerColorIn {
     pub color_body: u32,
@@ -340,7 +357,7 @@ pub(crate) struct UpdateControllerColorIn {
 const_assert_eq!(size_of::<UpdateControllerColorIn>(), 0x10);
 
 /// Input for UpdateDesignInfo (cmd 224).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct UpdateDesignInfoIn {
     pub color_body: u32,
@@ -355,7 +372,7 @@ pub(crate) struct UpdateDesignInfoIn {
 const_assert_eq!(size_of::<UpdateDesignInfoIn>(), 0x20);
 
 /// Input for ReadSerialFlash (cmd 229).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ReadSerialFlashIn {
     pub offset: u32,
@@ -367,7 +384,7 @@ pub(crate) struct ReadSerialFlashIn {
 const_assert_eq!(size_of::<ReadSerialFlashIn>(), 0x18);
 
 /// Input for WriteSerialFlash (cmd 230).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct WriteSerialFlashIn {
     pub offset: u32,
@@ -380,7 +397,7 @@ pub(crate) struct WriteSerialFlashIn {
 const_assert_eq!(size_of::<WriteSerialFlashIn>(), 0x20);
 
 /// Input for SetAutoPilotVirtualPadState (cmd 321).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetAutoPilotVirtualPadIn {
     pub abstracted_virtual_pad_id: i8,
@@ -391,7 +408,7 @@ pub(crate) struct SetAutoPilotVirtualPadIn {
 const_assert_eq!(size_of::<SetAutoPilotVirtualPadIn>(), 0xA0);
 
 /// Input for ApplyHdlsNpadAssignmentState \[13.0.0+\] (cmd 328).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ApplyHdlsNpadAssignmentIn {
     pub flag: u8,
@@ -402,17 +419,19 @@ pub(crate) struct ApplyHdlsNpadAssignmentIn {
 const_assert_eq!(size_of::<ApplyHdlsNpadAssignmentIn>(), 0x10);
 
 /// Input for SetHdlsState \[7.0.0-8.1.0\] (cmd 332).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetHdlsStateV7In {
     pub state: HdlsStateV7,
+    /// Alignment slack ahead of the 8-byte-aligned handle.
+    pub pad: [u8; 4],
     pub handle: HdlsHandle,
 }
 
 const_assert_eq!(size_of::<SetHdlsStateV7In>(), 0x30);
 
 /// Input for SetHdlsState \[9.0.0-11.0.1\] (cmd 332).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetHdlsStateV9In {
     pub handle: HdlsHandle,
@@ -422,7 +441,7 @@ pub(crate) struct SetHdlsStateV9In {
 const_assert_eq!(size_of::<SetHdlsStateV9In>(), 0x30);
 
 /// Input for SetHdlsState \[12.0.0+\] (cmd 332).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetHdlsStateIn {
     pub handle: HdlsHandle,

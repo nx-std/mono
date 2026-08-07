@@ -6,6 +6,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::dispatch_out,
@@ -36,23 +37,14 @@ pub(crate) fn is_firmware_update_needed_for_notification(
         unique_pad_id,
         applet_resource_user_id: aruid,
     };
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<IsFirmwareUpdateNeededIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::IS_FIRMWARE_UPDATE_NEEDED_FOR_NOTIFICATION)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .send_pid()
         .out_size(size_of::<u8>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    let out = unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
-    Ok(out & 1 != 0)
+    Ok(*result.value::<u8>() & 1 != 0)
 }

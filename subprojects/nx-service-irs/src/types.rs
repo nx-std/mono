@@ -7,10 +7,6 @@ use static_assertions::const_assert_eq;
 /// Maximum number of IR cameras (controller slots).
 pub const MAX_CAMERAS: usize = 9;
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
-
 /// IR camera availability status (from shared memory).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -103,12 +99,18 @@ pub enum HandAnalysisMode {
     SilhouetteOnly = 4,
 }
 
-// ---------------------------------------------------------------------------
-// Handle types
-// ---------------------------------------------------------------------------
-
 /// IR camera handle identifying a specific controller's IR sensor.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct IrCameraHandle {
     pub player_number: u8,
@@ -118,7 +120,7 @@ pub struct IrCameraHandle {
 const_assert_eq!(size_of::<IrCameraHandle>(), 0x4);
 
 /// Packed MCU firmware version.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedMcuVersion {
     pub major_version: u16,
@@ -127,7 +129,7 @@ pub struct PackedMcuVersion {
 const_assert_eq!(size_of::<PackedMcuVersion>(), 0x4);
 
 /// Packed function level for IR sensor activation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedFunctionLevel {
     pub ir_sensor_function_level: u8,
@@ -136,7 +138,7 @@ pub struct PackedFunctionLevel {
 const_assert_eq!(size_of::<PackedFunctionLevel>(), 0x4);
 
 /// Rectangle for window-of-interest regions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct Rect {
     pub x: i16,
@@ -146,12 +148,8 @@ pub struct Rect {
 }
 const_assert_eq!(size_of::<Rect>(), 0x8);
 
-// ---------------------------------------------------------------------------
-// Packed processor configs (wire format sent to service)
-// ---------------------------------------------------------------------------
-
 /// Packed wire-layout config for MomentProcessor (cmd 306).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedMomentProcessorConfig {
     pub exposure_time: u64,
@@ -168,7 +166,7 @@ pub struct PackedMomentProcessorConfig {
 const_assert_eq!(size_of::<PackedMomentProcessorConfig>(), 0x20);
 
 /// Packed wire-layout config for ClusteringProcessor (cmd 307).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedClusteringProcessorConfig {
     pub exposure_time: u64,
@@ -187,7 +185,7 @@ pub struct PackedClusteringProcessorConfig {
 const_assert_eq!(size_of::<PackedClusteringProcessorConfig>(), 0x28);
 
 /// Packed wire-layout config for ImageTransferProcessor (cmd 308).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedImageTransferProcessorConfig {
     pub exposure_time: u64,
@@ -202,7 +200,7 @@ pub struct PackedImageTransferProcessorConfig {
 const_assert_eq!(size_of::<PackedImageTransferProcessorConfig>(), 0x18);
 
 /// Packed wire-layout config for ImageTransferExProcessor (cmd 316). \[4.0.0+\]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedImageTransferProcessorExConfig {
     pub exposure_time: u64,
@@ -221,7 +219,7 @@ pub struct PackedImageTransferProcessorExConfig {
 const_assert_eq!(size_of::<PackedImageTransferProcessorExConfig>(), 0x20);
 
 /// Packed wire-layout config for PointingProcessor (cmd 312).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedPointingProcessorConfig {
     pub window_of_interest: Rect,
@@ -230,7 +228,7 @@ pub struct PackedPointingProcessorConfig {
 const_assert_eq!(size_of::<PackedPointingProcessorConfig>(), 0xC);
 
 /// Packed wire-layout config for TeraPluginProcessor (cmd 310).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedTeraPluginProcessorConfig {
     pub required_mcu_version: PackedMcuVersion,
@@ -242,7 +240,7 @@ pub struct PackedTeraPluginProcessorConfig {
 const_assert_eq!(size_of::<PackedTeraPluginProcessorConfig>(), 0x8);
 
 /// Packed wire-layout config for IrLedProcessor (cmd 317). \[4.0.0+\]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct PackedIrLedProcessorConfig {
     pub required_mcu_version: PackedMcuVersion,
@@ -251,13 +249,9 @@ pub struct PackedIrLedProcessorConfig {
 }
 const_assert_eq!(size_of::<PackedIrLedProcessorConfig>(), 0x8);
 
-// ---------------------------------------------------------------------------
-// IPC input structs
-// ---------------------------------------------------------------------------
-
 /// Input for StopImageProcessor / SuspendImageProcessor / StopImageProcessorAsync
 /// (cmds 305/313/318).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct HandleAruidIn {
     pub handle: IrCameraHandle,
@@ -267,7 +261,7 @@ pub(crate) struct HandleAruidIn {
 const_assert_eq!(size_of::<HandleAruidIn>(), 0x10);
 
 /// Input for RunMomentProcessor (cmd 306).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunMomentProcessorIn {
     pub handle: IrCameraHandle,
@@ -278,7 +272,7 @@ pub(crate) struct RunMomentProcessorIn {
 const_assert_eq!(size_of::<RunMomentProcessorIn>(), 0x30);
 
 /// Input for RunClusteringProcessor (cmd 307).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunClusteringProcessorIn {
     pub handle: IrCameraHandle,
@@ -289,7 +283,7 @@ pub(crate) struct RunClusteringProcessorIn {
 const_assert_eq!(size_of::<RunClusteringProcessorIn>(), 0x38);
 
 /// Input for RunImageTransferProcessor (cmd 308).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunImageTransferProcessorIn {
     pub handle: IrCameraHandle,
@@ -301,7 +295,7 @@ pub(crate) struct RunImageTransferProcessorIn {
 const_assert_eq!(size_of::<RunImageTransferProcessorIn>(), 0x30);
 
 /// Input for GetImageTransferProcessorState (cmd 309).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetImageTransferProcessorStateIn {
     pub handle: IrCameraHandle,
@@ -311,17 +305,19 @@ pub(crate) struct GetImageTransferProcessorStateIn {
 const_assert_eq!(size_of::<GetImageTransferProcessorStateIn>(), 0x10);
 
 /// Input for RunTeraPluginProcessor (cmd 310).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunTeraPluginProcessorIn {
     pub handle: IrCameraHandle,
     pub config: PackedTeraPluginProcessorConfig,
+    /// Alignment slack ahead of the 8-byte-aligned ARUID.
+    pub pad: u32,
     pub applet_resource_user_id: u64,
 }
 const_assert_eq!(size_of::<RunTeraPluginProcessorIn>(), 0x18);
 
 /// Input for RunPointingProcessor (cmd 312).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunPointingProcessorIn {
     pub handle: IrCameraHandle,
@@ -331,18 +327,20 @@ pub(crate) struct RunPointingProcessorIn {
 const_assert_eq!(size_of::<RunPointingProcessorIn>(), 0x18);
 
 /// Input for CheckFirmwareVersion (cmd 314). \[3.0.0+\]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CheckFirmwareVersionIn {
     pub handle: IrCameraHandle,
     pub version: PackedMcuVersion,
     pub pad: u32,
+    /// Alignment slack ahead of the 8-byte-aligned ARUID.
+    pub pad2: u32,
     pub applet_resource_user_id: u64,
 }
 const_assert_eq!(size_of::<CheckFirmwareVersionIn>(), 0x18);
 
 /// Input for RunImageTransferExProcessor (cmd 316). \[4.0.0+\]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunImageTransferExProcessorIn {
     pub handle: IrCameraHandle,
@@ -354,17 +352,19 @@ pub(crate) struct RunImageTransferExProcessorIn {
 const_assert_eq!(size_of::<RunImageTransferExProcessorIn>(), 0x38);
 
 /// Input for RunIrLedProcessor (cmd 317). \[4.0.0+\]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RunIrLedProcessorIn {
     pub handle: IrCameraHandle,
     pub config: PackedIrLedProcessorConfig,
+    /// Alignment slack ahead of the 8-byte-aligned ARUID.
+    pub pad: u32,
     pub applet_resource_user_id: u64,
 }
 const_assert_eq!(size_of::<RunIrLedProcessorIn>(), 0x18);
 
 /// Input for ActivateIrsensorWithFunctionLevel (cmd 319). \[4.0.0+\]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ActivateWithFunctionLevelIn {
     pub level: PackedFunctionLevel,
@@ -372,10 +372,6 @@ pub(crate) struct ActivateWithFunctionLevelIn {
     pub applet_resource_user_id: u64,
 }
 const_assert_eq!(size_of::<ActivateWithFunctionLevelIn>(), 0x10);
-
-// ---------------------------------------------------------------------------
-// Processor state types (read from shared memory)
-// ---------------------------------------------------------------------------
 
 /// Single statistic entry from the moment processor.
 #[derive(Debug, Clone, Copy)]
@@ -428,7 +424,7 @@ pub struct ClusteringProcessorState {
 const_assert_eq!(size_of::<ClusteringProcessorState>(), 0x198);
 
 /// State returned by GetImageTransferProcessorState (cmd 309 output).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ImageTransferProcessorState {
     pub sampling_number: u64,
@@ -486,10 +482,6 @@ pub struct TeraPluginProcessorState {
 }
 const_assert_eq!(size_of::<TeraPluginProcessorState>(), 0x140);
 
-// ---------------------------------------------------------------------------
-// Shared memory layout
-// ---------------------------------------------------------------------------
-
 /// Ring-buffer header for processor state entries in shared memory.
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -531,10 +523,6 @@ pub struct StatusManager {
     pub aruid_format: [AruidFormat; 5],
 }
 const_assert_eq!(size_of::<StatusManager>(), 0x8000);
-
-// ---------------------------------------------------------------------------
-// Client-side config types (user-facing, not sent on wire)
-// ---------------------------------------------------------------------------
 
 /// User-facing config for MomentProcessor (wider fields than the packed wire
 /// format).

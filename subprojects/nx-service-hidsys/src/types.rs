@@ -4,12 +4,18 @@ use core::mem::size_of;
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Core newtypes
-// ---------------------------------------------------------------------------
-
 /// Unique pad identifier.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct UniquePadId {
     pub id: u64,
@@ -18,7 +24,7 @@ pub struct UniquePadId {
 const_assert_eq!(size_of::<UniquePadId>(), 0x8);
 
 /// Unique pad serial number (16-byte fixed-length string).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct UniquePadSerialNumber {
     pub serial_number: [u8; 0x10],
@@ -27,7 +33,14 @@ pub struct UniquePadSerialNumber {
 const_assert_eq!(size_of::<UniquePadSerialNumber>(), 0x10);
 
 /// Bluetooth device address (6 bytes, duplicated per-crate).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct BtdrvAddress {
     pub address: [u8; 6],
@@ -35,12 +48,8 @@ pub struct BtdrvAddress {
 
 const_assert_eq!(size_of::<BtdrvAddress>(), 0x6);
 
-// ---------------------------------------------------------------------------
-// Notification LED types
-// ---------------------------------------------------------------------------
-
 /// Single mini-cycle in a notification LED pattern.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct NotificationLedPatternCycle {
     pub led_intensity: u8,
@@ -52,7 +61,7 @@ pub struct NotificationLedPatternCycle {
 const_assert_eq!(size_of::<NotificationLedPatternCycle>(), 0x4);
 
 /// Full notification LED pattern configuration.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct NotificationLedPattern {
     pub base_mini_cycle_duration: u8,
@@ -66,12 +75,8 @@ pub struct NotificationLedPattern {
 
 const_assert_eq!(size_of::<NotificationLedPattern>(), 0x48);
 
-// ---------------------------------------------------------------------------
-// Touch screen configuration
-// ---------------------------------------------------------------------------
-
 /// Touch screen configuration (from hid.h).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct HidTouchScreenConfigurationForNx {
     pub mode: u8,
@@ -79,10 +84,6 @@ pub struct HidTouchScreenConfigurationForNx {
 }
 
 const_assert_eq!(size_of::<HidTouchScreenConfigurationForNx>(), 0x10);
-
-// ---------------------------------------------------------------------------
-// Button config enums
-// ---------------------------------------------------------------------------
 
 /// Digital button assignment target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -133,12 +134,15 @@ pub enum UniquePadType {
     DebugPadController = 4,
 }
 
-// ---------------------------------------------------------------------------
-// Button config structs (typed — used by custom/hid button config commands)
-// ---------------------------------------------------------------------------
-
 /// Analog stick assignment for button remapping.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidcfgAnalogStickAssignment {
     pub rotation: u32,
@@ -149,7 +153,14 @@ pub struct HidcfgAnalogStickAssignment {
 const_assert_eq!(size_of::<HidcfgAnalogStickAssignment>(), 0x8);
 
 /// Button configuration for embedded (handheld) controller.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidcfgButtonConfigEmbedded {
     pub hardware_button_left: u32,
@@ -176,7 +187,14 @@ pub struct HidcfgButtonConfigEmbedded {
 const_assert_eq!(size_of::<HidcfgButtonConfigEmbedded>(), 0x54);
 
 /// Button configuration for full (pro) controller.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidcfgButtonConfigFull {
     pub hardware_button_left: u32,
@@ -203,7 +221,14 @@ pub struct HidcfgButtonConfigFull {
 const_assert_eq!(size_of::<HidcfgButtonConfigFull>(), 0x54);
 
 /// Button configuration for left Joy-Con.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidcfgButtonConfigLeft {
     pub hardware_button_left: u32,
@@ -223,7 +248,14 @@ pub struct HidcfgButtonConfigLeft {
 const_assert_eq!(size_of::<HidcfgButtonConfigLeft>(), 0x34);
 
 /// Button configuration for right Joy-Con.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidcfgButtonConfigRight {
     pub hardware_button_a: u32,
@@ -242,7 +274,14 @@ pub struct HidcfgButtonConfigRight {
 const_assert_eq!(size_of::<HidcfgButtonConfigRight>(), 0x30);
 
 /// Storage name for button config presets (UTF-8 NUL-terminated).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidcfgStorageName {
     pub name: [u8; 0x81],
@@ -250,12 +289,15 @@ pub struct HidcfgStorageName {
 
 const_assert_eq!(size_of::<HidcfgStorageName>(), 0x81);
 
-// ---------------------------------------------------------------------------
-// Legacy opaque button config blobs [10.0.0-10.2.0]
-// ---------------------------------------------------------------------------
-
 /// Opaque embedded button config blob (legacy wire format).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidsysButtonConfigEmbedded {
     pub data: [u8; 0x2C8],
@@ -264,7 +306,14 @@ pub struct HidsysButtonConfigEmbedded {
 const_assert_eq!(size_of::<HidsysButtonConfigEmbedded>(), 0x2C8);
 
 /// Opaque full button config blob (legacy wire format).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidsysButtonConfigFull {
     pub data: [u8; 0x2C8],
@@ -273,7 +322,14 @@ pub struct HidsysButtonConfigFull {
 const_assert_eq!(size_of::<HidsysButtonConfigFull>(), 0x2C8);
 
 /// Opaque left button config blob (legacy wire format).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidsysButtonConfigLeft {
     pub data: [u8; 0x1C8],
@@ -282,7 +338,14 @@ pub struct HidsysButtonConfigLeft {
 const_assert_eq!(size_of::<HidsysButtonConfigLeft>(), 0x1C8);
 
 /// Opaque right button config blob (legacy wire format).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct HidsysButtonConfigRight {
     pub data: [u8; 0x1A0],
@@ -290,12 +353,8 @@ pub struct HidsysButtonConfigRight {
 
 const_assert_eq!(size_of::<HidsysButtonConfigRight>(), 0x1A0);
 
-// ---------------------------------------------------------------------------
-// IPC input structs (pub(crate) — not part of public API)
-// ---------------------------------------------------------------------------
-
 /// EnableAppletToGetInput (cmd 503) input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EnableAppletToGetInputIn {
     pub permit_input: u8,
@@ -306,7 +365,7 @@ pub(crate) struct EnableAppletToGetInputIn {
 const_assert_eq!(size_of::<EnableAppletToGetInputIn>(), 0x10);
 
 /// u64 + bool combined input (cmds 1202 legacy, 1273, etc.).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct InU64BoolIn {
     pub flag: u8,
@@ -317,7 +376,7 @@ pub(crate) struct InU64BoolIn {
 const_assert_eq!(size_of::<InU64BoolIn>(), 0x10);
 
 /// BtdrvAddress + bool combined input (cmds 1204, etc.).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C, packed)]
 pub(crate) struct InAddrBoolIn {
     pub flag: u8,
@@ -327,7 +386,7 @@ pub(crate) struct InAddrBoolIn {
 const_assert_eq!(size_of::<InAddrBoolIn>(), 0x7);
 
 /// SetNotificationLedPattern (cmd 830) input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetNotificationLedPatternIn {
     pub pattern: NotificationLedPattern,
@@ -337,7 +396,7 @@ pub(crate) struct SetNotificationLedPatternIn {
 const_assert_eq!(size_of::<SetNotificationLedPatternIn>(), 0x50);
 
 /// SetNotificationLedPatternWithTimeout (cmd 831) input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetNotificationLedPatternWithTimeoutIn {
     pub pattern: NotificationLedPattern,
@@ -348,7 +407,7 @@ pub(crate) struct SetNotificationLedPatternWithTimeoutIn {
 const_assert_eq!(size_of::<SetNotificationLedPatternWithTimeoutIn>(), 0x58);
 
 /// IsFirmwareUpdateNeededForNotification (cmd 1154) input.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct IsFirmwareUpdateNeededIn {
     pub val: i32,
@@ -360,7 +419,7 @@ pub(crate) struct IsFirmwareUpdateNeededIn {
 const_assert_eq!(size_of::<IsFirmwareUpdateNeededIn>(), 0x18);
 
 /// GetNpadLeftRightInterfaceType / HasLeftRightBattery output.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct LeftRightU8Out {
     pub left: u8,

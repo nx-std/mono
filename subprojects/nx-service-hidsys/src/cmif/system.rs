@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -23,10 +24,6 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// Keyboard
-// ---------------------------------------------------------------------------
-
 /// SendKeyboardLockKeyEvent (cmd 31).
 pub(crate) fn send_keyboard_lock_key_event(
     service: &Session,
@@ -34,10 +31,6 @@ pub(crate) fn send_keyboard_lock_key_event(
 ) -> Result<(), DispatchError> {
     dispatch_in(service, proto::SEND_KEYBOARD_LOCK_KEY_EVENT, &events)
 }
-
-// ---------------------------------------------------------------------------
-// Npad system policy
-// ---------------------------------------------------------------------------
 
 /// ApplyNpadSystemCommonPolicy (cmd 303).
 pub(crate) fn apply_npad_system_common_policy(service: &Session) -> Result<(), DispatchError> {
@@ -96,33 +89,17 @@ pub(crate) fn get_unique_pads_from_npad(
     npad_id: u32,
     out_pads: &mut [UniquePadId],
 ) -> Result<i64, DispatchError> {
-    // SAFETY: `npad_id` is a `Copy` value on the stack, valid until `.send()`.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const npad_id).cast::<u8>(), size_of::<u32>()) };
-    // SAFETY: `out_pads` is a valid `&mut` slice; viewing it as mutable bytes
-    // for the OUT pointer buffer is sound.
-    let buf_bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            out_pads.as_mut_ptr().cast::<u8>(),
-            core::mem::size_of_val(out_pads),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::GET_UNIQUE_PADS_FROM_NPAD)
-        .in_raw(in_bytes)
-        .out_buffer(buf_bytes, BufferAttr::HIPC_POINTER)
+        .in_raw(npad_id.as_bytes())
+        .out_buffer(out_pads.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .out_size(size_of::<i64>())
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least 8 bytes.
-    Ok(unsafe { core::ptr::read_unaligned(result.data.as_ptr().cast::<i64>()) })
+    Ok(*result.value::<i64>())
 }
-
-// ---------------------------------------------------------------------------
-// Applet resource / handheld control
-// ---------------------------------------------------------------------------
 
 /// SetAppletResourceUserId (cmd 500).
 pub(crate) fn set_applet_resource_user_id(
