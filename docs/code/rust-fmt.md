@@ -96,7 +96,7 @@ A type's rendering is a contract: it lands on the console's fatal screen, in a p
 dump, and in the `Display` a homebrew developer reads when a call fails. Prose describing it drifts; an assertion
 does not. Without one, a change to the encoding breaks every consumer without breaking a single test.
 
-Crates here build for `aarch64-nintendo-switch-freestanding`, where `cargo test --doc` does not run, so the
+Crates here build for `aarch64-nintendo-horizon.json`, where `cargo test --doc` does not run, so the
 rustdoc example documents the rendering but **does not pin it**. The pin is a plain `#[test]` over the formatted
 string in the in-tree `tests` module — a host-runnable unit test with no `it_` prefix, since formatting needs no
 kernel. Write both: the example for the reader, the test for CI.

@@ -24,5 +24,7 @@
     "kind": "inline"
   },
   "target-pointer-width": 64,
-  "vendor": "nintendo"
+  "vendor": "nintendo",
+  "has-thread-local": true,
+  "tls-model": "local-exec"
 }

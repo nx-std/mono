@@ -11,8 +11,8 @@ builddir := "buildDir"
 # Cargo target directory (can be overridden with just cargo_target_dir=<path> <task>)
 cargo_target_dir := builddir / "cargo-target"
 
-# Target platform for Rust builds
-target := "aarch64-nintendo-switch-freestanding"
+# Target platform for Rust builds (repo-local spec; see .cargo/config.toml)
+target := "aarch64-nintendo-horizon.json"
 
 
 ## Format

@@ -570,6 +570,30 @@ pub unsafe fn init_thread_vars(
             tls_ptr,
         });
     }
+
+    // The same thread pointer has to reach the register the compiler resolves
+    // thread-locals against. C code gets it by calling `__aarch64_read_tp`,
+    // which reads the `tls_ptr` field written just above; Rust does not - LLVM
+    // emits `mrs <x>, tpidr_el0` and adds a link-time offset. Horizon leaves
+    // that register alone, so unless it is set here the two disagree and every
+    // Rust thread-local on this thread resolves against an uninitialized base.
+    //
+    // Setting it beside the field it must agree with is what keeps them from
+    // drifting: there is one place a thread's pointer is established, and both
+    // consumers read what it wrote.
+    //
+    // The converse is the load-bearing part, and it is not checkable from here:
+    // this is the *only* writer, so a thread that reached user code without
+    // calling it has no valid `tpidr_el0`. libnx's `newlibSetup`/`threadCreate`
+    // set `tls_ptr` and nothing else, so a thread libnx created is exactly that
+    // thread. Reading a Rust thread-local on one resolves against a stale base
+    // and yields another thread's memory rather than faulting. Builds that use
+    // Rust thread-locals therefore have to let Rust own thread startup; the
+    // crates that hold one enforce it at configure time.
+    //
+    // SAFETY: `init_thread_vars` runs on the thread being initialized, and
+    // `tls_ptr` is the thread-pointer value its TLS block was laid out for.
+    unsafe { control_regs::set_tpidr_el0(tls_ptr.to_raw() as usize) };
 }
 
 /// Returns a type-safe pointer to the current thread's language-specific thread object.

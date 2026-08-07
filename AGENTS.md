@@ -179,7 +179,7 @@ Build artifacts go to `buildDir/`:
 
 ### Cross-Compilation
 
-The project targets `aarch64-nintendo-switch-freestanding`. Cargo configuration in `.cargo/config.toml` enables:
+The project targets `aarch64-nintendo-horizon.json`, the repo-local target spec. Cargo configuration in `.cargo/config.toml` enables:
 
 - `build-std` for `core`, `compiler_builtins`, `alloc`
 - `panic = "abort"` for both dev and release profiles
@@ -423,7 +423,7 @@ Edit File → /code-format skill
 **Essential conventions:**
 
 - **Maintain type safety**: Leverage Rust's type system fully (see [Type-Driven Design](docs/code/principle-type-driven-design.md))
-- **No-std discipline**: Code targets `aarch64-nintendo-switch-freestanding` — no `std`, `panic = "abort"`
+- **No-std discipline**: Code targets `aarch64-nintendo-horizon.json` — no `std`, `panic = "abort"`
 - **Validate at FFI boundaries**: Hard shell on the C-facing surface (`__nx_*`); soft core inside (see [Validate at the Edge](docs/code/principle-validate-at-edge.md))
 - **Format code before checks/commit**: Use `/code-format` skill
 - **Fix all warnings**: Use `/code-check` skill for clippy
