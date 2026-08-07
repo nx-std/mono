@@ -9,10 +9,6 @@ pub use nx_service_mii::{
 };
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
-
 /// NFP service type — determines which service name to connect to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NfpServiceType {
@@ -112,10 +108,6 @@ pub enum NfpBreakType {
     Break2 = 2,
 }
 
-// ---------------------------------------------------------------------------
-// Bitflags
-// ---------------------------------------------------------------------------
-
 bitflags! {
     /// NFP mount target flags.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,12 +153,18 @@ bitflags! {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Wire-layout structs
-// ---------------------------------------------------------------------------
-
 /// NFP date.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpDate {
     pub year: u16,
@@ -177,7 +175,15 @@ pub struct NfpDate {
 const_assert_eq!(size_of::<NfpDate>(), 0x04);
 
 /// NFC tag UID.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfcTagUid {
     pub uid: [u8; 10],
@@ -188,7 +194,15 @@ pub struct NfcTagUid {
 const_assert_eq!(size_of::<NfcTagUid>(), 0x20);
 
 /// Tag info shared by NFP and NFC (identical wire layout).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfcTagInfo {
     pub uid: NfcTagUid,
@@ -204,7 +218,15 @@ const_assert_eq!(size_of::<NfcTagInfo>(), 0x58);
 pub type NfpTagInfo = NfcTagInfo;
 
 /// NFP common info (requires Ram mount).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpCommonInfo {
     pub last_write_date: NfpDate,
@@ -217,7 +239,15 @@ pub struct NfpCommonInfo {
 const_assert_eq!(size_of::<NfpCommonInfo>(), 0x40);
 
 /// NFP model info (requires Rom mount).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpModelInfo {
     pub character_id: [u8; 3],
@@ -256,7 +286,15 @@ pub struct NfpRegisterInfoPrivate {
 const_assert_eq!(size_of::<NfpRegisterInfoPrivate>(), 0x100);
 
 /// NFP admin info (system/debug only).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfpAdminInfo {
     pub application_id: u64,
@@ -309,7 +347,17 @@ pub struct NfpData {
 const_assert_eq!(size_of::<NfpData>(), 0x298);
 
 /// NFC device handle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NfcDeviceHandle {
     pub handle: [u8; 0x8],
@@ -318,7 +366,7 @@ pub struct NfcDeviceHandle {
 const_assert_eq!(size_of::<NfcDeviceHandle>(), 0x08);
 
 /// NFC sector key for Mifare operations.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C, packed)]
 pub struct NfcSectorKey {
     pub mifare_command: u8,
@@ -331,7 +379,7 @@ pub struct NfcSectorKey {
 const_assert_eq!(size_of::<NfcSectorKey>(), 0x10);
 
 /// Mifare read block parameter.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C, packed)]
 pub struct NfcMifareReadBlockParameter {
     pub sector_number: u8,
@@ -342,7 +390,15 @@ pub struct NfcMifareReadBlockParameter {
 const_assert_eq!(size_of::<NfcMifareReadBlockParameter>(), 0x18);
 
 /// Mifare read block data (output).
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C, packed)]
 pub struct NfcMifareReadBlockData {
     pub data: [u8; 0x10],
@@ -353,7 +409,7 @@ pub struct NfcMifareReadBlockData {
 const_assert_eq!(size_of::<NfcMifareReadBlockData>(), 0x18);
 
 /// Mifare write block parameter.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct NfcMifareWriteBlockParameter {
     pub data: [u8; 0x10],
@@ -365,7 +421,7 @@ pub struct NfcMifareWriteBlockParameter {
 const_assert_eq!(size_of::<NfcMifareWriteBlockParameter>(), 0x28);
 
 /// Required MCU version data (sent during initialization).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct NfcRequiredMcuVersionData {
     pub version: u64,
@@ -374,12 +430,8 @@ pub struct NfcRequiredMcuVersionData {
 
 const_assert_eq!(size_of::<NfcRequiredMcuVersionData>(), 0x20);
 
-// ---------------------------------------------------------------------------
-// IPC input structs (crate-internal)
-// ---------------------------------------------------------------------------
-
 /// Input for NFP Mount command.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct MountIn {
     pub handle: NfcDeviceHandle,
@@ -390,7 +442,7 @@ pub(crate) struct MountIn {
 const_assert_eq!(size_of::<MountIn>(), 0x10);
 
 /// Input for NFP OpenApplicationArea / CreateApplicationArea / RecreateApplicationArea.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DeviceHandleAppIdIn {
     pub handle: NfcDeviceHandle,
@@ -400,7 +452,7 @@ pub(crate) struct DeviceHandleAppIdIn {
 const_assert_eq!(size_of::<DeviceHandleAppIdIn>(), 0x0C);
 
 /// Input for NFP BreakTag.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct BreakTagIn {
     pub handle: NfcDeviceHandle,
@@ -410,7 +462,7 @@ pub(crate) struct BreakTagIn {
 const_assert_eq!(size_of::<BreakTagIn>(), 0x0C);
 
 /// Input for NFP WriteNtf.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct WriteNtfIn {
     pub handle: NfcDeviceHandle,
@@ -420,7 +472,7 @@ pub(crate) struct WriteNtfIn {
 const_assert_eq!(size_of::<WriteNtfIn>(), 0x0C);
 
 /// Input for NFC StartDetection (4.0.0+ — device handle + protocol).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct NfcStartDetectionIn {
     pub handle: NfcDeviceHandle,
@@ -430,7 +482,7 @@ pub(crate) struct NfcStartDetectionIn {
 const_assert_eq!(size_of::<NfcStartDetectionIn>(), 0x0C);
 
 /// Input for NFC SendCommandByPassThrough (device handle + timeout).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SendCommandByPassThroughIn {
     pub handle: NfcDeviceHandle,
@@ -440,7 +492,7 @@ pub(crate) struct SendCommandByPassThroughIn {
 const_assert_eq!(size_of::<SendCommandByPassThroughIn>(), 0x10);
 
 /// Input for interface initialization (ARUID + zero).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct InitializeIn {
     pub aruid: u64,
