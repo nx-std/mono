@@ -3,12 +3,15 @@
 use bitflags::bitflags;
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Standard USB descriptor types
-// ---------------------------------------------------------------------------
-
 /// USB endpoint descriptor (7 bytes, packed per USB spec).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C, packed)]
 pub struct UsbEndpointDescriptor {
     pub b_length: u8,
@@ -22,7 +25,14 @@ pub struct UsbEndpointDescriptor {
 const_assert_eq!(size_of::<UsbEndpointDescriptor>(), 0x7);
 
 /// USB SuperSpeed endpoint companion descriptor (6 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct UsbSsEndpointCompanionDescriptor {
     pub b_length: u8,
@@ -35,7 +45,14 @@ pub struct UsbSsEndpointCompanionDescriptor {
 const_assert_eq!(size_of::<UsbSsEndpointCompanionDescriptor>(), 0x6);
 
 /// USB interface descriptor (9 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct UsbInterfaceDescriptor {
     pub b_length: u8,
@@ -52,7 +69,14 @@ pub struct UsbInterfaceDescriptor {
 const_assert_eq!(size_of::<UsbInterfaceDescriptor>(), 0x9);
 
 /// USB device descriptor (18 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct UsbDeviceDescriptor {
     pub b_length: u8,
@@ -74,7 +98,14 @@ pub struct UsbDeviceDescriptor {
 const_assert_eq!(size_of::<UsbDeviceDescriptor>(), 0x12);
 
 /// USB configuration descriptor (9 bytes, packed).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C, packed)]
 pub struct UsbConfigDescriptor {
     pub b_length: u8,
@@ -88,10 +119,6 @@ pub struct UsbConfigDescriptor {
 }
 
 const_assert_eq!(size_of::<UsbConfigDescriptor>(), 0x9);
-
-// ---------------------------------------------------------------------------
-// USB host stack types
-// ---------------------------------------------------------------------------
 
 bitflags! {
     /// Interface filter flags. When set, the corresponding descriptor field
@@ -122,7 +149,7 @@ bitflags! {
 ///
 /// On 7.0.0+ the filter must be unique (not shared with other processes) and
 /// `flags` must be non-zero.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct UsbHsInterfaceFilter {
     pub flags: u16,
@@ -144,9 +171,16 @@ const_assert_eq!(size_of::<UsbHsInterfaceFilter>(), 0x10);
 /// endpoint descriptors, and SuperSpeed endpoint companion descriptors.
 ///
 /// The INPUT/OUTPUT endpoint descriptors were swapped at 8.0.0. This crate
-/// does not perform the swap — callers targeting pre-8.0.0 must swap
+/// does not perform the swap; callers targeting pre-8.0.0 must swap
 /// input/output descriptor arrays themselves.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C, packed)]
 pub struct UsbHsInterfaceInfo {
     pub id: i32,
@@ -168,7 +202,14 @@ const_assert_eq!(size_of::<UsbHsInterfaceInfo>(), 0x1B8);
 
 /// Full interface struct (packed). Each USB device has a separate
 /// `UsbHsInterface` per interface.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C, packed)]
 pub struct UsbHsInterface {
     pub inf: UsbHsInterfaceInfo,
@@ -184,7 +225,15 @@ pub struct UsbHsInterface {
 const_assert_eq!(size_of::<UsbHsInterface>(), 0x228);
 
 /// Transfer report entry.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct UsbHsXferReport {
     pub xfer_id: u32,
@@ -206,12 +255,8 @@ pub struct UsbHsRingHeader {
 
 const_assert_eq!(size_of::<UsbHsRingHeader>(), 0x10);
 
-// ---------------------------------------------------------------------------
-// IPC input structs (crate-internal)
-// ---------------------------------------------------------------------------
-
 /// Input for CreateInterfaceAvailableEvent.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CreateInterfaceAvailableEventIn {
     pub index: u8,
@@ -222,7 +267,7 @@ pub(crate) struct CreateInterfaceAvailableEventIn {
 const_assert_eq!(size_of::<CreateInterfaceAvailableEventIn>(), 0x12);
 
 /// Input for SubmitControlRequest (pre-2.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SubmitControlRequestIn {
     pub b_request: u8,
@@ -236,7 +281,7 @@ pub(crate) struct SubmitControlRequestIn {
 const_assert_eq!(size_of::<SubmitControlRequestIn>(), 0xC);
 
 /// Input for CtrlXferAsync (2.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CtrlXferAsyncIn {
     pub bm_request_type: u8,
@@ -250,7 +295,7 @@ pub(crate) struct CtrlXferAsyncIn {
 const_assert_eq!(size_of::<CtrlXferAsyncIn>(), 0x10);
 
 /// Input for OpenUsbEp.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct OpenUsbEpIn {
     pub max_urb_count: u16,
@@ -264,7 +309,7 @@ pub(crate) struct OpenUsbEpIn {
 const_assert_eq!(size_of::<OpenUsbEpIn>(), 0x14);
 
 /// Input for endpoint SubmitRequest (pre-2.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EpSubmitRequestIn {
     pub size: u32,
@@ -274,7 +319,7 @@ pub(crate) struct EpSubmitRequestIn {
 const_assert_eq!(size_of::<EpSubmitRequestIn>(), 0x8);
 
 /// Input for endpoint PostBufferAsync (2.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EpPostBufferAsyncIn {
     pub size: u32,
@@ -286,7 +331,7 @@ pub(crate) struct EpPostBufferAsyncIn {
 const_assert_eq!(size_of::<EpPostBufferAsyncIn>(), 0x18);
 
 /// Input for endpoint BatchBufferAsync (2.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EpBatchBufferAsyncIn {
     pub urb_count: u32,
@@ -300,7 +345,7 @@ pub(crate) struct EpBatchBufferAsyncIn {
 const_assert_eq!(size_of::<EpBatchBufferAsyncIn>(), 0x20);
 
 /// Input for endpoint CreateSmmuSpace (4.0.0+).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EpCreateSmmuSpaceIn {
     pub size: u32,

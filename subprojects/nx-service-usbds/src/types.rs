@@ -17,7 +17,7 @@ pub struct UsbDsDeviceInfo {
 const_assert_eq!(size_of::<UsbDsDeviceInfo>(), 0x66);
 
 /// A single entry in a USB report.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct UsbDsReportEntry {
     pub id: u32,
@@ -29,7 +29,7 @@ pub struct UsbDsReportEntry {
 const_assert_eq!(size_of::<UsbDsReportEntry>(), 0x10);
 
 /// USB report data containing up to 8 entries.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct UsbDsReportData {
     pub report: [UsbDsReportEntry; 8],
@@ -39,7 +39,7 @@ pub struct UsbDsReportData {
 const_assert_eq!(size_of::<UsbDsReportData>(), 0x84);
 
 /// Wire-layout input for PostBufferAsync commands.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct PostBufferIn {
     pub size: u32,
@@ -50,7 +50,7 @@ pub(crate) struct PostBufferIn {
 const_assert_eq!(size_of::<PostBufferIn>(), 0x10);
 
 /// Wire-layout input for AppendConfigurationData (pre-11.0.0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct AppendConfigDataLegacyIn {
     pub intf_num: u8,
@@ -92,7 +92,7 @@ pub enum UsbComplexId {
 }
 
 /// USB string descriptor (wire layout for AddUsbStringDescriptor).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct UsbStringDescriptor {
     pub b_length: u8,

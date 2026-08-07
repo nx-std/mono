@@ -7,6 +7,7 @@ use nx_sf::service::{
     DispatchError,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -23,10 +24,6 @@ use crate::{
         UsbStringDescriptor,
     },
 };
-
-// ---------------------------------------------------------------------------
-// IDsService — root service commands
-// ---------------------------------------------------------------------------
 
 /// BindDevice (pre-11.0.0, cmd 0). Takes complex_id as u32.
 pub(crate) fn bind_device_legacy(service: &Session, complex_id: u32) -> Result<(), DispatchError> {
@@ -53,16 +50,11 @@ pub(crate) fn bind_device(
     complex_id: u32,
     proc_handle: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `complex_id` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const complex_id).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::BIND_DEVICE)
-        .in_raw(in_bytes)
+        .in_raw(complex_id.as_bytes())
         .in_handle(proc_handle)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -119,15 +111,11 @@ pub(crate) fn register_interface(
     cmd_id: u32,
     intf_num: u8,
 ) -> Result<u32, RegisterInterfaceError> {
-    // SAFETY: `intf_num` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const intf_num).cast::<u8>(), size_of::<u8>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(intf_num.as_bytes())
         .send(&mut ipc_buf)
         .map_err(RegisterInterfaceError::Dispatch)?;
 
@@ -160,20 +148,11 @@ pub(crate) fn add_usb_string_descriptor(
     cmd_id: u32,
     descriptor: &UsbStringDescriptor,
 ) -> Result<u8, DispatchError> {
-    // SAFETY: `UsbStringDescriptor` is a `#[repr(C)]` struct; viewing its
-    // `size_of` bytes as a byte slice for the IN buffer is sound, and the
-    // slice borrows `descriptor`.
-    let desc_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (descriptor as *const UsbStringDescriptor).cast::<u8>(),
-            size_of::<UsbStringDescriptor>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_buffer(desc_bytes, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(descriptor.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .out_size(size_of::<u8>())
         .send(&mut ipc_buf)?;
 
@@ -196,15 +175,11 @@ pub(crate) fn set_usb_device_descriptor(
     speed: u32,
     descriptor: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `speed` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const speed).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(speed.as_bytes())
         .in_buffer(descriptor, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -239,10 +214,6 @@ pub(crate) fn disable(service: &Session, cmd_id: u32) -> Result<(), DispatchErro
 pub(crate) fn get_speed(service: &Session, cmd_id: u32) -> Result<u32, DispatchError> {
     dispatch_domain_out::<u32>(service, cmd_id)
 }
-
-// ---------------------------------------------------------------------------
-// IDsInterface commands
-// ---------------------------------------------------------------------------
 
 /// GetSetupEvent. Returns copy-handle.
 pub(crate) fn intf_get_event(service: &Session, cmd_id: u32) -> Result<u32, GetEventError> {
@@ -327,16 +298,11 @@ pub(crate) fn intf_register_endpoint(
     service: &Session,
     endpoint_address: u8,
 ) -> Result<u32, RegisterEndpointError> {
-    // SAFETY: `endpoint_address` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const endpoint_address).cast::<u8>(), size_of::<u8>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::INTF_REGISTER_ENDPOINT)
-        .in_raw(in_bytes)
+        .in_raw(endpoint_address.as_bytes())
         .send(&mut ipc_buf)
         .map_err(RegisterEndpointError::Dispatch)?;
 
@@ -360,19 +326,11 @@ pub(crate) fn intf_append_configuration_data_legacy(
         speed,
     };
 
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<AppendConfigDataLegacyIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA_LEGACY)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -384,23 +342,15 @@ pub(crate) fn intf_append_configuration_data(
     speed: u32,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `speed` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const speed).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::INTF_APPEND_CONFIGURATION_DATA)
-        .in_raw(in_bytes)
+        .in_raw(speed.as_bytes())
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
-
-// ---------------------------------------------------------------------------
-// IDsEndpoint commands
-// ---------------------------------------------------------------------------
 
 /// Endpoint Cancel (cmd 1).
 pub(crate) fn ep_cancel(service: &Session) -> Result<(), DispatchError> {
@@ -417,10 +367,6 @@ pub(crate) fn ep_set_zlt(service: &Session, zlt: bool) -> Result<(), DispatchErr
     let val: u8 = u8::from(zlt);
     dispatch_domain_in_no_out(service, proto::EP_SET_ZLT, &val)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by event acquisition operations.
 #[derive(Debug, thiserror::Error)]
