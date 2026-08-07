@@ -427,15 +427,21 @@ pub fn set_focus_handling_mode(
         suspend_on_background as u8,
     ];
 
-    let mut buf = nx_sys_thread_tls::ipc_buffer();
+    // Scoped so the buffer is released before the second command asks for it.
+    // This sends two commands, and the call below acquires the buffer itself;
+    // holding this one across it would be a thread borrowing the buffer while
+    // it already holds it.
+    {
+        let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    self_controller
-        .dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE)
-        .in_raw(&input)
-        .send(&mut buf)
-        .map_err(SetFocusHandlingModeError::Dispatch)?;
+        self_controller
+            .dispatch(CMD_SC_SET_FOCUS_HANDLING_MODE)
+            .in_raw(&input)
+            .send(&mut buf)
+            .map_err(SetFocusHandlingModeError::Dispatch)?;
+    }
 
-    // cmd 16: SetOutOfFocusSuspendingEnabled — single bool. Required for AlwaysSuspend
+    // cmd 16: SetOutOfFocusSuspendingEnabled - single bool. Required for AlwaysSuspend
     // semantics; libnx always sends it on HOS 2.0.0+ so the flag does not leak across
     // mode transitions.
     set_out_of_focus_suspending_enabled(self_controller, out_of_focus_suspending)
