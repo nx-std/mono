@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the Bluetooth Driver service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -79,8 +77,6 @@ use crate::{
     },
 };
 
-// Core Bluetooth (cmds 0-15)
-
 /// InitializeBluetoothDriver (cmd 0).
 pub(crate) fn initialize_bluetooth_driver(service: &Session) -> Result<(), DispatchError> {
     dispatch_no_io(service, proto::INITIALIZE_BLUETOOTH_DRIVER)
@@ -128,16 +124,11 @@ pub(crate) fn get_adapter_property_legacy(
     property_type: u32,
     buf: &mut [u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `property_type` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const property_type).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::GET_ADAPTER_PROPERTY)
-        .in_raw(in_bytes)
+        .in_raw(property_type.as_bytes())
         .out_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -149,25 +140,15 @@ pub(crate) fn get_adapter_property(
     property_type: u32,
     out: &mut BtdrvAdapterProperty,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `property_type` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const property_type).cast::<u8>(), size_of::<u32>())
-    };
-    // SAFETY: `out` is a valid mutable reference; viewing its bytes as a
-    // slice for the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_buf = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut BtdrvAdapterProperty).cast::<u8>(),
-            size_of::<BtdrvAdapterProperty>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::GET_ADAPTER_PROPERTY)
-        .in_raw(in_bytes)
-        .out_buffer(out_buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(property_type.as_bytes())
+        .out_buffer(
+            out.as_mut_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -178,16 +159,11 @@ pub(crate) fn set_adapter_property_legacy(
     property_type: u32,
     buf: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `property_type` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const property_type).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_ADAPTER_PROPERTY)
-        .in_raw(in_bytes)
+        .in_raw(property_type.as_bytes())
         .in_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -199,25 +175,15 @@ pub(crate) fn set_adapter_property(
     property_type: u32,
     input: &BtdrvAdapterProperty,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `property_type` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const property_type).cast::<u8>(), size_of::<u32>())
-    };
-    // SAFETY: `input` is a valid reference; viewing its bytes as a slice for
-    // the IN buffer is sound, and the byte slice borrows `input`.
-    let buf = unsafe {
-        core::slice::from_raw_parts(
-            (input as *const BtdrvAdapterProperty).cast::<u8>(),
-            size_of::<BtdrvAdapterProperty>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_ADAPTER_PROPERTY)
-        .in_raw(in_bytes)
-        .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(property_type.as_bytes())
+        .in_buffer(
+            input.as_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -243,23 +209,13 @@ pub(crate) fn create_bond_legacy(
     addr: BtdrvAddress,
     bond_type: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
-    };
-    // SAFETY: `bond_type` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let type_buf = unsafe {
-        core::slice::from_raw_parts((&raw const bond_type).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::CREATE_BOND)
-        .in_raw(in_bytes)
+        .in_raw(addr.as_bytes())
         .in_buffer(
-            type_buf,
+            bond_type.as_bytes(),
             BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
         )
         .send(&mut ipc_buf)
@@ -318,8 +274,6 @@ pub(crate) fn get_event_info(service: &Session, buf: &mut [u8]) -> Result<u32, D
     dispatch_out_u32_out_buf(service, buf, proto::GET_EVENT_INFO)
 }
 
-// HID (cmds 16-27)
-
 /// InitializeHid (cmd 16, in u16 + copy handle out).
 pub(crate) fn initialize_hid(service: &Session) -> Result<u32, AcquireEventError> {
     dispatch_in_u16_get_handle(service, proto::INITIALIZE_HID, 0x1)
@@ -347,25 +301,15 @@ pub(crate) fn write_hid_data_legacy(
     addr: BtdrvAddress,
     report: &BtdrvHidData,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
-    };
-    // SAFETY: `report` is a valid reference; viewing its bytes as a slice for
-    // the IN buffer is sound, and the byte slice borrows `report`.
-    let buf = unsafe {
-        core::slice::from_raw_parts(
-            (report as *const BtdrvHidData).cast::<u8>(),
-            size_of::<BtdrvHidData>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::WRITE_HID_DATA)
-        .in_raw(in_bytes)
-        .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(addr.as_bytes())
+        .in_buffer(
+            report.as_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -376,25 +320,15 @@ pub(crate) fn write_hid_data(
     addr: BtdrvAddress,
     report: &BtdrvHidReport,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
-    };
-    // SAFETY: `report` is a valid reference; viewing its bytes as a slice for
-    // the IN buffer is sound, and the byte slice borrows `report`.
-    let buf = unsafe {
-        core::slice::from_raw_parts(
-            (report as *const BtdrvHidReport).cast::<u8>(),
-            size_of::<BtdrvHidReport>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::WRITE_HID_DATA)
-        .in_raw(in_bytes)
-        .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(addr.as_bytes())
+        .in_buffer(
+            report.as_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -405,16 +339,11 @@ pub(crate) fn write_hid_data2(
     addr: BtdrvAddress,
     buf: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::WRITE_HID_DATA2)
-        .in_raw(in_bytes)
+        .in_raw(addr.as_bytes())
         .in_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -426,25 +355,15 @@ pub(crate) fn set_hid_report_legacy(
     input: SetHidReportIn,
     report: &BtdrvHidData,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SetHidReportIn>())
-    };
-    // SAFETY: `report` is a valid reference; viewing its bytes as a slice for
-    // the IN buffer is sound, and the byte slice borrows `report`.
-    let buf = unsafe {
-        core::slice::from_raw_parts(
-            (report as *const BtdrvHidData).cast::<u8>(),
-            size_of::<BtdrvHidData>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_HID_REPORT)
-        .in_raw(in_bytes)
-        .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(input.as_bytes())
+        .in_buffer(
+            report.as_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -455,25 +374,15 @@ pub(crate) fn set_hid_report(
     input: SetHidReportIn,
     report: &BtdrvHidReport,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<SetHidReportIn>())
-    };
-    // SAFETY: `report` is a valid reference; viewing its bytes as a slice for
-    // the IN buffer is sound, and the byte slice borrows `report`.
-    let buf = unsafe {
-        core::slice::from_raw_parts(
-            (report as *const BtdrvHidReport).cast::<u8>(),
-            size_of::<BtdrvHidReport>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_HID_REPORT)
-        .in_raw(in_bytes)
-        .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(input.as_bytes())
+        .in_buffer(
+            report.as_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -516,25 +425,15 @@ pub(crate) fn get_paired_device_info(
     addr: BtdrvAddress,
     out: &mut SetSysBluetoothDevicesSettings,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
-    };
-    // SAFETY: `out` is a valid mutable reference; viewing its bytes as a
-    // slice for the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_buf = unsafe {
-        core::slice::from_raw_parts_mut(
-            (out as *mut SetSysBluetoothDevicesSettings).cast::<u8>(),
-            size_of::<SetSysBluetoothDevicesSettings>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::GET_PAIRED_DEVICE_INFO)
-        .in_raw(in_bytes)
-        .out_buffer(out_buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_raw(addr.as_bytes())
+        .out_buffer(
+            out.as_mut_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -548,8 +447,6 @@ pub(crate) fn finalize_hid(service: &Session) -> Result<(), DispatchError> {
 pub(crate) fn get_hid_event_info(service: &Session, buf: &mut [u8]) -> Result<u32, DispatchError> {
     dispatch_out_u32_out_buf(service, buf, proto::GET_HID_EVENT_INFO)
 }
-
-// Radio/Modulation (cmds 28-35)
 
 /// SetTsi (cmd 28).
 pub(crate) fn set_tsi(service: &Session, input: AddrU8In) -> Result<(), DispatchError> {
@@ -567,16 +464,11 @@ pub(crate) fn set_zero_retransmission(
     addr: BtdrvAddress,
     report_ids: &[u8],
 ) -> Result<(), DispatchError> {
-    // SAFETY: `addr` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const addr).cast::<u8>(), size_of::<BtdrvAddress>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::SET_ZERO_RETRANSMISSION)
-        .in_raw(in_bytes)
+        .in_raw(addr.as_bytes())
         .in_buffer(report_ids, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -712,8 +604,6 @@ pub(crate) fn is_afh_setting_enabled(service: &Session, cmd_id: u32) -> Result<u
     dispatch_out(service, cmd_id)
 }
 
-// BLE (cmds 46-61)
-
 /// InitializeBle (cmd 46) — returns event handle.
 pub(crate) fn initialize_ble(service: &Session) -> Result<u32, AcquireEventError> {
     acquire_event(service, proto::INITIALIZE_BLE)
@@ -830,8 +720,6 @@ pub(crate) fn clear_ble_scan_filters(service: &Session) -> Result<(), DispatchEr
 pub(crate) fn enable_ble_scan_filter(service: &Session, flag: u8) -> Result<(), DispatchError> {
     dispatch_in(service, proto::ENABLE_BLE_SCAN_FILTER, flag)
 }
-
-// GATT (cmds 62-97)
 
 /// RegisterGattClient (cmd 62).
 pub(crate) fn register_gatt_client(
@@ -1113,19 +1001,11 @@ pub(crate) fn write_gatt_characteristic(
     buf: &[u8],
     cmd_id: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<WriteGattCharacteristicIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -1138,19 +1018,11 @@ pub(crate) fn write_gatt_descriptor(
     buf: &[u8],
     cmd_id: u32,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<WriteGattDescriptorIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .in_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -1198,8 +1070,6 @@ pub(crate) fn set_ble_scan_parameter(
     dispatch_in(service, proto::SET_BLE_SCAN_PARAMETER, input)
 }
 
-// Other (cmds 99-100)
-
 /// MoveToSecondaryPiconet (cmd 99, 10.0.0+).
 pub(crate) fn move_to_secondary_piconet(
     service: &Session,
@@ -1212,8 +1082,6 @@ pub(crate) fn move_to_secondary_piconet(
 pub(crate) fn is_bluetooth_enabled(service: &Session) -> Result<u8, DispatchError> {
     dispatch_out(service, proto::IS_BLUETOOTH_ENABLED)
 }
-
-// Audio (cmds 128-149)
 
 /// AcquireAudioEvent (cmd 128) — returns event handle.
 pub(crate) fn acquire_audio_event(service: &Session) -> Result<u32, AcquireEventError> {
@@ -1325,22 +1193,16 @@ pub(crate) fn send_audio_data(
     audio_handle: u32,
     buf: &[u8],
 ) -> Result<u64, DispatchError> {
-    // SAFETY: `audio_handle` is a `Copy` value on the stack, valid until
-    // `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const audio_handle).cast::<u8>(), size_of::<u32>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::SEND_AUDIO_DATA)
-        .in_raw(in_bytes)
+        .in_raw(audio_handle.as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u64>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// AcquireAudioControlInputStateChangedEvent (cmd 142) — returns event handle.
@@ -1416,8 +1278,6 @@ pub(crate) fn send_audio_control_set_absolute_volume_command(
     )
 }
 
-// Debug (cmds 256-258)
-
 /// IsManufacturingMode (cmd 256).
 pub(crate) fn is_manufacturing_mode(service: &Session) -> Result<u8, DispatchError> {
     dispatch_out(service, proto::IS_MANUFACTURING_MODE)
@@ -1436,23 +1296,23 @@ pub(crate) fn get_ble_channel_map(
     dispatch_out_buf_alias_fixed(service, out, proto::GET_BLE_CHANNEL_MAP)
 }
 
-// Shared dispatch helpers
-
 /// HipcPointer fixed-size input buffer.
 pub(crate) fn dispatch_in_buf_ptr_fixed<T>(
     service: &Session,
     input: &T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `input` is a valid reference; viewing its bytes as a slice for
-    // the IN buffer is sound, and the byte slice borrows `input`.
-    let buf =
-        unsafe { core::slice::from_raw_parts((input as *const T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .in_buffer(
+            input.as_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -1462,16 +1322,18 @@ fn dispatch_out_buf_ptr_fixed<T>(
     service: &Session,
     out: &mut T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid mutable reference; viewing its bytes as a slice
-    // for the OUT buffer is sound, and the byte slice borrows `out`.
-    let buf =
-        unsafe { core::slice::from_raw_parts_mut((out as *mut T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::FromBytes + zerocopy::IntoBytes,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .out_buffer(buf, BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE))
+        .out_buffer(
+            out.as_mut_bytes(),
+            BufferAttr::HIPC_POINTER.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -1481,16 +1343,18 @@ fn dispatch_out_buf_alias_fixed<T>(
     service: &Session,
     out: &mut T,
     cmd_id: u32,
-) -> Result<(), DispatchError> {
-    // SAFETY: `out` is a valid mutable reference; viewing its bytes as a slice
-    // for the OUT buffer is sound, and the byte slice borrows `out`.
-    let buf =
-        unsafe { core::slice::from_raw_parts_mut((out as *mut T).cast::<u8>(), size_of::<T>()) };
+) -> Result<(), DispatchError>
+where
+    T: zerocopy::FromBytes + zerocopy::IntoBytes,
+{
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .out_buffer(buf, BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE))
+        .out_buffer(
+            out.as_mut_bytes(),
+            BufferAttr::HIPC_MAP_ALIAS.or(BufferAttr::FIXED_SIZE),
+        )
         .send(&mut ipc_buf)
         .map(|_| ())
 }
@@ -1518,15 +1382,11 @@ fn acquire_event_with_u32_in(
     cmd_id: u32,
     input: u32,
 ) -> Result<u32, AcquireEventError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u32>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
@@ -1544,15 +1404,11 @@ fn dispatch_in_u16_get_handle(
     cmd_id: u32,
     input: u16,
 ) -> Result<u32, AcquireEventError> {
-    // SAFETY: `input` is a `Copy` value on the stack, valid until `.send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes =
-        unsafe { core::slice::from_raw_parts((&raw const input).cast::<u8>(), size_of::<u16>()) };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
         .map_err(AcquireEventError::Dispatch)?;
@@ -1578,11 +1434,8 @@ fn dispatch_out_u32_out_buf(
         .out_buffer(buf, BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<u32>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u32>()) })
+    Ok(*result.value::<u32>())
 }
-
-// Error types
 
 /// Error returned by event acquisition commands (copy handle only).
 #[derive(Debug, thiserror::Error)]

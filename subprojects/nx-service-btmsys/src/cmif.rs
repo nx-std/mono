@@ -1,9 +1,6 @@
 //! CMIF protocol operations for the Bluetooth Manager System service.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::{
     dispatch::{
@@ -24,10 +22,6 @@ use crate::{
         BtmAudioDevice,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Root service commands
-// ---------------------------------------------------------------------------
 
 /// Gets the IBtmSystemCore sub-object (cmd 0).
 pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
@@ -44,10 +38,6 @@ pub(crate) fn get_core(service: &Session) -> Result<u32, GetCoreError> {
 
     Ok(handle)
 }
-
-// ---------------------------------------------------------------------------
-// IBtmSystemCore — Gamepad pairing commands
-// ---------------------------------------------------------------------------
 
 /// StartGamepadPairing (cmd 0).
 pub(crate) fn start_gamepad_pairing(service: &Session) -> Result<(), DispatchError> {
@@ -68,10 +58,6 @@ pub(crate) fn clear_gamepad_pairing_database(service: &Session) -> Result<(), Di
 pub(crate) fn get_paired_gamepad_count(service: &Session) -> Result<u8, DispatchError> {
     dispatch_out(service, proto::GET_PAIRED_GAMEPAD_COUNT)
 }
-
-// ---------------------------------------------------------------------------
-// IBtmSystemCore — Radio commands
-// ---------------------------------------------------------------------------
 
 /// EnableRadio (cmd 4).
 pub(crate) fn enable_radio(service: &Session) -> Result<(), DispatchError> {
@@ -110,10 +96,6 @@ pub(crate) fn is_gamepad_pairing_started(service: &Session) -> Result<bool, Disp
     let val: u8 = dispatch_out(service, proto::IS_GAMEPAD_PAIRING_STARTED)?;
     Ok(val & 1 != 0)
 }
-
-// ---------------------------------------------------------------------------
-// IBtmSystemCore — Audio device commands (13.0.0+)
-// ---------------------------------------------------------------------------
 
 /// StartAudioDeviceDiscovery (cmd 10).
 pub(crate) fn start_audio_device_discovery(service: &Session) -> Result<(), DispatchError> {
@@ -237,29 +219,17 @@ pub(crate) fn cancel_audio_device_connection_rejection(
     )
 }
 
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
-
 /// Dispatches a command that sends PID and an applet resource user ID.
 fn dispatch_aruid(
     service: &Session,
     cmd_id: u32,
     applet_resource_user_id: u64,
 ) -> Result<(), DispatchError> {
-    // SAFETY: `applet_resource_user_id` is a `Copy` value on the stack, valid
-    // until `.send()` returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const applet_resource_user_id).cast::<u8>(),
-            size_of::<u64>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(cmd_id)
-        .in_raw(in_bytes)
+        .in_raw(applet_resource_user_id.as_bytes())
         .send_pid()
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -272,21 +242,15 @@ fn get_audio_device_list(
     out: &mut [BtmAudioDevice],
     cmd_id: u32,
 ) -> Result<i32, DispatchError> {
-    // SAFETY: `out` is a valid `&mut [BtmAudioDevice]`; viewing it as a byte
-    // slice for the OUT buffer is sound, and the byte slice borrows `out`.
-    let out_bytes = unsafe {
-        core::slice::from_raw_parts_mut(out.as_mut_ptr().cast::<u8>(), core::mem::size_of_val(out))
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(cmd_id)
         .out_size(size_of::<i32>())
-        .out_buffer(out_bytes, BufferAttr::HIPC_POINTER)
+        .out_buffer(out.as_mut_bytes(), BufferAttr::HIPC_POINTER)
         .send(&mut ipc_buf)?;
 
-    // SAFETY: response payload is at least size_of::<i32>() bytes.
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<i32>()) })
+    Ok(*result.value::<i32>())
 }
 
 /// Dispatches a command that returns a copy handle for an event.
@@ -321,8 +285,7 @@ fn acquire_event_with_flag(
         .send(&mut ipc_buf)
         .map_err(AcquireEventWithFlagError::Dispatch)?;
 
-    // SAFETY: response payload is at least 1 byte.
-    let flag: u8 = unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u8>()) };
+    let flag = *result.value::<u8>();
 
     if flag == 0 {
         return Err(AcquireEventWithFlagError::FlagNotSet);
@@ -334,10 +297,6 @@ fn acquire_event_with_flag(
 
     Ok(handle)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`get_core`].
 #[derive(Debug, thiserror::Error)]
