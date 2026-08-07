@@ -1,9 +1,6 @@
 //! ns:su + ISystemUpdateControl CMIF commands.
 
-use core::{
-    mem::size_of,
-    ptr,
-};
+use core::mem::size_of;
 
 use nx_sf::service::{
     BufferAttr,
@@ -11,6 +8,7 @@ use nx_sf::service::{
     OutHandleAttr,
     Session,
 };
+use zerocopy::IntoBytes as _;
 
 use super::app_manager::{
     AsyncCommandError,
@@ -30,17 +28,13 @@ use crate::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// ns:su top-level commands
-// ---------------------------------------------------------------------------
-
 /// GetBackgroundNetworkUpdateState (cmd 0).
 #[inline]
 pub(crate) fn get_background_network_update_state(service: &Session) -> Result<u8, DispatchError> {
     dispatch_out(service, proto::NSSU_GET_BACKGROUND_NETWORK_UPDATE_STATE)
 }
 
-/// OpenSystemUpdateControl (cmd 1) — returns move handle.
+/// OpenSystemUpdateControl (cmd 1): returns move handle.
 pub(crate) fn open_system_update_control(
     service: &Session,
 ) -> Result<u32, OpenSystemUpdateControlError> {
@@ -96,7 +90,7 @@ pub(crate) fn notify_exfat_driver_downloaded_for_debug(
     )
 }
 
-/// GetSystemUpdateNotificationEventForContentDelivery (cmd 9) — returns copy handle.
+/// GetSystemUpdateNotificationEventForContentDelivery (cmd 9): returns copy handle.
 pub(crate) fn get_system_update_notification_event(
     service: &Session,
 ) -> Result<u32, AcquireEventError> {
@@ -144,17 +138,11 @@ pub(crate) fn request_send_system_update(
     input: RequestSendReceiveSystemUpdateIn,
     system_delivery_info: &[u8],
 ) -> Result<AsyncOut, AsyncCommandError> {
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<RequestSendReceiveSystemUpdateIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::NSSU_REQUEST_SEND_SYSTEM_UPDATE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .in_buffer(system_delivery_info, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
@@ -170,10 +158,6 @@ pub(crate) fn get_send_system_update_progress(
 ) -> Result<SystemUpdateProgress, DispatchError> {
     dispatch_out(service, proto::NSSU_GET_SEND_SYSTEM_UPDATE_PROGRESS)
 }
-
-// ---------------------------------------------------------------------------
-// ISystemUpdateControl commands (dispatched on the control session)
-// ---------------------------------------------------------------------------
 
 /// HasDownloaded (ctrl cmd 0).
 #[inline]
@@ -251,7 +235,7 @@ pub(crate) fn ctrl_get_downloaded_eula_data_size(
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// GetDownloadedEulaData (ctrl cmd 10).
@@ -269,7 +253,7 @@ pub(crate) fn ctrl_get_downloaded_eula_data(
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// SetupCardUpdate (ctrl cmd 11).
@@ -278,14 +262,11 @@ pub(crate) fn ctrl_setup_card_update(
     tmem_size: u64,
     tmem_handle: u32,
 ) -> Result<(), DispatchError> {
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::NSSU_CTRL_SETUP_CARD_UPDATE)
-        .in_raw(in_bytes)
+        .in_raw(tmem_size.as_bytes())
         .in_handle(tmem_handle)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -304,7 +285,7 @@ pub(crate) fn ctrl_get_prepared_card_update_eula_data_size(
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// GetPreparedCardUpdateEulaData (ctrl cmd 13).
@@ -322,7 +303,7 @@ pub(crate) fn ctrl_get_prepared_card_update_eula_data(
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// SetupCardUpdateViaSystemUpdater (ctrl cmd 14).
@@ -331,14 +312,11 @@ pub(crate) fn ctrl_setup_card_update_via_system_updater(
     tmem_size: u64,
     tmem_handle: u32,
 ) -> Result<(), DispatchError> {
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const tmem_size).cast::<u8>(), size_of::<u64>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     service
         .dispatch(proto::NSSU_CTRL_SETUP_CARD_UPDATE_VIA_SYSTEM_UPDATER)
-        .in_raw(in_bytes)
+        .in_raw(tmem_size.as_bytes())
         .in_handle(tmem_handle)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -356,17 +334,11 @@ pub(crate) fn ctrl_request_receive_system_update(
     service: &Session,
     input: RequestSendReceiveSystemUpdateIn,
 ) -> Result<AsyncOut, AsyncCommandError> {
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts(
-            (&raw const input).cast::<u8>(),
-            size_of::<RequestSendReceiveSystemUpdateIn>(),
-        )
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = service
         .dispatch(proto::NSSU_CTRL_REQUEST_RECEIVE_SYSTEM_UPDATE)
-        .in_raw(in_bytes)
+        .in_raw(input.as_bytes())
         .out_handle(0, OutHandleAttr::Copy)
         .send(&mut ipc_buf)
         .map_err(AsyncCommandError::Dispatch)?;
@@ -401,7 +373,7 @@ pub(crate) fn ctrl_get_received_eula_data_size(
         .in_buffer(path, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// GetReceivedEulaData (ctrl cmd 20).
@@ -419,7 +391,7 @@ pub(crate) fn ctrl_get_received_eula_data(
         .out_buffer(out, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
 
-    Ok(unsafe { ptr::read_unaligned(result.data.as_ptr().cast::<u64>()) })
+    Ok(*result.value::<u64>())
 }
 
 /// SetupToReceiveSystemUpdate (ctrl cmd 21).
@@ -438,10 +410,6 @@ pub(crate) fn ctrl_request_check_latest_update_includes_rebootless_update(
     )
 }
 
-// ---------------------------------------------------------------------------
-// Shared dispatch helpers
-// ---------------------------------------------------------------------------
-
 /// Dispatches an async control command with no input.
 fn dispatch_ctrl_async_no_in(
     service: &Session,
@@ -457,10 +425,6 @@ fn dispatch_ctrl_async_no_in(
 
     super::app_manager::extract_async_out(&result)
 }
-
-// ---------------------------------------------------------------------------
-// Error types
-// ---------------------------------------------------------------------------
 
 /// Error returned by [`open_system_update_control`].
 #[derive(Debug, thiserror::Error)]

@@ -23,8 +23,8 @@ pub enum StorageId {
 /// Input payload for redirect-application commands (9.0.0+ wire format).
 ///
 /// Wire layout: two title IDs.
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
-#[derive(Clone, Copy)]
 pub(crate) struct RedirectApplicationIn {
     pub tid: u64,
     pub tid2: u64,

@@ -4,10 +4,6 @@ use core::mem::size_of;
 
 use static_assertions::const_assert_eq;
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ShellEvent {
@@ -41,10 +37,6 @@ pub enum LatestSystemUpdate {
     Downloaded = 1,
     NeedsDownload = 2,
 }
-
-// ---------------------------------------------------------------------------
-// Public wire-layout types
-// ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -84,7 +76,7 @@ pub struct ApplicationRecord {
 }
 const_assert_eq!(size_of::<ApplicationRecord>(), 0x18);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ProgressForDeleteUserSaveDataAll {
     pub data: [u8; 0x28],
@@ -146,7 +138,15 @@ pub struct ApplicationViewWithPromotionInfo {
 }
 const_assert_eq!(size_of::<ApplicationViewWithPromotionInfo>(), 0x70);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C, packed)]
 pub struct LaunchProperties {
     pub program_id: u64,
@@ -157,7 +157,7 @@ pub struct LaunchProperties {
 }
 const_assert_eq!(size_of::<LaunchProperties>(), 0x0F);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct ShellEventInfo {
     pub event: u32,
@@ -166,7 +166,7 @@ pub struct ShellEventInfo {
 }
 const_assert_eq!(size_of::<ShellEventInfo>(), 0x10);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub struct SystemUpdateProgress {
     pub current_size: i64,
@@ -254,8 +254,16 @@ pub struct DownloadTaskStatus {
 }
 const_assert_eq!(size_of::<DownloadTaskStatus>(), 0x20);
 
-/// NcmContentMetaKey — matches libnx's NcmContentMetaKey layout (0x10 bytes).
-#[derive(Clone, Copy, Debug)]
+/// NcmContentMetaKey: matches libnx's NcmContentMetaKey layout (0x10 bytes).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct NcmContentMetaKey {
     pub id: u64,
@@ -266,19 +274,15 @@ pub struct NcmContentMetaKey {
 }
 const_assert_eq!(size_of::<NcmContentMetaKey>(), 0x10);
 
-/// AccountUid — 16-byte account identifier.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// AccountUid: 16-byte account identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct AccountUid {
     pub uid: [u64; 2],
 }
 const_assert_eq!(size_of::<AccountUid>(), 0x10);
 
-// ---------------------------------------------------------------------------
-// Internal input/output structs (pub(crate) only)
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct IsEntityMovableIn {
     pub(crate) storage_id: u8,
@@ -287,7 +291,7 @@ pub(crate) struct IsEntityMovableIn {
 }
 const_assert_eq!(size_of::<IsEntityMovableIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct StorageIdS64Out {
     pub(crate) storage_id: u8,
@@ -296,7 +300,7 @@ pub(crate) struct StorageIdS64Out {
 }
 const_assert_eq!(size_of::<StorageIdS64Out>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SetTerminateResultIn {
     pub(crate) result: u32,
@@ -305,7 +309,7 @@ pub(crate) struct SetTerminateResultIn {
 }
 const_assert_eq!(size_of::<SetTerminateResultIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DeleteUserSystemSaveDataIn {
     pub(crate) uid: AccountUid,
@@ -313,7 +317,7 @@ pub(crate) struct DeleteUserSystemSaveDataIn {
 }
 const_assert_eq!(size_of::<DeleteUserSystemSaveDataIn>(), 0x18);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct DeleteSaveDataIn {
     pub(crate) save_data_space_id: u8,
@@ -322,7 +326,7 @@ pub(crate) struct DeleteSaveDataIn {
 }
 const_assert_eq!(size_of::<DeleteSaveDataIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GameCardRegistrationGoldPointIn {
     pub(crate) uid: AccountUid,
@@ -330,7 +334,7 @@ pub(crate) struct GameCardRegistrationGoldPointIn {
 }
 const_assert_eq!(size_of::<GameCardRegistrationGoldPointIn>(), 0x18);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RegisterGameCardIn {
     pub(crate) inval: i32,
@@ -340,7 +344,7 @@ pub(crate) struct RegisterGameCardIn {
 }
 const_assert_eq!(size_of::<RegisterGameCardIn>(), 0x20);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct IsUpdateRequestedOut {
     pub(crate) flag: u8,
@@ -349,7 +353,7 @@ pub(crate) struct IsUpdateRequestedOut {
 }
 const_assert_eq!(size_of::<IsUpdateRequestedOut>(), 0x08);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CleanupUnavailableAddOnContentsIn {
     pub(crate) application_id: u64,
@@ -357,7 +361,7 @@ pub(crate) struct CleanupUnavailableAddOnContentsIn {
 }
 const_assert_eq!(size_of::<CleanupUnavailableAddOnContentsIn>(), 0x18);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct EstimateSizeToMoveIn {
     pub(crate) storage_id: u8,
@@ -367,7 +371,7 @@ pub(crate) struct EstimateSizeToMoveIn {
 }
 const_assert_eq!(size_of::<EstimateSizeToMoveIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ContentMetaStatusIn {
     pub(crate) index: i32,
@@ -376,7 +380,7 @@ pub(crate) struct ContentMetaStatusIn {
 }
 const_assert_eq!(size_of::<ContentMetaStatusIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetApplicationDeliveryInfoIn {
     pub(crate) attr: u32,
@@ -385,7 +389,7 @@ pub(crate) struct GetApplicationDeliveryInfoIn {
 }
 const_assert_eq!(size_of::<GetApplicationDeliveryInfoIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RequestReceiveApplicationIn {
     pub(crate) storage_id: u8,
@@ -396,7 +400,7 @@ pub(crate) struct RequestReceiveApplicationIn {
 }
 const_assert_eq!(size_of::<RequestReceiveApplicationIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RequestSendApplicationIn {
     pub(crate) port: u16,
@@ -406,7 +410,7 @@ pub(crate) struct RequestSendApplicationIn {
 }
 const_assert_eq!(size_of::<RequestSendApplicationIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ListNotCommittedContentMetaIn {
     pub(crate) unk: i32,
@@ -415,7 +419,7 @@ pub(crate) struct ListNotCommittedContentMetaIn {
 }
 const_assert_eq!(size_of::<ListNotCommittedContentMetaIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct GetApplicationRightsOnClientIn {
     pub(crate) flags: u32,
@@ -425,7 +429,7 @@ pub(crate) struct GetApplicationRightsOnClientIn {
 }
 const_assert_eq!(size_of::<GetApplicationRightsOnClientIn>(), 0x20);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ControlDataSourceAppIdIn {
     pub(crate) source: u8,
@@ -434,7 +438,7 @@ pub(crate) struct ControlDataSourceAppIdIn {
 }
 const_assert_eq!(size_of::<ControlDataSourceAppIdIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ControlData2In {
     pub(crate) source: u8,
@@ -445,7 +449,7 @@ pub(crate) struct ControlData2In {
 }
 const_assert_eq!(size_of::<ControlData2In>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct StorageSizesOut {
     pub(crate) total_space_size: i64,
@@ -453,7 +457,7 @@ pub(crate) struct StorageSizesOut {
 }
 const_assert_eq!(size_of::<StorageSizesOut>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct RequestSendReceiveSystemUpdateIn {
     pub(crate) port: u16,
@@ -462,7 +466,7 @@ pub(crate) struct RequestSendReceiveSystemUpdateIn {
 }
 const_assert_eq!(size_of::<RequestSendReceiveSystemUpdateIn>(), 0x08);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct ListApplicationTitleIn {
     pub(crate) source: u8,
@@ -471,7 +475,7 @@ pub(crate) struct ListApplicationTitleIn {
 }
 const_assert_eq!(size_of::<ListApplicationTitleIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct VerifyApplicationDeprecatedIn {
     pub(crate) application_id: u64,
@@ -479,7 +483,7 @@ pub(crate) struct VerifyApplicationDeprecatedIn {
 }
 const_assert_eq!(size_of::<VerifyApplicationDeprecatedIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct VerifyApplicationIn {
     pub(crate) unk: u32,
@@ -489,9 +493,7 @@ pub(crate) struct VerifyApplicationIn {
 }
 const_assert_eq!(size_of::<VerifyApplicationIn>(), 0x18);
 
-// ns:dev input structs
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct NsdevLaunchProgramIn {
     pub(crate) flags: u32,
@@ -501,7 +503,7 @@ pub(crate) struct NsdevLaunchProgramIn {
 }
 const_assert_eq!(size_of::<NsdevLaunchProgramIn>(), 0x18);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct NsdevLaunchApplicationForDevelopIn {
     pub(crate) flags: u32,
@@ -510,7 +512,7 @@ pub(crate) struct NsdevLaunchApplicationForDevelopIn {
 }
 const_assert_eq!(size_of::<NsdevLaunchApplicationForDevelopIn>(), 0x10);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct NsdevLaunchApplicationWithStorageIdIn {
     pub(crate) app_storage_id: u8,
