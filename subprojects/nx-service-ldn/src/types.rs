@@ -11,7 +11,17 @@ use crate::proto::LdnScanFilterFlag;
 
 /// IPv4 address (network-order convention is the caller's responsibility — the
 /// service does no byteswap).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnIpv4Address {
     pub addr: u32,
@@ -19,7 +29,16 @@ pub struct LdnIpv4Address {
 const_assert_eq!(size_of::<LdnIpv4Address>(), 4);
 
 /// IPv4 subnet mask.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnSubnetMask {
     pub mask: u32,
@@ -27,7 +46,18 @@ pub struct LdnSubnetMask {
 const_assert_eq!(size_of::<LdnSubnetMask>(), 4);
 
 /// 48-bit MAC address.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnMacAddress {
     pub addr: [u8; 6],
@@ -35,7 +65,14 @@ pub struct LdnMacAddress {
 const_assert_eq!(size_of::<LdnMacAddress>(), 6);
 
 /// SSID — length-prefixed string with a NUL-terminated payload.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnSsid {
     /// Length of `str` excluding the NUL terminator. Must be `0x1..=0x20`.
@@ -46,7 +83,18 @@ pub struct LdnSsid {
 const_assert_eq!(size_of::<LdnSsid>(), 0x22);
 
 /// Per-node update bookkeeping returned by `GetNetworkInfoAndHistory`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnNodeLatestUpdate {
     pub state_change: u8,
@@ -55,7 +103,7 @@ pub struct LdnNodeLatestUpdate {
 const_assert_eq!(size_of::<LdnNodeLatestUpdate>(), 8);
 
 /// IP + MAC entry, used as a static accept list for `CreateNetworkPrivate`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct LdnAddressEntry {
     pub ip_addr: LdnIpv4Address,
@@ -65,7 +113,14 @@ pub struct LdnAddressEntry {
 const_assert_eq!(size_of::<LdnAddressEntry>(), 0xC);
 
 /// Per-station node information.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnNodeInfo {
     pub ip_addr: LdnIpv4Address,
@@ -81,7 +136,7 @@ pub struct LdnNodeInfo {
 const_assert_eq!(size_of::<LdnNodeInfo>(), 0x40);
 
 /// User-config payload (user-name is the only meaningful field).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct LdnUserConfig {
     pub user_name: [u8; 0x21],
@@ -90,7 +145,17 @@ pub struct LdnUserConfig {
 const_assert_eq!(size_of::<LdnUserConfig>(), 0x30);
 
 /// Intent-id pair — local communication id + scene id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnIntentId {
     pub local_communication_id: i64,
@@ -101,7 +166,18 @@ pub struct LdnIntentId {
 const_assert_eq!(size_of::<LdnIntentId>(), 0x10);
 
 /// Per-network random nonce used as the SSID basis.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnSessionId {
     pub random: [u8; 0x10],
@@ -109,7 +185,17 @@ pub struct LdnSessionId {
 const_assert_eq!(size_of::<LdnSessionId>(), 0x10);
 
 /// Full network identity (intent + session).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnNetworkId {
     pub intent_id: LdnIntentId,
@@ -118,7 +204,14 @@ pub struct LdnNetworkId {
 const_assert_eq!(size_of::<LdnNetworkId>(), 0x20);
 
 /// On-wire common network info (BSSID + SSID + radio params).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnCommonNetworkInfo {
     pub bssid: LdnMacAddress,
@@ -131,7 +224,14 @@ pub struct LdnCommonNetworkInfo {
 const_assert_eq!(size_of::<LdnCommonNetworkInfo>(), 0x30);
 
 /// Network-info blob returned by `GetNetworkInfo` / `Scan`.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnNetworkInfo {
     pub network_id: LdnNetworkId,
@@ -153,7 +253,7 @@ pub struct LdnNetworkInfo {
 const_assert_eq!(size_of::<LdnNetworkInfo>(), 0x480);
 
 /// Scan filter sent to `Scan` / `ScanPrivate`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct LdnScanFilter {
     pub network_id: LdnNetworkId,
@@ -167,7 +267,7 @@ pub struct LdnScanFilter {
 const_assert_eq!(size_of::<LdnScanFilter>(), 0x60);
 
 /// Security material used to derive the SSID / passphrase.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct LdnSecurityConfig {
     pub security_mode: u16,
@@ -177,7 +277,18 @@ pub struct LdnSecurityConfig {
 const_assert_eq!(size_of::<LdnSecurityConfig>(), 0x44);
 
 /// Random server nonce + session-id pair.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnSecurityParameter {
     pub server_random: [u8; 0x10],
@@ -187,7 +298,17 @@ const_assert_eq!(size_of::<LdnSecurityParameter>(), 0x20);
 
 /// Network-config payload for `CreateNetwork` / `CreateNetworkPrivate` /
 /// `ConnectPrivate`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct LdnNetworkConfig {
     pub intent_id: LdnIntentId,
@@ -200,7 +321,7 @@ pub struct LdnNetworkConfig {
 const_assert_eq!(size_of::<LdnNetworkConfig>(), 0x20);
 
 /// Settings for `EnableActionFrame`.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub struct LdnActionFrameSettings {
     pub local_communication_id: i64,

@@ -1,12 +1,11 @@
 //! `nifm:u` / `nifm:s` / `nifm:a` static-service commands — used to spawn the
 //! `IGeneralService` sub-object on the converted-to-domain creator session.
 
-use core::mem::size_of;
-
 use nx_sf::service::{
     DispatchError,
     DomainRef,
 };
+use zerocopy::IntoBytes as _;
 
 use crate::proto::{
     CMD_CREATE_GENERAL_SERVICE,
@@ -44,17 +43,12 @@ pub(crate) fn create_general_service(
     creator: DomainRef<'_>,
 ) -> Result<u32, CreateGeneralServiceError> {
     let reserved: u64 = 0;
-    // SAFETY: `reserved` is a `Copy` value on the stack, valid until `send()`
-    // returns; viewing its bytes as a slice is sound.
-    let in_bytes = unsafe {
-        core::slice::from_raw_parts((&raw const reserved).cast::<u8>(), size_of::<u64>())
-    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = creator
         .dispatch(CMD_CREATE_GENERAL_SERVICE)
         .send_pid()
-        .in_raw(in_bytes)
+        .in_raw(reserved.as_bytes())
         .out_objects(1)
         .send(&mut ipc_buf)
         .map_err(CreateGeneralServiceError::Dispatch)?;

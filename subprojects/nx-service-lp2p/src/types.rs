@@ -1,9 +1,17 @@
 //! Wire-layout types for the LP2P service.
 
 use static_assertions::const_assert_eq;
+use zerocopy::FromZeros as _;
 
 /// MAC address (6 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct Lp2pMacAddress {
     pub addr: [u8; 6],
@@ -11,7 +19,14 @@ pub struct Lp2pMacAddress {
 const_assert_eq!(size_of::<Lp2pMacAddress>(), 0x6);
 
 /// Group identifier (BSSID, 6 bytes).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct Lp2pGroupId {
     pub id: [u8; 6],
@@ -23,7 +38,14 @@ const_assert_eq!(size_of::<Lp2pGroupId>(), 0x6);
 /// When used as input for [`Scan`](crate::Lp2pNetworkService::scan), only
 /// `supported_platform`, `priority`, `frequency`, `channel`,
 /// `preshared_key_binary_size`, and `preshared_key` are read by the service.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct Lp2pGroupInfo {
     pub unk_x0: [u8; 0x10],
@@ -84,14 +106,19 @@ impl Lp2pGroupInfo {
     }
 
     fn zeroed() -> Self {
-        // SAFETY: Lp2pGroupInfo is #[repr(C)] with no padding invariants;
-        // all-zeros is a valid bit pattern.
-        unsafe { core::mem::zeroed() }
+        Self::new_zeroed()
     }
 }
 
 /// Scan result entry.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct Lp2pScanResult {
     pub group_info: Lp2pGroupInfo,
@@ -104,7 +131,14 @@ pub struct Lp2pScanResult {
 const_assert_eq!(size_of::<Lp2pScanResult>(), 0x300);
 
 /// Node information (member/owner).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct Lp2pNodeInfo {
     pub ip_addr: [u8; 0x20],
@@ -115,7 +149,14 @@ pub struct Lp2pNodeInfo {
 const_assert_eq!(size_of::<Lp2pNodeInfo>(), 0x80);
 
 /// IP configuration (IPv4 only).
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct Lp2pIpConfig {
     pub unk_x0: [u8; 0x20],
@@ -126,12 +167,8 @@ pub struct Lp2pIpConfig {
 }
 const_assert_eq!(size_of::<Lp2pIpConfig>(), 0x100);
 
-// ---------------------------------------------------------------------------
-// IPC payload structs (crate-internal)
-// ---------------------------------------------------------------------------
-
 /// Input payload for CreateNetworkService (cmd 0).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct CreateNetworkServiceIn {
     pub inval: u32,
@@ -141,7 +178,7 @@ pub(crate) struct CreateNetworkServiceIn {
 const_assert_eq!(size_of::<CreateNetworkServiceIn>(), 0x10);
 
 /// Input payload for SendToOtherGroup (cmd 1536).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 #[repr(C)]
 pub(crate) struct SendToOtherGroupIn {
     pub addr: Lp2pMacAddress,
@@ -153,7 +190,7 @@ pub(crate) struct SendToOtherGroupIn {
 const_assert_eq!(size_of::<SendToOtherGroupIn>(), 0x14);
 
 /// Output payload for RecvFromOtherGroup (cmd 1544).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct RecvFromOtherGroupOut {
     pub addr: Lp2pMacAddress,
@@ -166,7 +203,7 @@ pub(crate) struct RecvFromOtherGroupOut {
 const_assert_eq!(size_of::<RecvFromOtherGroupOut>(), 0x14);
 
 /// Output payload for GetAdvertiseData / GetAdvertiseData2 (cmds 280/281).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout)]
 #[repr(C)]
 pub(crate) struct GetAdvertiseDataOut {
     pub transfer_size: u16,

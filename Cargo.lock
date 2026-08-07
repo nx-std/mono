@@ -741,6 +741,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -827,6 +828,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -853,6 +855,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -955,6 +958,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "static_assertions",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
