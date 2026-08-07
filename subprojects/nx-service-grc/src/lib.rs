@@ -58,10 +58,6 @@ pub use self::{
     },
 };
 
-// ---------------------------------------------------------------------------
-// grc:d root service
-// ---------------------------------------------------------------------------
-
 /// Game recording debug service (`grc:d`) root session wrapper.
 #[repr(transparent)]
 pub struct GrcdService(Session);
@@ -94,13 +90,9 @@ impl GrcdService {
         stream: GrcStream,
         buffer: &mut [u8],
     ) -> Result<TransferResult, TransferError> {
-        cmif::transfer(&self.0, stream as u32, buffer.as_mut_ptr(), buffer.len())
+        cmif::transfer(&self.0, stream as u32, buffer)
     }
 }
-
-// ---------------------------------------------------------------------------
-// IGameMovieTrimmer sub-object
-// ---------------------------------------------------------------------------
 
 /// Game movie trimmer session wrapper (IGameMovieTrimmer).
 ///
@@ -169,13 +161,9 @@ impl GrcGameMovieTrimmer {
         width: i32,
         height: i32,
     ) -> Result<(), DispatchError> {
-        cmif::trimmer_set_thumbnail_rgba(&self.0, buffer.as_ptr(), buffer.len(), width, height)
+        cmif::trimmer_set_thumbnail_rgba(&self.0, buffer, width, height)
     }
 }
-
-// ---------------------------------------------------------------------------
-// IMovieMaker sub-object
-// ---------------------------------------------------------------------------
 
 /// Movie maker session wrapper (IMovieMaker).
 ///
@@ -276,10 +264,8 @@ impl GrcMovieMaker {
             layer_handle,
             width,
             height,
-            userdata.as_ptr(),
-            userdata.len(),
-            thumbnail.as_ptr(),
-            thumbnail.len(),
+            userdata,
+            thumbnail,
         )
     }
 
@@ -300,10 +286,8 @@ impl GrcMovieMaker {
             layer_handle,
             width,
             height,
-            userdata.as_ptr(),
-            userdata.len(),
-            thumbnail.as_ptr(),
-            thumbnail.len(),
+            userdata,
+            thumbnail,
         )
     }
 
@@ -322,12 +306,7 @@ impl GrcMovieMaker {
         layer_handle: u64,
         buffer: &[u8],
     ) -> Result<u64, DispatchError> {
-        cmif::maker_encode_offscreen_layer_audio_sample(
-            &self.0,
-            layer_handle,
-            buffer.as_ptr(),
-            buffer.len(),
-        )
+        cmif::maker_encode_offscreen_layer_audio_sample(&self.0, layer_handle, buffer)
     }
 
     /// Gets the offscreen layer recording finish ready event handle
@@ -350,10 +329,6 @@ impl GrcMovieMaker {
         cmif::maker_get_offscreen_layer_audio_encode_ready_event(&self.0, layer_handle)
     }
 }
-
-// ---------------------------------------------------------------------------
-// Connect function
-// ---------------------------------------------------------------------------
 
 /// Connects to the `grc:d` service using CMIF.
 pub fn connect_cmif(sm: &SmService) -> Result<GrcdService, ConnectCmifError> {
