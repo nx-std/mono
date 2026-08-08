@@ -86,6 +86,14 @@ if get_option('use_nx_service_applet_err').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_err.ld'
 endif
 
+# nx-service-applet-nfp
+if get_option('use_nx_service_applet_nfp').enabled()
+    nx_service_applet_nfp_proj = subproject('nx-service-applet-nfp')
+    deps += nx_service_applet_nfp_proj.get_variable('nx_service_applet_nfp_dep')
+    cargo_features += 'service-applet-nfp'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_nfp.ld'
+endif
+
 # nx-service-fs
 if get_option('use_nx_service_fs').enabled()
     nx_service_fs_proj = subproject('nx-service-fs')
