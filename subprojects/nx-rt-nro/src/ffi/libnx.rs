@@ -25,6 +25,8 @@ mod applet_err;
 mod fs;
 #[cfg(feature = "service-hid")]
 mod hid;
+#[cfg(feature = "service-applet-nfp")]
+mod nfp;
 #[cfg(feature = "service-nv")]
 mod nv;
 #[cfg(feature = "service-set")]
