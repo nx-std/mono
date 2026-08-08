@@ -258,7 +258,7 @@
 //!        │       IStorage with results        │
 //! ```
 //!
-//! Every library applet receives a **CommonArguments** header (0x20 bytes) containing
+//! Every library applet receives a **LibraryAppletArgs** header (0x20 bytes) containing
 //! version info and system tick, followed by applet-specific configuration data.
 //!
 //! # Application Lifecycle
@@ -365,6 +365,7 @@ pub use self::{
         ReceiveMessageError,
     },
     library_applet::{
+        LibraryApplet,
         LibraryAppletAccessor,
         Storage,
         StorageAccessor,
@@ -378,6 +379,7 @@ pub use self::{
         AppletOperationMode,
         AppletPerformanceMode,
         AppletType,
+        LibraryAppletArgs,
         LibraryAppletExitReason,
         LibraryAppletMode,
         SERVICE_NAME_AE,

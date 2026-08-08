@@ -6,6 +6,7 @@
 use nx_sf::{
     error::{
         GENERIC_ERROR,
+        ResultCode,
         ToResultCode,
     },
     service::{
@@ -15,10 +16,7 @@ use nx_sf::{
     },
 };
 use nx_svc::{
-    error::{
-        ResultCode,
-        ToResultCode as _,
-    },
+    error::ToResultCode as _,
     sync::EventHandle,
 };
 

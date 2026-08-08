@@ -569,3 +569,51 @@ impl LibraryAppletMode {
         self as u32
     }
 }
+
+/// The common arguments every library applet reads as its **first** storage.
+///
+/// libnx calls this `LibAppletArgs`; switchbrew calls it `CommonArguments`. The
+/// applet rejects a `version` other than 1, and reads `size` to decide how much
+/// of the struct it can trust.
+///
+/// Fixed-layout payload written verbatim into an `IStorage`, so it is modelled
+/// as a `repr(C)` struct and converted with zerocopy rather than serialised
+/// field by field.
+#[derive(Debug, Clone, Copy, zerocopy::Immutable, zerocopy::IntoBytes)]
+#[repr(C)]
+pub struct LibraryAppletArgs {
+    /// Struct version. Must be 1; version 0 is not supported.
+    pub version: u32,
+    /// Size of this struct.
+    pub size: u32,
+    /// Library applet API version.
+    pub la_version: u32,
+    /// Theme colour the caller expects the applet to render with.
+    pub expected_theme_color: i32,
+    /// Whether the applet plays its startup sound.
+    pub play_startup_sound: u8,
+    _padding: [u8; 7],
+    /// System tick at the moment the arguments are pushed.
+    pub tick: u64,
+}
+
+const_assert_eq!(size_of::<LibraryAppletArgs>(), 0x20);
+
+impl LibraryAppletArgs {
+    /// Builds the common arguments for a library applet launched at `tick`.
+    ///
+    /// `expected_theme_color` is left at zero. libnx sources it from
+    /// `appletGetThemeColorType`, which costs another round trip and only
+    /// affects the palette the applet renders with, never whether it runs.
+    pub const fn new(la_version: u32, tick: u64) -> Self {
+        Self {
+            version: 1,
+            size: size_of::<Self>() as u32,
+            la_version,
+            expected_theme_color: 0,
+            play_startup_sound: 0,
+            _padding: [0; 7],
+            tick,
+        }
+    }
+}

@@ -6,6 +6,7 @@
 use nx_sf::{
     error::{
         GENERIC_ERROR,
+        ResultCode,
         ToResultCode,
     },
     service::{
@@ -13,7 +14,6 @@ use nx_sf::{
         DomainObjectRef,
     },
 };
-use nx_svc::error::ResultCode;
 use zerocopy::IntoBytes as _;
 
 use super::{
