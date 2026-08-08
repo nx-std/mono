@@ -3,22 +3,12 @@
 //! One accessor drives one launched library applet: start it, wait for it to
 //! exit, and exchange storages with it.
 
-use nx_sf::{
-    error::{
-        GENERIC_ERROR,
-        ResultCode,
-        ToResultCode,
-    },
-    service::{
-        DispatchError,
-        DomainObject,
-        OutHandleAttr,
-    },
+use nx_sf::service::{
+    DispatchError,
+    DomainObject,
+    OutHandleAttr,
 };
-use nx_svc::{
-    error::ToResultCode as _,
-    sync::EventHandle,
-};
+use nx_svc::sync::EventHandle;
 
 use super::{
     storage::Storage,
@@ -170,13 +160,14 @@ pub enum GetAppletStateChangedEventError {
     MissingHandle,
 }
 
-impl ToResultCode for GetAppletStateChangedEventError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetAppletStateChangedEventError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingHandle => GENERIC_ERROR,
+            Self::MissingHandle => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -189,8 +180,9 @@ pub enum StartError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for StartError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for StartError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -205,8 +197,9 @@ pub enum GetResultError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for GetResultError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetResultError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -224,10 +217,11 @@ pub enum JoinError {
     GetResult(#[source] GetResultError),
 }
 
-impl ToResultCode for JoinError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for JoinError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
-            Self::Wait(err) => err.to_rc(),
+            Self::Wait(err) => nx_svc::error::ToResultCode::to_rc(err),
             Self::GetResult(err) => err.to_rc(),
         }
     }
@@ -241,8 +235,9 @@ pub enum PushInDataError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for PushInDataError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for PushInDataError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -260,13 +255,14 @@ pub enum PopOutDataError {
     MissingObject,
 }
 
-impl ToResultCode for PopOutDataError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for PopOutDataError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }

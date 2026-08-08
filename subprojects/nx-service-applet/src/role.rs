@@ -23,11 +23,6 @@
 //! ones are non-optional, so the type system guarantees they exist whenever a
 //! [`Proxy<R>`](crate::Proxy) is held.
 
-use nx_sf::error::{
-    ResultCode,
-    ToResultCode,
-};
-
 use crate::{
     AppletProxyService,
     AppletType,
@@ -237,8 +232,9 @@ pub enum DrainExtrasError {
     GetSubInterface(#[source] GetSubInterfaceError),
 }
 
-impl ToResultCode for DrainExtrasError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for DrainExtrasError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::GetApplicationFunctions(err) => err.to_rc(),
             Self::GetSubInterface(err) => err.to_rc(),

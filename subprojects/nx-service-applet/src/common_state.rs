@@ -6,17 +6,10 @@
 
 use core::mem::size_of;
 
-use nx_sf::{
-    error::{
-        GENERIC_ERROR,
-        ResultCode,
-        ToResultCode,
-    },
-    service::{
-        DispatchError,
-        DomainObjectRef,
-        OutHandleAttr,
-    },
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
+    OutHandleAttr,
 };
 use nx_svc::sync::EventHandle;
 
@@ -71,13 +64,14 @@ pub enum GetEventHandleError {
     MissingHandle,
 }
 
-impl ToResultCode for GetEventHandleError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetEventHandleError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingHandle => GENERIC_ERROR,
+            Self::MissingHandle => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -131,13 +125,14 @@ pub enum ReceiveMessageError {
     InvalidResponse,
 }
 
-impl ToResultCode for ReceiveMessageError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ReceiveMessageError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse => GENERIC_ERROR,
+            Self::InvalidResponse => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -176,13 +171,14 @@ pub enum GetOperationModeError {
     InvalidValue(u8),
 }
 
-impl ToResultCode for GetOperationModeError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetOperationModeError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse | Self::InvalidValue(_) => GENERIC_ERROR,
+            Self::InvalidResponse | Self::InvalidValue(_) => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -221,13 +217,14 @@ pub enum GetPerformanceModeError {
     InvalidValue(u32),
 }
 
-impl ToResultCode for GetPerformanceModeError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetPerformanceModeError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse | Self::InvalidValue(_) => GENERIC_ERROR,
+            Self::InvalidResponse | Self::InvalidValue(_) => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -266,13 +263,14 @@ pub enum GetCurrentFocusStateError {
     InvalidValue(u8),
 }
 
-impl ToResultCode for GetCurrentFocusStateError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetCurrentFocusStateError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse | Self::InvalidValue(_) => GENERIC_ERROR,
+            Self::InvalidResponse | Self::InvalidValue(_) => nx_sf::error::GENERIC_ERROR,
         }
     }
 }

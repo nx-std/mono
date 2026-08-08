@@ -13,7 +13,16 @@ bench = false
 [features]
 # Master switch for the C-FFI surface (`__nx_rt_nro__*` symbols). Required for any libnx override.
 # Pulls `nx-rt-core/ffi`: the NRO FFI re-exports the shared helpers from `nx_rt_core::ffi::common`.
-ffi = ["nx-sf/ffi", "nx-rt-core/ffi"]
+# Pulls `nx-service-applet?/ffi` and `nx-service-applet-err?/ffi`: those crates
+# gate their result-code mapping on the feature, and only the adapters below this
+# switch call `to_rc`. A consumer that enables `service-applet` without this
+# compiles none of the mapping.
+ffi = [
+    "nx-sf/ffi",
+    "nx-rt-core/ffi",
+    "nx-service-applet?/ffi",
+    "nx-service-applet-err?/ffi",
+]
 # Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the homebrew-loader startup ABI). Leave it off on the
 # GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.

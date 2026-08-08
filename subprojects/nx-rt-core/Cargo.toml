@@ -12,7 +12,11 @@ bench = false
 
 [features]
 # Enable the __nx_rt_core FFI
-ffi = ["nx-sf/ffi"]
+# `nx-service-applet?/ffi` arrives here rather than under `service-applet`: that
+# crate gates its result-code mapping on the feature, and only this crate's C
+# boundary calls `to_rc`. A pure-Rust consumer of `service-applet` compiles none
+# of it.
+ffi = ["nx-sf/ffi", "nx-service-applet?/ffi"]
 # Application Manager (am) manager — gates the shared `services::applet`
 # applet handshake. Entry crates enable it and source the applet-type value.
 service-applet = ["dep:nx-service-applet"]

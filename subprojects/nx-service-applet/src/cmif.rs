@@ -6,11 +6,6 @@ use core::mem::size_of;
 
 use nx_sf::{
     cmif::ParseError,
-    error::{
-        GENERIC_ERROR,
-        ResultCode,
-        ToResultCode,
-    },
     service::{
         BufferAttr,
         ConvertToDomainError,
@@ -194,13 +189,16 @@ pub enum OpenProxyError {
     Timeout,
 }
 
-impl ToResultCode for OpenProxyError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for OpenProxyError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidAppletType | Self::MissingObject | Self::Timeout => GENERIC_ERROR,
+            Self::InvalidAppletType | Self::MissingObject | Self::Timeout => {
+                nx_sf::error::GENERIC_ERROR
+            }
         }
     }
 }
@@ -241,13 +239,14 @@ pub enum GetCommonStateGetterError {
     MissingObject,
 }
 
-impl ToResultCode for GetCommonStateGetterError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetCommonStateGetterError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -288,13 +287,14 @@ pub enum GetSelfControllerError {
     MissingObject,
 }
 
-impl ToResultCode for GetSelfControllerError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetSelfControllerError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -335,13 +335,14 @@ pub enum GetWindowControllerError {
     MissingObject,
 }
 
-impl ToResultCode for GetWindowControllerError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetWindowControllerError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -368,8 +369,9 @@ pub enum AcquireForegroundRightsError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for AcquireForegroundRightsError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for AcquireForegroundRightsError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -477,13 +479,14 @@ pub enum GetLibraryAppletLaunchableEventError {
     MissingHandle,
 }
 
-impl ToResultCode for GetLibraryAppletLaunchableEventError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetLibraryAppletLaunchableEventError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingHandle => GENERIC_ERROR,
+            Self::MissingHandle => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -499,8 +502,9 @@ pub enum SetFocusHandlingModeError {
     SetOutOfFocusSuspending(#[source] SetOutOfFocusSuspendingEnabledError),
 }
 
-impl ToResultCode for SetFocusHandlingModeError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for SetFocusHandlingModeError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             Self::SetOutOfFocusSuspending(err) => err.to_rc(),
@@ -534,8 +538,9 @@ pub enum SetOutOfFocusSuspendingEnabledError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for SetOutOfFocusSuspendingEnabledError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for SetOutOfFocusSuspendingEnabledError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -553,8 +558,9 @@ pub enum ConnectError {
     ConvertToDomain(#[source] ConvertToDomainError),
 }
 
-impl ToResultCode for ConnectError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ConnectError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::GetService(err) => err.to_rc(),
             Self::ConvertToDomain(err) => err.to_rc(),
@@ -591,8 +597,9 @@ pub enum SetOperationModeChangedNotificationError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for SetOperationModeChangedNotificationError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for SetOperationModeChangedNotificationError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -628,8 +635,9 @@ pub enum SetPerformanceModeChangedNotificationError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for SetPerformanceModeChangedNotificationError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for SetPerformanceModeChangedNotificationError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
         }
@@ -673,13 +681,14 @@ pub enum GetAppletResourceUserIdError {
     InvalidResponse,
 }
 
-impl ToResultCode for GetAppletResourceUserIdError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetAppletResourceUserIdError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse => GENERIC_ERROR,
+            Self::InvalidResponse => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -720,13 +729,14 @@ pub enum GetApplicationFunctionsError {
     MissingObject,
 }
 
-impl ToResultCode for GetApplicationFunctionsError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetApplicationFunctionsError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -764,13 +774,14 @@ pub enum NotifyRunningError {
     InvalidResponse,
 }
 
-impl ToResultCode for NotifyRunningError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for NotifyRunningError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse => GENERIC_ERROR,
+            Self::InvalidResponse => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -807,13 +818,14 @@ pub enum CreateManagedDisplayLayerError {
     InvalidResponse,
 }
 
-impl ToResultCode for CreateManagedDisplayLayerError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for CreateManagedDisplayLayerError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse => GENERIC_ERROR,
+            Self::InvalidResponse => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -834,13 +846,14 @@ pub enum GetSubInterfaceError {
     MissingObject,
 }
 
-impl ToResultCode for GetSubInterfaceError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetSubInterfaceError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
