@@ -70,6 +70,14 @@ if get_option('use_nx_service_applet').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet.ld'
 endif
 
+# nx-service-applet-album
+if get_option('use_nx_service_applet_album').enabled()
+    nx_service_applet_album_proj = subproject('nx-service-applet-album')
+    deps += nx_service_applet_album_proj.get_variable('nx_service_applet_album_dep')
+    cargo_features += 'service-applet-album'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_album.ld'
+endif
+
 # nx-service-applet-err
 if get_option('use_nx_service_applet_err').enabled()
     nx_service_applet_err_proj = subproject('nx-service-applet-err')

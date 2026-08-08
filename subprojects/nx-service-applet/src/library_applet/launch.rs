@@ -56,6 +56,11 @@ pub struct LibraryApplet {
     ///
     /// Carried in the common arguments; each applet defines its own numbering.
     pub la_version: u32,
+    /// Whether the applet plays its startup sound.
+    ///
+    /// Part of how the applet is launched rather than of what it is asked to do,
+    /// so an applet that varies it declares one value of this per variant.
+    pub play_startup_sound: bool,
 }
 
 /// Launches `applet` with `payload`, blocking until it exits.
@@ -102,7 +107,7 @@ pub fn launch(
         .map_err(LaunchError::StateChangedEvent)?;
 
     let tick = nx_cpu::counter::ticks().to_raw();
-    let args = LibraryAppletArgs::new(applet.la_version, tick);
+    let args = LibraryAppletArgs::new(applet.la_version, tick, applet.play_startup_sound);
 
     // The common arguments must be storage 0: the applet reads its own argument
     // struct from the second storage pushed, so reversing these two makes it

@@ -13,14 +13,14 @@ bench = false
 [features]
 # Master switch for the C-FFI surface (`__nx_rt_nro__*` symbols). Required for any libnx override.
 # Pulls `nx-rt-core/ffi`: the NRO FFI re-exports the shared helpers from `nx_rt_core::ffi::common`.
-# Pulls `nx-service-applet?/ffi` and `nx-service-applet-err?/ffi`: those crates
-# gate their result-code mapping on the feature, and only the adapters below this
-# switch call `to_rc`. A consumer that enables `service-applet` without this
-# compiles none of the mapping.
+# Pulls `nx-service-applet*?/ffi`: those crates gate their result-code mapping on
+# the feature, and only the adapters below this switch call `to_rc`. A consumer
+# that enables `service-applet` without this compiles none of the mapping.
 ffi = [
     "nx-sf/ffi",
     "nx-rt-core/ffi",
     "nx-service-applet?/ffi",
+    "nx-service-applet-album?/ffi",
     "nx-service-applet-err?/ffi",
 ]
 # Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
@@ -32,6 +32,9 @@ service-apm = ["dep:nx-service-apm"]
 # Applet (am) service — gates `services::applet` + `ffi::applet`.
 # Pulls `nx-rt-core/service-applet`: the shared applet manager lives in the core.
 service-applet = ["dep:nx-service-applet", "nx-rt-core/service-applet"]
+# Album library applet — gates `ffi::album`. Pulls `service-applet`: the Album
+# is launched through the applet proxy the core holds.
+service-applet-album = ["dep:nx-service-applet-album", "service-applet"]
 # Error library applet — gates `ffi::applet_err`. Pulls `service-applet`: the
 # dialog is launched through the applet proxy the core holds.
 service-applet-err = ["dep:nx-service-applet-err", "service-applet"]
@@ -63,6 +66,7 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-applet-album = { version = "0.1.0", path = "../nx-service-applet-album", optional = true }
 nx-service-applet-err = { version = "0.1.0", path = "../nx-service-applet-err", optional = true }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }

@@ -1,0 +1,24 @@
+[package]
+name = "nx-service-applet-album"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_service_applet_album"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the `ToResultCode` mapping the `nx-rt-*` FFI adapters consume. No FFI
+# surface lives here; the feature exists so a pure-Rust consumer does not compile
+# a mapping only a C boundary needs. Pulls the same feature on `nx-service-applet`,
+# whose `LaunchError` mapping `ShowError` forwards to.
+ffi = ["nx-service-applet/ffi"]
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+thiserror = { version = "2", default-features = false }

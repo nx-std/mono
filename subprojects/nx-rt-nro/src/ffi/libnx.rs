@@ -13,6 +13,8 @@ mod argv;
 mod cwd;
 mod env;
 
+#[cfg(feature = "service-applet-album")]
+mod album;
 #[cfg(feature = "service-apm")]
 mod apm;
 #[cfg(feature = "service-applet")]
