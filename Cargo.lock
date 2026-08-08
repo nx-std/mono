@@ -166,6 +166,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "nx-time",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]

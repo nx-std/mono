@@ -12,7 +12,10 @@ use nx_sf::{
     service::Session,
 };
 use nx_svc::raw::Handle as RawHandle;
-use zerocopy::FromBytes as _;
+use zerocopy::{
+    FromBytes as _,
+    IntoBytes as _,
+};
 
 use crate::{
     cmif,
@@ -126,10 +129,7 @@ impl Binder {
             objects_off: (ParcelHeader::SIZE + payload_size) as u32,
         };
 
-        // SAFETY: Header is repr(C) and properly sized.
-        unsafe {
-            core::ptr::write_unaligned(in_buf.as_mut_ptr().cast::<ParcelHeader>(), header);
-        }
+        in_buf[..ParcelHeader::SIZE].copy_from_slice(header.as_bytes());
 
         // Copy payload after header
         in_buf[ParcelHeader::SIZE..ParcelHeader::SIZE + payload_size]
@@ -165,19 +165,12 @@ impl Binder {
             return Err(TransactError::InvalidResponse);
         }
 
-        // Copy payload to output parcel
+        // Copy just the payload region into the output parcel, so its read
+        // cursor starts at the payload rather than at the header.
         let payload_start = out_header.payload_off as usize;
         let payload_end = payload_start + out_header.payload_size as usize;
-        out_parcel
-            .payload_mut()
-            .copy_from_slice(&out_buf[..PARCEL_MAX_PAYLOAD]);
-        out_parcel.set_payload_size(out_header.payload_size as usize);
-        out_parcel.reset_read_pos();
-
-        // Adjust read position to skip header offset (parcel data starts at payload_off)
-        // Actually, we copy the raw payload, so position should start at 0 relative to payload
-        // Let me reconsider: we want out_parcel to contain just the payload portion
         let payload_data = &out_buf[payload_start..payload_end];
+
         out_parcel.payload_mut()[..payload_data.len()].copy_from_slice(payload_data);
         out_parcel.set_payload_size(payload_data.len());
         out_parcel.reset_read_pos();

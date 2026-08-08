@@ -69,6 +69,7 @@ nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
 thiserror = { version = "2", default-features = false }
+zerocopy = { workspace = true }
 
 # `nx-sys-mem` and `nx-sys-thread-tls` are linked via meson for FFI symbol
 # re-export; not `use`d in Rust source.

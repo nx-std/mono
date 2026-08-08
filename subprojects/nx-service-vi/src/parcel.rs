@@ -11,7 +11,14 @@ pub const PARCEL_MAX_PAYLOAD: usize = 0x400;
 
 /// Parcel header structure.
 #[derive(
-    Debug, Clone, Copy, Default, zerocopy::FromBytes, zerocopy::Immutable, zerocopy::KnownLayout,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
 )]
 #[repr(C)]
 pub struct ParcelHeader {
@@ -26,8 +33,8 @@ pub struct ParcelHeader {
 }
 
 impl ParcelHeader {
-    /// Size of the parcel header.
-    pub const SIZE: usize = 16;
+    /// Size of the parcel header on the wire.
+    pub const SIZE: usize = core::mem::size_of::<Self>();
 }
 
 /// Parcel for Binder IPC serialization.
@@ -93,8 +100,9 @@ impl Parcel {
 
     /// Writes raw data to the parcel, aligned to 4 bytes.
     ///
-    /// Returns a pointer to the written data, or `None` if there's not enough space.
-    pub fn write_data(&mut self, data: &[u8]) -> Option<*mut u8> {
+    /// Returns the region the data was written into, or `None` if there's not
+    /// enough space.
+    pub fn write_data(&mut self, data: &[u8]) -> Option<&mut [u8]> {
         let data_size = data.len();
         if data_size > i32::MAX as usize {
             return None;
@@ -107,16 +115,12 @@ impl Parcel {
             return None;
         }
 
-        let ptr = self.payload[self.payload_size..].as_mut_ptr();
-        if !data.is_empty() {
-            // SAFETY: We checked bounds above.
-            unsafe {
-                core::ptr::copy_nonoverlapping(data.as_ptr(), ptr, data_size);
-            }
-        }
-
+        let start = self.payload_size;
         self.payload_size += aligned_size;
-        Some(ptr)
+
+        let written = &mut self.payload[start..start + data_size];
+        written.copy_from_slice(data);
+        Some(written)
     }
 
     /// Writes raw data and returns a mutable slice to fill.
@@ -254,7 +258,7 @@ impl Parcel {
     }
 
     /// Writes a flattened object to the parcel.
-    pub fn write_flattened_object(&mut self, data: &[u8]) -> Option<*mut u8> {
+    pub fn write_flattened_object(&mut self, data: &[u8]) -> Option<&mut [u8]> {
         self.write_i32(data.len() as i32); // len
         self.write_i32(0); // fd_count
         self.write_data(data)

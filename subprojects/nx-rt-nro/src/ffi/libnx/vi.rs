@@ -10,6 +10,7 @@ use nx_sf::{
     error::ToResultCode,
     ffi::Service,
 };
+use zerocopy::FromBytes as _;
 
 use crate::{
     ffi::common::{
@@ -1226,12 +1227,9 @@ fn parse_native_window_binder_id(
 ) -> Option<u32> {
     use nx_service_vi::ParcelHeader;
 
-    if native_window.len() < ParcelHeader::SIZE {
-        return None;
-    }
-
-    let header =
-        unsafe { core::ptr::read_unaligned(native_window.as_ptr().cast::<ParcelHeader>()) };
+    // Every rejection in this parser is a bare `None`, so a truncated buffer
+    // carries nothing the caller could act on beyond that.
+    let (header, _) = ParcelHeader::read_from_prefix(native_window.as_slice()).ok()?;
 
     let payload_off = header.payload_off as usize;
     let payload_size = header.payload_size as usize;
@@ -1252,9 +1250,9 @@ fn parse_native_window_binder_id(
         return None;
     }
 
-    let binder_id = unsafe {
-        core::ptr::read_unaligned(native_window.as_ptr().add(binder_id_offset).cast::<u32>())
-    };
+    // The bounds check above leaves at least 4 bytes past `binder_id_offset`, so
+    // this read cannot fail; the discard unwraps a result already known to be `Ok`.
+    let (binder_id, _) = u32::read_from_prefix(&native_window[binder_id_offset..]).ok()?;
 
     Some(binder_id)
 }
