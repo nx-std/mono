@@ -12,9 +12,15 @@
  * __nx_applet_type) are deliberately NOT aliased here — each output-kind entry
  * crate (nx-rt-nro, nx-rt-nso) owns those.
  *
+ * The `libapplet*` launcher surface is aliased here for the same reason: every
+ * function in libnx's applets/libapplet.c dispatches through the same zeroed
+ * g_appletILibraryAppletCreator once appletInitialize is overridden.
+ *
  * Organization:
  *   - Rust FFI:  subprojects/nx-rt-core/src/ffi/libnx/applet.rs
+ *                subprojects/nx-rt-core/src/ffi/libnx/libapplet.rs
  *   - libnx C:   subprojects/libnx/src/nx/source/services/applet.c
+ *                subprojects/libnx/src/nx/source/applets/libapplet.c
  */
 
 EXTERN(__nx_rt_core__libnx_applet_exit);
@@ -46,3 +52,36 @@ appletSetPerformanceModeChangedNotification = __nx_rt_core__libnx_applet_set_per
 appletGetAppletResourceUserId = __nx_rt_core__libnx_applet_get_applet_resource_user_id;
 appletAcquireForegroundRights = __nx_rt_core__libnx_applet_acquire_foreground_rights;
 appletCreateManagedDisplayLayer = __nx_rt_core__libnx_applet_create_managed_display_layer;
+
+/* Library applet launcher (applets/libapplet.c) */
+EXTERN(__nx_rt_core__libnx_libapplet_args_create);
+EXTERN(__nx_rt_core__libnx_libapplet_args_set_play_startup_sound);
+EXTERN(__nx_rt_core__libnx_libapplet_create_write_storage);
+EXTERN(__nx_rt_core__libnx_libapplet_read_storage);
+EXTERN(__nx_rt_core__libnx_libapplet_args_push);
+EXTERN(__nx_rt_core__libnx_libapplet_args_pop);
+EXTERN(__nx_rt_core__libnx_libapplet_push_in_data);
+EXTERN(__nx_rt_core__libnx_libapplet_pop_out_data);
+EXTERN(__nx_rt_core__libnx_libapplet_set_jump_flag);
+EXTERN(__nx_rt_core__libnx_libapplet_start);
+EXTERN(__nx_rt_core__libnx_libapplet_launch);
+EXTERN(__nx_rt_core__libnx_libapplet_request_home_menu);
+EXTERN(__nx_rt_core__libnx_libapplet_request_jump_to_system_update);
+EXTERN(__nx_rt_core__libnx_libapplet_request_to_launch_application);
+EXTERN(__nx_rt_core__libnx_libapplet_request_jump_to_story);
+
+libappletArgsCreate = __nx_rt_core__libnx_libapplet_args_create;
+libappletArgsSetPlayStartupSound = __nx_rt_core__libnx_libapplet_args_set_play_startup_sound;
+libappletCreateWriteStorage = __nx_rt_core__libnx_libapplet_create_write_storage;
+libappletReadStorage = __nx_rt_core__libnx_libapplet_read_storage;
+libappletArgsPush = __nx_rt_core__libnx_libapplet_args_push;
+libappletArgsPop = __nx_rt_core__libnx_libapplet_args_pop;
+libappletPushInData = __nx_rt_core__libnx_libapplet_push_in_data;
+libappletPopOutData = __nx_rt_core__libnx_libapplet_pop_out_data;
+libappletSetJumpFlag = __nx_rt_core__libnx_libapplet_set_jump_flag;
+libappletStart = __nx_rt_core__libnx_libapplet_start;
+libappletLaunch = __nx_rt_core__libnx_libapplet_launch;
+libappletRequestHomeMenu = __nx_rt_core__libnx_libapplet_request_home_menu;
+libappletRequestJumpToSystemUpdate = __nx_rt_core__libnx_libapplet_request_jump_to_system_update;
+libappletRequestToLaunchApplication = __nx_rt_core__libnx_libapplet_request_to_launch_application;
+libappletRequestJumpToStory = __nx_rt_core__libnx_libapplet_request_jump_to_story;

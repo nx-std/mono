@@ -14,6 +14,8 @@
 
 #[cfg(feature = "service-applet")]
 pub mod applet;
+#[cfg(feature = "service-applet")]
+pub mod libapplet;
 
 mod env;
 mod sm;
