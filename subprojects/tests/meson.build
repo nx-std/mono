@@ -240,6 +240,26 @@ custom_target(name + '.nro',
               input : elf, output : name + '.nro',
               build_by_default : true, depends : elf)
 
+# ── nx-tests-applet-album ─────────────────────────────────────────────────
+# Interactive: each Album launch blocks until a person leaves the applet, so
+# this cannot join the unattended suite. It links either way — with
+# `use_nx_service_applet_album` off the calls resolve to libnx, which is the
+# baseline to compare our implementation against.
+name = 'nx-tests-applet-album'
+src = files('source/applet_album/main.c')
+elf = executable(name + '.elf', src,
+                 dependencies : nx_dep,
+                 c_args : c_opts, cpp_args : cpp_opts,
+                 link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
+                 pie : true)
+custom_target(name + '.lst',
+              input : elf, output : name + '.lst',
+              command : [nm, '-CSn', '@INPUT@'], capture : true)
+custom_target(name + '.nro',
+              command : bundle_base + ['--name', name],
+              input : elf, output : name + '.nro',
+              build_by_default : true, depends : elf)
+
 # ── nx-tests-applet-err ───────────────────────────────────────────────────
 # Interactive: the error applet blocks until a person dismisses the dialog, so
 # this cannot join the unattended suite. It links either way — with

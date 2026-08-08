@@ -149,6 +149,15 @@ option(
 )
 
 option(
+    'use_nx_service_applet_album',
+    # Disable by default, WIP: follows use_nx_service_applet, which is itself
+    # off by default. Implies use_nx_service_applet.
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-applet-album (album library applet)',
+    yield : true
+)
+
+option(
     'use_nx_service_applet_err',
     # Disable by default, WIP: only the application error variant is ported; the
     # rest of the surface is aliased to panicking stubs. Implies

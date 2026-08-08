@@ -151,6 +151,7 @@ dependencies = [
  "nx-rt-core",
  "nx-service-apm",
  "nx-service-applet",
+ "nx-service-applet-album",
  "nx-service-applet-err",
  "nx-service-fs",
  "nx-service-hid",
@@ -218,6 +219,16 @@ dependencies = [
  "static_assertions",
  "thiserror",
  "zerocopy",
+]
+
+[[package]]
+name = "nx-service-applet-album"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-applet",
+ "nx-sf",
+ "thiserror",
 ]
 
 [[package]]

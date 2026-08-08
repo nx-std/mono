@@ -605,13 +605,13 @@ impl LibraryAppletArgs {
     /// `expected_theme_color` is left at zero. libnx sources it from
     /// `appletGetThemeColorType`, which costs another round trip and only
     /// affects the palette the applet renders with, never whether it runs.
-    pub const fn new(la_version: u32, tick: u64) -> Self {
+    pub const fn new(la_version: u32, tick: u64, play_startup_sound: bool) -> Self {
         Self {
             version: 1,
             size: size_of::<Self>() as u32,
             la_version,
             expected_theme_color: 0,
-            play_startup_sound: 0,
+            play_startup_sound: play_startup_sound as u8,
             _padding: [0; 7],
             tick,
         }

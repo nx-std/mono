@@ -23,6 +23,7 @@ const ERROR_APPLET: LibraryApplet = LibraryApplet {
     id: AppletId::LibraryAppletError,
     mode: LibraryAppletMode::AllForeground,
     la_version: 0,
+    play_startup_sound: false,
 };
 
 /// Size of the reply storage the applet pops back.
