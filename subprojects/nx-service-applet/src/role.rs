@@ -23,8 +23,10 @@
 //! ones are non-optional, so the type system guarantees they exist whenever a
 //! [`Proxy<R>`](crate::Proxy) is held.
 
-use nx_sf::error::ToResultCode;
-use nx_svc::error::ResultCode;
+use nx_sf::error::{
+    ResultCode,
+    ToResultCode,
+};
 
 use crate::{
     AppletProxyService,

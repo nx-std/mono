@@ -11,11 +11,9 @@ doctest = false
 bench = false
 
 [dependencies]
-nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
-nx-svc = { version = "0.1.0", path = "../nx-svc" }
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
 zerocopy = { workspace = true }

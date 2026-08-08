@@ -17,7 +17,9 @@
 //! # Launch sequence
 //!
 //! The order below is the protocol, not a convenience. Two steps are easy to
-//! miss and neither fails loudly:
+//! miss and neither fails loudly. [`launch`] performs all of it, and an applet
+//! that fits its shape — one payload storage in, at most one reply out — needs
+//! nothing else from this module:
 //!
 //! 1. Wait on the launchable event
 //!    ([`SelfController::get_library_applet_launchable_event`]). The system
@@ -37,6 +39,7 @@
 
 mod accessor;
 mod creator;
+mod launch;
 mod storage;
 mod support;
 
@@ -55,6 +58,12 @@ pub use self::{
         CreateStorageError,
         create_library_applet,
         create_storage,
+    },
+    launch::{
+        LaunchError,
+        LibraryApplet,
+        PushStorageError,
+        launch,
     },
     storage::{
         GetSizeError,

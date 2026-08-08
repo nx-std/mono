@@ -38,10 +38,11 @@
 //! # Shape
 //!
 //! [`ApplicationError`] carries the payload and nothing else; building one
-//! performs no IPC. [`ApplicationError::show`] does all of it, driving the
-//! sequence documented in [`nx_service_applet::library_applet`]: wait for the
-//! launchable event, create the applet, push the common arguments and then the
-//! error argument, start, wait, and read the reply.
+//! performs no IPC. [`ApplicationError::show`] does all of it, handing the
+//! argument struct to [`nx_service_applet::library_applet::launch`], which
+//! drives the sequence documented there. What this crate owns is the argument
+//! struct and the meaning of the reply; the launch itself is shared with every
+//! other library applet.
 //!
 //! Only the *application* error variant is implemented. The others in libnx's
 //! `error.h` share [`proto::ErrorCommonHeader`] but each needs its own argument
@@ -61,6 +62,5 @@ pub mod proto;
 
 pub use self::application_error::{
     ApplicationError,
-    PushStorageError,
     ShowError,
 };

@@ -9,6 +9,7 @@ use core::mem::size_of;
 use nx_sf::{
     error::{
         GENERIC_ERROR,
+        ResultCode,
         ToResultCode,
     },
     service::{
@@ -17,10 +18,7 @@ use nx_sf::{
         OutHandleAttr,
     },
 };
-use nx_svc::{
-    error::ResultCode,
-    sync::EventHandle,
-};
+use nx_svc::sync::EventHandle;
 
 use crate::proto::{
     AppletFocusState,

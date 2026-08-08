@@ -8,6 +8,7 @@ use nx_sf::{
     cmif::ParseError,
     error::{
         GENERIC_ERROR,
+        ResultCode,
         ToResultCode,
     },
     service::{
@@ -20,7 +21,6 @@ use nx_sf::{
     },
 };
 use nx_svc::{
-    error::ResultCode,
     process::Handle as ProcessHandle,
     sync::EventHandle,
     thread,

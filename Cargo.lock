@@ -209,6 +209,7 @@ dependencies = [
 name = "nx-service-applet"
 version = "0.1.0"
 dependencies = [
+ "nx-cpu",
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
@@ -223,11 +224,9 @@ dependencies = [
 name = "nx-service-applet-err"
 version = "0.1.0"
 dependencies = [
- "nx-cpu",
  "nx-panic-handler",
  "nx-service-applet",
  "nx-sf",
- "nx-svc",
  "static_assertions",
  "thiserror",
  "zerocopy",

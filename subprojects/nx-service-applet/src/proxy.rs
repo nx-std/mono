@@ -24,12 +24,10 @@ use core::marker::PhantomData;
 use nx_service_sm::SmService;
 use nx_sf::error::{
     GENERIC_ERROR,
+    ResultCode,
     ToResultCode,
 };
-use nx_svc::{
-    error::ResultCode,
-    process::Handle as ProcessHandle,
-};
+use nx_svc::process::Handle as ProcessHandle;
 
 use crate::{
     AcquireForegroundRightsError,
