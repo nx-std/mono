@@ -8,7 +8,13 @@
 use static_assertions::const_assert_eq;
 
 /// Fixed-capacity ASCII string for service names (max 8 bytes).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+// `IntoBytes` makes this usable as a field of a wire struct that encodes itself, so the
+// name reaches `sm` without a hand-rolled byte copy. Beware that the inherent
+// `as_bytes` below shadows the trait method and stops at the first NUL: a caller that
+// wants the padded 8 bytes the wire carries must use `as_bytes_raw`.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, zerocopy::IntoBytes, zerocopy::Immutable,
+)]
 #[repr(C)]
 pub struct ServiceName {
     name: [u8; 8],
