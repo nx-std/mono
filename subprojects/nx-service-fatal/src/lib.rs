@@ -3,6 +3,27 @@
 //! Provides an interface for throwing system fatal errors with configurable
 //! error reporting and screen display policies.
 //!
+//! ## The service
+//!
+//! `fatal:u` is how a process reports an unrecoverable failure to the system.
+//! The caller hands it a result code and a [`FatalPolicy`] saying what the
+//! system should do with it: write an error report, show the fatal error
+//! screen, or both. Whether the call returns is the policy's decision, not the
+//! caller's - [`FatalPolicy::ErrorReport`] records the failure and comes back,
+//! while the screen-showing policies do not.
+//!
+//! [`throw_fatal_with_context`](FatalService::throw_fatal_with_context) adds a
+//! [`FatalCpuContext`]: the register state, stack trace and exception type at
+//! the point of failure, which the system records alongside the report. The
+//! context is optional because the other two entry points describe failures a
+//! process detected itself, where its own register state says nothing useful.
+//!
+//! ## Architecture
+//!
+//! One connected session, [`FatalService`], obtained from [`connect_cmif`].
+//! The three throw commands differ only in how much they describe: a bare
+//! result code, a result code plus a policy, or both plus a CPU context.
+//!
 //! ## Divergence from libnx
 //!
 //! libnx's `fatal.c` performs a hosversion check to downgrade
@@ -34,10 +55,8 @@ pub use self::{
     cmif::ThrowFatalError,
     proto::SERVICE_NAME,
     types::{
-        FatalAarch32Context,
         FatalAarch64Context,
         FatalCpuContext,
-        FatalCpuContextUnion,
         FatalPolicy,
     },
 };
