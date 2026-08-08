@@ -2,11 +2,6 @@
 //!
 //! Used on HOS 10.0.0–11.x (pre-12.0.0).
 
-use core::{
-    mem::size_of,
-    ptr,
-};
-
 use nx_sf::{
     cmif,
     hipc::{
@@ -20,22 +15,19 @@ use nx_sf::{
         Session,
     },
 };
+use static_assertions::const_assert_eq;
+use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
     types::{
         ContentMetaInfo,
-        LaunchProgramCmifIn,
         NcmProgramLocation,
         PglLaunchFlag,
         ProcessEventInfo,
         SnapShotDumpType,
     },
 };
-
-// ---------------------------------------------------------------------------
-// Dispatch helpers
-// ---------------------------------------------------------------------------
 
 fn dispatch_in_u64(
     session: BorrowedSessionHandle<'_>,
@@ -44,9 +36,8 @@ fn dispatch_in_u64(
 ) -> Result<(), DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let payload = value.to_ne_bytes();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .with_data(&payload)
+        .with_data(value.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -63,9 +54,8 @@ fn dispatch_in_bool(
 ) -> Result<(), DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let payload = (value as u8).to_ne_bytes();
     let req = cmif::CmifRequestBuilder::new(cmd_id)
-        .with_data(&payload)
+        .with_data(value.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -112,10 +102,6 @@ pub enum DispatchError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-// ---------------------------------------------------------------------------
-// Root service commands
-// ---------------------------------------------------------------------------
-
 /// Launches a program (cmd 0, CMIF).
 pub fn launch_program(
     session: BorrowedSessionHandle<'_>,
@@ -123,20 +109,31 @@ pub fn launch_program(
     pm_launch_flags: u32,
     pgl_launch_flags: PglLaunchFlag,
 ) -> Result<u64, DispatchError> {
-    let input = LaunchProgramCmifIn {
+    // Wire layout: `{ u8 pgl_flags, u8[3] pad, u32 pm_flags, NcmProgramLocation }`.
+    // The field order is CMIF's own: TIPC sends the same three values with `loc`
+    // first, so the two layouts are not interchangeable.
+    #[derive(Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
+    #[repr(C)]
+    struct LaunchProgramIn {
+        pgl_flags: PglLaunchFlag,
+        _pad: [u8; 3],
+        pm_flags: u32,
+        loc: NcmProgramLocation,
+    }
+
+    const_assert_eq!(size_of::<LaunchProgramIn>(), 0x18);
+
+    let input = LaunchProgramIn {
         pgl_flags: pgl_launch_flags,
-        pad: [0; 3],
+        _pad: [0; 3],
         pm_flags: pm_launch_flags,
         loc: *loc,
     };
 
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<LaunchProgramCmifIn>()];
-    // SAFETY: `payload` is exactly `size_of::<LaunchProgramCmifIn>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<LaunchProgramCmifIn>(), input) };
     let req = cmif::CmifRequestBuilder::new(proto::LAUNCH_PROGRAM)
-        .with_data(&payload)
+        .with_data(input.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -164,11 +161,8 @@ pub fn launch_program_from_host(
 ) -> Result<u64, DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u32>()];
-    // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), pm_launch_flags) };
     let req = cmif::CmifRequestBuilder::new(proto::LAUNCH_PROGRAM_FROM_HOST)
-        .with_data(&payload)
+        .with_data(pm_launch_flags.as_bytes())
         .add_input_buffer(InputBuffer::new(content_path, BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
@@ -224,11 +218,8 @@ pub fn is_process_tracked(
 ) -> Result<bool, DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u64>()];
-    // SAFETY: `payload` is exactly `size_of::<u64>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u64>(), pid) };
     let req = cmif::CmifRequestBuilder::new(proto::IS_PROCESS_TRACKED)
-        .with_data(&payload)
+        .with_data(pid.as_bytes())
         .build();
     req.send(&mut buf, session)
         .map_err(DispatchError::SendRequest)?;
@@ -273,11 +264,8 @@ pub fn trigger_application_snapshot_dumper(
 ) -> Result<(), DispatchError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
-    let mut payload = [0u8; size_of::<u32>()];
-    // SAFETY: `payload` is exactly `size_of::<u32>()` bytes.
-    unsafe { ptr::write_unaligned(payload.as_mut_ptr().cast::<u32>(), dump_type as u32) };
     let req = cmif::CmifRequestBuilder::new(proto::TRIGGER_APPLICATION_SNAPSHOT_DUMPER)
-        .with_data(&payload)
+        .with_data(dump_type.as_bytes())
         .add_input_buffer(InputBuffer::new(arg, BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
@@ -323,10 +311,6 @@ pub enum GetEventObserverError {
     #[error("missing observer handle in response")]
     MissingHandle,
 }
-
-// ---------------------------------------------------------------------------
-// EventObserver sub-object commands (CMIF)
-// ---------------------------------------------------------------------------
 
 /// Gets the process event handle from the observer (cmd 0, copy handle).
 pub fn observer_get_process_event(
