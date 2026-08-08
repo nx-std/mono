@@ -271,6 +271,14 @@ if get_option('use_nx_service_applet_err').enabled()
     deps_cargo_features += ['service-applet-err']
 endif
 
+# nx-service-applet-nfp
+# No `subproject(...)` entry, mirroring the absent Cargo dependency: the cabinet
+# applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+if get_option('use_nx_service_applet_nfp').enabled()
+    debug('service-applet-nfp feature: enabled')
+    deps_cargo_features += ['service-applet-nfp']
+endif
+
 # nx-service-fs
 if get_option('use_nx_service_fs').enabled()
     nx_service_fs_proj = subproject('nx-service-fs')

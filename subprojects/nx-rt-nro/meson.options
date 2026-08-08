@@ -34,6 +34,13 @@ option(
 )
 
 option(
+    'use_nx_service_applet_nfp',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `service-applet-nfp` feature',
+    yield : true
+)
+
+option(
     'use_nx_service_fs',
     type : 'feature', value : 'auto',
     description : 'Enable the nx-rt-nro `service-fs` feature',

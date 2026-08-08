@@ -22,6 +22,7 @@ ffi = [
     "nx-service-applet?/ffi",
     "nx-service-applet-album?/ffi",
     "nx-service-applet-err?/ffi",
+    "nx-service-applet-nfp?/ffi",
 ]
 # Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the homebrew-loader startup ABI). Leave it off on the
@@ -38,6 +39,9 @@ service-applet-album = ["dep:nx-service-applet-album", "service-applet"]
 # Error library applet — gates `ffi::applet_err`. Pulls `service-applet`: the
 # dialog is launched through the applet proxy the core holds.
 service-applet-err = ["dep:nx-service-applet-err", "service-applet"]
+# Cabinet library applet — gates `ffi::nfp`. Pulls `service-applet`: the amiibo
+# editor is launched through the applet proxy the core holds.
+service-applet-nfp = ["dep:nx-service-applet-nfp", "service-applet"]
 # Filesystem (fsp-srv) service — gates `services::fs` + `ffi::fs`.
 # Pulls `nx-fsdev`: the session it connects lives there, alongside the filesystem
 # device that also addresses objects inside it.
@@ -68,6 +72,7 @@ nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = tru
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
 nx-service-applet-album = { version = "0.1.0", path = "../nx-service-applet-album", optional = true }
 nx-service-applet-err = { version = "0.1.0", path = "../nx-service-applet-err", optional = true }
+nx-service-applet-nfp = { version = "0.1.0", path = "../nx-service-applet-nfp", optional = true }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
