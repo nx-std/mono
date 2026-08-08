@@ -12,11 +12,6 @@ use nx_service_applet::{
         LaunchError,
     },
 };
-use nx_sf::error::{
-    GENERIC_ERROR,
-    ResultCode,
-    ToResultCode,
-};
 use zerocopy::IntoBytes as _;
 
 use crate::proto::ErrorApplicationArg;
@@ -118,13 +113,14 @@ pub enum ShowError {
     AppletStatus(u8),
 }
 
-impl ToResultCode for ShowError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ShowError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Launch(err) => err.to_rc(),
             // Reported by the applet rather than by a service, so no server
             // named a code for either.
-            Self::AbnormalExit(_) | Self::AppletStatus(_) => GENERIC_ERROR,
+            Self::AbnormalExit(_) | Self::AppletStatus(_) => nx_sf::error::GENERIC_ERROR,
         }
     }
 }

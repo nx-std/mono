@@ -7,11 +7,6 @@
 
 use nx_sf::{
     cmif::ObjectId,
-    error::{
-        GENERIC_ERROR,
-        ResultCode,
-        ToResultCode,
-    },
     service::{
         BufferAttr,
         DispatchError,
@@ -106,13 +101,14 @@ pub enum OpenStorageError {
     MissingObject,
 }
 
-impl ToResultCode for OpenStorageError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for OpenStorageError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -193,14 +189,15 @@ pub enum GetSizeError {
     InvalidResponse,
 }
 
-impl ToResultCode for GetSizeError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetSizeError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Open(err) => err.to_rc(),
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::InvalidResponse => GENERIC_ERROR,
+            Self::InvalidResponse => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -216,8 +213,9 @@ pub enum WriteStorageError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for WriteStorageError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for WriteStorageError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Open(err) => err.to_rc(),
             Self::Dispatch(err) => err.to_rc(),
@@ -236,8 +234,9 @@ pub enum ReadStorageError {
     Dispatch(#[source] DispatchError),
 }
 
-impl ToResultCode for ReadStorageError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ReadStorageError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Open(err) => err.to_rc(),
             Self::Dispatch(err) => err.to_rc(),

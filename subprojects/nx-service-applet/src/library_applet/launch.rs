@@ -10,11 +10,6 @@
 //! interactive storages while running, cannot use [`launch`]; it drives
 //! [`LibraryAppletCreator`] and [`LibraryAppletAccessor`] itself.
 
-use nx_sf::error::{
-    ResultCode,
-    ToResultCode,
-};
-use nx_svc::error::ToResultCode as _;
 use zerocopy::IntoBytes as _;
 
 use super::{
@@ -168,11 +163,12 @@ pub enum LaunchError {
     ReadReply(#[source] ReadStorageError),
 }
 
-impl ToResultCode for LaunchError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for LaunchError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::LaunchableEvent(err) => err.to_rc(),
-            Self::WaitLaunchable(err) => err.to_rc(),
+            Self::WaitLaunchable(err) => nx_svc::error::ToResultCode::to_rc(err),
             Self::CreateApplet(err) => err.to_rc(),
             Self::StateChangedEvent(err) => err.to_rc(),
             Self::PushArgs(err) | Self::PushPayload(err) => err.to_rc(),
@@ -221,8 +217,9 @@ pub enum PushStorageError {
     Push(#[source] PushInDataError),
 }
 
-impl ToResultCode for PushStorageError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for PushStorageError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Create(err) => err.to_rc(),
             Self::Write(err) => err.to_rc(),

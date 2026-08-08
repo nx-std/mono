@@ -3,16 +3,9 @@
 //! The creator mints the two kinds of object a launch needs: one accessor that
 //! drives a library applet, and the storages that carry data across to it.
 
-use nx_sf::{
-    error::{
-        GENERIC_ERROR,
-        ResultCode,
-        ToResultCode,
-    },
-    service::{
-        DispatchError,
-        DomainObjectRef,
-    },
+use nx_sf::service::{
+    DispatchError,
+    DomainObjectRef,
 };
 use zerocopy::IntoBytes as _;
 
@@ -82,13 +75,14 @@ pub enum CreateLibraryAppletError {
     MissingObject,
 }
 
-impl ToResultCode for CreateLibraryAppletError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for CreateLibraryAppletError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
@@ -132,13 +126,14 @@ pub enum CreateStorageError {
     MissingObject,
 }
 
-impl ToResultCode for CreateStorageError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for CreateStorageError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::MissingObject => GENERIC_ERROR,
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
         }
     }
 }

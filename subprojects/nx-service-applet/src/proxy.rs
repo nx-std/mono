@@ -22,11 +22,6 @@
 use core::marker::PhantomData;
 
 use nx_service_sm::SmService;
-use nx_sf::error::{
-    GENERIC_ERROR,
-    ResultCode,
-    ToResultCode,
-};
 use nx_svc::process::Handle as ProcessHandle;
 
 use crate::{
@@ -455,8 +450,9 @@ pub enum OpenError {
     DrainExtras(#[source] DrainExtrasError),
 }
 
-impl ToResultCode for OpenError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for OpenError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Connect(err) => err.to_rc(),
             Self::OpenProxy(err) => err.to_rc(),
@@ -467,7 +463,7 @@ impl ToResultCode for OpenError {
             Self::DrainExtras(err) => err.to_rc(),
             // Rejected locally after a successful reply, so no server
             // named a code for it.
-            Self::NoneAppletType => GENERIC_ERROR,
+            Self::NoneAppletType => nx_sf::error::GENERIC_ERROR,
         }
     }
 }
