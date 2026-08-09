@@ -56,11 +56,11 @@ use crate::{
 ///
 /// # Safety
 ///
-/// Must be called exactly once, on the startup thread, with the arguments the
-/// process manager's launch handed the `.crt0`: `main_thread` the handle of
-/// the process main thread, and `saved_lr` the address to return through.
-pub unsafe fn init(main_thread: ThreadHandle, saved_lr: LoaderReturnFn) {
-    env::setup(main_thread, saved_lr);
+/// Must be called exactly once, on the startup thread, with `main_thread` the
+/// handle the process manager's launch handed the `.crt0` for the process main
+/// thread.
+pub unsafe fn init(main_thread: ThreadHandle) {
+    env::setup(main_thread);
 
     // SAFETY: the environment is populated, so the main thread's handle is
     // known, and no thread-local has been touched yet.
@@ -97,11 +97,11 @@ pub unsafe fn exit(_status: i32) -> ! {
     unsafe { __appExit() };
 
     // The status is discarded rather than forwarded, as it is upstream: libnx
-    // passes a literal zero here too. Preserved so whatever reads the value
-    // sees what it saw before.
+    // passes a literal zero here too, and for this output kind the pointer it
+    // reaches is the process-exit syscall, which takes no status at all.
     //
-    // SAFETY: the function pointer is the one recorded during environment
-    // bring-up, and nothing runs after this.
+    // SAFETY: the function pointer is the one environment bring-up installed,
+    // and nothing runs after this.
     unsafe { __nx_exit(0, env::exit_func_ptr()) }
 }
 
