@@ -1,7 +1,7 @@
 //! Pool of cloned IPC sessions for concurrent socket operations.
 //!
-//! libnx's `bsd` service uses an internal `SessionMgr` to hand out a free
-//! session to each calling thread. Without that, a blocking `recv()` would
+//! The service is reached over a pool of sessions, one handed to each calling
+//! thread. Without that, a blocking `recv()` would
 //! serialise every other socket call on the process. This module re-creates
 //! the same behaviour with a fixed-size pool guarded by a mutex/condvar pair
 //! from [`nx_std_sync`].

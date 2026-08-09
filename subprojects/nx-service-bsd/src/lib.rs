@@ -1,6 +1,6 @@
 //! # nx-service-bsd
 //!
-//! Rust port of libnx's `bsd` BSD-socket service. The crate exposes:
+//! An IPC client for the Horizon `bsd` socket service. The crate exposes:
 //!
 //! - [`connect_with_options`] / [`ConnectError`] — establishes a `bsd:u` or
 //!   `bsd:s` session, wires up the transfer-memory the service requires, runs
@@ -497,7 +497,7 @@ impl BsdService {
 
     /// Waits for readiness across three descriptor sets.
     ///
-    /// Each `fd_set` slice carries the libnx `fd_set` byte layout; pass empty
+    /// Each `fd_set` slice carries the C `fd_set` byte layout; pass empty
     /// slices for fd_sets the caller does not need.
     /// # Errors
     ///
@@ -518,7 +518,7 @@ impl BsdService {
 
     /// Waits for readiness across a descriptor array.
     ///
-    /// `fds` carries the libnx `pollfd` array byte layout.
+    /// `fds` carries the C `pollfd` array byte layout.
     /// # Errors
     ///
     /// As [`Self::select`].
@@ -556,8 +556,7 @@ impl BsdService {
     ///
     /// Drops every pool session and the monitor session (each closes via
     /// `Drop`), then waits for the kernel to reclaim transfer-memory
-    /// permissions before freeing the backing buffer. Mirrors libnx's
-    /// `bsdExit`.
+    /// permissions before freeing the backing buffer.
     pub fn close(self) {
         let BsdService {
             pool,
@@ -583,10 +582,10 @@ impl BsdService {
     }
 }
 
-/// Establishes a `bsd:u`/`bsd:s` session, completes the libnx handshake, and
-/// builds the session pool.
+/// Establishes a `bsd:u`/`bsd:s` session, completes the service handshake,
+/// and builds the session pool.
 ///
-/// Steps mirror libnx's `_bsdInitialize`:
+/// The handshake is:
 /// 1. Look up the main service handle via SM (with `Auto` fallback when set).
 /// 2. Look up the monitor service handle via SM (same service name).
 /// 3. Allocate the transfer memory the service requires.

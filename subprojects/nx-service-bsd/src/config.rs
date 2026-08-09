@@ -6,15 +6,13 @@
 //! reject — a bound checked at construction is a bound nothing downstream has
 //! to re-check, silently clamp, or document in prose.
 //!
-//! # References
-//!
-//! - `subprojects/libnx/src/nx/include/switch/services/bsd.h` — `BsdInitConfig`
-//!   and the ranges its fields document.
+//! The ranges are the interface's own, not this crate's invention: the
+//! service documents what it accepts, and each bound below is that.
 
 /// Which BSD socket service to connect to.
 ///
-/// Mirrors libnx's `BsdServiceType` (`bsd.h`). `Auto` tries `bsd:s` first and
-/// falls back to `bsd:u` — the same precedence libnx applies at runtime.
+/// `Auto` tries `bsd:s` first and falls back to `bsd:u`, which is the
+/// precedence a client without a specific need wants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BsdServiceType {
     /// Try `bsd:s` first, fall back to `bsd:u` on failure.
@@ -27,13 +25,13 @@ pub enum BsdServiceType {
 
 /// The configuration revision a client declares to the service.
 ///
-/// libnx documents two observed values and always sends the first. Nothing in
-/// this workspace or in libnx branches on it, so an enum costs nothing: a
-/// firmware that introduces a third would need a variant added, and that is an
-/// edit worth a human's attention rather than an integer slipping through.
+/// Two revisions have been observed in the wild and nothing branches on the
+/// value, so an enum costs nothing: a firmware that introduces a third would
+/// need a variant added, and that is an edit worth a human's attention rather
+/// than an integer slipping through.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigVersion {
-    /// Observed on `[2.0.0+]`. What libnx sends, and the safe default.
+    /// Observed on `[2.0.0+]`. The safe default.
     V1,
     /// Observed on `[3.0.0+]`.
     V2,
@@ -61,10 +59,10 @@ pub struct BufferEfficiency(u32);
 impl BufferEfficiency {
     /// Lowest value the service accepts.
     pub const MIN: u32 = 1;
-    /// Highest value libnx documents as standard.
+    /// Highest value the interface documents as standard.
     pub const MAX: u32 = 8;
 
-    /// What libnx's default configuration uses.
+    /// What the default configuration uses.
     pub const DEFAULT: Self = Self(4);
 
     /// The value the service reads.
@@ -118,7 +116,7 @@ impl SessionCount {
     /// Most sessions the pool's free-mask can track.
     pub const MAX: u32 = 32;
 
-    /// What libnx's default configuration uses.
+    /// What the default configuration uses.
     pub const DEFAULT: Self = Self(3);
 
     /// The count, as a pool size.
@@ -163,7 +161,6 @@ pub struct SessionCountError {
 
 /// BSD service initialization configuration.
 ///
-/// Direct equivalent of libnx's `BsdInitConfig` plus the session-pool size.
 /// The buffer sizes are byte counts passed verbatim to the service; the crate
 /// computes the required transfer-memory size from them on the caller's
 /// behalf.
@@ -190,10 +187,14 @@ pub struct BsdConfig {
 }
 
 impl BsdConfig {
-    /// Returns the defaults from libnx's `bsdGetDefaultInitConfig`
-    /// (`bsd.c::g_defaultBsdInitConfig`). Suitable starting point when callers
-    /// have no specific tuning need.
-    pub const fn default_libnx() -> Self {
+    /// The configuration a client with no specific tuning need should send.
+    ///
+    /// These are the values the platform's own clients are observed to use.
+    pub const DEFAULT: Self = Self::defaults();
+
+    /// Body of [`Self::DEFAULT`], written as a `const fn` so the associated
+    /// constant can be built from it.
+    const fn defaults() -> Self {
         Self {
             version: ConfigVersion::V1,
             tcp_tx_buf_size: 0x8000,
@@ -209,9 +210,9 @@ impl BsdConfig {
 
     /// Computes the minimum transfer-memory size required for this config.
     ///
-    /// Mirrors `_bsdGetTransferMemSizeForConfig` in `bsd.c`: a per-socket sum
-    /// of the four max buffer sizes, rounded up to a page, times the buffer
-    /// count.
+    /// A per-socket sum of the four maximum buffer sizes, rounded up to a
+    /// page, times the buffer count — which is what the service provisions the
+    /// transfer memory against.
     pub(crate) const fn transfer_mem_size(&self) -> usize {
         let tcp_tx_max = if self.tcp_tx_buf_max_size != 0 {
             self.tcp_tx_buf_max_size
@@ -246,12 +247,10 @@ pub struct ConnectOptions {
 }
 
 impl ConnectOptions {
-    /// Returns connect options using libnx defaults and the `Auto` service-type
-    /// fallback (`bsd:s` then `bsd:u`).
-    pub const fn default_libnx() -> Self {
-        Self {
-            service_type: BsdServiceType::Auto,
-            config: BsdConfig::default_libnx(),
-        }
-    }
+    /// The options a client with no specific need should connect with: the
+    /// default configuration and the `Auto` service-type fallback.
+    pub const DEFAULT: Self = Self {
+        service_type: BsdServiceType::Auto,
+        config: BsdConfig::DEFAULT,
+    };
 }
