@@ -64,7 +64,4 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_env_setup(
     // ConfigEntry array terminated by EndOfList, and `main_thread` is the
     // kernel-supplied main-thread handle.
     unsafe { env::setup(ctx, ThreadHandle::from_raw_unchecked(main_thread), saved_lr) }
-
-    // Publish the parsed applet type to the global libnx-facing variable.
-    set_applet_type(env::applet_type().as_raw());
 }

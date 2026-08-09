@@ -13,3 +13,17 @@ option(
     description : 'Application Manager identity the nx-rt-nso NSO process registers as',
     yield : true
 )
+
+option(
+    'use_nx_sys_mem',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nso `sys-virtmem` feature (the virtmem substrate rides along with nx-sys-mem)',
+    yield : true
+)
+
+option(
+    'use_nx_sys_thread',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nso `sys-thread` feature',
+    yield : true
+)

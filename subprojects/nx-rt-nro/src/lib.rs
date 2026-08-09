@@ -105,4 +105,5 @@ pub mod app;
 pub mod argv;
 pub mod cwd;
 pub mod env;
+pub mod init;
 pub mod services;

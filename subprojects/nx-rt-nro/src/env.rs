@@ -179,4 +179,11 @@ pub unsafe fn setup(
             }
         }
     });
+
+    // Publish the parsed applet type to the C-facing global that libnx code
+    // left in the link reads directly. It sits here rather than in the
+    // `envSetup` override so both callers carry it: that override, and the
+    // startup sequence in [`crate::init`].
+    #[cfg(feature = "ffi")]
+    crate::ffi::set_applet_type(applet_type().as_raw());
 }

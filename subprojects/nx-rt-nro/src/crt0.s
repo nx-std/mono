@@ -16,9 +16,10 @@
  * Kernel-delivered user-mode exception entry reuses the same entry point:
  *   x0 = exception type (non-zero)   x1 = pointer to the exception context
  *
- * After self-relocation the `.crt0` hands off to the kind-agnostic runtime
- * init (`__libnx_init`), which drives nx-rt-core's heap / main-thread-TLS /
- * environment setup through the libnx symbol overrides.
+ * After self-relocation the `.crt0` hands off to this crate's runtime init
+ * (`__libnx_init`, in `src/init.rs`), which sequences the loader-config parse,
+ * the virtual-memory / heap / main-thread bring-up, the command line and the
+ * default services.
  */
 
 .section .crt0, "ax", %progbits

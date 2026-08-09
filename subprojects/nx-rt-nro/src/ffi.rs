@@ -23,6 +23,7 @@ pub mod libnx;
 // Re-exported for the `argv` / `env` runtime paths, which publish the C-facing
 // globals through these setters.
 pub(crate) use self::libnx::{
+    set_applet_type,
     set_nxlink_host,
     set_system_argv,
 };

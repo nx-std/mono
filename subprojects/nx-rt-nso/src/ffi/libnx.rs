@@ -14,6 +14,7 @@
 mod applet;
 mod argv;
 mod env;
+mod init;
 
 // Called by `argv::setup()` after parsing the `__argdata__` command line.
 pub(crate) use self::argv::set_system_argv;

@@ -126,3 +126,4 @@ pub mod applet;
 pub mod argv;
 pub mod caps;
 pub mod env;
+pub mod init;
