@@ -10,6 +10,8 @@
 pub use nx_alloc::ffi as alloc;
 #[cfg(feature = "fsdev")]
 pub use nx_fsdev::ffi as fsdev;
+#[cfg(feature = "net")]
+pub use nx_net::ffi as net;
 #[cfg(feature = "pm")]
 pub use nx_pm::ffi as pm;
 #[cfg(feature = "rand")]

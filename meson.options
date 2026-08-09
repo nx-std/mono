@@ -306,3 +306,10 @@ option(
     description : 'Enable nx-wlaninf (idiomatic WLAN InfraManager API; implies use_nx_service_wlaninf)',
     yield : true
 )
+
+option(
+    'use_nx_net',
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-net (idiomatic resolver API; replaces libnx resolver functions)',
+    yield : true
+)

@@ -1,21 +1,26 @@
 [package]
-name = "nx-service-sfdnsres"
+name = "nx-net"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "nx_service_sfdnsres"
+name = "nx_net"
 crate-type = ["rlib"]
 test = false
 doctest = false
 bench = false
 
+[features]
+# Enable the __nx_net FFI
+ffi = []
+
 [dependencies]
-bitflags = "2"
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-sfdnsres = { version = "0.1.0", path = "../nx-service-sfdnsres" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
-nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
 static_assertions = "1"
 thiserror = { version = "2", default-features = false }
-zerocopy = { workspace = true }

@@ -9,24 +9,37 @@
 //! Only CMIF is implemented; TIPC is not used by any known caller of this
 //! service.
 //!
-//! ## Divergence from libnx
+//! ## One session, not one per call
 //!
-//! libnx's `sfdnsres.c` opens a new service session for every call (via
+//! A C resolver typically opens a new service session for every call (via
 //! `smGetServiceOriginal` + `serviceClose`). This crate follows the
 //! convention of the other `nx-service-*` crates instead: connect once via
 //! [`connect_cmif`], reuse the [`SfdnsresService`] across calls, and close
 //! the session explicitly with `Drop`.
 //!
-//! ## Output Buffers
+//! ## Decoded Results
 //!
-//! Commands that return serialized hostent / addrinfo data (cmds 2, 3, 6)
-//! write into a caller-supplied `&mut [u8]` and report a
-//! `serialized_size`. Decoding the wire format is left to a higher-level
-//! consumer crate.
+//! This crate owns the `sfdnsres` wire-format codec. Commands that
+//! exchange serialized hostent / addrinfo data (cmds 2, 3, 6) and the
+//! `getnameinfo` reply (cmd 7) encode their typed inputs and decode their
+//! responses internally: callers pass typed inputs ([`AddrInfoHints`], an
+//! `IpAddr`, a `SocketAddr`) and receive owned, structurally-valid result
+//! types ([`HostEntry`], [`AddrInfoList`], [`NameInfo`]). The serialized
+//! layout is `sfdnsres`-specific knowledge, so it lives beside the commands
+//! that produce it rather than in a consumer crate.
 
 #![no_std]
 
+extern crate alloc; // String, Vec
 extern crate nx_panic_handler; // Provide #![panic_handler]
+
+use core::{
+    ffi::CStr,
+    net::{
+        IpAddr,
+        SocketAddr,
+    },
+};
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
@@ -35,26 +48,33 @@ use nx_sf::service::{
 };
 
 mod cmif;
+pub mod netdb;
 mod proto;
+mod wire;
 
 pub use self::{
     cmif::{
-        CancelError,
-        GetAddrInfoError,
+        CommandError,
         GetAddrInfoResult,
-        GetCancelHandleError,
-        GetGaiStringErrorError,
-        GetHostByAddrError,
         GetHostByAddrResult,
-        GetHostByNameError,
         GetHostByNameResult,
-        GetHostStringErrorError,
-        GetNameInfoError,
         GetNameInfoResult,
     },
     proto::{
         CancelHandle,
+        NameInfoFlags,
         SERVICE_NAME,
+    },
+    wire::{
+        AddrFamily,
+        AddrInfoHints,
+        AddrInfoList,
+        HostEntry,
+        NameInfo,
+        Protocol,
+        ResolvedAddr,
+        SockType,
+        WireError,
     },
 };
 
@@ -75,50 +95,37 @@ impl SfdnsresService {
 /// CMIF protocol methods.
 impl SfdnsresService {
     /// Resolves a host name (`GetHostByNameRequest`, cmd 2).
-    ///
-    /// See [`cmif::get_host_by_name`].
     #[inline]
     pub fn get_host_by_name(
         &self,
         cancel_handle: Option<CancelHandle>,
         use_nsd: bool,
-        name: Option<&[u8]>,
-        out_buffer: &mut [u8],
-    ) -> Result<GetHostByNameResult, GetHostByNameError> {
-        cmif::get_host_by_name(self.0.handle(), cancel_handle, use_nsd, name, out_buffer)
+        name: Option<&CStr>,
+    ) -> Result<GetHostByNameResult, CommandError> {
+        cmif::get_host_by_name(self.0.handle(), cancel_handle, use_nsd, name)
     }
 
-    /// Reverse-resolves an address (`GetHostByAddrRequest`, cmd 3).
+    /// Reverse-resolves an IP address (`GetHostByAddrRequest`, cmd 3).
     #[inline]
     pub fn get_host_by_addr(
         &self,
         cancel_handle: Option<CancelHandle>,
-        addr_type: u32,
-        addr: &[u8],
-        out_buffer: &mut [u8],
-    ) -> Result<GetHostByAddrResult, GetHostByAddrError> {
-        cmif::get_host_by_addr(self.0.handle(), cancel_handle, addr_type, addr, out_buffer)
+        addr: IpAddr,
+    ) -> Result<GetHostByAddrResult, CommandError> {
+        cmif::get_host_by_addr(self.0.handle(), cancel_handle, addr)
     }
 
     /// Looks up the textual description of an `h_errno` value
     /// (`GetHostStringErrorRequest`, cmd 4).
     #[inline]
-    pub fn get_host_string_error(
-        &self,
-        err: u32,
-        out_str: &mut [u8],
-    ) -> Result<(), GetHostStringErrorError> {
+    pub fn get_host_string_error(&self, err: u32, out_str: &mut [u8]) -> Result<(), CommandError> {
         cmif::get_host_string_error(self.0.handle(), err, out_str)
     }
 
     /// Looks up the textual description of a `getaddrinfo` error code
     /// (`GetGaiStringErrorRequest`, cmd 5).
     #[inline]
-    pub fn get_gai_string_error(
-        &self,
-        err: u32,
-        out_str: &mut [u8],
-    ) -> Result<(), GetGaiStringErrorError> {
+    pub fn get_gai_string_error(&self, err: u32, out_str: &mut [u8]) -> Result<(), CommandError> {
         cmif::get_gai_string_error(self.0.handle(), err, out_str)
     }
 
@@ -129,11 +136,10 @@ impl SfdnsresService {
         &self,
         cancel_handle: Option<CancelHandle>,
         use_nsd: bool,
-        node: Option<&[u8]>,
-        service: Option<&[u8]>,
-        hints: Option<&[u8]>,
-        out_buffer: &mut [u8],
-    ) -> Result<GetAddrInfoResult, GetAddrInfoError> {
+        node: Option<&CStr>,
+        service: Option<&CStr>,
+        hints: &AddrInfoHints,
+    ) -> Result<GetAddrInfoResult, CommandError> {
         cmif::get_addr_info(
             self.0.handle(),
             cancel_handle,
@@ -141,7 +147,6 @@ impl SfdnsresService {
             node,
             service,
             hints,
-            out_buffer,
         )
     }
 
@@ -151,25 +156,23 @@ impl SfdnsresService {
     pub fn get_name_info(
         &self,
         cancel_handle: Option<CancelHandle>,
-        flags: u32,
-        sockaddr: &[u8],
-        host: &mut [u8],
-        serv: &mut [u8],
-    ) -> Result<GetNameInfoResult, GetNameInfoError> {
-        cmif::get_name_info(self.0.handle(), cancel_handle, flags, sockaddr, host, serv)
+        flags: NameInfoFlags,
+        addr: &SocketAddr,
+    ) -> Result<GetNameInfoResult, CommandError> {
+        cmif::get_name_info(self.0.handle(), cancel_handle, flags, addr)
     }
 
     /// Allocates a fresh cancel-token
     /// (`GetCancelHandleRequest`, cmd 8).
     #[inline]
-    pub fn get_cancel_handle(&self) -> Result<CancelHandle, GetCancelHandleError> {
+    pub fn get_cancel_handle(&self) -> Result<CancelHandle, CommandError> {
         cmif::get_cancel_handle(self.0.handle())
     }
 
     /// Cancels any pending resolver call tagged with `handle`
     /// (`CancelRequest`, cmd 9).
     #[inline]
-    pub fn cancel(&self, handle: CancelHandle) -> Result<(), CancelError> {
+    pub fn cancel(&self, handle: CancelHandle) -> Result<(), CommandError> {
         cmif::cancel(self.0.handle(), handle)
     }
 }

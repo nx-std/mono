@@ -79,6 +79,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-net"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-service-sfdnsres",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
+ "static_assertions",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-panic-handler"
 version = "0.1.0"
 
@@ -1301,6 +1316,7 @@ dependencies = [
 name = "nx-service-sfdnsres"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
@@ -1495,6 +1511,7 @@ dependencies = [
  "nx-alloc",
  "nx-display",
  "nx-fsdev",
+ "nx-net",
  "nx-panic-handler",
  "nx-pm",
  "nx-rand",
