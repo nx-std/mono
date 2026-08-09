@@ -153,6 +153,7 @@ dependencies = [
  "nx-service-applet",
  "nx-service-applet-album",
  "nx-service-applet-err",
+ "nx-service-applet-friends",
  "nx-service-applet-nfp",
  "nx-service-applet-pctlauth",
  "nx-service-fs",
@@ -239,6 +240,20 @@ version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
  "nx-service-applet",
+ "nx-sf",
+ "static_assertions",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
+name = "nx-service-applet-friends"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-acc",
+ "nx-service-applet",
+ "nx-service-friends",
  "nx-sf",
  "static_assertions",
  "thiserror",

@@ -20,7 +20,15 @@ pub struct AccountUid {
 const_assert_eq!(size_of::<AccountUid>(), 0x10);
 
 /// In-app screen name for friend invitation.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct InAppScreenName {
     pub name: [u8; 0x40],
@@ -30,7 +38,14 @@ pub struct InAppScreenName {
 const_assert_eq!(size_of::<InAppScreenName>(), 0x48);
 
 /// Friend invitation game mode description.
-#[derive(Clone, Copy)]
+#[derive(
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct FriendInvitationGameModeDescription {
     pub data: [u8; 0xC00],
@@ -39,7 +54,15 @@ pub struct FriendInvitationGameModeDescription {
 const_assert_eq!(size_of::<FriendInvitationGameModeDescription>(), 0xC00);
 
 /// Friend invitation ID.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct FriendInvitationId {
     pub id: u64,
@@ -48,7 +71,15 @@ pub struct FriendInvitationId {
 const_assert_eq!(size_of::<FriendInvitationId>(), 0x8);
 
 /// Friend invitation group ID.
-#[derive(Debug, Clone, Copy)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct FriendInvitationGroupId {
     pub id: u64,

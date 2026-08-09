@@ -22,6 +22,7 @@ ffi = [
     "nx-service-applet?/ffi",
     "nx-service-applet-album?/ffi",
     "nx-service-applet-err?/ffi",
+    "nx-service-applet-friends?/ffi",
     "nx-service-applet-nfp?/ffi",
     "nx-service-applet-pctlauth?/ffi",
 ]
@@ -40,6 +41,9 @@ service-applet-album = ["dep:nx-service-applet-album", "service-applet"]
 # Error library applet — gates `ffi::applet_err`. Pulls `service-applet`: the
 # dialog is launched through the applet proxy the core holds.
 service-applet-err = ["dep:nx-service-applet-err", "service-applet"]
+# MyPage library applet — gates `ffi::friends`. Pulls `service-applet`: the
+# friends menu is launched through the applet proxy the core holds.
+service-applet-friends = ["dep:nx-service-applet-friends", "service-applet"]
 # Cabinet library applet — gates `ffi::nfp`. Pulls `service-applet`: the amiibo
 # editor is launched through the applet proxy the core holds.
 service-applet-nfp = ["dep:nx-service-applet-nfp", "service-applet"]
@@ -77,6 +81,7 @@ nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = tru
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
 nx-service-applet-album = { version = "0.1.0", path = "../nx-service-applet-album", optional = true }
 nx-service-applet-err = { version = "0.1.0", path = "../nx-service-applet-err", optional = true }
+nx-service-applet-friends = { version = "0.1.0", path = "../nx-service-applet-friends", optional = true }
 nx-service-applet-nfp = { version = "0.1.0", path = "../nx-service-applet-nfp", optional = true }
 nx-service-applet-pctlauth = { version = "0.1.0", path = "../nx-service-applet-pctlauth", optional = true }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
