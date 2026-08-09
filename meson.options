@@ -186,6 +186,15 @@ option(
 )
 
 option(
+    'use_nx_service_applet_psel',
+    # Disable by default, WIP: follows use_nx_service_applet, which is itself
+    # off by default. Implies use_nx_service_applet.
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-applet-psel (player-select library applet)',
+    yield : true
+)
+
+option(
     'use_nx_service_fs',
     # The override covers every `fs*` command libnx exports outside the
     # fsdev/fsldr/fspr families, so nothing falls through to the zeroed `g_fsSrv`
