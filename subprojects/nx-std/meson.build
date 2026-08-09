@@ -288,6 +288,14 @@ if get_option('use_nx_service_applet_hid').enabled()
     deps_cargo_features += ['service-applet-hid']
 endif
 
+# nx-service-applet-mii
+# No `subproject(...)` entry, mirroring the absent Cargo dependency: the Mii
+# editor applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+if get_option('use_nx_service_applet_mii').enabled()
+    debug('service-applet-mii feature: enabled')
+    deps_cargo_features += ['service-applet-mii']
+endif
+
 # nx-service-applet-nfp
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the cabinet
 # applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.

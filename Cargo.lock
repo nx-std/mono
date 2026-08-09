@@ -155,6 +155,7 @@ dependencies = [
  "nx-service-applet-err",
  "nx-service-applet-friends",
  "nx-service-applet-hid",
+ "nx-service-applet-mii",
  "nx-service-applet-nfp",
  "nx-service-applet-pctlauth",
  "nx-service-applet-psel",
@@ -270,6 +271,20 @@ dependencies = [
  "nx-service-applet",
  "nx-service-hid",
  "nx-sf",
+ "static_assertions",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
+name = "nx-service-applet-mii"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-service-applet",
+ "nx-service-mii",
+ "nx-sf",
+ "nx-svc",
  "static_assertions",
  "thiserror",
  "zerocopy",
