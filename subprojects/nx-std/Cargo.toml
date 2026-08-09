@@ -78,9 +78,19 @@ svc = ["dep:nx-svc"]
 sync = ["dep:nx-std-sync", "alloc"]
 # Virtual file descriptor table and device registry, replacing libsysbase's
 sys-fd = ["dep:nx-sys-fd", "alloc"]
-sys-mem = ["dep:nx-sys-mem", "dep:nx-sys-virtmem", "alloc"]
+# Forwards `sys-virtmem` to whichever runtime crate is in the build: its startup
+# sequence calls `virtmem`'s Rust API directly when the crate is present, and
+# falls back to libnx's `virtmemSetup` by name when it is not.
+sys-mem = [
+    "dep:nx-sys-mem",
+    "dep:nx-sys-virtmem",
+    "alloc",
+    "nx-rt-nro?/sys-virtmem",
+    "nx-rt-nso?/sys-virtmem",
+]
 sys-sync = ["dep:nx-sys-sync"]
-sys-thread = ["dep:nx-sys-thread"]
+# Forwards `sys-thread` to the runtime crate, on the same terms as `sys-mem`.
+sys-thread = ["dep:nx-sys-thread", "nx-rt-nro?/sys-thread", "nx-rt-nso?/sys-thread"]
 sys-thread-tls = ["dep:nx-sys-thread-tls"]
 time = ["dep:nx-time"]
 wlaninf = ["dep:nx-wlaninf"]

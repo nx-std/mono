@@ -18,16 +18,17 @@
  *
  * The `.crt0` mechanism — the `_start` header, the relative MOD0 pointer,
  * `__nx_dynamic` self-relocation and BSS zeroing — is identical to the
- * homebrew-NRO kind; only the entry ABI above differs. The NSO-vs-NRO fork
- * happens later, inside `__libnx_init`, which inspects `x1`: a main-thread
- * handle (any value other than the NRO `-1` sentinel) selects the NSO path,
- * where the loader return address is the process-exit syscall. The
- * `"HOMEBREW"` magic and `"LNY*"` MOD0 blocks are libnx homebrew extensions,
- * kept here because nx-rt builds homebrew NSOs (matching `switch_crt0.s`).
+ * homebrew-NRO kind; only the entry ABI above differs. Upstream forks between
+ * the two inside `__libnx_init`, on a null configuration block; here there is
+ * no fork to make, because the branch it hands off to below is this crate's
+ * and this crate is the NSO one. The `"HOMEBREW"` magic and `"LNY*"` MOD0
+ * blocks are libnx homebrew extensions, kept here because nx-rt builds
+ * homebrew NSOs (matching `switch_crt0.s`).
  *
- * After self-relocation the `.crt0` hands off to the kind-agnostic runtime
- * init (`__libnx_init`), which drives nx-rt-core's heap / main-thread-TLS /
- * environment setup through the libnx symbol overrides.
+ * After self-relocation the `.crt0` hands off to this crate's runtime init
+ * (`__libnx_init`, in `src/init.rs`), which sequences the environment,
+ * virtual-memory / heap / main-thread bring-up, the command line and the
+ * default services.
  */
 
 .section .crt0, "ax", %progbits

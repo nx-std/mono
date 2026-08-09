@@ -12,6 +12,7 @@ mod app;
 mod argv;
 mod cwd;
 mod env;
+mod init;
 
 #[cfg(feature = "service-applet-album")]
 mod album;
@@ -48,5 +49,9 @@ mod vi;
 
 // Called by argv::setup() after parsing argv from loader config
 pub(crate) use self::argv::set_system_argv;
-// Called by argv::strip_nxlink_suffix() when _NXLINK_ suffix detected
-pub(crate) use self::env::set_nxlink_host;
+// Called by env::setup() once the loader config's applet type is parsed, and
+// by argv::strip_nxlink_suffix() when the _NXLINK_ suffix is detected.
+pub(crate) use self::env::{
+    set_applet_type,
+    set_nxlink_host,
+};

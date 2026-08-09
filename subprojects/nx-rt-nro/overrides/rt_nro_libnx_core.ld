@@ -52,6 +52,23 @@ __appInit = __nx_rt_nro__libnx_app_init;
 __appExit = __nx_rt_nro__libnx_app_exit;
 
 /*
+ * Runtime Startup and Exit
+ * Rust: ffi/libnx/init.rs
+ * libnx: runtime/init.c
+ *
+ * The outermost pair: `__libnx_init` is what the `.crt0` branches to once the
+ * image has relocated itself, and `__libnx_exit` is what newlib's
+ * `__syscall_exit` reaches on the way out. That one is referenced weakly
+ * there — `if (&__libnx_exit)` — so defining it is what keeps `exit()` from
+ * falling into the `for (;;)` behind the test.
+ */
+EXTERN(__nx_rt_nro__libnx_init);
+EXTERN(__nx_rt_nro__libnx_exit);
+
+__libnx_init = __nx_rt_nro__libnx_init;
+__libnx_exit = __nx_rt_nro__libnx_exit;
+
+/*
  * Startup Working Directory
  * Rust: ffi/libnx/cwd.rs
  * libnx: runtime/devices/fs_dev.c

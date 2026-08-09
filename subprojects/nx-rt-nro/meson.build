@@ -191,6 +191,22 @@ if get_option('use_nx_service_vi').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_vi.ld'
 endif
 
+# nx-sys-thread — the Rust arm of the `__libnx_init_thread` startup step.
+if get_option('use_nx_sys_thread').enabled()
+    nx_sys_thread_proj = subproject('nx-sys-thread')
+    deps += nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
+    cargo_features += 'sys-thread'
+endif
+
+# nx-sys-virtmem — the Rust arm of the `virtmemSetup` startup step. Gated on
+# `use_nx_sys_mem` rather than an option of its own: the heap-free `virtmem`
+# substrate rides along with `nx-sys-mem`, as it does in `nx-std`.
+if get_option('use_nx_sys_mem').enabled()
+    nx_sys_virtmem_proj = subproject('nx-sys-virtmem')
+    deps += nx_sys_virtmem_proj.get_variable('nx_sys_virtmem_dep')
+    cargo_features += 'sys-virtmem'
+endif
+
 # rt-link — the rustc-link pipeline's per-kind hbloader `.crt0`.
 # On the rustc pipeline this crate supplies its own `_start`; on the GCC
 # pipeline `_start` comes from libnx's `switch_crt0.s`, so the feature stays

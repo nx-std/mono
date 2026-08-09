@@ -116,3 +116,17 @@ option(
     description : 'Enable the nx-rt-nro `service-vi` feature',
     yield : true
 )
+
+option(
+    'use_nx_sys_mem',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `sys-virtmem` feature (the virtmem substrate rides along with nx-sys-mem)',
+    yield : true
+)
+
+option(
+    'use_nx_sys_thread',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `sys-thread` feature',
+    yield : true
+)

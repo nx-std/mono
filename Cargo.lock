@@ -170,7 +170,9 @@ dependencies = [
  "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",
+ "nx-sys-thread",
  "nx-sys-thread-tls",
+ "nx-sys-virtmem",
  "nx-time",
  "thiserror",
  "zerocopy",
@@ -185,6 +187,8 @@ dependencies = [
  "nx-rt-core",
  "nx-service-applet",
  "nx-svc",
+ "nx-sys-thread",
+ "nx-sys-virtmem",
 ]
 
 [[package]]
