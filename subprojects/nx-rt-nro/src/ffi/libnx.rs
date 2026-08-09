@@ -29,6 +29,8 @@ mod hid;
 mod nfp;
 #[cfg(feature = "service-nv")]
 mod nv;
+#[cfg(feature = "service-applet-pctlauth")]
+mod pctlauth;
 #[cfg(feature = "service-set")]
 mod setsys;
 #[cfg(feature = "service-time")]
