@@ -24,6 +24,7 @@ ffi = [
     "nx-service-applet-err?/ffi",
     "nx-service-applet-friends?/ffi",
     "nx-service-applet-hid?/ffi",
+    "nx-service-applet-mii?/ffi",
     "nx-service-applet-nfp?/ffi",
     "nx-service-applet-pctlauth?/ffi",
     "nx-service-applet-psel?/ffi",
@@ -52,6 +53,9 @@ service-applet-friends = ["dep:nx-service-applet-friends", "service-applet"]
 # style set and joy hold type, and libnx's own HID session is left zeroed once
 # `hidInitialize` is overridden.
 service-applet-hid = ["dep:nx-service-applet-hid", "service-applet", "service-hid"]
+# Mii editor library applet — gates `ffi::mii`. Pulls `service-applet`: the Mii
+# editor is launched through the applet proxy the core holds.
+service-applet-mii = ["dep:nx-service-applet-mii", "service-applet"]
 # Cabinet library applet — gates `ffi::nfp`. Pulls `service-applet`: the amiibo
 # editor is launched through the applet proxy the core holds.
 service-applet-nfp = ["dep:nx-service-applet-nfp", "service-applet"]
@@ -94,6 +98,7 @@ nx-service-applet-album = { version = "0.1.0", path = "../nx-service-applet-albu
 nx-service-applet-err = { version = "0.1.0", path = "../nx-service-applet-err", optional = true }
 nx-service-applet-friends = { version = "0.1.0", path = "../nx-service-applet-friends", optional = true }
 nx-service-applet-hid = { version = "0.1.0", path = "../nx-service-applet-hid", optional = true }
+nx-service-applet-mii = { version = "0.1.0", path = "../nx-service-applet-mii", optional = true }
 nx-service-applet-nfp = { version = "0.1.0", path = "../nx-service-applet-nfp", optional = true }
 nx-service-applet-pctlauth = { version = "0.1.0", path = "../nx-service-applet-pctlauth", optional = true }
 nx-service-applet-psel = { version = "0.1.0", path = "../nx-service-applet-psel", optional = true }

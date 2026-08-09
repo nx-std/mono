@@ -29,6 +29,8 @@ mod fs;
 mod hid;
 #[cfg(feature = "service-applet-hid")]
 mod hid_la;
+#[cfg(feature = "service-applet-mii")]
+mod mii;
 #[cfg(feature = "service-applet-nfp")]
 mod nfp;
 #[cfg(feature = "service-nv")]
