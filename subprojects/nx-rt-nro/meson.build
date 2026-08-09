@@ -94,6 +94,14 @@ if get_option('use_nx_service_applet_friends').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_friends.ld'
 endif
 
+# nx-service-applet-hid (depends on applet and hid at the Rust level)
+if get_option('use_nx_service_applet_hid').enabled()
+    nx_service_applet_hid_proj = subproject('nx-service-applet-hid')
+    deps += nx_service_applet_hid_proj.get_variable('nx_service_applet_hid_dep')
+    cargo_features += 'service-applet-hid'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_hid.ld'
+endif
+
 # nx-service-applet-nfp
 if get_option('use_nx_service_applet_nfp').enabled()
     nx_service_applet_nfp_proj = subproject('nx-service-applet-nfp')

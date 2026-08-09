@@ -165,7 +165,7 @@ impl ParentalAuth {
             self_controller,
             creator,
             &applet,
-            self.build_arg().as_bytes(),
+            &[self.build_arg().as_bytes()],
             Some(reply.as_mut_bytes()),
         )
         .map_err(ShowError::Launch)?;

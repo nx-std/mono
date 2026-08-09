@@ -86,7 +86,7 @@ impl ApplicationError {
             self_controller,
             creator,
             &ERROR_APPLET,
-            self.arg.as_bytes(),
+            &[self.arg.as_bytes()],
             Some(&mut reply),
         )
         .map_err(ShowError::Launch)?;

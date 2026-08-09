@@ -3,12 +3,12 @@
 //! [`launch`] drives the sequence documented in
 //! [`library_applet`](crate::library_applet) end to end: wait for the launchable
 //! event, create the applet, push the common arguments and then the caller's
-//! payload, start, wait for the user, and read the reply. It is libnx's
+//! payloads, start, wait for the user, and read the reply. It is libnx's
 //! `libappletLaunch`.
 //!
-//! An applet that pushes more than one payload storage, or that exchanges
-//! interactive storages while running, cannot use [`launch`]; it drives
-//! [`LibraryAppletCreator`] and [`LibraryAppletAccessor`] itself.
+//! An applet that exchanges interactive storages while running cannot use
+//! [`launch`]; it drives [`LibraryAppletCreator`] and [`LibraryAppletAccessor`]
+//! itself.
 
 use zerocopy::IntoBytes as _;
 
@@ -63,7 +63,12 @@ pub struct LibraryApplet {
     pub play_startup_sound: bool,
 }
 
-/// Launches `applet` with `payload`, blocking until it exits.
+/// Launches `applet` with `payloads`, blocking until it exits.
+///
+/// The payload storages are pushed in the order given, after the common
+/// arguments. Most applets read a single one; those that read several depend on
+/// the order, so fixing it is the caller's job. The controller applet is one: it
+/// reads a request storage and then the request's own arguments.
 ///
 /// Reads the applet's reply into `reply` when one is expected. Pass [`None`] for
 /// an applet that returns no data.
@@ -84,7 +89,7 @@ pub fn launch(
     self_controller: &SelfController<'_>,
     creator: &LibraryAppletCreator<'_>,
     applet: &LibraryApplet,
-    payload: &[u8],
+    payloads: &[&[u8]],
     reply: Option<&mut [u8]>,
 ) -> Result<LibraryAppletExitReason, LaunchError> {
     let launchable = self_controller
@@ -110,10 +115,12 @@ pub fn launch(
     let args = LibraryAppletArgs::new(applet.la_version, tick, applet.play_startup_sound);
 
     // The common arguments must be storage 0: the applet reads its own argument
-    // struct from the second storage pushed, so reversing these two makes it
+    // struct from the storages that follow, so pushing a payload first makes it
     // decode the header as arguments.
     push_storage(creator, &accessor, args.as_bytes()).map_err(LaunchError::PushArgs)?;
-    push_storage(creator, &accessor, payload).map_err(LaunchError::PushPayload)?;
+    for payload in payloads {
+        push_storage(creator, &accessor, payload).map_err(LaunchError::PushPayload)?;
+    }
 
     accessor.start().map_err(LaunchError::Start)?;
 

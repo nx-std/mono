@@ -23,6 +23,7 @@ ffi = [
     "nx-service-applet-album?/ffi",
     "nx-service-applet-err?/ffi",
     "nx-service-applet-friends?/ffi",
+    "nx-service-applet-hid?/ffi",
     "nx-service-applet-nfp?/ffi",
     "nx-service-applet-pctlauth?/ffi",
     "nx-service-applet-psel?/ffi",
@@ -45,6 +46,12 @@ service-applet-err = ["dep:nx-service-applet-err", "service-applet"]
 # MyPage library applet — gates `ffi::friends`. Pulls `service-applet`: the
 # friends menu is launched through the applet proxy the core holds.
 service-applet-friends = ["dep:nx-service-applet-friends", "service-applet"]
+# Controller library applet — gates `ffi::hid_la`. Pulls `service-applet`: the
+# applet is launched through the applet proxy the core holds. Pulls
+# `service-hid`: every launch first asks the HID service for the supported npad
+# style set and joy hold type, and libnx's own HID session is left zeroed once
+# `hidInitialize` is overridden.
+service-applet-hid = ["dep:nx-service-applet-hid", "service-applet", "service-hid"]
 # Cabinet library applet — gates `ffi::nfp`. Pulls `service-applet`: the amiibo
 # editor is launched through the applet proxy the core holds.
 service-applet-nfp = ["dep:nx-service-applet-nfp", "service-applet"]
@@ -86,6 +93,7 @@ nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional
 nx-service-applet-album = { version = "0.1.0", path = "../nx-service-applet-album", optional = true }
 nx-service-applet-err = { version = "0.1.0", path = "../nx-service-applet-err", optional = true }
 nx-service-applet-friends = { version = "0.1.0", path = "../nx-service-applet-friends", optional = true }
+nx-service-applet-hid = { version = "0.1.0", path = "../nx-service-applet-hid", optional = true }
 nx-service-applet-nfp = { version = "0.1.0", path = "../nx-service-applet-nfp", optional = true }
 nx-service-applet-pctlauth = { version = "0.1.0", path = "../nx-service-applet-pctlauth", optional = true }
 nx-service-applet-psel = { version = "0.1.0", path = "../nx-service-applet-psel", optional = true }

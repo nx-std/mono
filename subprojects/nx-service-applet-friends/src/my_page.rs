@@ -358,7 +358,7 @@ fn show(
         None
     };
 
-    let exit_reason = library_applet::launch(self_controller, creator, applet, payload, reply)
+    let exit_reason = library_applet::launch(self_controller, creator, applet, &[payload], reply)
         .map_err(ShowError::Launch)?;
 
     // libnx treats anything but a normal exit as a failed launch, including the

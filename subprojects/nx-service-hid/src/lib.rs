@@ -53,11 +53,16 @@ pub use self::{
         ActivateNpadError,
         ActivateTouchScreenError,
         CreateAppletResourceError,
+        GetNpadJoyHoldTypeError,
         GetSharedMemoryHandleError,
+        GetSupportedNpadStyleSetError,
         SetSupportedNpadIdTypeError,
         SetSupportedNpadStyleSetError,
     },
-    proto::SERVICE_NAME,
+    proto::{
+        NpadJoyHoldType,
+        SERVICE_NAME,
+    },
 };
 
 /// HID service (IHidServer) session wrapper.
@@ -114,6 +119,29 @@ impl HidService {
         style_set: u32,
     ) -> Result<(), SetSupportedNpadStyleSetError> {
         cmif::set_supported_npad_style_set(self.service.handle(), self.aruid, style_set)
+    }
+
+    /// Get the Npad style set the system supports.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`GetSupportedNpadStyleSetError`] when the request could not be
+    /// sent or the reply could not be parsed.
+    #[inline]
+    pub fn supported_npad_style_set(&self) -> Result<u32, GetSupportedNpadStyleSetError> {
+        cmif::get_supported_npad_style_set(self.service.handle(), self.aruid)
+    }
+
+    /// Get how the system expects a pair of Joy-Cons to be held.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`GetNpadJoyHoldTypeError`] when the request could not be sent,
+    /// the reply could not be parsed, or the server named a hold type this
+    /// client does not know.
+    #[inline]
+    pub fn npad_joy_hold_type(&self) -> Result<NpadJoyHoldType, GetNpadJoyHoldTypeError> {
+        cmif::get_npad_joy_hold_type(self.service.handle(), self.aruid)
     }
 
     /// Set supported Npad ID types.
