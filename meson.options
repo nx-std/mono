@@ -168,6 +168,15 @@ option(
 )
 
 option(
+    'use_nx_service_applet_friends',
+    # Disable by default, WIP: follows use_nx_service_applet, which is itself
+    # off by default. Implies use_nx_service_applet.
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-applet-friends (MyPage library applet)',
+    yield : true
+)
+
+option(
     'use_nx_service_applet_nfp',
     # Disable by default, WIP: follows use_nx_service_applet, which is itself
     # off by default. Implies use_nx_service_applet.

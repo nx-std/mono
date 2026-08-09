@@ -86,6 +86,14 @@ if get_option('use_nx_service_applet_err').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_err.ld'
 endif
 
+# nx-service-applet-friends
+if get_option('use_nx_service_applet_friends').enabled()
+    nx_service_applet_friends_proj = subproject('nx-service-applet-friends')
+    deps += nx_service_applet_friends_proj.get_variable('nx_service_applet_friends_dep')
+    cargo_features += 'service-applet-friends'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_applet_friends.ld'
+endif
+
 # nx-service-applet-nfp
 if get_option('use_nx_service_applet_nfp').enabled()
     nx_service_applet_nfp_proj = subproject('nx-service-applet-nfp')

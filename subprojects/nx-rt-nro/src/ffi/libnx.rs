@@ -21,6 +21,8 @@ mod apm;
 mod applet;
 #[cfg(feature = "service-applet-err")]
 mod applet_err;
+#[cfg(feature = "service-applet-friends")]
+mod friends;
 #[cfg(feature = "service-fs")]
 mod fs;
 #[cfg(feature = "service-hid")]

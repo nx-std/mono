@@ -10,6 +10,7 @@
 //! `.to_rc()` rather than a function that took another crate's error apart.
 
 #[cfg(any(
+    feature = "service-applet-friends",
     feature = "service-applet-pctlauth",
     feature = "service-fs",
     feature = "service-vi"

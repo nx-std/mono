@@ -19,6 +19,7 @@ members = [
     "subprojects/nx-service-applet",
     "subprojects/nx-service-applet-album",
     "subprojects/nx-service-applet-err",
+    "subprojects/nx-service-applet-friends",
     "subprojects/nx-service-applet-nfp",
     "subprojects/nx-service-applet-pctlauth",
     "subprojects/nx-service-aud",

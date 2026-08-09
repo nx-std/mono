@@ -65,7 +65,17 @@ pub struct AccountProfileBase {
 const_assert_eq!(size_of::<AccountProfileBase>(), 0x38);
 
 /// Network service account identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
 #[repr(C)]
 pub struct AccountNetworkServiceAccountId {
     pub id: u64,
