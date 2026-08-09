@@ -24,23 +24,27 @@ use crate::{
 /// Aliasing it here takes that away; what a program keeps is the `userAppInit`
 /// hook the service bring-up still calls.
 ///
+/// The third argument is the loader-return function, which is not a return
+/// path for this kind either: an NSO leaves through the process-exit syscall,
+/// installed during environment bring-up. It is ignored here for the same
+/// reason `envSetup` ignores it.
+///
 /// # Safety
 ///
-/// Must be called once, on the startup thread, with the arguments the process
-/// launch passed the `.crt0`: `main_thread` the kernel-supplied main-thread
-/// handle, and `saved_lr` the loader-return function.
+/// Must be called once, on the startup thread, with `main_thread` the
+/// kernel-supplied main-thread handle the process launch passed the `.crt0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nso__libnx_init(
     _ctx: *const c_void,
     main_thread: u32,
-    saved_lr: LoaderReturnFn,
+    _saved_lr: LoaderReturnFn,
 ) {
     // SAFETY: the caller guarantees `main_thread` is the handle the kernel
     // supplied for this process's main thread.
     let main_thread = ThreadHandle::from_raw_unchecked(main_thread);
 
     // SAFETY: the caller guarantees this runs once, on the startup thread.
-    unsafe { init::init(main_thread, saved_lr) }
+    unsafe { init::init(main_thread) }
 }
 
 /// Closes what [`__nx_rt_nso__libnx_init`] opened and leaves the process.

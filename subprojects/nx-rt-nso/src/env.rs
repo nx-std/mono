@@ -51,9 +51,15 @@ use nx_svc::thread::Handle as ThreadHandle;
 /// configuration block, so there is nothing to parse: no heap override, no
 /// `argv` pointer, and no loader-supplied service overrides. The bring-up
 /// records that the process is an NSO, marks every supervisor call available
-/// (the NSO ABI grants the full set), and seeds the main-thread handle and
-/// loader-return function from the kernel-supplied startup arguments.
-pub fn setup(main_thread: ThreadHandle, saved_lr: LoaderReturnFn) {
+/// (the NSO ABI grants the full set), seeds the main-thread handle from the
+/// kernel-supplied startup argument, and installs the process-exit syscall as
+/// the way out.
+///
+/// It takes no loader-return function, because there is no loader to return
+/// to. The `.crt0` is handed one and passes it along, as it does for a
+/// homebrew NRO, but for this output kind the value is not a return path:
+/// branching to it would resume the launch stub rather than end the process.
+pub fn setup(main_thread: ThreadHandle) {
     init_once(|state| {
         // An NSO process is unconditionally an NSO.
         state.is_nso = true;
@@ -63,6 +69,23 @@ pub fn setup(main_thread: ThreadHandle, saved_lr: LoaderReturnFn) {
         // hints restricting it, so mark every syscall available.
         state.syscall_hints = Some(SyscallHints::all_available());
 
-        set_exit_func_ptr(saved_lr);
+        set_exit_func_ptr(Some(exit_process));
     });
+}
+
+/// The way out of an NSO process: the process-exit supervisor call.
+///
+/// libnx installs `svcExitProcess` in this slot by casting it to the
+/// loader-return signature — the syscall takes no arguments, that signature
+/// takes a status. The shim performs the same widening through the type system
+/// rather than a cast, and drops the status for the reason the cast ignored
+/// it: nothing outlives the call to read one.
+///
+/// # Safety
+///
+/// Ends the process, and never returns.
+unsafe extern "C" fn exit_process(_status: i32) -> ! {
+    // SAFETY: reached only through the exit-function pointer, after the
+    // runtime teardown that precedes it has run.
+    unsafe { nx_svc::raw::exit_process() }
 }
