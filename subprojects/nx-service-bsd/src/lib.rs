@@ -57,13 +57,13 @@ use nx_sys_mem::tmem::{
 };
 
 mod cmif;
+pub mod config;
 mod fd;
 pub mod posix;
 mod proto;
 mod session;
 pub mod sockaddr;
 pub mod transfer;
-mod types;
 
 pub use crate::{
     cmif::{
@@ -73,6 +73,16 @@ pub use crate::{
         RegisterClientError,
         SelectTimeout,
         StartMonitoringError,
+    },
+    config::{
+        BsdConfig,
+        BsdServiceType,
+        BufferEfficiency,
+        BufferEfficiencyError,
+        ConfigVersion,
+        ConnectOptions,
+        SessionCount,
+        SessionCountError,
     },
     fd::BsdSockFd,
     posix::PosixError,
@@ -90,11 +100,6 @@ pub use crate::{
         SendFlags,
         Shutdown,
         StatusFlags,
-    },
-    types::{
-        BsdConfig,
-        BsdServiceType,
-        ConnectOptions,
     },
 };
 
@@ -667,10 +672,9 @@ pub fn connect_with_options(
     };
 
     // 7. Build the pool: slot 0 is the main session, the rest are clones.
-    let num_sessions = opts
-        .config
-        .num_sessions
-        .clamp(1, session::MAX_SESSIONS as u32) as usize;
+    // `SessionCount` is bounded to what the pool's free-mask can track, so
+    // there is nothing to clamp here.
+    let num_sessions = opts.config.num_sessions.to_len();
     let mut sessions: Vec<Session> = Vec::with_capacity(num_sessions);
     sessions.push(main);
     for _ in 1..num_sessions {

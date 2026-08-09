@@ -32,6 +32,7 @@ use nx_sys_thread_tls::IpcBuffer;
 use zerocopy::IntoBytes as _;
 
 use crate::{
+    config::BsdConfig,
     fd::BsdSockFd,
     posix::PosixError,
     proto::{
@@ -64,7 +65,6 @@ use crate::{
         Shutdown,
         StatusFlags,
     },
-    types::BsdConfig,
 };
 
 /// Sends `IBsdServices::RegisterClient` on `session`.
@@ -79,14 +79,14 @@ pub(crate) fn register_client(
 ) -> Result<u64, RegisterClientError> {
     let payload = RegisterClientIn {
         config: BsdServiceConfigWire {
-            version: config.version,
+            version: config.version.to_wire(),
             tcp_tx_buf_size: config.tcp_tx_buf_size,
             tcp_rx_buf_size: config.tcp_rx_buf_size,
             tcp_tx_buf_max_size: config.tcp_tx_buf_max_size,
             tcp_rx_buf_max_size: config.tcp_rx_buf_max_size,
             udp_tx_buf_size: config.udp_tx_buf_size,
             udp_rx_buf_size: config.udp_rx_buf_size,
-            sb_efficiency: config.sb_efficiency,
+            sb_efficiency: config.sb_efficiency.to_wire(),
         },
         pid_placeholder: 0,
         tmem_size,

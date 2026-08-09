@@ -37,11 +37,22 @@ struct PoolState {
 impl SessionPool {
     /// Builds a pool over the given sessions.
     ///
-    /// Caller is responsible for ensuring `sessions.len() <= MAX_SESSIONS`;
-    /// values beyond that limit are silently truncated to keep the bitset
-    /// representable.
+    /// The count is bounded upstream by
+    /// [`SessionCount`](crate::SessionCount), which is what keeps the free
+    /// mask representable; nothing is clamped here, because a pool larger than
+    /// the mask can no longer be built.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, if `sessions` holds more than [`MAX_SESSIONS`]
+    /// entries — a bound that was not applied where the count entered.
     pub(crate) fn new(sessions: Box<[Session]>) -> Self {
-        let n = core::cmp::min(sessions.len(), MAX_SESSIONS);
+        debug_assert!(
+            sessions.len() <= MAX_SESSIONS,
+            "session pool exceeds the free-mask width",
+        );
+
+        let n = sessions.len();
         let free_mask = if n >= MAX_SESSIONS {
             u32::MAX
         } else {
@@ -64,7 +75,8 @@ impl SessionPool {
         let mut guard = self.state.lock();
         guard = self.cv.wait_while(guard, |state| state.free_mask == 0);
 
-        // SAFETY: free_mask != 0 by the wait_while predicate, so trailing_zeros < 32.
+        // `free_mask` is non-zero by the `wait_while` predicate above, so
+        // `trailing_zeros` is below 32 and names a real slot.
         let slot = guard.free_mask.trailing_zeros() as u8;
         guard.free_mask &= !(1u32 << slot);
         drop(guard);
