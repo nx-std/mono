@@ -279,6 +279,15 @@ if get_option('use_nx_service_applet_friends').enabled()
     deps_cargo_features += ['service-applet-friends']
 endif
 
+# nx-service-applet-hid
+# No `subproject(...)` entry, mirroring the absent Cargo dependency: the
+# controller applet's FFI lives in `nx-rt-nro`, which pulls the crate in and
+# builds it.
+if get_option('use_nx_service_applet_hid').enabled()
+    debug('service-applet-hid feature: enabled')
+    deps_cargo_features += ['service-applet-hid']
+endif
+
 # nx-service-applet-nfp
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the cabinet
 # applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.

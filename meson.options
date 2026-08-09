@@ -177,6 +177,20 @@ option(
 )
 
 option(
+    'use_nx_service_applet_hid',
+    # Disable by default, WIP: follows use_nx_service_applet, which is itself
+    # off by default. Needs use_nx_service_applet and use_nx_service_hid enabled
+    # alongside it, and turns on neither: the applet is launched through the
+    # applet proxy, and every launch first reads the supported npad style set
+    # and joy hold type from the HID service. With either left off the override
+    # for it stays unlinked, libnx keeps its own zeroed state, and every
+    # hidLaShow* call fails at that first read.
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-service-applet-hid (controller library applet)',
+    yield : true
+)
+
+option(
     'use_nx_service_applet_nfp',
     # Disable by default, WIP: follows use_nx_service_applet, which is itself
     # off by default. Implies use_nx_service_applet.

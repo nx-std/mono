@@ -115,7 +115,7 @@ impl AmiiboSettings<'_> {
             self_controller,
             creator,
             &CABINET_APPLET,
-            param.as_bytes(),
+            &[param.as_bytes()],
             Some(reply.as_mut_bytes()),
         )
         .map_err(StartError::Launch)?;

@@ -132,6 +132,13 @@ option(
 )
 
 option(
+    'use_nx_service_applet_hid',
+    type : 'feature', value : 'disabled',
+    description : 'Enable the `service-applet-hid` feature',
+    yield : true
+)
+
+option(
     'use_nx_service_applet_nfp',
     type : 'feature', value : 'disabled',
     description : 'Enable the `service-applet-nfp` feature',

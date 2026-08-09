@@ -348,7 +348,7 @@ fn show_ui(
         self_controller,
         creator,
         &applet,
-        payload,
+        &[payload],
         Some(reply.as_mut_bytes()),
     )
     .map_err(ShowError::Launch)?;

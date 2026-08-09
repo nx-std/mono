@@ -65,7 +65,7 @@ impl AlbumView {
             self_controller,
             creator,
             &applet,
-            &[self.arg().as_raw()],
+            &[&[self.arg().as_raw()]],
             None,
         )
         .map_err(ShowError::Launch)?;

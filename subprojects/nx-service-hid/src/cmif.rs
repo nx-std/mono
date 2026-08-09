@@ -25,6 +25,7 @@ use nx_svc::mem::shmem::Handle as ShmemHandle;
 use zerocopy::IntoBytes as _;
 
 use crate::proto::{
+    NpadJoyHoldType,
     applet_resource_cmds,
     cmds,
 };
@@ -164,6 +165,36 @@ pub fn set_supported_npad_style_set(
     Ok(())
 }
 
+/// Gets the Npad style set the system supports.
+///
+/// This is IHidServer command 101.
+///
+/// # Errors
+///
+/// Returns a [`GetSupportedNpadStyleSetError`] when the request could not be
+/// sent or the reply could not be parsed.
+pub fn get_supported_npad_style_set(
+    session: BorrowedSessionHandle<'_>,
+    aruid: Option<Aruid>,
+) -> Result<u32, GetSupportedNpadStyleSetError> {
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
+
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
+
+    let req = cmif::CmifRequestBuilder::new(cmds::GET_SUPPORTED_NPAD_STYLE_SET)
+        .with_context(0x20)
+        .with_data_value(&aruid)
+        .with_send_pid()
+        .build();
+    req.send(&mut buf, session)
+        .map_err(GetSupportedNpadStyleSetError::SendRequest)?;
+
+    let resp =
+        cmif::parse_response::<&u32>(&buf).map_err(GetSupportedNpadStyleSetError::ParseResponse)?;
+
+    Ok(*resp.payload)
+}
+
 /// Sets the supported Npad ID types.
 ///
 /// This is IHidServer command 102.
@@ -188,6 +219,38 @@ pub fn set_supported_npad_id_type(
     cmif::parse_response::<()>(&buf).map_err(SetSupportedNpadIdTypeError::ParseResponse)?;
 
     Ok(())
+}
+
+/// Gets how the system expects a pair of Joy-Cons to be held.
+///
+/// This is IHidServer command 121.
+///
+/// # Errors
+///
+/// Returns a [`GetNpadJoyHoldTypeError`] when the request could not be sent, the
+/// reply could not be parsed, or the server named a hold type this client does
+/// not know.
+pub fn get_npad_joy_hold_type(
+    session: BorrowedSessionHandle<'_>,
+    aruid: Option<Aruid>,
+) -> Result<NpadJoyHoldType, GetNpadJoyHoldTypeError> {
+    let aruid = aruid.map(|a| a.to_raw()).unwrap_or(NO_ARUID);
+
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
+
+    let req = cmif::CmifRequestBuilder::new(cmds::GET_NPAD_JOY_HOLD_TYPE)
+        .with_context(0x20)
+        .with_data_value(&aruid)
+        .with_send_pid()
+        .build();
+    req.send(&mut buf, session)
+        .map_err(GetNpadJoyHoldTypeError::SendRequest)?;
+
+    let resp =
+        cmif::parse_response::<&u64>(&buf).map_err(GetNpadJoyHoldTypeError::ParseResponse)?;
+    let raw = *resp.payload;
+
+    NpadJoyHoldType::from_raw(raw).ok_or(GetNpadJoyHoldTypeError::UnknownHoldType(raw))
 }
 
 /// Activates touch screen input.
@@ -391,6 +454,32 @@ impl ToResultCode for SetSupportedNpadStyleSetError {
     }
 }
 
+/// Error returned by [`get_supported_npad_style_set`].
+#[derive(Debug, thiserror::Error)]
+pub enum GetSupportedNpadStyleSetError {
+    /// Failed to send the IPC request.
+    ///
+    /// Occurs when the request did not reach the server: the session was closed
+    /// or the request did not fit the IPC buffer.
+    #[error("failed to send request")]
+    SendRequest(#[source] cmif::SendError),
+    /// Failed to parse the CMIF response.
+    ///
+    /// Occurs when the server replied with a failure code, or with a reply the
+    /// CMIF decoder rejected.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseError),
+}
+
+impl ToResultCode for GetSupportedNpadStyleSetError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Error returned by [`set_supported_npad_id_type`].
 #[derive(Debug, thiserror::Error)]
 pub enum SetSupportedNpadIdTypeError {
@@ -407,6 +496,41 @@ impl ToResultCode for SetSupportedNpadIdTypeError {
         match self {
             Self::SendRequest(err) => err.to_rc(),
             Self::ParseResponse(err) => err.to_rc(),
+        }
+    }
+}
+
+/// Error returned by [`get_npad_joy_hold_type`].
+#[derive(Debug, thiserror::Error)]
+pub enum GetNpadJoyHoldTypeError {
+    /// Failed to send the IPC request.
+    ///
+    /// Occurs when the request did not reach the server: the session was closed
+    /// or the request did not fit the IPC buffer.
+    #[error("failed to send request")]
+    SendRequest(#[source] cmif::SendError),
+    /// Failed to parse the CMIF response.
+    ///
+    /// Occurs when the server replied with a failure code, or with a reply the
+    /// CMIF decoder rejected.
+    #[error("failed to parse response")]
+    ParseResponse(#[source] cmif::ParseError),
+    /// The server reported a hold type this client does not know.
+    ///
+    /// Occurs when the command succeeded but named a value outside
+    /// [`NpadJoyHoldType`], which a firmware newer than this client would.
+    #[error("unknown npad joy hold type: {0}")]
+    UnknownHoldType(u64),
+}
+
+impl ToResultCode for GetNpadJoyHoldTypeError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SendRequest(err) => err.to_rc(),
+            Self::ParseResponse(err) => err.to_rc(),
+            // Rejected locally after a successful reply, so no server
+            // named a code for it.
+            Self::UnknownHoldType(_) => GENERIC_ERROR,
         }
     }
 }
