@@ -20,6 +20,7 @@ sys = ["svc", "sys-fd", "sys-mem", "sys-sync", "sys-thread", "sys-thread-tls"]
 # FFI overrides for libnx functions (only if the dependency is enabled)
 ffi = [
     "nx-alloc?/ffi",
+    "nx-net?/ffi",
     "nx-fsdev?/ffi",
     "nx-pm?/ffi",
     "nx-rand?/ffi",
@@ -46,6 +47,7 @@ services = ["service-apm", "service-applet", "service-fs", "service-hid", "servi
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 display = ["dep:nx-display", "service-vi"]
+net = ["dep:nx-net"]
 # The filesystem device, replacing libnx's fsdev devoptab layer.
 fsdev = ["dep:nx-fsdev", "sys-fd", "service-fs"]
 pm = ["dep:nx-pm"]
@@ -98,6 +100,7 @@ wlaninf = ["dep:nx-wlaninf"]
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", optional = true }
 nx-display = { version = "0.1.0", path = "../nx-display", optional = true }
+nx-net = { version = "0.1.0", path = "../nx-net", optional = true }
 nx-fsdev = { version = "0.1.0", path = "../nx-fsdev", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-pm = { version = "0.1.0", path = "../nx-pm", optional = true }

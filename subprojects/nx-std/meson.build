@@ -442,6 +442,20 @@ if get_option('use_nx_wlaninf').enabled()
     deps_cargo_features += ['wlaninf']
 endif
 
+# nx-net
+# `nx-net` depends on `nx-service-sfdnsres`, `nx-service-sm`, and the global
+# allocator internally; enabling `use_nx_net` pulls those crates in
+# transitively via Cargo and Meson's subproject graph.
+if get_option('use_nx_net').enabled()
+    nx_net_proj = subproject('nx-net')
+
+    deps += nx_net_proj.get_variable('nx_net_dep')
+    deps_override_link_args += ['-T', nx_net_proj.get_variable('nx_net_ld_override')]
+
+    debug('net feature: enabled')
+    deps_cargo_features += ['net']
+endif
+
 #---------------------------------------------------------------------------------
 # Configuration constraints
 #---------------------------------------------------------------------------------
