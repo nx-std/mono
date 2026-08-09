@@ -14,10 +14,9 @@
 //! producing one is that surface's job: it knows which numbering its caller
 //! reads, which this crate does not.
 //!
-//! # References
-//!
-//! - `subprojects/libnx/src/nx/source/runtime/devices/convert_errno.c` — the
-//!   Linux-index-to-newlib table libnx applies on the way out to C.
+//! The mapping from these conditions to whatever numbering a C caller reads
+//! is that caller's to apply, and is a table rather than an offset: the two
+//! numberings agree only below 35.
 
 /// A failure condition reported by the BSD socket service.
 ///

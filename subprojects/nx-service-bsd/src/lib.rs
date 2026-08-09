@@ -1,6 +1,6 @@
 //! # nx-service-bsd
 //!
-//! Rust port of libnx's `bsd` BSD-socket service. The crate exposes:
+//! An IPC client for the Horizon `bsd` socket service. The crate exposes:
 //!
 //! - [`connect_with_options`] / [`ConnectError`] — establishes a `bsd:u` or
 //!   `bsd:s` session, wires up the transfer-memory the service requires, runs
@@ -57,13 +57,13 @@ use nx_sys_mem::tmem::{
 };
 
 mod cmif;
+pub mod config;
 mod fd;
 pub mod posix;
 mod proto;
 mod session;
 pub mod sockaddr;
 pub mod transfer;
-mod types;
 
 pub use crate::{
     cmif::{
@@ -73,6 +73,16 @@ pub use crate::{
         RegisterClientError,
         SelectTimeout,
         StartMonitoringError,
+    },
+    config::{
+        BsdConfig,
+        BsdServiceType,
+        BufferEfficiency,
+        BufferEfficiencyError,
+        ConfigVersion,
+        ConnectOptions,
+        SessionCount,
+        SessionCountError,
     },
     fd::BsdSockFd,
     posix::PosixError,
@@ -90,11 +100,6 @@ pub use crate::{
         SendFlags,
         Shutdown,
         StatusFlags,
-    },
-    types::{
-        BsdConfig,
-        BsdServiceType,
-        ConnectOptions,
     },
 };
 
@@ -492,7 +497,7 @@ impl BsdService {
 
     /// Waits for readiness across three descriptor sets.
     ///
-    /// Each `fd_set` slice carries the libnx `fd_set` byte layout; pass empty
+    /// Each `fd_set` slice carries the C `fd_set` byte layout; pass empty
     /// slices for fd_sets the caller does not need.
     /// # Errors
     ///
@@ -513,7 +518,7 @@ impl BsdService {
 
     /// Waits for readiness across a descriptor array.
     ///
-    /// `fds` carries the libnx `pollfd` array byte layout.
+    /// `fds` carries the C `pollfd` array byte layout.
     /// # Errors
     ///
     /// As [`Self::select`].
@@ -551,8 +556,7 @@ impl BsdService {
     ///
     /// Drops every pool session and the monitor session (each closes via
     /// `Drop`), then waits for the kernel to reclaim transfer-memory
-    /// permissions before freeing the backing buffer. Mirrors libnx's
-    /// `bsdExit`.
+    /// permissions before freeing the backing buffer.
     pub fn close(self) {
         let BsdService {
             pool,
@@ -578,10 +582,10 @@ impl BsdService {
     }
 }
 
-/// Establishes a `bsd:u`/`bsd:s` session, completes the libnx handshake, and
-/// builds the session pool.
+/// Establishes a `bsd:u`/`bsd:s` session, completes the service handshake,
+/// and builds the session pool.
 ///
-/// Steps mirror libnx's `_bsdInitialize`:
+/// The handshake is:
 /// 1. Look up the main service handle via SM (with `Auto` fallback when set).
 /// 2. Look up the monitor service handle via SM (same service name).
 /// 3. Allocate the transfer memory the service requires.
@@ -667,10 +671,9 @@ pub fn connect_with_options(
     };
 
     // 7. Build the pool: slot 0 is the main session, the rest are clones.
-    let num_sessions = opts
-        .config
-        .num_sessions
-        .clamp(1, session::MAX_SESSIONS as u32) as usize;
+    // `SessionCount` is bounded to what the pool's free-mask can track, so
+    // there is nothing to clamp here.
+    let num_sessions = opts.config.num_sessions.to_len();
     let mut sessions: Vec<Session> = Vec::with_capacity(num_sessions);
     sessions.push(main);
     for _ in 1..num_sessions {

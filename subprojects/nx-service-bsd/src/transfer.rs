@@ -5,7 +5,7 @@
 //! against the selectors it passes through. A `level`/`optname` pair names a
 //! point in a namespace the service owns and can extend, so no enum written
 //! here would stay complete. A transfer flag is not like that: the set is
-//! closed, libnx's headers enumerate it, and the values are as much a part of
+//! closed, the C headers enumerate it, and the values are as much a part of
 //! the interface as the command ids.
 //!
 //! # Why send and receive have separate flag sets
@@ -21,10 +21,8 @@
 //! not something a caller asks for, so putting them in an input set would
 //! invite sending a flag the service does not read.
 //!
-//! # References
-//!
-//! - `subprojects/libnx/src/nx/external/bsd/include/sys/socket.h` — the
-//!   `MSG_*` and `SHUT_*` values, which are FreeBSD's.
+//! The `MSG_*` and `SHUT_*` values are FreeBSD's, which is the lineage the
+//! service's socket interface follows.
 
 bitflags::bitflags! {
     /// What a receive may ask for, beyond the default.

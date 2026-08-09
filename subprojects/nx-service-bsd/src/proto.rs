@@ -1,7 +1,7 @@
 //! BSD service protocol constants and wire-format types.
 //!
-//! Mirrors `subprojects/libnx/src/nx/source/services/bsd.c`. Every `#[repr(C)]`
-//! struct here crosses the IPC boundary and must match libnx byte for byte.
+//! Every `#[repr(C)]` struct here crosses the IPC boundary, so each must match
+//! the layout the service reads, byte for byte.
 
 use core::mem::size_of;
 
@@ -168,9 +168,9 @@ impl core::fmt::Display for Command {
     }
 }
 
-/// Wire-format `BsdServiceConfig` shipped to `RegisterClient`.
+/// The service configuration shipped with `RegisterClient`.
 ///
-/// Layout matches `BsdServiceConfig` in libnx `bsd.c`. Every buffer size is in
+/// Every buffer size is in
 /// bytes and is the service's, not this process's: the transfer memory
 /// registered alongside is what they are carved out of.
 #[repr(C)]
@@ -338,7 +338,7 @@ pub(crate) struct DuplicateSocketIn {
     pub sockfd: i32,
     /// Alignment padding ahead of the reserved word.
     pub _pad: u32,
-    /// Reserved by the interface. Sent as zero, as libnx sends it.
+    /// Reserved by the interface. Sent as zero.
     pub reserved: u64,
 }
 const_assert_eq!(size_of::<DuplicateSocketIn>(), 16);
@@ -365,15 +365,15 @@ pub(crate) struct Timespec {
 }
 const_assert_eq!(size_of::<Timespec>(), 16);
 
-/// `BsdSelectTimeval`: a `timeval` plus the flag that says to ignore it.
+/// A `timeval` plus the flag that says to ignore it.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 pub(crate) struct SelectTimeval {
     /// How long to wait, meaningful only when `is_null` is zero.
     pub tv: Timeval,
     /// Non-zero to wait indefinitely, which is what a C caller passing a null
-    /// `struct timeval *` means. libnx writes a C `bool`; the same byte is
-    /// written here as a `u8`.
+    /// `struct timeval *` means. The interface carries a C `bool` here; the
+    /// same byte is written as a `u8`.
     pub is_null: u8,
     /// Padding out to the struct's 8-byte alignment.
     pub _pad: [u8; 7],
@@ -397,8 +397,8 @@ const_assert_eq!(size_of::<SelectIn>(), 32);
 #[repr(C)]
 #[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 pub(crate) struct PollIn {
-    /// How many `pollfd` entries the accompanying buffer holds. `nfds_t` in
-    /// libnx is `unsigned long`, which is 64-bit on this target.
+    /// How many `pollfd` entries the accompanying buffer holds. `nfds_t` is
+    /// `unsigned long`, which is 64-bit on this target.
     pub nfds: u64,
     /// Milliseconds to wait; negative waits indefinitely.
     pub timeout: i32,

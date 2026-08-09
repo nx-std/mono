@@ -1,12 +1,11 @@
 //! CMIF protocol operations for the BSD socket service.
 //!
-//! Every command maps one-to-one to a `_bsd*` entry point in libnx's
-//! `bsd.c`. Each function is `pub(crate)` so [`crate::BsdService`] can compose
-//! them after acquiring a session from the pool.
+//! One function per command in the interface, each `pub(crate)` so
+//! [`crate::BsdService`] can compose them after acquiring a session from the
+//! pool.
 //!
 //! Every command past the two handshake commands shares one response prefix,
-//! `{ int ret; int error_code }` (libnx's `_bsdDispatchImpl`), so they share
-//! one error type: [`CommandError`] names the step that failed and the command
+//! `{ int ret; int error_code }`, so they share one error type: [`CommandError`] names the step that failed and the command
 //! it failed for. A rejected command arrives as [`CommandError::Service`],
 //! carrying the condition the service reported as a [`PosixError`] rather than
 //! the raw wire number — see [`crate::posix`] for why that distinction is
@@ -32,6 +31,7 @@ use nx_sys_thread_tls::IpcBuffer;
 use zerocopy::IntoBytes as _;
 
 use crate::{
+    config::BsdConfig,
     fd::BsdSockFd,
     posix::PosixError,
     proto::{
@@ -64,7 +64,6 @@ use crate::{
         Shutdown,
         StatusFlags,
     },
-    types::BsdConfig,
 };
 
 /// Sends `IBsdServices::RegisterClient` on `session`.
@@ -79,14 +78,14 @@ pub(crate) fn register_client(
 ) -> Result<u64, RegisterClientError> {
     let payload = RegisterClientIn {
         config: BsdServiceConfigWire {
-            version: config.version,
+            version: config.version.to_wire(),
             tcp_tx_buf_size: config.tcp_tx_buf_size,
             tcp_rx_buf_size: config.tcp_rx_buf_size,
             tcp_tx_buf_max_size: config.tcp_tx_buf_max_size,
             tcp_rx_buf_max_size: config.tcp_rx_buf_max_size,
             udp_tx_buf_size: config.udp_tx_buf_size,
             udp_rx_buf_size: config.udp_rx_buf_size,
-            sb_efficiency: config.sb_efficiency,
+            sb_efficiency: config.sb_efficiency.to_wire(),
         },
         pid_placeholder: 0,
         tmem_size,
@@ -309,7 +308,7 @@ pub enum CommandError {
 
 /// Sends a command whose entire input is one value and whose reply is bare.
 ///
-/// The shape libnx writes as `_bsdDispatchIn(cmd, in)` with no buffers.
+/// The shape a command takes when it carries one value and no buffers.
 fn send_value_only<T>(
     session: BorrowedSessionHandle<'_>,
     command: Command,
@@ -332,7 +331,7 @@ where
     read_service_response(&buf, command, ExtraWord::None)
 }
 
-/// `bsdSocket`. Creates a socket and returns its descriptor.
+/// Creates a socket and returns its descriptor.
 pub(crate) fn socket(
     session: BorrowedSessionHandle<'_>,
     domain: i32,
@@ -350,7 +349,7 @@ pub(crate) fn socket(
     Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
 }
 
-/// `bsdSocketExempt`. Creates a socket exempt from the system's socket
+/// Creates a socket exempt from the system's socket
 /// accounting; identical to [`socket`] in every other respect.
 pub(crate) fn socket_exempt(
     session: BorrowedSessionHandle<'_>,
@@ -369,10 +368,10 @@ pub(crate) fn socket_exempt(
     Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
 }
 
-/// `bsdOpen`. Opens a path in the service's own namespace.
+/// Opens a path in the service's own namespace.
 ///
-/// The path travels with its terminating NUL, which is what libnx's
-/// `strlen(pathname) + 1` length amounts to.
+/// The path travels with its terminating NUL, which is the length the
+/// service expects.
 pub(crate) fn open(
     session: BorrowedSessionHandle<'_>,
     path: &CStr,
@@ -400,13 +399,13 @@ pub(crate) fn open(
     Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
 }
 
-/// `bsdClose`. Releases a descriptor.
+/// Releases a descriptor.
 pub(crate) fn close(session: BorrowedSessionHandle<'_>, fd: BsdSockFd) -> Result<(), CommandError> {
     send_value_only(session, Command::Close, &fd.to_raw())?;
     Ok(())
 }
 
-/// `bsdDuplicateSocket`. Returns a second descriptor naming the same socket.
+/// Returns a second descriptor naming the same socket.
 pub(crate) fn duplicate_socket(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -448,7 +447,7 @@ fn send_sockfd_with_addr(
     Ok(())
 }
 
-/// `bsdBind`. Assigns a local address to a socket.
+/// Assigns a local address to a socket.
 pub(crate) fn bind(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -457,7 +456,7 @@ pub(crate) fn bind(
     send_sockfd_with_addr(session, Command::Bind, sockfd, addr)
 }
 
-/// `bsdConnect`. Initiates a connection to a peer.
+/// Initiates a connection to a peer.
 pub(crate) fn connect(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -496,7 +495,7 @@ fn send_sockfd_for_addr(
     Ok((outcome, addr))
 }
 
-/// `bsdAccept`. Takes the next connection off a listening socket's queue,
+/// Takes the next connection off a listening socket's queue,
 /// returning its descriptor and the peer's address.
 pub(crate) fn accept(
     session: BorrowedSessionHandle<'_>,
@@ -508,7 +507,7 @@ pub(crate) fn accept(
     Ok((BsdSockFd::from_raw_unchecked(outcome.ret), addr))
 }
 
-/// `bsdGetSockName`. Reports the socket's own address.
+/// Reports the socket's own address.
 pub(crate) fn get_sock_name(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -517,7 +516,7 @@ pub(crate) fn get_sock_name(
     Ok(addr)
 }
 
-/// `bsdGetPeerName`. Reports the connected peer's address.
+/// Reports the connected peer's address.
 pub(crate) fn get_peer_name(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -526,7 +525,7 @@ pub(crate) fn get_peer_name(
     Ok(addr)
 }
 
-/// `bsdListen`. Marks a socket as accepting connections.
+/// Marks a socket as accepting connections.
 pub(crate) fn listen(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -540,7 +539,7 @@ pub(crate) fn listen(
     Ok(())
 }
 
-/// `bsdShutdown`. Disables further sends, receives, or both, on one socket.
+/// Disables further sends, receives, or both, on one socket.
 pub(crate) fn shutdown(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -554,7 +553,7 @@ pub(crate) fn shutdown(
     Ok(())
 }
 
-/// `bsdShutdownAllSockets`. Applies `how` to every socket this client owns.
+/// Applies `how` to every socket this client owns.
 pub(crate) fn shutdown_all_sockets(
     session: BorrowedSessionHandle<'_>,
     how: Shutdown,
@@ -563,7 +562,7 @@ pub(crate) fn shutdown_all_sockets(
     Ok(())
 }
 
-/// `bsdRecv`. Receives from a connected socket, returning the byte count.
+/// Receives from a connected socket, returning the byte count.
 pub(crate) fn recv(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -591,7 +590,7 @@ pub(crate) fn recv(
     Ok(outcome.byte_count())
 }
 
-/// `bsdRecvFrom`. Receives and reports the sender's address.
+/// Receives and reports the sender's address.
 ///
 /// The data buffer stays the caller's, because only the caller knows how much
 /// it wants; the address buffer is this function's own, for the reasons
@@ -626,7 +625,7 @@ pub(crate) fn recv_from(
     Ok((outcome.byte_count(), addr))
 }
 
-/// `bsdSend`. Sends on a connected socket, returning the accepted byte count.
+/// Sends on a connected socket, returning the accepted byte count.
 pub(crate) fn send(
     session: BorrowedSessionHandle<'_>,
     sockfd: BsdSockFd,
@@ -654,7 +653,7 @@ pub(crate) fn send(
     Ok(outcome.byte_count())
 }
 
-/// `bsdSendTo`. Sends to an explicit address, returning the accepted byte
+/// Sends to an explicit address, returning the accepted byte
 /// count.
 pub(crate) fn send_to(
     session: BorrowedSessionHandle<'_>,
@@ -685,7 +684,7 @@ pub(crate) fn send_to(
     Ok(outcome.byte_count())
 }
 
-/// `bsdRead`. Reads from a descriptor, returning the byte count.
+/// Reads from a descriptor, returning the byte count.
 pub(crate) fn read(
     session: BorrowedSessionHandle<'_>,
     fd: BsdSockFd,
@@ -709,7 +708,7 @@ pub(crate) fn read(
     Ok(outcome.byte_count())
 }
 
-/// `bsdWrite`. Writes to a descriptor, returning the accepted byte count.
+/// Writes to a descriptor, returning the accepted byte count.
 pub(crate) fn write(
     session: BorrowedSessionHandle<'_>,
     fd: BsdSockFd,
@@ -733,7 +732,7 @@ pub(crate) fn write(
     Ok(outcome.byte_count())
 }
 
-/// `bsdGetSockOpt`. Reads a socket option, returning its value.
+/// Reads a socket option, returning its value.
 ///
 /// The option's type is what says how many bytes it occupies, so `T` supplies
 /// both the buffer and its length and there is nothing for a caller to size
@@ -775,7 +774,7 @@ where
     Ok(value)
 }
 
-/// `bsdSetSockOpt`. Writes a socket option.
+/// Writes a socket option.
 ///
 /// Takes the option's own type, for the same reason [`get_sock_opt`] returns
 /// one: the length is the type's, not the caller's to get right.
@@ -813,8 +812,8 @@ where
 
 /// A `fcntl` operation the BSD service implements.
 ///
-/// The service answers only these two. libnx rejects every other `fcntl`
-/// command with "operation not supported" before sending anything, and making
+/// The service answers only these two. Every other `fcntl` command is
+/// rejected with "operation not supported" without a round-trip, and making
 /// the pair a type moves that rejection out to the edge that still holds the
 /// C command number — this crate never has to represent a command it cannot
 /// send.
@@ -829,7 +828,7 @@ pub enum FcntlOp {
 impl FcntlOp {
     /// The `(cmd, flags)` pair this operation is sent as.
     ///
-    /// A read sends zero flags, which is what libnx substitutes rather than
+    /// A read sends zero flags rather than
     /// forwarding whatever the caller happened to pass alongside one.
     const fn to_wire(self) -> (i32, i32) {
         /// `F_GETFL`, as newlib numbers it.
@@ -844,7 +843,7 @@ impl FcntlOp {
     }
 }
 
-/// `bsdFcntl`. Reads or replaces a descriptor's status flags.
+/// Reads or replaces a descriptor's status flags.
 ///
 /// Returns the descriptor's status flags for [`FcntlOp::GetFlags`], and an
 /// empty set for [`FcntlOp::SetFlags`].
@@ -886,7 +885,7 @@ mod ioc {
     }
 }
 
-/// `bsdIoctl`, for every request whose payload is one flat block.
+/// Issues a device control request whose payload is one flat block.
 ///
 /// The direction bits and the payload length are read out of `request`: a
 /// request with neither direction bit set carries no payload at all.
@@ -920,7 +919,7 @@ pub(crate) fn ioctl(
     let payload = IoctlIn {
         fd: fd.to_raw(),
         request,
-        // libnx counts one buffer for every request on this path, including
+        // One buffer is counted for every request on this path, including
         // the ones carrying no payload, so this does not track the direction
         // bits.
         bufcount: 1,
@@ -928,7 +927,7 @@ pub(crate) fn ioctl(
     let builder = cmif::CmifRequestBuilder::new(command.id()).with_data_value(&payload);
     // When both directions are requested, `data` is attached once through
     // `add_inout_auto_buffer` - a single descriptor the kernel both reads and
-    // writes - matching libnx's wire shape without aliasing two descriptors
+    // writes - matching the wire shape without aliasing two descriptors
     // over the same memory.
     let builder = match (has_in, has_out) {
         (true, true) => builder.add_inout_auto_buffer(InOutBuffer::new(
@@ -955,15 +954,15 @@ pub(crate) fn ioctl(
     Ok(outcome.ret)
 }
 
-/// `bsdIoctl`, for the requests whose payload is a header plus a list.
+/// Issues a device control request that answers with a header plus a list.
 ///
 /// `SIOCGIFCONF` answers with a header and an array of interface records;
 /// `SIOCGIFMEDIA` and `SIOCGIFXMEDIA` answer with a header and an array of
-/// media words. In C the header holds a pointer to that array and libnx
-/// follows it to find the second buffer; here the caller passes both, so no
+/// media words. In C the header holds a pointer to that array, and finding
+/// the second buffer means following it; here the caller passes both, so no
 /// pointer is ever read out of caller-supplied bytes.
 ///
-/// Both buffers travel in each direction, as they do in libnx: the service
+/// Both buffers travel in each direction: the service
 /// reads the header to learn how much room the list has, then writes both back.
 pub(crate) fn ioctl_with_entries(
     session: BorrowedSessionHandle<'_>,
@@ -995,7 +994,7 @@ pub(crate) fn ioctl_with_entries(
     Ok(outcome.ret)
 }
 
-/// `bsdSysctl`. Reads or writes a kernel networking parameter.
+/// Reads or writes a kernel networking parameter.
 ///
 /// `name` is the MIB naming the parameter, `new_value` is what to write (empty
 /// for a plain read), and `old_value` receives the previous value. Returns the
@@ -1025,7 +1024,7 @@ pub(crate) fn sysctl(
 }
 
 /// Optional timeout for [`BsdService::select`](crate::BsdService::select)
-/// (mirrors libnx's `BsdSelectTimeval`).
+/// (the `timeval` the interface carries, plus its "ignore me" flag).
 #[derive(Debug, Clone, Copy)]
 pub struct SelectTimeout {
     /// Seconds component.
@@ -1034,12 +1033,12 @@ pub struct SelectTimeout {
     pub usec: i64,
 }
 
-/// `bsdSelect`. Waits for readiness across three descriptor sets.
+/// Waits for readiness across three descriptor sets.
 ///
 /// Each `fd_set` buffer is opaque to this crate; callers are expected to use
-/// libnx's `fd_set` byte layout. Pass empty slices for fd_sets that should be
-/// transmitted as null, and `None` for `timeout` to send the libnx
-/// `is_null = true` sentinel.
+/// the C `fd_set` byte layout. Pass empty slices for fd_sets that should be
+/// transmitted as null, and `None` for `timeout` to send the interface's
+/// "no timeout" sentinel.
 pub(crate) fn select(
     session: BorrowedSessionHandle<'_>,
     nfds: i32,
@@ -1076,7 +1075,7 @@ pub(crate) fn select(
 
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
-    // Each fd_set is both read and written by the kernel - libnx's wire shape
+    // Each fd_set is both read and written by the kernel - the wire shape
     // - so each is attached once through `add_inout_auto_buffer` instead of
     // aliasing an in-auto-buffer and an out-auto-buffer over the same memory.
     // This emits the three fd_set descriptors interleaved (in, out, in, out,
@@ -1100,9 +1099,9 @@ pub(crate) fn select(
     Ok(outcome.ret)
 }
 
-/// `bsdPoll`. Waits for readiness across a descriptor array.
+/// Waits for readiness across a descriptor array.
 ///
-/// `fds` must have the layout of libnx's `pollfd` array; it is read as input
+/// `fds` must have the layout of the C `pollfd` array; it is read as input
 /// and written back as output.
 pub(crate) fn poll(
     session: BorrowedSessionHandle<'_>,
@@ -1118,7 +1117,7 @@ pub(crate) fn poll(
         timeout,
         _pad: 0,
     };
-    // `fds` is both read and written by the kernel - libnx's wire shape - so
+    // `fds` is both read and written by the kernel - the wire shape - so
     // it is attached once through `add_inout_auto_buffer` instead of aliasing
     // an in-auto-buffer and an out-auto-buffer over the same memory.
     let req = cmif::CmifRequestBuilder::new(command.id())
@@ -1149,14 +1148,14 @@ pub struct RecvTimeout {
     pub nsec: i64,
 }
 
-/// `bsdRecvMMsg`. Receives up to `vlen` messages in one request.
+/// Receives up to `vlen` messages in one request.
 ///
 /// `buf` carries the caller's `mmsghdr` array together with the message
 /// buffers it points at, and the service writes the received messages back
 /// into it.
 ///
 /// The command exists from `[3.0.0]`, but only its `[7.0.0+]` form is sent
-/// here, matching libnx; on older firmware the service rejects it. Deciding
+/// here; on older firmware the service rejects it. Deciding
 /// whether the running firmware is new enough is the caller's, since this
 /// crate has no dependency on the runtime that knows the version.
 pub(crate) fn recv_mmsg(
@@ -1180,7 +1179,7 @@ pub(crate) fn recv_mmsg(
             tv_nsec: timeout.nsec,
         },
     };
-    // A map-alias buffer rather than an auto-select one, as in libnx: the
+    // A map-alias buffer rather than an auto-select one: the
     // message array is far larger than the pointer-buffer a session offers.
     let req = cmif::CmifRequestBuilder::new(command.id())
         .with_data_value(&payload)
@@ -1196,7 +1195,7 @@ pub(crate) fn recv_mmsg(
     Ok(outcome.ret)
 }
 
-/// `bsdSendMMsg`. Sends up to `vlen` messages in one request.
+/// Sends up to `vlen` messages in one request.
 ///
 /// `buf` carries the caller's `mmsghdr` array; the service writes each
 /// message's accepted length back into it, which is why the buffer travels as
