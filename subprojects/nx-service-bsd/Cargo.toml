@@ -11,6 +11,7 @@ doctest = false
 bench = false
 
 [dependencies]
+bitflags = "2"
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }

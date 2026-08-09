@@ -1,37 +1,55 @@
 //! BSD socket file descriptor newtype.
+//!
+//! [`BsdSockFd`] maintains one invariant: it always names a descriptor the BSD
+//! service issued. Nothing in this module establishes it, because nothing here
+//! can — whether a descriptor was issued is what the command's response says,
+//! and only the caller that read that response knows. So validation happens in
+//! [`crate::cmif`], where a negative return becomes an error before any
+//! descriptor is built, and [`BsdSockFd::from_raw_unchecked`] is what the
+//! commands use to record that they did the check.
 
-/// File descriptor returned by [`BsdService::socket`](crate::BsdService::socket)
-/// and consumed by every other socket operation.
+/// A descriptor the BSD socket service issued.
 ///
-/// Wraps the `i32` returned by the BSD service. A value of `-1`
-/// ([`BsdSockFd::INVALID`]) signifies "no socket / closed", matching POSIX.
+/// Returned by [`BsdService::socket`](crate::BsdService::socket) and
+/// [`BsdService::accept`](crate::BsdService::accept), and taken by every
+/// command that names a socket.
+///
+/// **A value of this type always names a descriptor the service issued.** The
+/// service reports "no descriptor" the POSIX way, as a negative return
+/// alongside the condition that caused it, and this crate turns that into an
+/// `Err` before a descriptor is ever built — so there is no sentinel here to
+/// test against, and no caller has to. Holding the invariant in the type is
+/// what removes the check every operation would otherwise have to repeat, and
+/// the guessing about whether it was performed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct BsdSockFd(i32);
 
 impl BsdSockFd {
-    /// Sentinel for "no file descriptor". Equal to `-1`, matching POSIX.
-    pub const INVALID: Self = Self(-1);
-
-    /// Returns the raw `i32` file descriptor value.
+    /// Returns the raw `i32` the service knows this descriptor by.
     #[inline]
-    pub const fn raw(self) -> i32 {
+    pub const fn to_raw(self) -> i32 {
         self.0
     }
 
-    /// Returns whether this descriptor is the [`INVALID`](Self::INVALID) sentinel.
-    #[inline]
-    pub const fn is_invalid(self) -> bool {
-        self.0 < 0
-    }
-
-    /// Constructs a [`BsdSockFd`] from a raw `i32` returned by the BSD service.
+    /// Adopts a descriptor the BSD service just issued.
     ///
-    /// Crate-private — external callers obtain descriptors via
-    /// [`BsdService::socket`](crate::BsdService::socket) and
-    /// [`BsdService::accept`](crate::BsdService::accept) only.
+    /// The caller must ensure `fd` came from a command the service accepted,
+    /// which is what makes it non-negative; nothing here can establish that
+    /// on its own, since only the response the caller read says whether the
+    /// command succeeded. A debug build asserts the part that is checkable.
+    ///
+    /// Crate-private, so the only callers are the command wrappers that read
+    /// the response themselves.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, if `fd` is negative — the service returning a
+    /// descriptor for a command it rejected, or a caller adopting one without
+    /// checking the response first.
     #[inline]
-    pub(crate) const fn from_raw(fd: i32) -> Self {
+    pub(crate) const fn from_raw_unchecked(fd: i32) -> Self {
+        debug_assert!(fd >= 0, "adopted a negative BSD socket descriptor");
         Self(fd)
     }
 }

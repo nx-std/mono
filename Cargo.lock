@@ -466,6 +466,7 @@ dependencies = [
 name = "nx-service-bsd"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "nx-panic-handler",
  "nx-service-sm",
  "nx-sf",
