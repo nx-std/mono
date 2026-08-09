@@ -12,6 +12,7 @@
 #[cfg(any(
     feature = "service-applet-friends",
     feature = "service-applet-pctlauth",
+    feature = "service-applet-psel",
     feature = "service-fs",
     feature = "service-vi"
 ))]

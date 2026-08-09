@@ -295,6 +295,15 @@ if get_option('use_nx_service_applet_pctlauth').enabled()
     deps_cargo_features += ['service-applet-pctlauth']
 endif
 
+# nx-service-applet-psel
+# No `subproject(...)` entry, mirroring the absent Cargo dependency: the
+# player-select applet's FFI lives in `nx-rt-nro`, which pulls the crate in and
+# builds it.
+if get_option('use_nx_service_applet_psel').enabled()
+    debug('service-applet-psel feature: enabled')
+    deps_cargo_features += ['service-applet-psel']
+endif
+
 # nx-service-fs
 if get_option('use_nx_service_fs').enabled()
     nx_service_fs_proj = subproject('nx-service-fs')

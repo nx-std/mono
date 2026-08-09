@@ -25,6 +25,7 @@ ffi = [
     "nx-service-applet-friends?/ffi",
     "nx-service-applet-nfp?/ffi",
     "nx-service-applet-pctlauth?/ffi",
+    "nx-service-applet-psel?/ffi",
 ]
 # Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the homebrew-loader startup ABI). Leave it off on the
@@ -51,6 +52,9 @@ service-applet-nfp = ["dep:nx-service-applet-nfp", "service-applet"]
 # `service-applet`: the PIN screens are launched through the applet proxy the
 # core holds.
 service-applet-pctlauth = ["dep:nx-service-applet-pctlauth", "service-applet"]
+# Player-select library applet — gates `ffi::psel`. Pulls `service-applet`: the
+# user picker is launched through the applet proxy the core holds.
+service-applet-psel = ["dep:nx-service-applet-psel", "service-applet"]
 # Filesystem (fsp-srv) service — gates `services::fs` + `ffi::fs`.
 # Pulls `nx-fsdev`: the session it connects lives there, alongside the filesystem
 # device that also addresses objects inside it.
@@ -84,6 +88,7 @@ nx-service-applet-err = { version = "0.1.0", path = "../nx-service-applet-err", 
 nx-service-applet-friends = { version = "0.1.0", path = "../nx-service-applet-friends", optional = true }
 nx-service-applet-nfp = { version = "0.1.0", path = "../nx-service-applet-nfp", optional = true }
 nx-service-applet-pctlauth = { version = "0.1.0", path = "../nx-service-applet-pctlauth", optional = true }
+nx-service-applet-psel = { version = "0.1.0", path = "../nx-service-applet-psel", optional = true }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }

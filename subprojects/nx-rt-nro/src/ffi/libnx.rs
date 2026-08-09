@@ -33,6 +33,8 @@ mod nfp;
 mod nv;
 #[cfg(feature = "service-applet-pctlauth")]
 mod pctlauth;
+#[cfg(feature = "service-applet-psel")]
+mod psel;
 #[cfg(feature = "service-set")]
 mod setsys;
 #[cfg(feature = "service-time")]
