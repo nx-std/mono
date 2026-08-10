@@ -680,6 +680,16 @@ fn device_error_rc(err: DeviceError) -> u32 {
         DeviceError::NotFound | DeviceError::AlreadyExists | DeviceError::Io => {
             error::last_result()
         }
+        // Conditions the descriptor table can carry but a filesystem never raises: this device
+        // has no non-blocking mode, no connection, and no deadline of its own. They are matched
+        // rather than swept into a wildcard so that a condition added later is a compile error
+        // here, which is how the two above came to be distinguished in the first place.
+        DeviceError::WouldBlock
+        | DeviceError::Interrupted
+        | DeviceError::ConnectionReset
+        | DeviceError::NotConnected
+        | DeviceError::PermissionDenied
+        | DeviceError::TimedOut => error::last_result(),
     }
 }
 

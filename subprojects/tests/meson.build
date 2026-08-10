@@ -240,6 +240,45 @@ custom_target(name + '.nro',
               input : elf, output : name + '.nro',
               build_by_default : true, depends : elf)
 
+# ── nx-tests-net ──────────────────────────────────────────────────────────
+# The socket surface, kept in its own binary because it brings up a network
+# stack: the driver claims transfer memory and several IPC sessions for as long
+# as it is up, and a console where the service refuses to start would fail every
+# case for a reason that has nothing to do with the code under test. Every test
+# runs over loopback, so a run needs no network and no peer. It links either
+# way: with `use_nx_sys_net` off the calls resolve to libnx's own socket driver,
+# the baseline to compare against.
+name = 'nx-tests-net'
+src = files(
+    'source/net/socket/fixture.h',
+    'source/net/socket/suite.h',
+    'source/net/socket/test_0001_socket_create_and_close_round_trips.c',
+    'source/net/socket/test_0002_bind_then_getsockname_reports_the_address.c',
+    'source/net/socket/test_0003_tcp_loopback_round_trips_a_payload.c',
+    'source/net/socket/test_0004_read_and_write_reach_the_socket.c',
+    'source/net/socket/test_0005_udp_loopback_round_trips_a_datagram.c',
+    'source/net/socket/test_0006_nonblocking_accept_on_an_idle_listener_reports_eagain.c',
+    'source/net/socket/test_0007_poll_reports_readability_when_data_arrives.c',
+    'source/net/socket/test_0008_select_reports_readability_when_data_arrives.c',
+    'source/net/socket/test_0009_socket_calls_on_a_non_socket_report_enotsock.c',
+    'source/net/socket/test_0010_sockopt_round_trips_a_value.c',
+    'source/net/socket/test_0011_getpeername_reports_the_connected_peer.c',
+    'source/net/socket/test_0012_shutdown_ends_the_peer_receive.c',
+    'source/net/main.c',
+)
+elf = executable(name + '.elf', src,
+                 dependencies : [nx_dep, nx_std_sync_dep],
+                 c_args : c_opts, cpp_args : cpp_opts,
+                 link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
+                 pie : true)
+custom_target(name + '.lst',
+              input : elf, output : name + '.lst',
+              command : [nm, '-CSn', '@INPUT@'], capture : true)
+custom_target(name + '.nro',
+              command : bundle_base + ['--name', name],
+              input : elf, output : name + '.nro',
+              build_by_default : true, depends : elf)
+
 # ── nx-tests-applet-album ─────────────────────────────────────────────────
 # Interactive: each Album launch blocks until a person leaves the applet, so
 # this cannot join the unattended suite. It links either way — with

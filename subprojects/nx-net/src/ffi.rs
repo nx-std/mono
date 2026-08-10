@@ -56,6 +56,7 @@ use core::{
 };
 
 use nx_service_sfdnsres::NameInfoFlags;
+use nx_service_sm::SmService;
 
 use self::{
     abi::{
@@ -112,8 +113,8 @@ const IPV4_ADDR_LEN: u32 = 4;
 /// `node` and `service`, when non-null, must point to NUL-terminated C
 /// strings. `hints`, when non-null, must point to a valid `addrinfo`. `res`
 /// must be a non-null, writable pointer to a `*mut addrinfo` slot.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_net__getaddrinfo(
+pub unsafe extern "C" fn getaddrinfo(
+    sm: &SmService,
     node: *const c_char,
     service: *const c_char,
     hints: *const addrinfo,
@@ -156,14 +157,15 @@ pub unsafe extern "C" fn __nx_net__getaddrinfo(
     };
 
     // Run the lookup over the shared resolver session.
-    let list =
-        match with_resolver(|svc| lookup_addrinfo(svc, node.as_ref(), service.as_ref(), &hints)) {
-            Ok(Ok(list)) => list,
-            // The resolver classified the failure: surface its own codes.
-            Ok(Err(err)) => return fail(err.gai_code(), Some(err.errno())),
-            // The `sfdnsres` session could not be established.
-            Err(_) => return fail(abi::EAI_AGAIN, Some(abi::EAGAIN)),
-        };
+    let list = match with_resolver(sm, |svc| {
+        lookup_addrinfo(svc, node.as_ref(), service.as_ref(), &hints)
+    }) {
+        Ok(Ok(list)) => list,
+        // The resolver classified the failure: surface its own codes.
+        Ok(Err(err)) => return fail(err.gai_code(), Some(err.errno())),
+        // The `sfdnsres` session could not be established.
+        Err(_) => return fail(abi::EAI_AGAIN, Some(abi::EAGAIN)),
+    };
     if list.is_empty() {
         return fail(abi::EAI_NODATA, None);
     }
@@ -217,10 +219,9 @@ pub unsafe extern "C" fn __nx_net__freeaddrinfo(ai: *mut addrinfo) {
 /// # Safety
 ///
 /// `name`, when non-null, must point to a NUL-terminated C string.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_net__gethostbyname(name: *const c_char) -> *mut hostent {
+pub unsafe extern "C" fn gethostbyname(sm: &SmService, name: *const c_char) -> *mut hostent {
     // SAFETY: `name` is null or a NUL-terminated C string, per the contract.
-    unsafe { host_by_name(name, AddrFamily::Inet) }
+    unsafe { host_by_name(sm, name, AddrFamily::Inet) }
 }
 
 /// Resolves a host name into a `hostent`, restricted to address family `af`.
@@ -234,14 +235,17 @@ pub unsafe extern "C" fn __nx_net__gethostbyname(name: *const c_char) -> *mut ho
 /// # Safety
 ///
 /// `name`, when non-null, must point to a NUL-terminated C string.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_net__gethostbyname2(name: *const c_char, af: c_int) -> *mut hostent {
+pub unsafe extern "C" fn gethostbyname2(
+    sm: &SmService,
+    name: *const c_char,
+    af: c_int,
+) -> *mut hostent {
     let family = match AddrFamily::try_from(af) {
         Ok(family) => family,
         Err(_) => return host_fail(abi::HOST_NOT_FOUND, abi::EAFNOSUPPORT),
     };
     // SAFETY: `name` is null or a NUL-terminated C string, per the contract.
-    unsafe { host_by_name(name, family) }
+    unsafe { host_by_name(sm, name, family) }
 }
 
 /// Reverse-resolves an IPv4 address into a C-ABI `hostent`.
@@ -254,8 +258,8 @@ pub unsafe extern "C" fn __nx_net__gethostbyname2(name: *const c_char, af: c_int
 /// # Safety
 ///
 /// `addr`, when non-null, must point to at least `len` readable bytes.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_net__gethostbyaddr(
+pub unsafe extern "C" fn gethostbyaddr(
+    sm: &SmService,
     addr: *const c_void,
     len: u32,
     addr_type: c_int,
@@ -278,7 +282,7 @@ pub unsafe extern "C" fn __nx_net__gethostbyaddr(
     let octets = unsafe { ptr::read_unaligned(addr.cast::<[u8; 4]>()) };
     let ip = Ipv4Addr::from(octets);
 
-    match with_resolver(|svc| lookup_host_by_addr(svc, ip)) {
+    match with_resolver(sm, |svc| lookup_host_by_addr(svc, ip)) {
         Ok(Ok(entry)) => pack_hostent(&entry),
         Ok(Err(err)) => host_fail(err.h_errno(), err.errno()),
         Err(_) => host_fail(abi::NETDB_INTERNAL, abi::EAGAIN),
@@ -322,8 +326,8 @@ pub unsafe extern "C" fn __nx_net__freehostent(he: *mut hostent) {
 /// `sa` must be non-null and point to at least `salen` readable bytes.
 /// `host`, when non-null, must point to at least `hostlen` writable bytes;
 /// `serv`, when non-null, to at least `servlen` writable bytes.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_net__getnameinfo(
+pub unsafe extern "C" fn getnameinfo(
+    sm: &SmService,
     sa: *const sockaddr,
     salen: u32,
     host: *mut c_char,
@@ -349,7 +353,7 @@ pub unsafe extern "C" fn __nx_net__getnameinfo(
     // The C caller's bitmask is adopted here, at the boundary it arrives
     // through, so the resolver below never handles an untyped word.
     let flags = NameInfoFlags::from_raw(flags as u32);
-    let info = match with_resolver(|svc| lookup_nameinfo(svc, &addr, flags)) {
+    let info = match with_resolver(sm, |svc| lookup_nameinfo(svc, &addr, flags)) {
         Ok(Ok(info)) => info,
         // The resolver classified the failure: surface its own codes.
         Ok(Err(err)) => return fail(err.gai_code(), Some(err.errno())),
@@ -442,14 +446,14 @@ pub unsafe extern "C" fn __nx_net__herror(s: *const c_char) {
 /// # Safety
 ///
 /// `name` must be null or point to a NUL-terminated C string.
-unsafe fn host_by_name(name: *const c_char, family: AddrFamily) -> *mut hostent {
+unsafe fn host_by_name(sm: &SmService, name: *const c_char, family: AddrFamily) -> *mut hostent {
     // SAFETY: `name` is null or a NUL-terminated C string, per the contract.
     let name = match unsafe { parse_arg::<Hostname>(name) } {
         Ok(Some(name)) => name,
         Ok(None) | Err(()) => return host_fail(abi::HOST_NOT_FOUND, abi::EINVAL),
     };
 
-    match with_resolver(|svc| lookup_host_by_name(svc, &name, family)) {
+    match with_resolver(sm, |svc| lookup_host_by_name(svc, &name, family)) {
         Ok(Ok(entry)) => pack_hostent(&entry),
         // The resolver classified the failure: surface its own codes.
         Ok(Err(err)) => host_fail(err.h_errno(), err.errno()),

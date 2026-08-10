@@ -411,6 +411,45 @@ impl BsdService {
         cmif::get_sock_opt(g.session(), sockfd, level, optname)
     }
 
+    /// Reads a socket option into `optval`, returning how many bytes it holds.
+    ///
+    /// The untyped counterpart of [`Self::get_sock_opt`], for a caller that already has the
+    /// buffer: a C surface is handed one, along with the length its caller chose, by somebody who
+    /// has already decided which option they mean.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::get_sock_opt`].
+    pub fn get_sock_opt_bytes(
+        &self,
+        sockfd: BsdSockFd,
+        level: i32,
+        optname: i32,
+        optval: &mut [u8],
+    ) -> Result<usize, CommandError> {
+        let g = self.pool.acquire();
+        cmif::get_sock_opt_bytes(g.session(), sockfd, level, optname, optval)
+    }
+
+    /// Writes a socket option from `optval`.
+    ///
+    /// The untyped counterpart of [`Self::set_sock_opt`], for the reason given on
+    /// [`Self::get_sock_opt_bytes`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::get_sock_opt`].
+    pub fn set_sock_opt_bytes(
+        &self,
+        sockfd: BsdSockFd,
+        level: i32,
+        optname: i32,
+        optval: &[u8],
+    ) -> Result<(), CommandError> {
+        let g = self.pool.acquire();
+        cmif::set_sock_opt_bytes(g.session(), sockfd, level, optname, optval)
+    }
+
     /// Writes a socket option.
     /// # Errors
     ///

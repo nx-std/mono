@@ -810,6 +810,83 @@ where
     Ok(())
 }
 
+/// Reads a socket option into a caller-supplied buffer.
+///
+/// The untyped counterpart of [`get_sock_opt`], for a caller that has bytes
+/// rather than a type: the C surface is handed a buffer and a length by
+/// somebody who has already decided which option they are asking about, and
+/// inventing a type to describe those bytes would not make the request any
+/// better checked.
+///
+/// Returns how many bytes the service wrote, which is the option's real length
+/// bounded by the buffer.
+pub(crate) fn get_sock_opt_bytes(
+    session: BorrowedSessionHandle<'_>,
+    sockfd: BsdSockFd,
+    level: i32,
+    optname: i32,
+    optval: &mut [u8],
+) -> Result<usize, CommandError> {
+    let command = Command::GetSockOpt;
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
+
+    let payload = SockOptIn {
+        sockfd: sockfd.to_raw(),
+        level,
+        optname,
+    };
+    let capacity = optval.len();
+    let req = cmif::CmifRequestBuilder::new(command.id())
+        .with_data_value(&payload)
+        .add_out_auto_buffer(OutputBuffer::new(optval, BufferMode::Normal))
+        .build();
+    req.send(&mut ipc_buf, session)
+        .map_err(|err| CommandError::SendRequest {
+            command,
+            source: err,
+        })?;
+
+    let outcome = read_service_response(&ipc_buf, command, ExtraWord::U32)?;
+    // The service reports the option's real length, which can exceed the buffer
+    // it was given; clamping keeps the count describing bytes that were written.
+    // A response without the extra word describes no length, so nothing was.
+    let reported = outcome.extra.unwrap_or(0) as usize;
+    Ok(core::cmp::min(reported, capacity))
+}
+
+/// Writes a socket option from caller-supplied bytes.
+///
+/// The untyped counterpart of [`set_sock_opt`], for the reason given on
+/// [`get_sock_opt_bytes`].
+pub(crate) fn set_sock_opt_bytes(
+    session: BorrowedSessionHandle<'_>,
+    sockfd: BsdSockFd,
+    level: i32,
+    optname: i32,
+    optval: &[u8],
+) -> Result<(), CommandError> {
+    let command = Command::SetSockOpt;
+    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
+
+    let payload = SockOptIn {
+        sockfd: sockfd.to_raw(),
+        level,
+        optname,
+    };
+    let req = cmif::CmifRequestBuilder::new(command.id())
+        .with_data_value(&payload)
+        .add_in_auto_buffer(InputBuffer::new(optval, BufferMode::Normal))
+        .build();
+    req.send(&mut ipc_buf, session)
+        .map_err(|err| CommandError::SendRequest {
+            command,
+            source: err,
+        })?;
+
+    read_service_response(&ipc_buf, command, ExtraWord::None)?;
+    Ok(())
+}
+
 /// A `fcntl` operation the BSD service implements.
 ///
 /// The service answers only these two. Every other `fcntl` command is

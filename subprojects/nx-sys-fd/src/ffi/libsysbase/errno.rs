@@ -39,11 +39,20 @@ use crate::{
 /// No such file or directory.
 pub const ENOENT: c_int = 2;
 
+/// Interrupted system call.
+pub const EINTR: c_int = 4;
+
 /// I/O error.
 pub const EIO: c_int = 5;
 
 /// Bad file descriptor.
 pub const EBADF: c_int = 9;
+
+/// Resource temporarily unavailable.
+pub const EAGAIN: c_int = 11;
+
+/// Permission denied.
+pub const EACCES: c_int = 13;
 
 /// File exists.
 pub const EEXIST: c_int = 17;
@@ -62,6 +71,15 @@ pub const ESPIPE: c_int = 29;
 
 /// Function not implemented.
 pub const ENOSYS: c_int = 88;
+
+/// Connection reset by peer.
+pub const ECONNRESET: c_int = 104;
+
+/// Connection timed out.
+pub const ETIMEDOUT: c_int = 116;
+
+/// Socket is not connected.
+pub const ENOTCONN: c_int = 128;
 
 /// Reports `errno` through `r` and returns C's integer failure value.
 pub fn fail(r: *mut Reent, errno: c_int) -> c_int {
@@ -202,6 +220,12 @@ impl ToErrno for DeviceError {
             Self::NotFound => ENOENT,
             Self::AlreadyExists => EEXIST,
             Self::InvalidPath => EINVAL,
+            Self::WouldBlock => EAGAIN,
+            Self::Interrupted => EINTR,
+            Self::ConnectionReset => ECONNRESET,
+            Self::NotConnected => ENOTCONN,
+            Self::PermissionDenied => EACCES,
+            Self::TimedOut => ETIMEDOUT,
         }
     }
 }

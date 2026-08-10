@@ -4,3 +4,17 @@ option(
     description : 'Enable the nx-rt-core `service-applet` feature',
     yield : true
 )
+
+option(
+    'use_nx_sys_net',
+    type : 'feature', value : 'auto',
+    description : 'Enable the socket driver initialization override (socketInitialize)',
+    yield : true
+)
+
+option(
+    'use_nx_net',
+    type : 'feature', value : 'auto',
+    description : 'Enable the resolver overrides that need the service-manager session',
+    yield : true
+)

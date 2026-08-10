@@ -424,6 +424,49 @@ pub enum SyncError {
     File(#[source] DeviceError),
 }
 
+/// Runs `op` against the file behind `fd`, returning what it produced.
+///
+/// This is how a device reaches state only it knows its files hold. The operations above are the
+/// ones every device performs the same way; a socket layer's descriptor is not one of them, and the
+/// C functions that need it (`send`, `bind`, `listen`, …) are not device operations at all. `op`
+/// receives the file as a trait object and downcasts it to the type the device produced, which is
+/// what [`File`] requiring [`Any`](core::any::Any) is for.
+///
+/// The file's lock is held for as long as `op` runs, so `op` copies out what it needs and returns.
+/// Doing the work inside it would serialize against every other operation on the same descriptor,
+/// which for a socket means a receive blocking a send on the same connection.
+///
+/// # Errors
+///
+/// Returns [`WithFileError::BadDescriptor`] when `fd` is not open, and [`WithFileError::NotAFile`]
+/// when it is a stream descriptor, which owns no file to reach.
+pub fn with_file<T>(fd: Fd, op: impl FnOnce(&mut dyn File) -> T) -> Result<T, WithFileError> {
+    match target_of(fd) {
+        None => Err(WithFileError::BadDescriptor),
+        Some(Target::Stream(_)) => Err(WithFileError::NotAFile),
+        Some(Target::File(file)) => {
+            let mut guard = file.lock();
+            Ok(op(guard.file()))
+        }
+    }
+}
+
+/// Errors returned by [`with_file`].
+#[derive(Debug, thiserror::Error)]
+pub enum WithFileError {
+    /// The descriptor is not open
+    ///
+    /// `op` did not run.
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// The descriptor owns no file
+    ///
+    /// Occurs on a stream descriptor, which reaches its device directly. `op` did not run.
+    #[error("Descriptor does not hold a file")]
+    NotAFile,
+}
+
 /// Returns the device backing `fd`.
 pub fn device_of(fd: Fd) -> Option<DeviceId> {
     let number = fd.number();

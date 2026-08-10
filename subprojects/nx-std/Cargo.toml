@@ -15,7 +15,7 @@ bench = false
 default = ["alloc", "rand", "sync", "time"]
 
 # Low-level features
-sys = ["svc", "sys-fd", "sys-mem", "sys-sync", "sys-thread", "sys-thread-tls"]
+sys = ["svc", "sys-fd", "sys-mem", "sys-net", "sys-sync", "sys-thread", "sys-thread-tls"]
 
 # FFI overrides for libnx functions (only if the dependency is enabled)
 ffi = [
@@ -33,6 +33,7 @@ ffi = [
     "nx-svc?/ffi",
     "nx-sys-fd?/ffi",
     "nx-sys-mem?/ffi",
+    "nx-sys-net?/ffi",
     "nx-sys-sync?/ffi",
     "nx-sys-thread?/ffi",
     "nx-sys-thread-tls?/ffi",
@@ -47,7 +48,9 @@ services = ["service-apm", "service-applet", "service-fs", "service-hid", "servi
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 display = ["dep:nx-display", "service-vi"]
-net = ["dep:nx-net"]
+# Forwards to `nx-rt-core`, which owns the five resolver symbols that reach
+# `sfdnsres` over the service-manager session it holds.
+net = ["dep:nx-net", "nx-rt-core?/net"]
 # The filesystem device, replacing libnx's fsdev devoptab layer.
 fsdev = ["dep:nx-fsdev", "sys-fd", "service-fs"]
 pm = ["dep:nx-pm"]
@@ -67,6 +70,7 @@ service-applet-mii = ["nx-rt-nro?/service-applet-mii"]
 service-applet-nfp = ["nx-rt-nro?/service-applet-nfp"]
 service-applet-pctlauth = ["nx-rt-nro?/service-applet-pctlauth"]
 service-applet-psel = ["nx-rt-nro?/service-applet-psel"]
+service-bsd = ["dep:nx-service-bsd"]
 service-fs = ["dep:nx-service-fs", "nx-rt-nro?/service-fs"]
 service-hid = ["dep:nx-service-hid", "nx-rt-nro?/service-hid"]
 service-nv = ["dep:nx-service-nv", "nx-rt-nro?/service-nv"]
@@ -90,6 +94,10 @@ sys-mem = [
     "nx-rt-nro?/sys-virtmem",
     "nx-rt-nso?/sys-virtmem",
 ]
+# The socket driver, replacing libnx's socket.c: the "soc" device plus the BSD C API.
+# Forwards to `nx-rt-core`, which owns the one entry point whose interface
+# revision follows the running firmware.
+sys-net = ["dep:nx-sys-net", "sys-fd", "service-bsd", "nx-rt-core?/sys-net"]
 sys-sync = ["dep:nx-sys-sync"]
 # Forwards `sys-thread` to the runtime crate, on the same terms as `sys-mem`.
 sys-thread = ["dep:nx-sys-thread", "nx-rt-nro?/sys-thread", "nx-rt-nso?/sys-thread"]
@@ -114,6 +122,7 @@ nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true 
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
+nx-service-bsd = { version = "0.1.0", path = "../nx-service-bsd", optional = true }
 nx-service-sfdnsres = { version = "0.1.0", path = "../nx-service-sfdnsres", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm", optional = true }
 nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = true }
@@ -123,6 +132,7 @@ nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
 nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd", optional = true }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", optional = true }
+nx-sys-net = { version = "0.1.0", path = "../nx-sys-net", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync", optional = true }
 nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls", optional = true }
@@ -132,4 +142,4 @@ nx-wlaninf = { version = "0.1.0", path = "../nx-wlaninf", optional = true }
 
 # Feature-gated, linked via meson for FFI symbol re-export; not `use`d in Rust source.
 [package.metadata.cargo-machete]
-ignored = ["nx-service-fs", "nx-service-nv"]
+ignored = ["nx-service-bsd", "nx-service-fs", "nx-service-nv"]

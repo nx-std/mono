@@ -25,16 +25,37 @@ pub enum BsdServiceType {
 
 /// The configuration revision a client declares to the service.
 ///
-/// Two revisions have been observed in the wild and nothing branches on the
-/// value, so an enum costs nothing: a firmware that introduces a third would
-/// need a variant added, and that is an edit worth a human's attention rather
-/// than an integer slipping through.
+/// The revision tracks the firmware, and the service accepts any revision up to
+/// the one its own firmware introduced: a client that declares less than it
+/// could is speaking an older dialect the service still answers, which is why
+/// [`Self::V1`] is a safe default on every firmware rather than only the oldest.
+/// An enum rather than an integer because the set is closed and a firmware that
+/// introduces a tenth is an edit worth a human's attention.
+///
+/// Each variant names the firmware range it covers, and choosing one is the
+/// caller's job: this crate never derives a revision from a system version,
+/// because the crate that holds the system version is one it may not depend on.
+/// The ladder that maps one onto the other lives with the runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigVersion {
-    /// Observed on `[2.0.0+]`. The safe default.
+    /// Introduced before `[3.0.0]`. Accepted by every firmware, and the default.
     V1,
-    /// Observed on `[3.0.0+]`.
+    /// Introduced with `[3.0.0]`.
     V2,
+    /// Introduced with `[4.0.0]`.
+    V3,
+    /// Introduced with `[5.0.0]`.
+    V4,
+    /// Introduced with `[6.0.0]`.
+    V5,
+    /// Introduced with `[8.0.0]`.
+    V6,
+    /// Introduced with `[9.0.0]`.
+    V7,
+    /// Introduced with `[13.0.0]`.
+    V8,
+    /// Introduced with `[16.0.0]`. The latest revision this crate names.
+    V9,
 }
 
 impl ConfigVersion {
@@ -43,6 +64,13 @@ impl ConfigVersion {
         match self {
             Self::V1 => 1,
             Self::V2 => 2,
+            Self::V3 => 3,
+            Self::V4 => 4,
+            Self::V5 => 5,
+            Self::V6 => 6,
+            Self::V7 => 7,
+            Self::V8 => 8,
+            Self::V9 => 9,
         }
     }
 }
