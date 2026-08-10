@@ -1,0 +1,26 @@
+[package]
+name = "nx-sys-net"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_sys_net"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_sys_net FFI
+ffi = []
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-bsd = { version = "0.1.0", path = "../nx-service-bsd" }
+nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd" }
+thiserror = { version = "2.0.12", default-features = false }
+zerocopy = "0.8"

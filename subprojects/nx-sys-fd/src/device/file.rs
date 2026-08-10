@@ -7,6 +7,21 @@
 //! That is why the operations here take `&mut self` and the device's take `&self`: a file has a
 //! position and a session of its own, and the table proves exclusive access before calling in, so
 //! an implementation does not have to lock anything itself.
+//!
+//! ## Why a file is recoverable as its own type
+//!
+//! The operations below are the ones every device performs the same way, and a caller reaching one
+//! of them does not care which device is behind it. Some state is not like that: a socket layer
+//! stores the service's own descriptor in its file, and the free functions a C caller reaches
+//! (`send`, `bind`, `listen`, …) are not device operations at all — they need that descriptor back
+//! from a number the caller passed. Nothing generic can hand it over, because nothing generic knows
+//! it exists.
+//!
+//! So [`File`] requires [`Any`], which lets the device that produced a file downcast back to its
+//! own type through [`crate::table::with_file`]. The table stays ignorant of what it is holding;
+//! only the device that put it there can get anything device-specific out of it.
+
+use core::any::Any;
 
 use super::{
     error::DeviceError,
@@ -22,7 +37,10 @@ use super::{
 /// Every operation defaults to reporting [`DeviceError::Unsupported`], so an implementation writes
 /// only what it actually offers: a file opened read-only implements [`File::read`] and leaves
 /// [`File::write`] alone.
-pub trait File: Send {
+///
+/// [`Any`] is required so the device that produced a file can recover it as its own type; see the
+/// module documentation for why that is not a generic operation.
+pub trait File: Any + Send {
     /// Reads into `buf` from the current position, returning how many bytes were produced.
     ///
     /// Returning `Ok(0)` means end of file. A short read is not an error.

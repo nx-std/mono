@@ -41,4 +41,46 @@ pub enum DeviceError {
     /// path is malformed. Nothing was changed.
     #[error("The path is not valid for this operation")]
     InvalidPath,
+
+    /// The operation would have had to wait
+    ///
+    /// Occurs on a device set not to block, such as a non-blocking socket with nothing to receive.
+    /// Nothing was transferred and the call is meant to be retried, which is why it is separate
+    /// from [`Self::Io`]: a caller that reads it as a failure spins on an error that is not one.
+    #[error("Operation would block")]
+    WouldBlock,
+
+    /// The operation was cut short before it did anything
+    ///
+    /// Occurs when a wait was broken off. Nothing was transferred, and the C standard library
+    /// reports it as its own error number because callers routinely retry on it.
+    #[error("Operation was interrupted")]
+    Interrupted,
+
+    /// The peer is gone
+    ///
+    /// Occurs when the far end of a connection reset it or is no longer reachable. Distinguished
+    /// from [`Self::Io`] because it is the ordinary way a connection ends rather than a fault, and
+    /// callers branch on it to close their side.
+    #[error("Connection was reset by the peer")]
+    ConnectionReset,
+
+    /// There is no connection to operate on
+    ///
+    /// Occurs when an operation that needs an established connection runs on one that has none.
+    #[error("Not connected")]
+    NotConnected,
+
+    /// The caller may not do this
+    ///
+    /// Occurs when the device recognised the request and refused it on permission grounds.
+    #[error("Permission denied")]
+    PermissionDenied,
+
+    /// The operation ran out of time
+    ///
+    /// Occurs when the device gave the operation a deadline and it expired. How much was completed
+    /// is unknown, as with [`Self::Io`].
+    #[error("Operation timed out")]
+    TimedOut,
 }

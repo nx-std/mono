@@ -446,7 +446,20 @@ endif
 # `nx-net` depends on `nx-service-sfdnsres`, `nx-service-sm`, and the global
 # allocator internally; enabling `use_nx_net` pulls those crates in
 # transitively via Cargo and Meson's subproject graph.
+# The five resolver symbols that reach `sfdnsres` are overridden by
+# `nx-rt-core`, not here: acquiring that service needs the process's
+# service-manager session, and a process gets one, which the runtime holds.
+# That fragment is appended by `nx-rt-core`'s own override list, gated on this
+# option.
 if get_option('use_nx_net').enabled()
+    if not get_option('use_nx_rt').enabled()
+        error(
+            'use_nx_net=enabled requires -Duse_nx_rt=enabled (currently @0@): the runtime holds the service-manager session the resolver is acquired over, and without it the five service-touching symbols have no override'.format(
+                get_option('use_nx_rt'),
+            ),
+        )
+    endif
+
     nx_net_proj = subproject('nx-net')
 
     deps += nx_net_proj.get_variable('nx_net_dep')
@@ -454,6 +467,48 @@ if get_option('use_nx_net').enabled()
 
     debug('net feature: enabled')
     deps_cargo_features += ['net']
+endif
+
+# nx-sys-net
+# The socket driver. Depends on `nx-service-bsd` and `nx-sys-fd` internally;
+# enabling `use_nx_sys_net` pulls both in transitively via Cargo and Meson's
+# subproject graph.
+#
+# It requires `use_nx_sys_fd`: its sockets are held in that crate's descriptor
+# table, and with libsysbase's own table still live the `read`/`write`/`close`
+# a C caller makes would resolve there instead, against a table that has never
+# heard of the socket device.
+if get_option('use_nx_sys_net').enabled()
+    if not get_option('use_nx_sys_fd').enabled()
+        error(
+            'use_nx_sys_net=enabled requires -Duse_nx_sys_fd=enabled (currently @0@): socket descriptors live in the Rust descriptor table, and read/write/close on one only reach the socket device through it'.format(
+                get_option('use_nx_sys_fd'),
+            ),
+        )
+    endif
+
+    # `socketInitialize` is overridden by `nx-rt-core`, because the interface revision it
+    # declares follows the running firmware and only the runtime holds that. Without the
+    # runtime, libnx's own `socketInitialize` survives and brings up libnx's BSD client and
+    # devoptab instead of this driver, leaving two socket layers live over separate state.
+    if not get_option('use_nx_rt').enabled()
+        error(
+            'use_nx_sys_net=enabled requires -Duse_nx_rt=enabled (currently @0@): the runtime owns socketInitialize, and without it libnx brings up its own socket driver alongside this one'.format(
+                get_option('use_nx_rt'),
+            ),
+        )
+    endif
+
+    # `socketInitialize` is overridden by `nx-rt-core`, not here: its interface
+    # revision follows the running firmware, which only the runtime can read. That
+    # fragment is appended by `nx-rt-core`'s own override list, gated on this option.
+    nx_sys_net_proj = subproject('nx-sys-net')
+
+    deps += nx_sys_net_proj.get_variable('nx_sys_net_dep')
+    deps_override_link_args += ['-T', nx_sys_net_proj.get_variable('nx_sys_net_ld_override')]
+
+    debug('sys-net feature: enabled')
+    deps_cargo_features += ['sys-net']
 endif
 
 #---------------------------------------------------------------------------------

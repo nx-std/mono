@@ -58,7 +58,7 @@ pub use nx_service_sfdnsres::{
     NameInfo,
     ResolvedAddr,
 };
-use nx_service_sm::ConnectError as SmConnectError;
+use nx_service_sm::SmService;
 
 use super::{
     family::{
@@ -71,28 +71,22 @@ use super::{
     service::ServiceSpec,
 };
 
-/// Establishes a fresh `sfdnsres` resolver session.
+/// Acquires an `sfdnsres` resolver session over the service manager session `sm`.
 ///
-/// Performs the two-step Horizon handshake: connect to the service manager,
-/// then acquire the `sfdnsres` service from it. The transient service-manager
-/// session is dropped once the `sfdnsres` handle has been obtained — the
-/// returned [`SfdnsresService`] owns an independent session and does not
-/// depend on it.
+/// `sm` is borrowed rather than opened here: a process gets one service-manager
+/// session, and the runtime has taken it long before anything resolves a name.
+/// Opening a second does not get a second session — it fails, and it fails
+/// before `sfdnsres` has been asked for at all.
 ///
 /// The returned session is passed by reference to the per-operation resolver
 /// functions, which keeps session ownership with the caller.
-pub fn connect() -> Result<SfdnsresService, ConnectError> {
-    let sm = nx_service_sm::connect().map_err(ConnectError::ServiceManager)?;
-    nx_service_sfdnsres::connect_cmif(&sm).map_err(ConnectError::Service)
+pub fn connect(sm: &SmService) -> Result<SfdnsresService, ConnectError> {
+    nx_service_sfdnsres::connect_cmif(sm).map_err(ConnectError::Service)
 }
 
 /// Error returned when establishing the `sfdnsres` resolver connection.
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
-    /// The `sm:` service-manager handshake failed.
-    #[error("failed to connect to the service manager")]
-    ServiceManager(#[source] SmConnectError),
-
     /// Acquiring the `sfdnsres` session from the service manager failed.
     #[error("failed to connect to the sfdnsres service")]
     Service(#[source] ConnectCmifError),

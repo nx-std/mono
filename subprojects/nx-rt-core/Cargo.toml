@@ -16,19 +16,31 @@ bench = false
 # crate gates its result-code mapping on the feature, and only this crate's C
 # boundary calls `to_rc`. A pure-Rust consumer of `service-applet` compiles none
 # of it.
-ffi = ["nx-sf/ffi", "nx-service-applet?/ffi"]
+# `nx-sys-net?/ffi` arrives here for the same reason: only this crate's C boundary
+# calls the socket driver's C-shaped entry, and it is gated on that crate's own
+# `ffi` feature.
+ffi = ["nx-sf/ffi", "nx-net?/ffi", "nx-service-applet?/ffi", "nx-sys-net?/ffi"]
 # Application Manager (am) manager — gates the shared `services::applet`
 # applet handshake. Entry crates enable it and source the applet-type value.
 service-applet = ["dep:nx-service-applet"]
+# Name resolution — gates the five resolver symbols that reach `sfdnsres`, which
+# is acquired over the service-manager session this crate owns.
+net = ["dep:nx-net"]
+# Socket driver initialization — gates the one socket symbol whose interface
+# revision follows the running firmware, which only this crate can read.
+sys-net = ["dep:nx-service-bsd", "dep:nx-sys-net"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
+nx-net = { version = "0.1.0", path = "../nx-net", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
+nx-service-bsd = { version = "0.1.0", path = "../nx-service-bsd", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-net = { version = "0.1.0", path = "../nx-sys-net", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 thiserror = { version = "2", default-features = false }

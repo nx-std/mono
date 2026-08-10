@@ -89,6 +89,12 @@ ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_core_libnx_core.l
 if get_option('use_nx_service_applet').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_core_libnx_service_applet.ld'
 endif
+if get_option('use_nx_net').enabled()
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_core_libnx_net.ld'
+endif
+if get_option('use_nx_sys_net').enabled()
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_core_libnx_sys_net.ld'
+endif
 nx_rt_core_ld_overrides = ld_overrides
 
 nx_rt_core_dep = declare_dependency(

@@ -128,12 +128,15 @@ name = "nx-rt-core"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
+ "nx-net",
  "nx-panic-handler",
  "nx-service-applet",
+ "nx-service-bsd",
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-net",
  "nx-sys-sync",
  "nx-sys-thread-tls",
  "thiserror",
@@ -1520,6 +1523,7 @@ dependencies = [
  "nx-rt-nso",
  "nx-service-apm",
  "nx-service-applet",
+ "nx-service-bsd",
  "nx-service-fs",
  "nx-service-hid",
  "nx-service-nv",
@@ -1533,6 +1537,7 @@ dependencies = [
  "nx-svc",
  "nx-sys-fd",
  "nx-sys-mem",
+ "nx-sys-net",
  "nx-sys-sync",
  "nx-sys-thread",
  "nx-sys-thread-tls",
@@ -1581,6 +1586,21 @@ dependencies = [
  "nx-svc",
  "nx-sys-virtmem",
  "thiserror",
+]
+
+[[package]]
+name = "nx-sys-net"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-service-bsd",
+ "nx-service-sm",
+ "nx-sf",
+ "nx-std-sync",
+ "nx-sys-fd",
+ "thiserror",
+ "zerocopy",
 ]
 
 [[package]]

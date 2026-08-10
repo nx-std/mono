@@ -40,6 +40,8 @@ pub mod sys_mem {
         tmem::ffi as tmem,
     };
 }
+#[cfg(feature = "sys-net")]
+pub use nx_sys_net::ffi as sys_net;
 #[cfg(feature = "sys-sync")]
 pub use nx_sys_sync::ffi as sys_sync;
 #[cfg(feature = "sys-thread")]

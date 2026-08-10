@@ -313,3 +313,17 @@ option(
     description : 'Enable nx-net (idiomatic resolver API; replaces libnx resolver functions)',
     yield : true
 )
+
+option(
+    'use_nx_service_bsd',
+    type : 'feature', value : 'disabled', # Disable by default, WIP
+    description : 'Enable nx-service-bsd (BSD socket service IPC client)',
+    yield : true
+)
+
+option(
+    'use_nx_sys_net',
+    type : 'feature', value : 'disabled', # Disable by default, WIP
+    description : 'Enable nx-sys-net (socket driver; replaces the libnx socket driver and implies use_nx_service_bsd)',
+    yield : true
+)

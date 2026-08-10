@@ -98,10 +98,23 @@ bitflags::bitflags! {
     /// Only the flags that describe how a descriptor behaves are settable;
     /// the access mode and the open-time flags are fixed once the descriptor
     /// exists, so they have no place in a set built to be written back.
+    ///
+    /// # These are the service's numbers, not a C caller's
+    ///
+    /// The value below is the one the service reads, which is not the one the
+    /// C library on this platform uses for the same flag: the service numbers
+    /// non-blocking `0x800` and newlib numbers it `0x4000`. A layer facing C
+    /// therefore has to translate in both directions rather than pass the
+    /// caller's word through, exactly as it does for `errno`.
+    ///
+    /// Getting this wrong does not fail: the service accepts a word it does
+    /// not recognise, sets nothing, and reports the descriptor unchanged — so
+    /// a socket stays blocking while its owner believes otherwise, and the
+    /// first receive with nothing to read hangs instead of returning.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct StatusFlags: i32 {
         /// Operations return rather than blocking when they would have to
         /// wait. What a socket layer sets to drive a socket non-blocking.
-        const NONBLOCK = 0x0000_4000;
+        const NONBLOCK = 0x0000_0800;
     }
 }
