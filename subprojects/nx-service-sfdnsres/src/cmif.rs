@@ -193,8 +193,8 @@ pub fn get_host_by_name(
     let out: GetHostByNameOut = invoke(session, CMD_GET_HOST_BY_NAME, &input, |builder| {
         builder
             .with_send_pid()
-            .add_in_auto_buffer(InputBuffer::new(name_bytes, BufferMode::Normal))
-            .add_out_auto_buffer(OutputBuffer::new(&mut out_buffer, BufferMode::Normal))
+            .add_in_map_alias(InputBuffer::new(name_bytes, BufferMode::Normal))
+            .add_out_map_alias(OutputBuffer::new(&mut out_buffer, BufferMode::Normal))
     })?;
 
     Ok(GetHostByNameResult {
@@ -255,8 +255,8 @@ pub fn get_host_by_addr(
 
     let out: GetHostByAddrOut = invoke(session, CMD_GET_HOST_BY_ADDR, &input, |builder| {
         builder
-            .add_in_auto_buffer(InputBuffer::new(&octets[..addr_len], BufferMode::Normal))
-            .add_out_auto_buffer(OutputBuffer::new(&mut out_buffer, BufferMode::Normal))
+            .add_in_map_alias(InputBuffer::new(&octets[..addr_len], BufferMode::Normal))
+            .add_out_map_alias(OutputBuffer::new(&mut out_buffer, BufferMode::Normal))
     })?;
 
     Ok(GetHostByAddrResult {
@@ -324,10 +324,10 @@ pub fn get_addr_info(
     let out: GetAddrInfoOut = invoke(session, CMD_GET_ADDR_INFO, &input, |builder| {
         builder
             .with_send_pid()
-            .add_in_auto_buffer(InputBuffer::new(node_bytes, BufferMode::Normal))
-            .add_in_auto_buffer(InputBuffer::new(svc_bytes, BufferMode::Normal))
-            .add_in_auto_buffer(InputBuffer::new(&hints_buf, BufferMode::Normal))
-            .add_out_auto_buffer(OutputBuffer::new(&mut out_buffer, BufferMode::Normal))
+            .add_in_map_alias(InputBuffer::new(node_bytes, BufferMode::Normal))
+            .add_in_map_alias(InputBuffer::new(svc_bytes, BufferMode::Normal))
+            .add_in_map_alias(InputBuffer::new(&hints_buf, BufferMode::Normal))
+            .add_out_map_alias(OutputBuffer::new(&mut out_buffer, BufferMode::Normal))
     })?;
 
     let len = (out.serialized_size as usize).min(out_buffer.len());
@@ -375,9 +375,9 @@ pub fn get_name_info(
     let out: GetNameInfoOut = invoke(session, CMD_GET_NAME_INFO, &input, |builder| {
         builder
             .with_send_pid()
-            .add_in_auto_buffer(InputBuffer::new(&sockaddr, BufferMode::Normal))
-            .add_out_auto_buffer(OutputBuffer::new(&mut host, BufferMode::Normal))
-            .add_out_auto_buffer(OutputBuffer::new(&mut serv, BufferMode::Normal))
+            .add_in_map_alias(InputBuffer::new(&sockaddr, BufferMode::Normal))
+            .add_out_map_alias(OutputBuffer::new(&mut host, BufferMode::Normal))
+            .add_out_map_alias(OutputBuffer::new(&mut serv, BufferMode::Normal))
     })?;
 
     Ok(GetNameInfoResult {
@@ -449,6 +449,6 @@ fn string_error_impl(
     out_str: &mut [u8],
 ) -> Result<(), CommandError> {
     invoke(session, cmd_id, &err, |builder| {
-        builder.add_out_auto_buffer(OutputBuffer::new(out_str, BufferMode::Normal))
+        builder.add_out_map_alias(OutputBuffer::new(out_str, BufferMode::Normal))
     })
 }

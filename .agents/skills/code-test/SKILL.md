@@ -65,11 +65,48 @@ Network transfer via `cargo nx link`. See `/code-deploy` for prerequisites (Atmo
 
 **On deploy failure:** retry up to 3 times with a 10-second delay (Switch may not yet be on the network or nxlink not running).
 
-### Step 4 — verify results
+### Step 4 — read the results
 
-🚨 **MANDATORY**: Ask the user to confirm tests passed on the console.
+The harness records every case's verdict in a table (`g_test_results` in
+`source/harness.h`) precisely so the run can be read back afterwards. Prefer reading it:
 
-Test output is only visible on the Switch screen. **Do NOT assume tests passed.**
+```bash
+scripts/read-test-results.sh <console-ip> buildDir/subprojects/tests/<binary>.elf
+```
+
+It prints one line per case and a pass/fail tally. Run it any time after the suite has
+finished — it attaches over Atmosphère's GDB stub and reads memory, so there is no
+breakpoint and no race with the run.
+
+**Requires** `enable_standalone_gdbstub=u8!0x1` and `enable_htc=u8!0x0` in
+`atmosphere/config/system_settings.ini` (reboot after changing). Without the stub, fall
+back to asking the user.
+
+**Fallback — ask the user.** If the stub is unavailable or the script cannot find the
+module, ask the user to confirm what the console shows. **Never assume tests passed**:
+the result reaches you from the console or not at all.
+
+#### Why not read the console text
+
+The console has no text buffer to dump. libnx draws each character straight to the
+framebuffer through `renderer->drawChar`; `PrintConsole` holds a font, cursor, colours
+and dimensions and nothing else. Anything a test only `printf`s is unreadable
+afterwards — so a diagnostic worth capturing goes in a `volatile` global, not a print.
+
+#### Why the script works the way it does
+
+Three constraints shaped it, and each will bite anyone who reimplements it:
+
+- **The module base moves every launch.** ASLR relocates the NRO, so the script reads
+  `monitor get modules` each run rather than caching an address.
+- **`monitor` output goes to stderr.** Capturing it needs `2>&1`; discarding stderr
+  silently yields "module not loaded".
+- **The recording table must be `volatile`.** Nothing in the process reads it, so
+  without `volatile` the stores are dead and the whole array is optimised out of the
+  binary. Being `static` in a header, each translation unit also gets its own copy —
+  the script probes every copy and uses the one that recorded anything.
+
+This gdb build has no Python, so the address arithmetic is done in the shell.
 
 ## Test Architecture
 
@@ -78,6 +115,11 @@ Tests live in `subprojects/tests/`:
 - `source/harness.h` — test framework macros
 - `source/sync/` — synchronization primitive tests
 - `source/rand/` — RNG tests
+- `source/net/` — socket driver and resolver tests (own binary; brings up a network stack)
+
+Suites that need console state — a network, savedata, a particular firmware — report
+`TEST_SKIPPED` from `//* Given` rather than failing, since that state is a property of
+the console rather than of the code under test.
 
 C code links against the Rust crates to verify FFI correctness; the linker scripts (`*_override.ld`) redirect `libnx` symbols to the Rust implementations.
 
@@ -88,6 +130,8 @@ C code links against the Rust crates to verify FFI correctness; the linker scrip
 - Building `nx-tests.nro` without `use_nx=enabled` — the suite would link against libnx and not exercise the Rust replacements.
 - Assuming a deploy succeeded without on-console confirmation.
 - Skipping the NRO run on FFI-surface changes.
+- Reporting a suite as passing without either reading the result table or asking the user.
+- Putting a diagnostic in a `printf` and expecting to read it back — only recorded state survives the run.
 
 ## Pre-approved Commands
 
@@ -96,6 +140,7 @@ Runnable without user permission:
 - `just build-tests`
 - `just deploy <nro-path>`
 - `just reconfigure -Duse_nx=enabled`
+- `scripts/read-test-results.sh <ip> <elf>` — attaches read-only over the GDB stub and detaches.
 
 ## Related Skills
 

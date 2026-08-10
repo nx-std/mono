@@ -60,6 +60,57 @@ typedef void (*TestSuiteFn)(void);
     printf("\n" CONSOLE_CYAN "TEST SUITE:" CONSOLE_RESET " " suite_name "\n\n");
 
 /**
+ * @brief How many results the recording table holds.
+ *
+ * Larger than any suite in this workspace; a run that exceeds it stops
+ * recording rather than writing past the end, and the count says it did.
+ */
+#define TEST_RESULTS_CAPACITY 64
+
+/**
+ * @brief One recorded test result.
+ *
+ * The console draws its text straight to the framebuffer and keeps no copy, so
+ * a result that was only printed cannot be read back afterwards. Recording it
+ * here gives a debugger something to read out of memory once the run is over,
+ * with no need to catch the test as it happens.
+ */
+typedef struct {
+    /** The title passed to `TEST_CASE`. */
+    const char* title;
+    /** What the case returned. */
+    test_rc_t rc;
+} TestResult;
+
+/**
+ * @brief Every result the run has produced, in order.
+ *
+ * `volatile` because nothing in the process ever reads it: the only reader is a
+ * debugger attached afterwards, which the compiler cannot see. Without it the
+ * stores are dead and the whole array is optimised away, leaving a debugger
+ * with a symbol that is not in the binary.
+ */
+static volatile TestResult g_test_results[TEST_RESULTS_CAPACITY];
+
+/** @brief How many entries of `g_test_results` are filled. */
+static volatile int g_test_result_count = 0;
+
+/**
+ * @brief Records one result, ignoring anything past the table's capacity.
+ */
+static inline void test_record(const char* title, test_rc_t rc) {
+    const int at = g_test_result_count;
+    if (at < 0 || at >= TEST_RESULTS_CAPACITY) {
+        return;
+    }
+    g_test_results[at].title = title;
+    g_test_results[at].rc = rc;
+    // Written last, so a reader that catches the table mid-update sees a count
+    // covering only entries that are already complete.
+    g_test_result_count = at + 1;
+}
+
+/**
  * @brief Arguments for a test case thread.
  */
 typedef struct {
@@ -87,6 +138,7 @@ static int test_case_thread_func(void* arg) {
 #define XTEST_CASE(test_title, test_func) \
     { \
         printf(test_title ": " CONSOLE_YELLOW "SKIPPED" CONSOLE_RESET "\n"); \
+        test_record(test_title, TEST_SKIPPED); \
     }
 
 /**
@@ -114,6 +166,7 @@ static int test_case_thread_func(void* arg) {
             void* recv_value = NULL; \
             if (__nx_std_sync__oneshot_recv(receiver, &recv_value) == 0) { \
                 test_rc_t test_res = (test_rc_t)(intptr_t)recv_value; \
+                test_record(test_title, test_res); \
                 if (test_res == TEST_SUCCESS) { \
                     printf(CONSOLE_GREEN "OK" CONSOLE_RESET "\n"); \
                 } else if (test_res == TEST_TODO) { \

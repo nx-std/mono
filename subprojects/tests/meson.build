@@ -250,6 +250,14 @@ custom_target(name + '.nro',
 # the baseline to compare against.
 name = 'nx-tests-net'
 src = files(
+    'source/net/resolve/fixture.h',
+    'source/net/resolve/suite.h',
+    'source/net/resolve/test_0001_getaddrinfo_with_a_numeric_host_returns_that_address.c',
+    'source/net/resolve/test_0002_getaddrinfo_with_no_host_and_no_service_fails.c',
+    'source/net/resolve/test_0003_getnameinfo_describes_an_address.c',
+    'source/net/resolve/test_0004_gai_strerror_describes_every_code.c',
+    'source/net/resolve/test_0005_gethostbyname_with_a_numeric_host_returns_that_address.c',
+    'source/net/resolve/test_0006_getaddrinfo_resolves_a_public_name.c',
     'source/net/socket/fixture.h',
     'source/net/socket/suite.h',
     'source/net/socket/test_0001_socket_create_and_close_round_trips.c',
