@@ -30,10 +30,6 @@ deps += nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 nx_rt_core_proj = subproject('nx-rt-core')
 deps += nx_rt_core_proj.get_variable('nx_rt_core_dep')
 
-# nx-service-sm (always required — sm is the foundation for every other service)
-nx_service_sm_proj = subproject('nx-service-sm')
-deps += nx_service_sm_proj.get_variable('nx_service_sm_dep')
-
 # nx-sf (always required)
 nx_sf_proj = subproject('nx-sf')
 deps += nx_sf_proj.get_variable('nx_sf_dep')

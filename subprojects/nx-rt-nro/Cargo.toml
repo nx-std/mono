@@ -117,7 +117,6 @@ nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = tru
 nx-nv = { version = "0.1.0", path = "../nx-nv", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
-nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = true }
 nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
