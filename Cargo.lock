@@ -1563,6 +1563,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-std-path"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+]
+
+[[package]]
 name = "nx-std-sync"
 version = "0.1.0"
 dependencies = [
