@@ -130,98 +130,97 @@ fn resolve_hos_version() {
         return;
     }
 
-    #[cfg(feature = "service-set")]
-    {
-        use crate::services::set;
+    cfg_select! {
+        feature = "service-set" => {
+            use crate::services::set;
 
-        // Every failure below leaves the version unset, which is the outcome
-        // the doc comment describes, so none of them is reported.
-        if set::init().is_err() {
-            return;
-        }
-        if let Ok(fw) = set::firmware_version() {
-            hos_version::set(HosVersion::new(fw.major, fw.minor, fw.patch).as_u32());
-        }
-        set::exit();
-    }
-
-    #[cfg(not(feature = "service-set"))]
-    {
-        // The layout libnx writes into, from `SetSysFirmwareVersion` in
-        // `services/set.h`. Only the three version bytes are read; the rest is
-        // carried so the buffer is the 0x100 bytes the command fills.
-        #[repr(C)]
-        struct FirmwareVersion {
-            major: u8,
-            minor: u8,
-            micro: u8,
-            rest: [u8; 0xFD],
-        }
-
-        unsafe extern "C" {
-            fn setsysInitialize() -> u32;
-            fn setsysGetFirmwareVersion(out: *mut FirmwareVersion) -> u32;
-            fn setsysExit();
-        }
-
-        // SAFETY: the Service Manager is open, which is all `setsysInitialize`
-        // requires, and the out-pointer below addresses a live local.
-        unsafe {
-            if setsysInitialize() != 0 {
+            // Every failure below leaves the version unset, which is the outcome
+            // the doc comment describes, so none of them is reported.
+            if set::init().is_err() {
                 return;
             }
-
-            let mut fw = FirmwareVersion {
-                major: 0,
-                minor: 0,
-                micro: 0,
-                rest: [0; 0xFD],
-            };
-            if setsysGetFirmwareVersion(&raw mut fw) == 0 {
-                hos_version::set(HosVersion::new(fw.major, fw.minor, fw.micro).as_u32());
+            if let Ok(fw) = set::firmware_version() {
+                hos_version::set(HosVersion::new(fw.major, fw.minor, fw.patch).as_u32());
+            }
+            set::exit();
+        }
+        _ => {
+            // The layout libnx writes into, from `SetSysFirmwareVersion` in
+            // `services/set.h`. Only the three version bytes are read; the rest is
+            // carried so the buffer is the 0x100 bytes the command fills.
+            #[repr(C)]
+            struct FirmwareVersion {
+                major: u8,
+                minor: u8,
+                micro: u8,
+                rest: [u8; 0xFD],
             }
 
-            setsysExit();
+            unsafe extern "C" {
+                fn setsysInitialize() -> u32;
+                fn setsysGetFirmwareVersion(out: *mut FirmwareVersion) -> u32;
+                fn setsysExit();
+            }
+
+            // SAFETY: the Service Manager is open, which is all `setsysInitialize`
+            // requires, and the out-pointer below addresses a live local.
+            unsafe {
+                if setsysInitialize() != 0 {
+                    return;
+                }
+
+                let mut fw = FirmwareVersion {
+                    major: 0,
+                    minor: 0,
+                    micro: 0,
+                    rest: [0; 0xFD],
+                };
+                if setsysGetFirmwareVersion(&raw mut fw) == 0 {
+                    hos_version::set(HosVersion::new(fw.major, fw.minor, fw.micro).as_u32());
+                }
+
+                setsysExit();
+            }
         }
     }
 }
 
 /// Opens the Applet Manager session and performs the per-role handshake.
 fn init_applet() {
-    #[cfg(feature = "service-applet")]
-    {
-        if let Err(err) = crate::services::applet::init_from_env() {
-            panic!("startup: the Applet Manager failed to initialize: {err}");
+    cfg_select! {
+        feature = "service-applet" => {
+            if let Err(err) = crate::services::applet::init_from_env() {
+                panic!("startup: the Applet Manager failed to initialize: {err}");
+            }
         }
-    }
+        _ => {
+            unsafe extern "C" {
+                fn appletInitialize() -> u32;
+            }
 
-    #[cfg(not(feature = "service-applet"))]
-    {
-        unsafe extern "C" {
-            fn appletInitialize() -> u32;
-        }
-
-        // SAFETY: the Service Manager is open, which is what this requires.
-        let rc = unsafe { appletInitialize() };
-        if rc != 0 {
-            panic!("startup: the Applet Manager failed to initialize: {rc:#x}");
+            // SAFETY: the Service Manager is open, which is what this requires.
+            let rc = unsafe { appletInitialize() };
+            if rc != 0 {
+                panic!("startup: the Applet Manager failed to initialize: {rc:#x}");
+            }
         }
     }
 }
 
 /// Closes the Applet Manager session.
 fn exit_applet() {
-    #[cfg(feature = "service-applet")]
-    crate::services::applet::exit();
-
-    #[cfg(not(feature = "service-applet"))]
-    {
-        unsafe extern "C" {
-            fn appletExit();
+    cfg_select! {
+        feature = "service-applet" => {
+            crate::services::applet::exit();
         }
+        _ => {
+            unsafe extern "C" {
+                fn appletExit();
+            }
 
-        // SAFETY: teardown of a session this sequence opened.
-        unsafe { appletExit() };
+            // SAFETY: teardown of a session this sequence opened.
+            unsafe { appletExit() };
+        }
     }
 }
 
@@ -233,24 +232,23 @@ fn exit_applet() {
 /// block has no encoding for `None`: [`crate::env::applet_type`] cannot
 /// return one, so the branch could only ever go one way.
 fn init_hid() {
-    #[cfg(feature = "service-hid")]
-    {
-        if let Err(err) = crate::services::hid::init() {
-            panic!("startup: HID failed to initialize: {err}");
+    cfg_select! {
+        feature = "service-hid" => {
+            if let Err(err) = crate::services::hid::init() {
+                panic!("startup: HID failed to initialize: {err}");
+            }
         }
-    }
+        _ => {
+            unsafe extern "C" {
+                fn hidInitialize() -> u32;
+            }
 
-    #[cfg(not(feature = "service-hid"))]
-    {
-        unsafe extern "C" {
-            fn hidInitialize() -> u32;
-        }
-
-        // SAFETY: the Applet Manager is open, which HID reads the applet
-        // resource user id from.
-        let rc = unsafe { hidInitialize() };
-        if rc != 0 {
-            panic!("startup: HID failed to initialize: {rc:#x}");
+            // SAFETY: the Applet Manager is open, which HID reads the applet
+            // resource user id from.
+            let rc = unsafe { hidInitialize() };
+            if rc != 0 {
+                panic!("startup: HID failed to initialize: {rc:#x}");
+            }
         }
     }
 }
@@ -261,17 +259,18 @@ fn init_hid() {
 /// and that stays true here: closing a session that was never opened is a
 /// no-op, so the two do not need to agree.
 fn exit_hid() {
-    #[cfg(feature = "service-hid")]
-    crate::services::hid::exit();
-
-    #[cfg(not(feature = "service-hid"))]
-    {
-        unsafe extern "C" {
-            fn hidExit();
+    cfg_select! {
+        feature = "service-hid" => {
+            crate::services::hid::exit();
         }
+        _ => {
+            unsafe extern "C" {
+                fn hidExit();
+            }
 
-        // SAFETY: teardown of a session this sequence opened.
-        unsafe { hidExit() };
+            // SAFETY: teardown of a session this sequence opened.
+            unsafe { hidExit() };
+        }
     }
 }
 
@@ -281,89 +280,89 @@ fn exit_hid() {
 /// fatal in libnx either: the clock is left unanchored and the timezone unset,
 /// which costs a program that reads the wall clock and nothing else.
 fn init_time() {
-    #[cfg(feature = "service-time")]
-    {
-        use crate::services::time;
+    cfg_select! {
+        feature = "service-time" => {
+            use crate::services::time;
 
-        if let Err(err) = time::init() {
-            panic!("startup: Time failed to initialize: {err}");
-        }
-        // A clock that could not be anchored is the documented outcome of this
-        // failing, and there is no caller to report it to this early.
-        let _ = time::init_wall_clock();
-    }
-
-    #[cfg(not(feature = "service-time"))]
-    {
-        unsafe extern "C" {
-            fn timeInitialize() -> u32;
-            fn __libnx_init_time();
-        }
-
-        // SAFETY: the Service Manager is open, which is what these require.
-        unsafe {
-            let rc = timeInitialize();
-            if rc != 0 {
-                panic!("startup: Time failed to initialize: {rc:#x}");
+            if let Err(err) = time::init() {
+                panic!("startup: Time failed to initialize: {err}");
             }
-            __libnx_init_time();
+            // A clock that could not be anchored is the documented outcome of this
+            // failing, and there is no caller to report it to this early.
+            let _ = time::init_wall_clock();
+        }
+        _ => {
+            unsafe extern "C" {
+                fn timeInitialize() -> u32;
+                fn __libnx_init_time();
+            }
+
+            // SAFETY: the Service Manager is open, which is what these require.
+            unsafe {
+                let rc = timeInitialize();
+                if rc != 0 {
+                    panic!("startup: Time failed to initialize: {rc:#x}");
+                }
+                __libnx_init_time();
+            }
         }
     }
 }
 
 /// Closes the Time session.
 fn exit_time() {
-    #[cfg(feature = "service-time")]
-    crate::services::time::exit();
-
-    #[cfg(not(feature = "service-time"))]
-    {
-        unsafe extern "C" {
-            fn timeExit();
+    cfg_select! {
+        feature = "service-time" => {
+            crate::services::time::exit();
         }
+        _ => {
+            unsafe extern "C" {
+                fn timeExit();
+            }
 
-        // SAFETY: teardown of a session this sequence opened.
-        unsafe { timeExit() };
+            // SAFETY: teardown of a session this sequence opened.
+            unsafe { timeExit() };
+        }
     }
 }
 
 /// Opens the `fsp-srv` session every mount and every file is addressed inside.
 fn init_fs() {
-    #[cfg(feature = "service-fs")]
-    {
-        if let Err(err) = crate::services::fs::init() {
-            panic!("startup: the filesystem failed to initialize: {err}");
+    cfg_select! {
+        feature = "service-fs" => {
+            if let Err(err) = crate::services::fs::init() {
+                panic!("startup: the filesystem failed to initialize: {err}");
+            }
         }
-    }
+        _ => {
+            unsafe extern "C" {
+                fn fsInitialize() -> u32;
+            }
 
-    #[cfg(not(feature = "service-fs"))]
-    {
-        unsafe extern "C" {
-            fn fsInitialize() -> u32;
-        }
-
-        // SAFETY: the Service Manager is open, which is what this requires.
-        let rc = unsafe { fsInitialize() };
-        if rc != 0 {
-            panic!("startup: the filesystem failed to initialize: {rc:#x}");
+            // SAFETY: the Service Manager is open, which is what this requires.
+            let rc = unsafe { fsInitialize() };
+            if rc != 0 {
+                panic!("startup: the filesystem failed to initialize: {rc:#x}");
+            }
         }
     }
 }
 
 /// Closes the `fsp-srv` session, after every mount inside it is gone.
 fn exit_fs() {
-    #[cfg(feature = "service-fs")]
-    crate::services::fs::exit();
-
-    #[cfg(not(feature = "service-fs"))]
-    {
-        unsafe extern "C" {
-            fn fsExit();
+    cfg_select! {
+        feature = "service-fs" => {
+            crate::services::fs::exit();
         }
+        _ => {
+            unsafe extern "C" {
+                fn fsExit();
+            }
 
-        // SAFETY: teardown of a session this sequence opened, and every mount
-        // inside it was unmounted first.
-        unsafe { fsExit() };
+            // SAFETY: teardown of a session this sequence opened, and every mount
+            // inside it was unmounted first.
+            unsafe { fsExit() };
+        }
     }
 }
 
@@ -373,42 +372,42 @@ fn exit_fs() {
 /// inserted still runs a program that never touches one, and the mount failing
 /// is reported again by the first path that tries to resolve through it.
 fn mount_sdmc() {
-    #[cfg(feature = "service-fs")]
-    {
-        // Reporting this would abort a program that never touches the SD card, on a
-        // console where none is inserted. The failure is not lost: the first path that
-        // resolves through `sdmc:` reports it again, to a caller that can act on it.
-        let _ = nx_fsdev::mount::mount_sdmc();
-    }
-
-    #[cfg(not(feature = "service-fs"))]
-    {
-        unsafe extern "C" {
-            fn fsdevMountSdmc() -> u32;
+    cfg_select! {
+        feature = "service-fs" => {
+            // Reporting this would abort a program that never touches the SD card, on a
+            // console where none is inserted. The failure is not lost: the first path that
+            // resolves through `sdmc:` reports it again, to a caller that can act on it.
+            let _ = nx_fsdev::mount::mount_sdmc();
         }
+        _ => {
+            unsafe extern "C" {
+                fn fsdevMountSdmc() -> u32;
+            }
 
-        // Discarded for the reason above.
-        // SAFETY: the `fsp-srv` session is open, which is what this requires.
-        let _ = unsafe { fsdevMountSdmc() };
+            // Discarded for the reason above.
+            // SAFETY: the `fsp-srv` session is open, which is what this requires.
+            let _ = unsafe { fsdevMountSdmc() };
+        }
     }
 }
 
 /// Unmounts every filesystem, so no mount outlives the session holding it.
 fn unmount_all() {
-    #[cfg(feature = "service-fs")]
-    nx_fsdev::mount::unmount_all();
-
-    #[cfg(not(feature = "service-fs"))]
-    {
-        unsafe extern "C" {
-            fn fsdevUnmountAll() -> u32;
+    cfg_select! {
+        feature = "service-fs" => {
+            nx_fsdev::mount::unmount_all();
         }
+        _ => {
+            unsafe extern "C" {
+                fn fsdevUnmountAll() -> u32;
+            }
 
-        // A mount that failed to come down is one this call wanted gone anyway, and the
-        // process is exiting, so there is no caller left to report it to. The Rust arm
-        // above returns nothing for the same reason.
-        // SAFETY: teardown of the mounts this sequence made.
-        let _ = unsafe { fsdevUnmountAll() };
+            // A mount that failed to come down is one this call wanted gone anyway, and the
+            // process is exiting, so there is no caller left to report it to. The Rust arm
+            // above returns nothing for the same reason.
+            // SAFETY: teardown of the mounts this sequence made.
+            let _ = unsafe { fsdevUnmountAll() };
+        }
     }
 }
 

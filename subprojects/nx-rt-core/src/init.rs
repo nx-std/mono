@@ -36,18 +36,19 @@ pub fn setup_heap() {
 ///
 /// Reads no kind-specific fact, so every output kind runs the same one.
 pub fn setup_virtmem() {
-    #[cfg(feature = "sys-virtmem")]
-    nx_sys_virtmem::virtmem::lock().init();
-
-    #[cfg(not(feature = "sys-virtmem"))]
-    {
-        unsafe extern "C" {
-            fn virtmemSetup();
+    cfg_select! {
+        feature = "sys-virtmem" => {
+            nx_sys_virtmem::virtmem::lock().init();
         }
+        _ => {
+            unsafe extern "C" {
+                fn virtmemSetup();
+            }
 
-        // SAFETY: no other thread exists yet, which is the only thing this
-        // step requires.
-        unsafe { virtmemSetup() };
+            // SAFETY: no other thread exists yet, which is the only thing this
+            // step requires.
+            unsafe { virtmemSetup() };
+        }
     }
 }
 
@@ -57,20 +58,19 @@ pub fn setup_virtmem() {
 /// Reads no kind-specific fact: which thread the process started on is a
 /// kernel argument every output kind receives.
 pub fn init_main_thread() {
-    #[cfg(feature = "sys-thread")]
-    {
-        // SAFETY: this is the main thread, the heap is up, and no other thread
-        // API has run yet.
-        unsafe { nx_sys_thread::thread::init_main_thread() };
-    }
-
-    #[cfg(not(feature = "sys-thread"))]
-    {
-        unsafe extern "C" {
-            fn __libnx_init_thread();
+    cfg_select! {
+        feature = "sys-thread" => {
+            // SAFETY: this is the main thread, the heap is up, and no other
+            // thread API has run yet.
+            unsafe { nx_sys_thread::thread::init_main_thread() };
         }
+        _ => {
+            unsafe extern "C" {
+                fn __libnx_init_thread();
+            }
 
-        // SAFETY: as above.
-        unsafe { __libnx_init_thread() };
+            // SAFETY: as above.
+            unsafe { __libnx_init_thread() };
+        }
     }
 }
