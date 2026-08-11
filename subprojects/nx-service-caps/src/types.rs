@@ -1,8 +1,8 @@
 //! Shared capture-service wire-layout types.
 
-// `modular_bitfield`'s generated code trips both lints; the same suppression
+// `modular_bitfield`'s generated code trips the lint; the same suppression
 // sits at the top of `nx-service-capsdc`'s wire types for the same reason.
-#![expect(unused_parens, clippy::identity_op)]
+#![expect(clippy::identity_op)]
 
 use modular_bitfield::prelude::*;
 use static_assertions::const_assert_eq;

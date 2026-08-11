@@ -1,10 +1,9 @@
 //! Wire-layout types for the PGL service.
 
 #![expect(
-    unused_parens,
     clippy::identity_op,
-    reason = "the `#[bitfield]` accessors compute each field's bit offset as a parenthesised `0 + ..` sum, \
-              so both lints fire inside generated code this module does not write"
+    reason = "the `#[bitfield]` accessors compute each field's bit offset as a `0 + ..` sum, \
+              so the lint fires inside generated code this module does not write"
 )]
 
 use modular_bitfield::specifiers::B5;

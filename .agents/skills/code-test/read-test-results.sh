@@ -24,8 +24,12 @@ NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm
 # Static offsets of the table and its count, as linked.
 # `harness.h` declares the table and each binary's `main.c` defines it exactly
 # once via `TEST_RESULTS_STORAGE`, so there is one address to find.
-COUNT_OFF=$("$NM" "$ELF" | awk '$3=="g_test_result_count"{print "0x"$1; exit}')
-TABLE_OFF=$("$NM" "$ELF" | awk '$3=="g_test_results"{print "0x"$1; exit}')
+# The symbol table is read once and filtered in-process: `awk` exits at the
+# first match, and closing the pipe under it would kill `nm` with SIGPIPE and
+# trip `pipefail` before anything is printed.
+SYMS=$("$NM" "$ELF")
+COUNT_OFF=$(awk '$3=="g_test_result_count"{print "0x"$1; exit}' <<<"$SYMS")
+TABLE_OFF=$(awk '$3=="g_test_results"{print "0x"$1; exit}' <<<"$SYMS")
 [ -n "$COUNT_OFF" ] && [ -n "$TABLE_OFF" ] || {
   echo "$(basename "$ELF") records no results — is it a harness-based suite built from this tree?" >&2
   exit 1
@@ -50,7 +54,7 @@ case "$PROBE" in
     exit 1
     ;;
 esac
-PID=$(printf '%s\n' "$PROBE" | awk '/hbloader/{print $1; exit}')
+PID=$(awk '/hbloader/{print $1; exit}' <<<"$PROBE")
 [ -n "$PID" ] || { echo "hbloader is not running — launch hbmenu or an NRO first" >&2; exit 1; }
 
 cat > "$TMP/mods.gdb" <<EOF
@@ -67,8 +71,11 @@ EOF
 # The module is named after the ELF being read, so a caller pointing at one
 # binary never picks up another's base by accident.
 MODULE=$(basename "$ELF")
-BASE=$("${GDB[@]}" "$TMP/mods.gdb" 2>&1 || true \
-  | awk -v m="$MODULE" 'index($0, m){print $1; exit}')
+# `|| true` binds tighter than the pipe, so extracting the base has to be a
+# separate step: `cmd || true | awk` reads as `cmd || (true | awk)` and leaves
+# the whole gdb transcript in `BASE`.
+MODS=$("${GDB[@]}" "$TMP/mods.gdb" 2>&1 || true)
+BASE=$(awk -v m="$MODULE" 'index($0, m){print $1; exit}' <<<"$MODS")
 [ -n "$BASE" ] || { echo "$MODULE is not loaded on the console" >&2; exit 1; }
 
 COUNT_ADDR=$(printf '0x%x' $(( BASE + COUNT_OFF )))
@@ -92,7 +99,8 @@ detach
 disconnect
 EOF
 
-"${GDB[@]}" "$TMP/read.gdb" 2>&1 | awk '
+READ_OUT=$("${GDB[@]}" "$TMP/read.gdb" 2>&1 || true)
+awk '
   /^COUNT/ { total = $2; next }
   /^RESULT/ {
     rc = $2
@@ -108,4 +116,4 @@ EOF
   }
   END {
     printf "\n%d recorded, %d failed\n", total, failed + 0
-  }'
+  }' <<<"$READ_OUT"

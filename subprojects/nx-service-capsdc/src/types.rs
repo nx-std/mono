@@ -1,6 +1,6 @@
 //! JPEG decoder wire-layout types.
 
-#![expect(unused_parens, clippy::identity_op)]
+#![expect(clippy::identity_op)]
 
 use modular_bitfield::prelude::*;
 use static_assertions::const_assert_eq;
