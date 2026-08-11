@@ -29,16 +29,32 @@ pub static mut __nx_rt_nso__libnx_system_argv: *mut *mut c_char =
 /// Must be called after the global allocator is initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nso__libnx_argv_setup() {
-    unsafe { argv::setup() }
+    // SAFETY: the caller guarantees the allocator is up, which is what the
+    // parse and the publication below both require.
+    unsafe {
+        argv::setup();
+        publish();
+    }
 }
 
-/// Publishes the C-style argc/argv globals.
+/// Points the C-facing globals at the parsed command line.
+///
+/// The startup sequence calls this too. The parse and the publication are
+/// separate steps so that the module holding the parsed arguments does not
+/// have to reach up into this one to announce them.
 ///
 /// # Safety
 ///
-/// Only called from `argv::setup()` with `argc`/`argv` describing the leaked
-/// argument allocation owned by `nx_rt_core::argv`.
-pub(crate) unsafe fn set_system_argv(argc: i32, argv: *mut *mut c_char) {
+/// The arguments must already be parsed, which is what leaves something to
+/// publish; calling it beforehand leaves the globals as they were.
+pub(crate) unsafe fn publish() {
+    let Some((argc, argv)) = nx_rt_core::argv::system_argv() else {
+        return;
+    };
+
+    // SAFETY: argc/argv describe the leaked argument allocation owned by
+    // `nx_rt_core::argv`, which lives for the rest of the program, and the
+    // startup thread is the only one running.
     unsafe {
         __nx_rt_nso__libnx_system_argc = argc;
         __nx_rt_nso__libnx_system_argv = argv;

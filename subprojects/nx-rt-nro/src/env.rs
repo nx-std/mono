@@ -76,6 +76,10 @@ const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
 /// arguments in their own right, so they are recorded either way and the rest
 /// of startup runs on the defaults.
 ///
+/// Parsing is all this does. Publishing the parsed applet type to the C-facing
+/// global is the caller's step, because that global belongs to the C boundary
+/// and this module sits below it.
+///
 /// # Safety
 ///
 /// `ctx`, when present, must point to a valid `ConfigEntry` array terminated
@@ -185,16 +189,4 @@ pub unsafe fn setup(
             }
         }
     });
-
-    // Publish the parsed applet type to the C-facing global that code left in
-    // the link reads directly. It sits here rather than in the `envSetup`
-    // override so both callers carry it: that override, and the startup
-    // sequence in [`crate::init`].
-    //
-    // The global is unsigned because the C declaration is, so `Default` (-1)
-    // arrives there as `0xFFFF_FFFF`. That is the bit pattern C reads back and
-    // compares against its own -1, so the reinterpretation is the interchange
-    // format rather than a loss.
-    #[cfg(feature = "ffi")]
-    crate::ffi::set_applet_type(applet_type().as_raw() as u32);
 }

@@ -21,33 +21,32 @@ use crate::env;
 
 /// Sets up argv parsing.
 ///
-/// This function can be called multiple times safely — initialization only
-/// happens once. Subsequent calls are no-ops.
+/// This function can be called multiple times safely: initialization only
+/// happens once, and subsequent calls are no-ops.
+///
+/// Parsing is all this does. Publishing the result to the C-facing globals is
+/// the caller's step, because the globals belong to the C boundary and this
+/// module sits below it; a module that reached up into its own crate's `ffi`
+/// to announce itself would make the two depend on each other.
+///
+/// Returns the nxlink host address the loader appended, when it appended one.
 ///
 /// # Safety
 ///
 /// Must be called after the global allocator is initialized.
-pub unsafe fn setup() {
+pub unsafe fn setup() -> Option<u32> {
     // A homebrew NRO sources its arguments from the loader configuration.
     // SAFETY: called during initialization, after the allocator is up.
-    let args_str = match unsafe { get_nro_args() } {
-        Some(args_str) => args_str,
-        None => return, // No arguments available.
-    };
+    // No arguments available.
+    let args_str = unsafe { get_nro_args() }?;
 
     // Strip the homebrew-only nxlink host suffix before the shared scanner
     // sees the string.
-    let args_str = strip_nxlink_suffix(args_str);
+    let (args_str, nxlink_host) = strip_nxlink_suffix(args_str);
 
     nx_rt_core::argv::setup_from(args_str);
 
-    // Publish the C-style argc/argv globals for C consumers.
-    #[cfg(feature = "ffi")]
-    if let Some((argc, argv)) = nx_rt_core::argv::system_argv() {
-        // SAFETY: argc/argv describe the leaked argument allocation owned by
-        // `nx_rt_core::argv`, which lives for the rest of the program.
-        unsafe { crate::ffi::set_system_argv(argc, argv) };
-    }
+    nxlink_host
 }
 
 /// Reads the NRO command-line arguments from the homebrew loader config.
@@ -74,13 +73,17 @@ unsafe fn get_nro_args() -> Option<&'static str> {
 }
 
 /// Strips the trailing `XXXXXXXX_NXLINK_` token nxlink appends to the argument
-/// string, recording the host address through the FFI surface.
+/// string.
 ///
-/// Returns the argument string with the suffix removed, or unchanged when no
-/// well-formed nxlink token is present. The token is the last
-/// whitespace-delimited word — 8 hexadecimal digits followed by the
-/// `_NXLINK_` marker — and is stripped only when a real argument precedes it.
-fn strip_nxlink_suffix(args: &str) -> &str {
+/// Returns the argument string with the suffix removed and the host address it
+/// carried, or the string unchanged and `None` when no well-formed nxlink
+/// token is present. The token is the last whitespace-delimited word: 8
+/// hexadecimal digits followed by the `_NXLINK_` marker, stripped only when a
+/// real argument precedes it.
+///
+/// The host is handed back rather than published from here, so that this
+/// module does not have to reach into the crate's C boundary to announce it.
+fn strip_nxlink_suffix(args: &str) -> (&str, Option<u32>) {
     /// Marker that terminates the nxlink token, after the 8-hex-digit host.
     const NXLINK_MARKER: &str = "_NXLINK_";
     /// Full nxlink token length: 8 hexadecimal digits plus the marker.
@@ -89,21 +92,19 @@ fn strip_nxlink_suffix(args: &str) -> &str {
     // nxlink appends the host as the last whitespace-delimited token; with no
     // separator there is no real argument before it, so leave `args` alone.
     let Some((rest, token)) = args.trim_end().rsplit_once(char::is_whitespace) else {
-        return args;
+        return (args, None);
     };
     // nxlink only appends its host alongside real arguments; if nothing
     // precedes the token, treat it as an ordinary argument.
     if rest.trim().is_empty() {
-        return args;
+        return (args, None);
     }
     if token.len() != NXLINK_TOKEN_LEN || !token.ends_with(NXLINK_MARKER) {
-        return args;
+        return (args, None);
     }
     // The token's first 8 characters are the hexadecimal host address.
-    let Ok(_host) = u32::from_str_radix(&token[..8], 16) else {
-        return args;
+    let Ok(host) = u32::from_str_radix(&token[..8], 16) else {
+        return (args, None);
     };
-    #[cfg(feature = "ffi")]
-    crate::ffi::set_nxlink_host(_host);
-    rest
+    (rest, Some(host))
 }

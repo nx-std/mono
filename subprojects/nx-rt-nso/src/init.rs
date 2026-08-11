@@ -73,6 +73,12 @@ pub unsafe fn init(main_thread: ThreadHandle) {
     // SAFETY: the heap is up, which is what the argument scanner allocates
     // from, and no other thread exists to race the parse.
     unsafe { argv::setup() };
+    #[cfg(feature = "ffi")]
+    // SAFETY: the arguments were just parsed, which is what leaves something
+    // to publish.
+    unsafe {
+        crate::ffi::libnx::publish_argv()
+    };
 
     // SAFETY: the runtime is up, which is the state the service bring-up
     // expects, and it runs once.

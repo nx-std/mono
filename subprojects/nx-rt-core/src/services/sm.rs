@@ -45,8 +45,16 @@ pub const MAX_OVERRIDES: usize = 32;
 static SM_SESSION: RwLock<Option<SmService>> = RwLock::new(None);
 
 /// Static override table.
-#[allow(clippy::declare_interior_mutable_const)]
 static OVERRIDES: [OnceLock<Override>; MAX_OVERRIDES] = {
+    // The table is fixed-size and every slot starts empty, so the array is
+    // built by repeating one empty cell. Repeating a `const` is the only way
+    // to write that for a type without `Copy`, and the interior mutability the
+    // lint warns about is the point: each slot is filled at most once, later,
+    // through `OnceLock`.
+    #[expect(
+        clippy::declare_interior_mutable_const,
+        reason = "the const is a template for array repetition, never read as a value"
+    )]
     const INIT: OnceLock<Override> = OnceLock::new();
     [INIT; MAX_OVERRIDES]
 };

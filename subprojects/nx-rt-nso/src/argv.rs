@@ -44,14 +44,6 @@ pub unsafe fn setup() {
     };
 
     nx_rt_core::argv::setup_from(args_str);
-
-    // Publish the C-style argc/argv globals for C consumers.
-    #[cfg(feature = "ffi")]
-    if let Some((argc, argv)) = nx_rt_core::argv::system_argv() {
-        // SAFETY: argc/argv describe the leaked argument allocation owned by
-        // `nx_rt_core::argv`, which lives for the rest of the program.
-        unsafe { crate::ffi::set_system_argv(argc, argv) };
-    }
 }
 
 /// Reads the NSO command-line arguments from the `__argdata__` region.

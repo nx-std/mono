@@ -49,11 +49,11 @@ mod time;
 #[cfg(feature = "service-vi")]
 mod vi;
 
-// Called by argv::setup() after parsing argv from loader config
-pub(crate) use self::argv::set_system_argv;
-// Called by env::setup() once the loader config's applet type is parsed, and
-// by argv::strip_nxlink_suffix() when the _NXLINK_ suffix is detected.
-pub(crate) use self::env::{
-    set_applet_type,
-    set_nxlink_host,
+// The startup sequence parses the environment and the command line, then
+// calls these to point the C-facing globals at what it parsed. The parse and
+// the publication are separate so that the modules holding the parsed values
+// do not have to reach into this one.
+pub(crate) use self::{
+    argv::publish as publish_argv,
+    env::publish_applet_type,
 };

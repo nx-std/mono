@@ -72,6 +72,8 @@ pub unsafe fn init(
     // this runs once on the startup thread before anything reads back the
     // environment it fills.
     unsafe { env::setup(ctx, main_thread, saved_lr) };
+    #[cfg(feature = "ffi")]
+    crate::ffi::libnx::publish_applet_type();
 
     // SAFETY: the environment is parsed, so the main thread's handle is known,
     // and no thread-local has been touched yet.
@@ -83,7 +85,13 @@ pub unsafe fn init(
 
     // SAFETY: the heap is up, which is what the argument scanner allocates
     // from, and no other thread exists to race the parse.
-    unsafe { argv::setup() };
+    let _nxlink_host = unsafe { argv::setup() };
+    #[cfg(feature = "ffi")]
+    // SAFETY: the arguments were just parsed, which is what leaves something
+    // to publish.
+    unsafe {
+        crate::ffi::libnx::publish_argv(_nxlink_host)
+    };
 
     app::init();
 
