@@ -25,13 +25,13 @@
 //! holding it lives in the table until the descriptor is closed.
 
 use alloc::boxed::Box;
-use core::ffi::CStr;
 
 use nx_service_bsd::{
     BsdSockFd,
     CommandError,
     PosixError,
 };
+use nx_std_path::Path;
 use nx_sys_fd::{
     device::{
         Device,
@@ -52,7 +52,7 @@ use crate::{
 };
 
 /// The name paths resolve through, and the name the registry knows this device by.
-const DEVICE_NAME: &CStr = c"soc";
+const DEVICE_NAME: &str = "soc";
 
 /// The device every socket descriptor is opened against.
 ///
@@ -65,7 +65,7 @@ pub struct SocDevice;
 static SOC_DEVICE: SocDevice = SocDevice;
 
 impl Device for SocDevice {
-    fn name(&self) -> &'static CStr {
+    fn name(&self) -> &'static str {
         DEVICE_NAME
     }
 
@@ -74,7 +74,7 @@ impl Device for SocDevice {
     /// The service has a small namespace of its own — the packet filter, and the like — that is
     /// reached by path rather than by protocol. An ordinary socket does not come through here; it
     /// comes from `socket()`, which has no path to resolve.
-    fn open(&self, path: &CStr, flags: OpenFlags) -> Result<Box<dyn File>, DeviceError> {
+    fn open(&self, path: &Path, flags: OpenFlags) -> Result<Box<dyn File>, DeviceError> {
         let sock = session::with_service(|svc| svc.open(path, open_flags_to_wire(flags)))
             .map_err(|_| DeviceError::Io)?
             .map_err(to_device_error)?;

@@ -46,6 +46,17 @@
 //! Every operation on all three traits has a default that reports [`DeviceError::Unsupported`], so
 //! an implementation writes only what it actually offers, and a caller reaching for the rest gets a
 //! clean refusal rather than a stub that lies.
+//!
+//! ## Paths are `&Path`
+//!
+//! A device is handed a [`Path`], never a nul-terminated C string. The C standard library passes
+//! paths as `*const c_char`, and the boundary in [`crate::ffi`] is where one becomes the other: it
+//! borrows the bytes between the pointer and its terminator, and nothing past that point carries a
+//! terminator it did not ask for.
+//!
+//! A [`Path`] holds bytes rather than text, so a name that is not UTF-8 reaches the filesystem as
+//! its caller wrote it. The encoding is never checked, here or below, because nothing on this route
+//! has business refusing a name Horizon itself accepts.
 
 mod dir;
 mod error;
@@ -53,7 +64,8 @@ mod file;
 mod metadata;
 
 use alloc::boxed::Box;
-use core::ffi::CStr;
+
+use nx_std_path::Path;
 
 pub use self::{
     dir::{
@@ -84,7 +96,7 @@ pub use self::{
 /// descriptor needs lives in the [`File`] or [`Dir`] the device produces.
 pub trait Device: Sync {
     /// Name this device is reached by, as the prefix of a path such as `"sdmc:/file"`.
-    fn name(&self) -> &'static CStr;
+    fn name(&self) -> &'static str;
 
     /// Opens `path`, producing the object that will serve the descriptor.
     ///
@@ -96,7 +108,7 @@ pub trait Device: Sync {
     /// [`DeviceError::NotFound`] when the entry does not exist and `flags` did not ask to create
     /// it, [`DeviceError::AlreadyExists`] when it exists and `flags` demanded it did not, and
     /// [`DeviceError::Io`] when opening failed.
-    fn open(&self, path: &CStr, flags: OpenFlags) -> Result<Box<dyn File>, DeviceError> {
+    fn open(&self, path: &Path, flags: OpenFlags) -> Result<Box<dyn File>, DeviceError> {
         let _ = (path, flags);
         Err(DeviceError::Unsupported)
     }
@@ -140,7 +152,7 @@ pub trait Device: Sync {
     /// Returns [`DeviceError::Unsupported`] when the device has no directories,
     /// [`DeviceError::NotFound`] when the path names nothing, [`DeviceError::InvalidPath`] when it
     /// names a file, and [`DeviceError::Io`] when opening failed.
-    fn open_dir(&self, path: &CStr) -> Result<Box<dyn Dir>, DeviceError> {
+    fn open_dir(&self, path: &Path) -> Result<Box<dyn Dir>, DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
@@ -152,7 +164,7 @@ pub trait Device: Sync {
     /// Returns [`DeviceError::Unsupported`] when the device reports nothing about its entries,
     /// [`DeviceError::NotFound`] when the path names nothing, and [`DeviceError::Io`] when the
     /// query failed.
-    fn metadata(&self, path: &CStr) -> Result<Metadata, DeviceError> {
+    fn metadata(&self, path: &Path) -> Result<Metadata, DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
@@ -164,7 +176,7 @@ pub trait Device: Sync {
     /// Returns [`DeviceError::Unsupported`] when the device is read-only,
     /// [`DeviceError::NotFound`] when the path names nothing, [`DeviceError::InvalidPath`] when it
     /// names a directory, and [`DeviceError::Io`] when the removal failed.
-    fn remove_file(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn remove_file(&self, path: &Path) -> Result<(), DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
@@ -176,7 +188,7 @@ pub trait Device: Sync {
     /// Returns [`DeviceError::Unsupported`] when the device is read-only,
     /// [`DeviceError::AlreadyExists`] when something is already there, and [`DeviceError::Io`] when
     /// the creation failed.
-    fn create_dir(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn create_dir(&self, path: &Path) -> Result<(), DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
@@ -189,7 +201,7 @@ pub trait Device: Sync {
     /// [`DeviceError::NotFound`] when the path names nothing, [`DeviceError::InvalidPath`] when it
     /// names a file or a directory that is not empty, and [`DeviceError::Io`] when the removal
     /// failed.
-    fn remove_dir(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn remove_dir(&self, path: &Path) -> Result<(), DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
@@ -204,7 +216,7 @@ pub trait Device: Sync {
     /// Returns [`DeviceError::Unsupported`] when the device is read-only,
     /// [`DeviceError::NotFound`] when `from` names nothing, [`DeviceError::AlreadyExists`] when
     /// `to` is occupied, and [`DeviceError::Io`] when the move failed.
-    fn rename(&self, from: &CStr, to: &CStr) -> Result<(), DeviceError> {
+    fn rename(&self, from: &Path, to: &Path) -> Result<(), DeviceError> {
         let _ = (from, to);
         Err(DeviceError::Unsupported)
     }
@@ -216,7 +228,7 @@ pub trait Device: Sync {
     /// Returns [`DeviceError::Unsupported`] when the device has no working directory,
     /// [`DeviceError::NotFound`] when the path names nothing, [`DeviceError::InvalidPath`] when it
     /// names a file, and [`DeviceError::Io`] when the change failed.
-    fn set_current_dir(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn set_current_dir(&self, path: &Path) -> Result<(), DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
@@ -227,7 +239,7 @@ pub trait Device: Sync {
     ///
     /// Returns [`DeviceError::Unsupported`] when the device does not measure space, or
     /// [`DeviceError::Io`] when the query failed.
-    fn space_info(&self, path: &CStr) -> Result<SpaceInfo, DeviceError> {
+    fn space_info(&self, path: &Path) -> Result<SpaceInfo, DeviceError> {
         let _ = path;
         Err(DeviceError::Unsupported)
     }
