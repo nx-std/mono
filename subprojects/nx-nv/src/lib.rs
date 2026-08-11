@@ -38,22 +38,36 @@
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
+pub mod graphic_buffer;
 pub mod map;
 
-pub use self::map::{
-    AdoptMapError,
-    BorrowedMapDevice,
-    CacheAttrError,
-    CreateMapError,
-    MapAlign,
-    MapAlignError,
-    MapBuffer,
-    MapBufferError,
-    MapHandle,
-    MapId,
-    MapKind,
-    MemoryMap,
-    NvMapDevice,
-    OpenError,
-    PAGE_SIZE,
+pub use self::{
+    graphic_buffer::{
+        ColorFormat,
+        GraphicBuffer,
+        GraphicBufferParams,
+        Layout,
+        ScanFormat,
+        Surface,
+        USAGE_HW_COMPOSER,
+        USAGE_HW_RENDER,
+        USAGE_HW_TEXTURE,
+    },
+    map::{
+        AdoptMapError,
+        BorrowedMapDevice,
+        CacheAttrError,
+        CreateMapError,
+        MapAlign,
+        MapAlignError,
+        MapBuffer,
+        MapBufferError,
+        MapHandle,
+        MapId,
+        MapKind,
+        MemoryMap,
+        NvMapDevice,
+        OpenError,
+        PAGE_SIZE,
+    },
 };
