@@ -26,8 +26,11 @@
 
 #![no_std]
 
+extern crate alloc;
+extern crate nx_alloc; // proves a #[global_allocator] exists at link time
 extern crate nx_panic_handler; // provides #[panic_handler]
 
+pub mod framebuffer;
 pub mod native_window;
 
 pub use self::native_window::{

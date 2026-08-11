@@ -57,6 +57,9 @@ dependencies = [
 name = "nx-display"
 version = "0.1.0"
 dependencies = [
+ "nx-alloc",
+ "nx-cpu",
+ "nx-nv",
  "nx-panic-handler",
  "nx-service-vi",
  "nx-sf",

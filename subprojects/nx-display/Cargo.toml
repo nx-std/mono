@@ -11,6 +11,9 @@ doctest = false
 bench = false
 
 [dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
+nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
+nx-nv = { version = "0.1.0", path = "../nx-nv" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-vi = { version = "0.1.0", path = "../nx-service-vi" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
