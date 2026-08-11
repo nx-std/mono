@@ -179,10 +179,10 @@ _ensure-configured:
 meson-compile *TARGETS: _ensure-configured
     meson compile -C {{builddir}} {{TARGETS}}
 
-# Build the nx-tests NRO (Switch homebrew test executable)
+# Build the nx-tests loader NRO and every test suite NRO
 [group: 'build']
 build-tests: _ensure-configured
-    meson compile -C {{builddir}} nx-tests.nro
+    meson compile -C {{builddir}} nx-tests.nro nx-tests-rand.nro nx-tests-rt.nro nx-tests-thread.nro nx-tests-sync.nro nx-tests-fs.nro nx-tests-net.nro nx-tests-applet-album.nro nx-tests-applet-err.nro
 
 # List all build targets (meson introspect --targets)
 [group: 'build']

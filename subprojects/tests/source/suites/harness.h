@@ -6,6 +6,7 @@
 #include <inttypes.h>
 
 #include "nx_sync_oneshot.h"
+#include "tap.h"
 
 /**
  * @brief The result code for a test case.
@@ -55,9 +56,11 @@ typedef void (*TestSuiteFn)(void);
  * Test suite declaration.
  *
  * @param suite_name The name of the test suite.
+ *
+ * A group of cases is not something the protocol has, so it is reported as a
+ * comment: a reader that groups by it can, and one that does not is unaffected.
  */
-#define TEST_SUITE(suite_name) \
-    printf("\n" CONSOLE_CYAN "TEST SUITE:" CONSOLE_RESET " " suite_name "\n\n");
+#define TEST_SUITE(suite_name) tap_comment(suite_name);
 
 /**
  * @brief How many results the recording table holds.
@@ -135,9 +138,14 @@ typedef struct {
 
 /**
  * @brief The entry point for a test case thread.
+ *
+ * `inline` like the rest of this header: most files that include it declare
+ * cases without running any, and a plain `static` here is an unused function in
+ * every one of them.
+ *
  * @param arg A pointer to the TestCaseThreadArgs struct.
  */
-static int test_case_thread_func(void* arg) {
+static inline int test_case_thread_func(void* arg) {
     TestCaseThreadArgs* args = (TestCaseThreadArgs*)arg;
     test_rc_t rc = args->func();
     __nx_std_sync__oneshot_send(args->sender, (void*)(intptr_t)rc);
@@ -152,8 +160,8 @@ static int test_case_thread_func(void* arg) {
  */
 #define XTEST_CASE(test_title, test_func) \
     { \
-        printf(test_title ": " CONSOLE_YELLOW "SKIPPED" CONSOLE_RESET "\n"); \
         test_record(test_title, TEST_SKIPPED); \
+        tap_case(test_title, TEST_SKIPPED); \
     }
 
 /**
@@ -164,9 +172,6 @@ static int test_case_thread_func(void* arg) {
  */
 #define TEST_CASE(test_title, test_func) \
     { \
-        printf(test_title ": "); \
-        fflush(stdout); \
-        \
         NxSyncOneshotSender* sender; \
         NxSyncOneshotReceiver* receiver; \
         __nx_std_sync__oneshot_create(&sender, &receiver); \
@@ -174,7 +179,8 @@ static int test_case_thread_func(void* arg) {
         TestCaseThreadArgs args = { .sender = sender, .func = test_func }; \
         thrd_t thread; \
         if (thrd_create(&thread, test_case_thread_func, &args) != thrd_success) { \
-            printf(CONSOLE_RED "HARNESS_ERROR: thread_create failed" CONSOLE_RESET "\n"); \
+            test_record(test_title, TEST_SETUP_FAILED); \
+            tap_harness_error(test_title, "the thread to run the case on could not be created"); \
             __nx_std_sync__oneshot_sender_free(sender); \
             __nx_std_sync__oneshot_receiver_free(receiver); \
         } else { \
@@ -182,19 +188,10 @@ static int test_case_thread_func(void* arg) {
             if (__nx_std_sync__oneshot_recv(receiver, &recv_value) == 0) { \
                 test_rc_t test_res = (test_rc_t)(intptr_t)recv_value; \
                 test_record(test_title, test_res); \
-                if (test_res == TEST_SUCCESS) { \
-                    printf(CONSOLE_GREEN "OK" CONSOLE_RESET "\n"); \
-                } else if (test_res == TEST_TODO) { \
-                    printf(CONSOLE_MAGENTA "TODO" CONSOLE_RESET "\n"); \
-                } else if (test_res == TEST_SKIPPED) { \
-                    printf(CONSOLE_YELLOW "SKIPPED" CONSOLE_RESET "\n"); \
-                } else if (test_res == TEST_SETUP_FAILED) { \
-                    printf(CONSOLE_YELLOW "SETUP FAILED" CONSOLE_RESET "\n"); \
-                } else { \
-                    printf(CONSOLE_RED "FAILED" CONSOLE_RESET " (0x%X)\n", test_res); \
-                } \
+                tap_case(test_title, test_res); \
             } else { \
-                printf(CONSOLE_RED "HARNESS_ERROR: recv failed" CONSOLE_RESET "\n"); \
+                test_record(test_title, TEST_SETUP_FAILED); \
+                tap_harness_error(test_title, "the case's result never arrived"); \
             } \
             thrd_join(thread, NULL); \
         } \

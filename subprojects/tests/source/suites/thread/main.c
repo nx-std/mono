@@ -1,11 +1,22 @@
-#include <stdio.h>
+// Thread tests.
+//
+// Split out of `nx-tests` when that binary became the test runner: what used to be
+// one unattended suite is now one binary per area, each of which the runner can
+// be handed on its own.
+//
+// The same binary links either way: with `use_nx_sys_thread` off the calls
+// resolve to libnx's own thread layer, which is the baseline to compare ours
+// against — except that libnx leaves `thrd_detach` unimplemented, so the detach
+// cases fail there by construction rather than by regression.
+
 #include <inttypes.h>
+#include <stdio.h>
+
 #include <switch.h>
 
-#include "harness.h"
-#include "rand/suite.h"
-#include "rt/cwd/suite.h"
-#include "thread/suite.h"
+#include "../handback.h"
+#include "../harness.h"
+#include "suite.h"
 
 /** The one definition of the result table this binary records into. */
 TEST_RESULTS_STORAGE
@@ -14,10 +25,6 @@ TEST_RESULTS_STORAGE
  * Test suites
  */
 static TestSuiteFn test_suites[] = {
-    // random
-    rand_suite,
-    // runtime
-    rt_cwd_suite,
     // thread
     thread_suite,
 };
@@ -33,13 +40,11 @@ int main()
     PadState pad;
     padInitializeDefault(&pad);
 
-    // Print the test header
-    printf("NX-TESTS (%s)\n", VERSION);
-    u32 ver = hosversionGet();
-    printf("HOS %d.%d.%d%s\n",
-        HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
-        hosversionIsAtmosphere() ? " (AMS)" : "");
-    printf("Press + to exit\n");
+    // Launched by the runner, this suite has no reader waiting on it and no
+    // reason to wait for one back.
+    const bool unattended = suite_is_unattended();
+
+    tap_begin("thread", VERSION, unattended);
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
     uint64_t curr_test_suite = 0;
@@ -60,10 +65,21 @@ int main()
         if (curr_test_suite < test_suites_count) {
             test_suites[curr_test_suite]();
             curr_test_suite++;
+        } else if (unattended) {
+            // Everything has run and there is nobody to read it: the runner is
+            // waiting for its turn back.
+            break;
         }
 
         consoleUpdate(NULL);
     }
+
+    tap_plan();
+    tap_report("thread", false);
+
+    // Back to the runner that launched this suite, if one did: a run is
+    // several suites, and it ends here otherwise.
+    handback_to_runner("thread");
 
     consoleExit(NULL);
     return 0;

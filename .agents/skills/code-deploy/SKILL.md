@@ -17,7 +17,8 @@ Deploy NRO/NSP artifacts to a Nintendo Switch console via `cargo nx link` (nxlin
 ## Prerequisites
 
 1. **Switch** running a homebrew environment (e.g., Atmosphère).
-2. **nxlink server** running on the Switch (typically launched via hbmenu's netloader).
+2. **Something listening** for the transfer on the Switch: hbmenu's netloader, or the `nx-tests`
+   runner, which serves the same protocol and launches each suite it receives.
 3. **Network connectivity** between dev machine and Switch.
 4. **`cargo-nx`** installed. If missing, **ask the user** to run `just install-cargo-nx` — do NOT run it yourself.
 
@@ -27,10 +28,11 @@ Deploy NRO/NSP artifacts to a Nintendo Switch console via `cargo nx link` (nxlin
 
 Use `/code-build` to compile the target first. Common outputs:
 
-| Target   | Path                                         |
-|----------|----------------------------------------------|
-| hbmenu   | `buildDir/subprojects/nx-hbmenu/hbmenu.nro`  |
-| nx-tests | `buildDir/subprojects/tests/nx-tests.nro`    |
+| Target          | Path                                             |
+|-----------------|--------------------------------------------------|
+| hbmenu          | `buildDir/subprojects/nx-hbmenu/hbmenu.nro`      |
+| nx-tests runner | `buildDir/subprojects/tests/nx-tests.nro`        |
+| a test suite    | `buildDir/subprojects/tests/nx-tests-<area>.nro` |
 
 ### Step 2 — Deploy
 
@@ -41,9 +43,18 @@ just deploy <path-to-file.nro>
 Examples:
 ```bash
 just deploy buildDir/subprojects/nx-hbmenu/hbmenu.nro
-just deploy buildDir/subprojects/tests/nx-tests.nro
-just deploy buildDir/subprojects/tests/nx-tests.nro --address 192.168.1.100
+just deploy buildDir/subprojects/tests/nx-tests-sync.nro
+just deploy buildDir/subprojects/tests/nx-tests-sync.nro --address 192.168.1.100
+just deploy buildDir/subprojects/tests/nx-tests-sync.nro --retries 60
 ```
+
+`--retries` keeps knocking instead of failing, which is what makes a push land on a console that is
+busy right now but will be listening shortly — pushing one suite to the `nx-tests` runner while the
+previous suite is still running is the usual case. Prefer it over sleeping between attempts.
+
+`--server` keeps a stdio server up after the transfer, so anything the homebrew sends back lands in
+your terminal. For a test suite that is its TAP report, which is how a run is confirmed without
+asking anyone what the screen says — see `/code-test`.
 
 ### Step 3 — Confirm with the user
 
