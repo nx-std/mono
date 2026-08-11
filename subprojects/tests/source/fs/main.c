@@ -29,6 +29,9 @@
 #include "savedata/suite.h"
 #include "sdmc/suite.h"
 
+/** The one definition of the result table this binary records into. */
+TEST_RESULTS_STORAGE
+
 /**
  * Test suites
  */

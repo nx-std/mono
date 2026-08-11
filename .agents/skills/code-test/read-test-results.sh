@@ -6,7 +6,11 @@
 # process reads that table; this does, over Atmosphere's GDB stub, after the run
 # is over. There is no timing pressure and no breakpoint involved.
 #
-# Usage: scripts/read-test-results.sh <console-ip> <path-to-elf>
+# Usage: read-test-results.sh <console-ip> <path-to-elf>
+#
+# Works for any harness-based test binary: nx-tests, nx-tests-sync, nx-tests-fs,
+# nx-tests-net. The interactive applet binaries have no test cases and record
+# nothing.
 set -euo pipefail
 
 IP="${1:?console ip}"
@@ -18,13 +22,14 @@ GDB=(just gdb --batch -x)
 NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm
 
 # Static offsets of the table and its count, as linked.
-# `harness.h` declares the table `static`, so every translation unit that
-# includes it emits its own copy and only the one holding the suite functions is
-# ever filled. Collect every candidate pair and pick the populated one below.
-mapfile -t COUNT_OFFS < <("$NM" "$ELF" | awk '$3=="g_test_result_count"{print "0x"$1}')
-mapfile -t TABLE_OFFS < <("$NM" "$ELF" | awk '$3=="g_test_results"{print "0x"$1}')
-[ "${#COUNT_OFFS[@]}" -gt 0 ] && [ "${#TABLE_OFFS[@]}" -gt 0 ] || { echo "symbols missing from $ELF" >&2; exit 1; }
-[ "${#COUNT_OFFS[@]}" -eq "${#TABLE_OFFS[@]}" ] || { echo "table and count copies disagree" >&2; exit 1; }
+# `harness.h` declares the table and each binary's `main.c` defines it exactly
+# once via `TEST_RESULTS_STORAGE`, so there is one address to find.
+COUNT_OFF=$("$NM" "$ELF" | awk '$3=="g_test_result_count"{print "0x"$1; exit}')
+TABLE_OFF=$("$NM" "$ELF" | awk '$3=="g_test_results"{print "0x"$1; exit}')
+[ -n "$COUNT_OFF" ] && [ -n "$TABLE_OFF" ] || {
+  echo "$(basename "$ELF") records no results — is it a harness-based suite built from this tree?" >&2
+  exit 1
+}
 
 # The NRO is loaded at a fresh base every launch, so it has to be read back
 # rather than assumed.
@@ -66,29 +71,8 @@ BASE=$("${GDB[@]}" "$TMP/mods.gdb" 2>&1 || true \
   | awk -v m="$MODULE" 'index($0, m){print $1; exit}')
 [ -n "$BASE" ] || { echo "$MODULE is not loaded on the console" >&2; exit 1; }
 
-# Read each copy's count and keep the first that recorded anything.
-COUNT_ADDR=""
-for i in "${!COUNT_OFFS[@]}"; do
-  probe=$(printf '0x%x' $(( BASE + ${COUNT_OFFS[$i]} )))
-  cat > "$TMP/count.gdb" <<EOF
-set pagination off
-set confirm off
-set architecture aarch64
-handle SIGTRAP nostop noprint pass
-target extended-remote $IP:22225
-attach $PID
-printf "N %d\n", *(int *)$probe
-detach
-disconnect
-EOF
-  n=$("${GDB[@]}" "$TMP/count.gdb" 2>&1 | awk '/^N /{print $2; exit}')
-  if [ -n "$n" ] && [ "$n" -gt 0 ] 2>/dev/null; then
-    COUNT_ADDR="$probe"
-    TABLE_ADDR=$(printf '0x%x' $(( BASE + ${TABLE_OFFS[$i]} )))
-    break
-  fi
-done
-[ -n "$COUNT_ADDR" ] || { echo "no run recorded any results" >&2; exit 1; }
+COUNT_ADDR=$(printf '0x%x' $(( BASE + COUNT_OFF )))
+TABLE_ADDR=$(printf '0x%x' $(( BASE + TABLE_OFF )))
 
 # One entry is a `const char*` title followed by an `int` result, padded to 16.
 cat > "$TMP/read.gdb" <<EOF

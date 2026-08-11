@@ -39,6 +39,9 @@
 #include "resolve/suite.h"
 #include "socket/suite.h"
 
+/** The one definition of the result table this binary records into. */
+TEST_RESULTS_STORAGE
+
 /**
  * Test suites
  */

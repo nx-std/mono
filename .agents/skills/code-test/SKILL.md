@@ -1,7 +1,7 @@
 ---
 name: code-test
 description: Run nx-std tests on Nintendo Switch hardware after format/check/clippy are green. Builds the nx-tests NRO, deploys via cargo-nx, and asks the user to confirm results on the console.
-allowed-tools: "Bash(just build-tests:*), Bash(just deploy:*), Bash(just list-options-configured:*), Bash(just reconfigure:*)"
+allowed-tools: "Bash(just build-tests:*), Bash(just deploy:*), Bash(just list-options-configured:*), Bash(just reconfigure:*), Bash(.agents/skills/code-test/read-test-results.sh:*)"
 ---
 
 # Code Testing Skill
@@ -71,8 +71,12 @@ The harness records every case's verdict in a table (`g_test_results` in
 `source/harness.h`) precisely so the run can be read back afterwards. Prefer reading it:
 
 ```bash
-scripts/read-test-results.sh <console-ip> buildDir/subprojects/tests/<binary>.elf
+.agents/skills/code-test/read-test-results.sh <console-ip> buildDir/subprojects/tests/<binary>.elf
 ```
+
+Works for any harness-based binary — `nx-tests`, `nx-tests-sync`, `nx-tests-fs`,
+`nx-tests-net`. The interactive applet binaries (`nx-tests-applet-*`) have no test cases
+and record nothing, so they still need a person watching the screen.
 
 It prints one line per case and a pass/fail tally. Run it any time after the suite has
 finished — it attaches over Atmosphère's GDB stub and reads memory, so there is no
@@ -103,8 +107,9 @@ Three constraints shaped it, and each will bite anyone who reimplements it:
   silently yields "module not loaded".
 - **The recording table must be `volatile`.** Nothing in the process reads it, so
   without `volatile` the stores are dead and the whole array is optimised out of the
-  binary. Being `static` in a header, each translation unit also gets its own copy —
-  the script probes every copy and uses the one that recorded anything.
+  binary. `volatile` also stops the compiler dropping *unused* copies, which is why the
+  table is declared `extern` in `harness.h` and defined once per binary — a `static`
+  definition in the header gave `nx-tests-sync` twenty-six tables to search.
 
 This gdb build has no Python, so the address arithmetic is done in the shell.
 
@@ -120,6 +125,10 @@ Tests live in `subprojects/tests/`:
 Suites that need console state — a network, savedata, a particular firmware — report
 `TEST_SKIPPED` from `//* Given` rather than failing, since that state is a property of
 the console rather than of the code under test.
+
+A new test binary joins the reader by expanding `TEST_RESULTS_STORAGE` once at file scope
+in its `main.c`. Without it the link fails on the undefined table, which is the intended
+outcome: a binary that runs cases has to record them.
 
 C code links against the Rust crates to verify FFI correctness; the linker scripts (`*_override.ld`) redirect `libnx` symbols to the Rust implementations.
 
@@ -140,7 +149,7 @@ Runnable without user permission:
 - `just build-tests`
 - `just deploy <nro-path>`
 - `just reconfigure -Duse_nx=enabled`
-- `scripts/read-test-results.sh <ip> <elf>` — attaches read-only over the GDB stub and detaches.
+- `.agents/skills/code-test/read-test-results.sh <ip> <elf>` — attaches read-only over the GDB stub and detaches.
 
 ## Related Skills
 
