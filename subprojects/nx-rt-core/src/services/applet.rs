@@ -37,7 +37,6 @@ use nx_std_sync::{
 };
 use nx_svc::process::Handle as ProcessHandle;
 
-mod error;
 mod handle;
 mod init;
 mod state;
@@ -47,13 +46,20 @@ use self::state::{
     AppletState,
 };
 pub use self::{
-    error::ConnectError,
     handle::{
         ApplicationHandle,
         LibraryAppletHandle,
         OverlayAppletHandle,
         SystemAppletHandle,
         SystemApplicationHandle,
+    },
+    init::{
+        CacheError,
+        NotificationError,
+        OpenAppletError,
+        OpenApplicationError,
+        OpenSystemApplicationError,
+        WaitInFocusError,
     },
 };
 use super::sm;
@@ -115,31 +121,68 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
 
     let singleton = match applet_type {
         // appletOE cmd 0
-        AppletType::Application | AppletType::Default => {
-            AppletSingleton::Application(init::open_application(&sm, process_handle)?)
-        }
+        AppletType::Application | AppletType::Default => AppletSingleton::Application(
+            init::open_application(&sm, process_handle).map_err(ConnectError::Application)?,
+        ),
         // appletAE cmd 200·201
-        AppletType::LibraryApplet => {
-            AppletSingleton::LibraryApplet(init::open_library_applet(&sm, process_handle)?)
-        }
+        AppletType::LibraryApplet => AppletSingleton::LibraryApplet(
+            init::open_library_applet(&sm, process_handle).map_err(ConnectError::Applet)?,
+        ),
         // appletAE cmd 100
-        AppletType::SystemApplet => {
-            AppletSingleton::SystemApplet(init::open_system_applet(&sm, process_handle)?)
-        }
+        AppletType::SystemApplet => AppletSingleton::SystemApplet(
+            init::open_system_applet(&sm, process_handle).map_err(ConnectError::Applet)?,
+        ),
         // appletAE cmd 300
-        AppletType::OverlayApplet => {
-            AppletSingleton::OverlayApplet(init::open_overlay_applet(&sm, process_handle)?)
-        }
+        AppletType::OverlayApplet => AppletSingleton::OverlayApplet(
+            init::open_overlay_applet(&sm, process_handle).map_err(ConnectError::Applet)?,
+        ),
         // appletAE cmd 350
-        AppletType::SystemApplication => {
-            AppletSingleton::SystemApplication(init::open_system_application(&sm, process_handle)?)
-        }
+        AppletType::SystemApplication => AppletSingleton::SystemApplication(
+            init::open_system_application(&sm, process_handle)
+                .map_err(ConnectError::SystemApplication)?,
+        ),
         AppletType::None => unreachable!("AppletType::None handled at function entry"),
     };
 
     let mut guard = state().write();
     *guard = Some(AppletState::new(singleton));
     Ok(())
+}
+
+/// Error returned by [`init`].
+///
+/// One variant per role rather than one per step: each role runs a different
+/// handshake, so a flat set would give every caller variants the role it asked
+/// for cannot produce.
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the applet bring-up runs before the Service Manager is
+    /// connected. Nothing was opened.
+    #[error("the Service Manager is not initialized")]
+    SmNotInitialized(#[source] crate::services::sm::NotInitializedError),
+    /// The `Application`-role bring-up failed.
+    #[error("failed to open the Application applet session")]
+    Application(#[source] init::OpenApplicationError),
+    /// The `SystemApplication`-role bring-up failed.
+    #[error("failed to open the SystemApplication applet session")]
+    SystemApplication(#[source] init::OpenSystemApplicationError),
+    /// A library, system or overlay applet bring-up failed.
+    #[error("failed to open the applet session")]
+    Applet(#[source] init::OpenAppletError),
+}
+
+#[cfg(feature = "ffi")]
+impl crate::error::ToResultCode for ConnectError {
+    fn to_rc(self) -> crate::error::ResultCode {
+        match self {
+            Self::SmNotInitialized(err) => err.to_rc(),
+            Self::Application(err) => err.to_rc(),
+            Self::SystemApplication(err) => err.to_rc(),
+            Self::Applet(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Releases one caller's hold on the applet session.
