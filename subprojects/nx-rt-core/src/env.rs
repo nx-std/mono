@@ -19,6 +19,7 @@ mod syscall_hint;
 use core::{
     cell::UnsafeCell,
     ffi::{
+        CStr,
         c_char,
         c_void,
     },
@@ -44,6 +45,11 @@ use nx_sys_sync::{
 };
 
 pub use self::syscall_hint::SyscallHints;
+#[cfg(feature = "ffi")]
+use crate::error::{
+    LibnxError,
+    libnx_error,
+};
 
 /// Loader return function type
 pub type LoaderReturnFn = Option<unsafe extern "C" fn(i32) -> !>;
@@ -60,7 +66,8 @@ static ENV_INIT: Once = Once::new();
 /// Exit function pointer (mutable at runtime)
 static EXIT_FUNC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
-static NEXT_LOAD: NextLoadState = NextLoadState::new();
+/// Serializes writes into the loader's chain-load buffers.
+static NEXT_LOAD_LOCK: Mutex = Mutex::new();
 
 /// Populate the global environment state exactly once.
 ///
@@ -191,7 +198,7 @@ pub fn user_id_storage() -> Option<NonNull<AccountUid>> {
 pub fn has_next_load() -> bool {
     // SAFETY: ENV_STATE is initialized once via init_once() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.has_next_load
+    state.next_load.is_some()
 }
 
 /// Get service overrides as a slice of Options (first `count` are Some)
@@ -215,68 +222,55 @@ pub fn applet_workaround() -> bool {
     state.applet_workaround
 }
 
-/// Set next NRO to load (chain loading)
+/// Names the program to run once this one exits.
 ///
-/// Returns 0 on success, non-zero on error
+/// The request is written into the loader's own buffers, which is the only
+/// place it can be read from: by the time the loader looks, this program is
+/// gone. A copy kept here instead would be discarded with it, and the loader
+/// would fall back to whatever it runs when nothing was asked for.
 ///
-/// # Safety
+/// A program started without a command line still gets one; it is empty.
 ///
-/// The caller must ensure that `path` and `argv` (if not null) point to valid,
-/// null-terminated C strings that remain valid for the duration of this call.
-pub unsafe fn set_next_load(path: *const c_char, argv: *const c_char) -> u32 {
+/// # Errors
+///
+/// Returns an error when the loader runs nothing after this program, or when
+/// the request does not fit the buffers it provided.
+pub fn set_next_load(path: &CStr, argv: Option<&CStr>) -> Result<(), SetNextLoadError> {
     // SAFETY: ENV_STATE is initialized once via init_once() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
 
-    if !state.has_next_load {
-        return 1; // Chain loading not supported
-    }
+    let Some(next_load) = state.next_load else {
+        return Err(SetNextLoadError::Unsupported);
+    };
 
-    // Lock mutex to protect buffer access
-    NEXT_LOAD.mutex.lock();
+    // Two callers writing at once would interleave their bytes into one
+    // request, and the loader would run neither program.
+    NEXT_LOAD_LOCK.lock();
+    let written = next_load.write(path, argv.unwrap_or(c""));
+    NEXT_LOAD_LOCK.unlock();
 
-    // SAFETY: We hold the mutex, so we have exclusive access to the buffers
-    let path_buf = unsafe { &mut *NEXT_LOAD.path.get() };
-    let argv_buf = unsafe { &mut *NEXT_LOAD.argv.get() };
+    written
+}
 
-    // Copy path string
-    if !path.is_null() {
-        let mut i = 0;
-        while i < path_buf.len() - 1 {
-            // SAFETY: Caller guarantees path points to a valid null-terminated C string.
-            // We stop at the first null byte or buffer limit, whichever comes first.
-            let byte = unsafe { *path.add(i) };
-            path_buf[i] = byte;
-            if byte == 0 {
-                break;
-            }
-            i += 1;
+/// Error returned by [`set_next_load`].
+#[derive(Debug, thiserror::Error)]
+pub enum SetNextLoadError {
+    /// The loader offered no way to name the program to run next.
+    #[error("the loader does not run another program after this one")]
+    Unsupported,
+    /// The path or the command line is longer than the loader's buffer for it.
+    #[error("the request does not fit the loader's buffers")]
+    TooLong,
+}
+
+#[cfg(feature = "ffi")]
+impl crate::error::ToResultCode for SetNextLoadError {
+    fn to_rc(self) -> crate::error::ResultCode {
+        match self {
+            Self::Unsupported => libnx_error(LibnxError::NotInitialized),
+            Self::TooLong => libnx_error(LibnxError::BadInput),
         }
-        path_buf[i] = 0; // Ensure null termination
-    } else {
-        path_buf[0] = 0;
     }
-
-    // Copy argv string
-    if !argv.is_null() {
-        let mut i = 0;
-        while i < argv_buf.len() - 1 {
-            // SAFETY: Caller guarantees argv points to a valid null-terminated C string.
-            // We stop at the first null byte or buffer limit, whichever comes first.
-            let byte = unsafe { *argv.add(i) };
-            argv_buf[i] = byte;
-            if byte == 0 {
-                break;
-            }
-            i += 1;
-        }
-        argv_buf[i] = 0; // Ensure null termination
-    } else {
-        argv_buf[0] = 0;
-    }
-
-    NEXT_LOAD.mutex.unlock();
-
-    0 // Success
 }
 
 /// Static storage for parsed environment state.
@@ -315,8 +309,9 @@ pub struct EnvState {
     /// User ID storage pointer
     pub user_id_storage: Option<NonNull<AccountUid>>,
 
-    /// Chain loading capability flag (set once during init)
-    pub has_next_load: bool,
+    /// Where to write the program to run after this one, when the loader
+    /// accepts one
+    pub next_load: Option<NextLoad>,
 
     /// Service override entries from loader
     pub service_overrides: [Option<ServiceOverride>; MAX_SERVICE_OVERRIDES],
@@ -342,7 +337,7 @@ impl EnvState {
             last_load_result: 0,
             loader_info: None,
             user_id_storage: None,
-            has_next_load: false,
+            next_load: None,
             service_overrides: [None; MAX_SERVICE_OVERRIDES],
             service_override_count: 0,
             applet_type: AppletType::Default,
@@ -456,21 +451,107 @@ impl EnvStateWrapper {
 
 unsafe impl Sync for EnvStateWrapper {}
 
-/// Chain loading state (mutable at runtime)
-struct NextLoadState {
-    path: UnsafeCell<[u8; 512]>,
-    argv: UnsafeCell<[u8; 2048]>,
-    mutex: Mutex,
+/// The buffers the loader reads a chain-load request out of.
+///
+/// They belong to the loader, not to this process: it keeps running after this
+/// program exits, and what it finds here is what it runs next. A program that
+/// never asks leaves them as the loader left them, which is what makes not
+/// asking mean "go back to where I came from".
+#[derive(Debug, Clone, Copy)]
+pub struct NextLoad {
+    /// Where the path of the next program goes.
+    path: LoaderBuffer,
+    /// Where its command line goes.
+    argv: LoaderBuffer,
 }
 
-impl NextLoadState {
-    const fn new() -> Self {
+impl NextLoad {
+    /// How much the loader's path buffer holds, terminator included.
+    ///
+    /// The loader announces the buffers without saying how large they are, so
+    /// their sizes are part of the convention rather than of the message. These
+    /// are the ones every loader in this family allocates.
+    pub const PATH_CAPACITY: usize = 512;
+
+    /// How much the loader's command-line buffer holds, terminator included.
+    pub const ARGV_CAPACITY: usize = 2048;
+
+    /// Takes the two buffers out of the loader's startup configuration.
+    ///
+    /// This is the one place the loader's word is taken for anything: every
+    /// write below rests on the guarantee stated here.
+    ///
+    /// # Safety
+    ///
+    /// Both pointers come from the loader's own configuration, where each
+    /// addresses a buffer of at least the capacity documented above, writable
+    /// and live for as long as this program runs.
+    pub unsafe fn from_loader(path: NonNull<c_char>, argv: NonNull<c_char>) -> Self {
         Self {
-            path: UnsafeCell::new([0; 512]),
-            argv: UnsafeCell::new([0; 2048]),
-            mutex: Mutex::new(),
+            path: LoaderBuffer {
+                ptr: path.cast(),
+                capacity: Self::PATH_CAPACITY,
+            },
+            argv: LoaderBuffer {
+                ptr: argv.cast(),
+                capacity: Self::ARGV_CAPACITY,
+            },
         }
+    }
+
+    /// Records what the loader should run next, in the order it reads it.
+    fn write(self, path: &CStr, argv: &CStr) -> Result<(), SetNextLoadError> {
+        // The loader reads the path to decide whether to run anything at all,
+        // so the path lands last: until it does, whatever sits in the
+        // command-line buffer is not part of any request. That ordering is what
+        // keeps a request that does not fit from being acted on in part, with
+        // no need to measure both halves before writing either.
+        if !self.argv.write(argv.to_bytes_with_nul()) || !self.path.write(path.to_bytes_with_nul())
+        {
+            // An earlier request must not be left standing with a command line
+            // that is no longer its own. Emptying the path withdraws it.
+            self.path.clear();
+            return Err(SetNextLoadError::TooLong);
+        }
+
+        Ok(())
     }
 }
 
-unsafe impl Sync for NextLoadState {}
+/// One of the loader's buffers: where it starts, and how much it takes.
+///
+/// The two travel together because neither is usable without the other, and a
+/// caller holding them separately could pair a buffer with the capacity of its
+/// neighbour.
+#[derive(Debug, Clone, Copy)]
+struct LoaderBuffer {
+    ptr: NonNull<u8>,
+    capacity: usize,
+}
+
+impl LoaderBuffer {
+    /// Copies `bytes` in, or reports that they do not fit.
+    ///
+    /// Nothing is written when they do not: a truncated path names a different
+    /// program, and the loader would run it without complaint.
+    #[must_use = "bytes that did not fit were not written"]
+    fn write(self, bytes: &[u8]) -> bool {
+        if bytes.len() > self.capacity {
+            return false;
+        }
+
+        // SAFETY: `NextLoad::from_loader` establishes that `ptr` addresses
+        // `capacity` writable bytes for as long as this program runs, and the
+        // check above keeps the copy inside them. The loader's buffers are its
+        // own, so they cannot overlap the caller's `bytes`.
+        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), self.ptr.as_ptr(), bytes.len()) };
+        true
+    }
+
+    /// Empties the buffer, withdrawing whatever it held.
+    fn clear(self) {
+        // A lone terminator fits in any buffer the loader hands over, so this
+        // cannot be a write that does not fit.
+        let _ = self.write(&[0]);
+    }
+}
