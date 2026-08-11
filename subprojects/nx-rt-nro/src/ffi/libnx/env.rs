@@ -54,13 +54,13 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_env_setup(
     main_thread: u32,
     saved_lr: LoaderReturnFn,
 ) {
-    // The homebrew loader always supplies a non-null configuration block for
-    // an NRO; a null `ctx` would be a malformed launch with nothing to parse.
-    let Some(ctx) = NonNull::new(ctx.cast_mut()) else {
-        return;
-    };
+    // A null `ctx` is a malformed launch with nothing to parse. It is still
+    // handed on rather than returned early: the main-thread handle and the
+    // return address are arguments in their own right, and the startup steps
+    // that follow read them back.
+    let ctx = NonNull::new(ctx.cast_mut());
 
-    // SAFETY: Caller (libnx CRT0) guarantees `ctx` points to a valid
+    // SAFETY: the caller guarantees `ctx` is null or points to a valid
     // ConfigEntry array terminated by EndOfList, and `main_thread` is the
     // kernel-supplied main-thread handle.
     unsafe { env::setup(ctx, ThreadHandle::from_raw_unchecked(main_thread), saved_lr) }

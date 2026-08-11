@@ -38,6 +38,7 @@ use super::{
     error::ConnectError,
     state::{
         AppletCache,
+        OwnedEventHandle,
         Slot,
     },
 };
@@ -153,16 +154,25 @@ fn fetch_initial_cache<R: Role>(proxy: &Proxy<R>) -> Result<AppletCache, Connect
         .get_current_focus_state()
         .map_err(ConnectError::GetFocusState)?;
 
-    // ARUID failures are non-fatal — non-Application roles legitimately
-    // receive ARUID=0/IPC errors here. Mirror the prior FFI behavior of
-    // treating any failure as "no aruid available".
+    // ARUID failures are non-fatal: non-Application roles legitimately receive
+    // ARUID=0 or an IPC error here, and every caller treats a missing one as
+    // "this role has none".
     let aruid = proxy.get_applet_resource_user_id().unwrap_or_default();
+
+    // Asked for once, here, because each ask mints a fresh kernel handle that
+    // this process then owns. Every later reader borrows this one.
+    let message_event = proxy
+        .common_state_getter()
+        .get_event_handle()
+        .map(OwnedEventHandle::new)
+        .map_err(ConnectError::GetEventHandle)?;
 
     Ok(AppletCache {
         aruid,
         focus_state: AtomicU8::new(focus_state as u8),
         operation_mode: AtomicU8::new(operation_mode as u8),
         performance_mode: AtomicU32::new(performance_mode as u32),
+        message_event,
     })
 }
 
@@ -183,8 +193,13 @@ fn enable_mode_notifications(self_controller: SelfController<'_>) -> Result<(), 
 /// focus state, then loop waiting on the event and refreshing focus on
 /// `FocusStateChanged` messages. Application / SystemApplication path only.
 fn wait_in_focus(common_state_getter: CommonStateGetter<'_>) -> Result<(), ConnectError> {
-    let event_handle = common_state_getter
+    // This runs before the session's own copy of the event exists, so it takes
+    // one of its own and closes it on the way out. Both are handles to the same
+    // kernel object; owning this one for the length of the wait is what keeps
+    // it from outliving the loop.
+    let event = common_state_getter
         .get_event_handle()
+        .map(OwnedEventHandle::new)
         .map_err(ConnectError::GetEventHandle)?;
 
     let mut focus_state = common_state_getter
@@ -192,16 +207,16 @@ fn wait_in_focus(common_state_getter: CommonStateGetter<'_>) -> Result<(), Conne
         .map_err(ConnectError::GetFocusState)?;
 
     while focus_state != AppletFocusState::InFocus {
-        // SAFETY: event_handle is a valid kernel handle owned by
-        // CommonStateGetter for the duration of init. Waiting on / resetting
-        // its signal is sound.
+        // SAFETY: `event` owns the handle for the whole of this loop, so it
+        // names a live kernel event; the Application Manager issues it as a
+        // resettable one, which is what `reset_signal` requires.
         unsafe {
-            nx_svc::sync::wait_synchronization_single(&event_handle, u64::MAX)
+            nx_svc::sync::wait_synchronization_single(event.as_handle(), u64::MAX)
                 .map_err(ConnectError::WaitSynchronization)?;
-            // The applet message event has autoclear=false; clear the signal
-            // manually to avoid the wait returning immediately on the next
-            // iteration.
-            let _ = nx_svc::sync::reset_signal(&event_handle);
+            // The event does not clear itself, so the signal is cleared here;
+            // leaving it set would make the next wait return at once and spin
+            // this loop.
+            let _ = nx_svc::sync::reset_signal(event.as_handle());
         }
 
         if let Ok(Some(msg)) = common_state_getter.receive_message()

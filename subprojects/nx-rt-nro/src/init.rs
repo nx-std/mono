@@ -71,7 +71,7 @@ pub unsafe fn init(
     // SAFETY: the caller guarantees the loader-supplied arguments, and that
     // this runs once on the startup thread before anything reads back the
     // environment it fills.
-    unsafe { setup_env(ctx, main_thread, saved_lr) };
+    unsafe { env::setup(ctx, main_thread, saved_lr) };
 
     // SAFETY: the environment is parsed, so the main thread's handle is known,
     // and no thread-local has been touched yet.
@@ -110,29 +110,6 @@ pub unsafe fn exit(_status: i32) -> ! {
     // SAFETY: the function pointer is the loader's own, recorded while the
     // configuration block was parsed, and nothing runs after this.
     unsafe { __nx_exit(0, env::exit_func_ptr()) }
-}
-
-/// Parses the loader's configuration block into the runtime environment state.
-///
-/// A null block is a malformed launch with nothing to read, and the steps
-/// after it still run: they need a heap and a main thread, neither of which
-/// the block is required to describe.
-///
-/// # Safety
-///
-/// See [`init`], which is the only caller and holds the same contract.
-unsafe fn setup_env(
-    ctx: Option<NonNull<ConfigEntry>>,
-    main_thread: ThreadHandle,
-    saved_lr: LoaderReturnFn,
-) {
-    let Some(ctx) = ctx else {
-        return;
-    };
-
-    // SAFETY: the caller guarantees `ctx` addresses a `ConfigEntry` array
-    // terminated by `EndOfList`, and that this runs once.
-    unsafe { env::setup(ctx, main_thread, saved_lr) }
 }
 
 /// Initializes the reservation map that address-space lookups are served from.

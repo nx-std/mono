@@ -42,7 +42,10 @@ mod handle;
 mod init;
 mod state;
 
-use self::state::AppletSingleton;
+use self::state::{
+    AppletSingleton,
+    AppletState,
+};
 pub use self::{
     error::ConnectError,
     handle::{
@@ -60,9 +63,9 @@ use crate::services::sm;
 const FOCUS_STATE_UNKNOWN: u8 = 0;
 
 /// Global applet singleton, lazily initialized.
-static APPLET_STATE: OnceLock<RwLock<Option<AppletSingleton>>> = OnceLock::new();
+static APPLET_STATE: OnceLock<RwLock<Option<AppletState>>> = OnceLock::new();
 
-fn state() -> &'static RwLock<Option<AppletSingleton>> {
+fn state() -> &'static RwLock<Option<AppletState>> {
     APPLET_STATE.get_or_init(|| RwLock::new(None))
 }
 
@@ -83,12 +86,27 @@ fn state() -> &'static RwLock<Option<AppletSingleton>> {
 ///   → `appletAE` cmd 350
 /// - [`AppletType::None`] → no Application Manager session is opened
 ///
+/// Counts its callers: a second caller joins the session the first opened
+/// rather than performing the handshake again, and the session closes when the
+/// last of them calls [`exit`]. Without the count, the second call would
+/// replace the singleton and drop the first one's proxy handles while the C
+/// surface still held a snapshot of them, and the first [`exit`] would tear
+/// the session down for everyone.
+///
 /// # Panics
 ///
 /// Panics if SM is not initialized.
 pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<(), ConnectError> {
     if matches!(applet_type, AppletType::None) {
         return Ok(());
+    }
+
+    {
+        let mut guard = state().write();
+        if let Some(applet_state) = guard.as_mut() {
+            applet_state.retain();
+            return Ok(());
+        }
     }
 
     let sm_guard = sm::sm_session();
@@ -119,29 +137,41 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
     };
 
     let mut guard = state().write();
-    *guard = Some(singleton);
+    *guard = Some(AppletState::new(singleton));
     Ok(())
 }
 
-/// Exits the applet service session.
+/// Releases one caller's hold on the applet session.
 ///
-/// For Application-role applets, libnx `_appletCleanup` resets the focus
-/// handling mode to [`AppletFocusHandlingMode::NoSuspend`] before closing
-/// sessions so the OS does not force-suspend the process mid-teardown. We
-/// mirror that here.
+/// The session closes once the last caller has let go. For an Application-role
+/// applet the focus handling mode is reset to
+/// [`AppletFocusHandlingMode::NoSuspend`] first, so the system does not
+/// force-suspend the process part-way through the teardown.
 pub fn exit() {
     let mut guard = state().write();
-    if let Some(singleton) = guard.take() {
-        if let AppletSingleton::Application(slot) = &singleton {
-            // Best-effort: errors here would just delay teardown.
-            let _ = slot
-                .proxy
-                .set_focus_handling_mode(AppletFocusHandlingMode::NoSuspend);
-        }
-        // `Proxy<R>` is RAII; dropping `singleton` closes every IPC handle in
-        // reverse acquisition order via `Drop`.
-        drop(singleton);
+
+    let Some(applet_state) = guard.as_mut() else {
+        return;
+    };
+    if !applet_state.release() {
+        return;
     }
+
+    let Some(state) = guard.take() else {
+        return;
+    };
+    let singleton = state.into_singleton();
+
+    if let AppletSingleton::Application(slot) = &singleton {
+        // The session is closing either way, so a refusal here costs nothing
+        // beyond the suspend window it was meant to shorten.
+        let _ = slot
+            .proxy
+            .set_focus_handling_mode(AppletFocusHandlingMode::NoSuspend);
+    }
+    // `Proxy<R>` is RAII; dropping `singleton` closes every IPC handle in
+    // reverse acquisition order via `Drop`.
+    drop(singleton);
 }
 
 /// Updates cached applet state in response to a received [`AppletMessage`].
@@ -151,7 +181,7 @@ pub fn exit() {
 /// authoritative value and update the cache.
 pub fn process_message(msg: AppletMessage) {
     let guard = state().read();
-    let Some(singleton) = guard.as_ref() else {
+    let Some(singleton) = guard.as_ref().map(AppletState::singleton) else {
         return;
     };
 
@@ -188,7 +218,7 @@ pub fn process_message(msg: AppletMessage) {
 /// [`AppletType::Application`].
 pub fn as_application() -> Option<ApplicationHandle> {
     let guard = state().read();
-    match guard.as_ref() {
+    match guard.as_ref().map(AppletState::singleton) {
         // SAFETY: variant verified by the match arm above; the read lock held
         // by `guard` prevents the variant from changing for the handle's
         // lifetime.
@@ -203,7 +233,7 @@ pub fn as_application() -> Option<ApplicationHandle> {
 /// [`AppletType::LibraryApplet`].
 pub fn as_library_applet() -> Option<LibraryAppletHandle> {
     let guard = state().read();
-    match guard.as_ref() {
+    match guard.as_ref().map(AppletState::singleton) {
         // SAFETY: see `as_application`.
         Some(AppletSingleton::LibraryApplet(_)) => {
             Some(unsafe { LibraryAppletHandle::from_guard(guard) })
@@ -216,7 +246,7 @@ pub fn as_library_applet() -> Option<LibraryAppletHandle> {
 /// [`AppletType::SystemApplet`].
 pub fn as_system_applet() -> Option<SystemAppletHandle> {
     let guard = state().read();
-    match guard.as_ref() {
+    match guard.as_ref().map(AppletState::singleton) {
         // SAFETY: see `as_application`.
         Some(AppletSingleton::SystemApplet(_)) => {
             Some(unsafe { SystemAppletHandle::from_guard(guard) })
@@ -229,7 +259,7 @@ pub fn as_system_applet() -> Option<SystemAppletHandle> {
 /// [`AppletType::OverlayApplet`].
 pub fn as_overlay_applet() -> Option<OverlayAppletHandle> {
     let guard = state().read();
-    match guard.as_ref() {
+    match guard.as_ref().map(AppletState::singleton) {
         // SAFETY: see `as_application`.
         Some(AppletSingleton::OverlayApplet(_)) => {
             Some(unsafe { OverlayAppletHandle::from_guard(guard) })
@@ -242,7 +272,7 @@ pub fn as_overlay_applet() -> Option<OverlayAppletHandle> {
 /// [`AppletType::SystemApplication`].
 pub fn as_system_application() -> Option<SystemApplicationHandle> {
     let guard = state().read();
-    match guard.as_ref() {
+    match guard.as_ref().map(AppletState::singleton) {
         // SAFETY: see `as_application`.
         Some(AppletSingleton::SystemApplication(_)) => {
             Some(unsafe { SystemApplicationHandle::from_guard(guard) })
@@ -291,20 +321,43 @@ pub fn get_window_controller() -> Option<WindowControllerRef> {
     }
 }
 
+/// Names the event the system signals when an applet message is waiting.
+///
+/// The event belongs to the session and is closed with it, so what comes back
+/// is the number to wait on rather than a handle to close. Returns `None` when
+/// no session is open.
+pub fn message_event_handle() -> Option<u32> {
+    let guard = state().read();
+    Some(
+        guard
+            .as_ref()?
+            .singleton()
+            .cache()
+            .message_event
+            .as_handle()
+            .to_raw(),
+    )
+}
+
 /// Gets the cached applet resource user ID.
 ///
 /// Returns `None` if the applet is not initialised or the ARUID was not
 /// available during init.
 pub fn get_applet_resource_user_id() -> Option<Aruid> {
     let guard = state().read();
-    guard.as_ref().and_then(|s| s.cache().aruid)
+    guard.as_ref().and_then(|s| s.singleton().cache().aruid)
 }
 
 /// Returns the cached focus state, or `None` if the applet is not initialised
 /// or the cached value is unknown.
 pub fn cached_focus_state() -> Option<AppletFocusState> {
     let guard = state().read();
-    let raw = guard.as_ref()?.cache().focus_state.load(Ordering::Acquire);
+    let raw = guard
+        .as_ref()?
+        .singleton()
+        .cache()
+        .focus_state
+        .load(Ordering::Acquire);
     if raw == FOCUS_STATE_UNKNOWN {
         return None;
     }
@@ -319,7 +372,9 @@ pub fn cached_operation_mode() -> AppletOperationMode {
     guard
         .as_ref()
         .and_then(|s| {
-            AppletOperationMode::from_raw(s.cache().operation_mode.load(Ordering::Acquire))
+            AppletOperationMode::from_raw(
+                s.singleton().cache().operation_mode.load(Ordering::Acquire),
+            )
         })
         .unwrap_or_default()
 }
@@ -332,7 +387,12 @@ pub fn cached_performance_mode() -> AppletPerformanceMode {
     guard
         .as_ref()
         .and_then(|s| {
-            AppletPerformanceMode::from_raw(s.cache().performance_mode.load(Ordering::Acquire))
+            AppletPerformanceMode::from_raw(
+                s.singleton()
+                    .cache()
+                    .performance_mode
+                    .load(Ordering::Acquire),
+            )
         })
         .unwrap_or_default()
 }
@@ -347,14 +407,14 @@ pub fn cached_performance_mode() -> AppletPerformanceMode {
 
 macro_rules! define_core_ref {
     ($Ref:ident, $Target:ident, $method:ident) => {
-        pub struct $Ref(RwLockReadGuard<'static, Option<AppletSingleton>>);
+        pub struct $Ref(RwLockReadGuard<'static, Option<AppletState>>);
 
         impl $Ref {
             /// Borrows the sub-interface for the duration of `&self`, which is
             /// what keeps it from outliving the read lock.
             #[inline]
             pub fn get(&self) -> $Target<'_> {
-                match self.0.as_ref() {
+                match self.0.as_ref().map(AppletState::singleton) {
                     Some(singleton) => singleton.$method(),
                     // SAFETY: construction is guarded by `is_some()` in the
                     // module-level accessor, and the read lock held by `self.0`

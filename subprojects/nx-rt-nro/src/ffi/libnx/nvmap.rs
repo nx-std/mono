@@ -171,7 +171,12 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nvmap_create(
     // A caller that asks for less than a page gets the page the driver would
     // have rounded up to anyway, which is what the C surface has always done.
     let align = MapAlign::try_from(align.max(MapAlign::PAGE.to_raw())).unwrap_or(MapAlign::PAGE);
-    let kind = MapKind::from_raw(kind as u8);
+    // The kind is a byte on the wire and arrives here in a C `u32`. Narrowing
+    // it silently would fold 0x100 onto 0x00, which is a different, valid kind.
+    let Ok(kind) = u8::try_from(kind) else {
+        return GENERIC_ERROR;
+    };
+    let kind = MapKind::from_raw(kind);
 
     let Some(service) = crate::services::nv::get_service() else {
         return GENERIC_ERROR;

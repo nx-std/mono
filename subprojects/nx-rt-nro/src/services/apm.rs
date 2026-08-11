@@ -22,26 +22,42 @@ fn state() -> &'static RwLock<Option<ApmState>> {
     APM_STATE.get_or_init(|| RwLock::new(None))
 }
 
-/// Initializes the APM service and opens ISession.
+/// Opens the performance-management service and its configuration session.
 ///
-/// This matches libnx's `apmInitialize()` behavior, which connects to the
-/// service and immediately opens the ISession interface.
+/// The session is opened here rather than on first use: every caller needs it,
+/// and opening it alongside the service keeps the pair's lifetime single.
+///
+/// Counts its callers: a second caller joins the session the first opened
+/// rather than replacing it, and both close when the last of them calls
+/// [`exit`]. Without the count, two independent users of this service in one
+/// process would each close it under the other.
 ///
 /// # Panics
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
+    {
+        let mut guard = state().write();
+        if let Some(ref mut apm_state) = *guard {
+            apm_state.ref_count += 1;
+            return Ok(());
+        }
+    }
+
     let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Connect to APM service
     let service = nx_service_apm::connect(sm).map_err(ConnectError::Connect)?;
 
-    // Open session immediately (libnx compatibility)
     let session = service.open_session().map_err(ConnectError::OpenSession)?;
 
     let mut guard = state().write();
-    *guard = Some(ApmState { service, session });
+    *guard = Some(ApmState {
+        service,
+        session,
+        ref_count: 1,
+    });
 
     Ok(())
 }
@@ -67,12 +83,19 @@ pub fn get_session() -> Option<impl core::ops::Deref<Target = ApmSession> + 'sta
 }
 
 /// Exits the APM service session.
+///
+/// Decrements the caller count. The session and the service close when it
+/// reaches zero.
 pub fn exit() {
     let mut guard = state().write();
-    // RAII: dropping `ApmState` closes the session and the service in field
-    // declaration order (session first, then service), matching the previous
-    // explicit close order.
-    let _ = guard.take();
+    if let Some(ref mut apm_state) = *guard {
+        apm_state.ref_count = apm_state.ref_count.saturating_sub(1);
+        if apm_state.ref_count == 0 {
+            // RAII: dropping `ApmState` closes the session and the service in
+            // field declaration order, session first.
+            let _ = guard.take();
+        }
+    }
 }
 
 /// Internal storage for APM service and session.
@@ -81,6 +104,8 @@ struct ApmState {
     service: ApmService,
     /// ISession for performance configuration
     session: ApmSession,
+    /// How many callers of [`init`] have not yet called [`exit`]
+    ref_count: u32,
 }
 
 /// Wrapper for accessing ApmService through RwLockReadGuard.

@@ -56,6 +56,11 @@ fsdev = ["dep:nx-fsdev", "sys-fd", "service-fs"]
 pm = ["dep:nx-pm"]
 rand = ["dep:nx-rand"]
 rt = ["dep:nx-rt-core"]
+# Per-kind `.crt0` for the opt-in `rustc`-link pipeline. Forwards to whichever
+# entry crate is in the link, because the `_start` it emits only reaches the
+# binary through this crate: the entry crates build as rlibs, and a feature set
+# on their own cargo invocation does not travel to the staticlib linked here.
+rt-link = ["nx-rt-nro?/rt-link", "nx-rt-nso?/rt-link"]
 rt-nro = ["dep:nx-rt-nro", "rt"]
 rt-nso = ["dep:nx-rt-nso", "rt"]
 service-apm = ["dep:nx-service-apm", "nx-rt-nro?/service-apm"]

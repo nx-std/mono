@@ -207,6 +207,16 @@ if get_option('use_nx_rt').enabled()
 
     debug('rt feature: enabled')
     deps_cargo_features += ['rt']
+
+    # The `rustc`-link pipeline takes its `_start` from the entry crate rather
+    # than from libnx's `switch_crt0.s`. The feature has to be selected here,
+    # on the staticlib that is actually linked: setting it on the entry crate's
+    # own cargo invocation builds an rlib nothing consumes, and the `_start` it
+    # emits never reaches the binary.
+    if get_option('link_pipeline') == 'rustc'
+        debug('rt-link feature: enabled')
+        deps_cargo_features += ['rt-link']
+    endif
 endif
 
 # nx-alloc requires the nx-rt runtime for heap initialization

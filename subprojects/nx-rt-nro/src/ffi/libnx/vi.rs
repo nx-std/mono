@@ -45,7 +45,13 @@ static VI_FFI_MANAGER_DISPLAY: SyncUnsafeCell<MaybeUninit<Service>> =
 static VI_FFI_BINDER_INDIRECT: SyncUnsafeCell<MaybeUninit<Service>> =
     SyncUnsafeCell::new(MaybeUninit::uninit());
 
-/// C-compatible display structure matching libnx ViDisplay.
+/// How long a display name may be, terminator excluded.
+///
+/// The name travels in a fixed 64-byte field that the display server reads as
+/// a C string, so the last byte is spoken for.
+const DISPLAY_NAME_CAPACITY: usize = 0x3F;
+
+/// C-compatible display structure.
 #[repr(C)]
 pub struct ViDisplay {
     /// Display ID.
@@ -177,19 +183,26 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_vi_open_display(
         return GENERIC_ERROR;
     };
 
+    // The name addresses a particular display, so one this shim cannot carry
+    // exactly is refused rather than adjusted to fit. Substituting a default
+    // or truncating would open a different display and report success, and the
+    // caller would go on to create layers on it.
+    // SAFETY: the caller guarantees `name` addresses a NUL-terminated string.
+    let name_cstr = unsafe { core::ffi::CStr::from_ptr(name) };
+    let Ok(name) = name_cstr.to_str() else {
+        return GENERIC_ERROR;
+    };
+    if name.len() > DISPLAY_NAME_CAPACITY {
+        return GENERIC_ERROR;
+    }
+
     // Zero-initialize the display struct
     unsafe { core::ptr::write_bytes(display, 0, 1) };
 
-    // Copy display name from C string
     let display_ref = unsafe { &mut *display };
-    let name_cstr = unsafe { core::ffi::CStr::from_ptr(name) };
-    let name_bytes = name_cstr.to_bytes();
-    let copy_len = name_bytes.len().min(0x3F);
-    display_ref.display_name[..copy_len].copy_from_slice(&name_bytes[..copy_len]);
+    display_ref.display_name[..name.len()].copy_from_slice(name.as_bytes());
 
-    // Create DisplayName from the bytes
-    let vi_display_name =
-        nx_service_vi::DisplayName::from_ascii(name_cstr.to_str().unwrap_or("Default"));
+    let vi_display_name = nx_service_vi::DisplayName::from_ascii(name);
 
     match service.open_display(&vi_display_name) {
         Ok(display_id) => {

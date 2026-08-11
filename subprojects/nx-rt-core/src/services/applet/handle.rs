@@ -23,7 +23,10 @@ use nx_service_applet::{
 };
 use nx_std_sync::rwlock::RwLockReadGuard;
 
-use super::state::AppletSingleton;
+use super::state::{
+    AppletSingleton,
+    AppletState,
+};
 
 /// Defines a role-specific handle: storage, the (unsafe) projection to
 /// `Proxy<R>`, and the `Deref` impl that exposes every method
@@ -38,7 +41,7 @@ macro_rules! define_handle {
     ($(#[$meta:meta])* $Handle:ident, $variant:ident, $role:ty) => {
         $(#[$meta])*
         pub struct $Handle {
-            guard: RwLockReadGuard<'static, Option<AppletSingleton>>,
+            guard: RwLockReadGuard<'static, Option<AppletState>>,
         }
 
         impl $Handle {
@@ -51,7 +54,7 @@ macro_rules! define_handle {
             /// `guard` then prevents the variant from changing for the
             /// handle's lifetime.
             pub(super) unsafe fn from_guard(
-                guard: RwLockReadGuard<'static, Option<AppletSingleton>>,
+                guard: RwLockReadGuard<'static, Option<AppletState>>,
             ) -> Self {
                 Self { guard }
             }
@@ -61,7 +64,7 @@ macro_rules! define_handle {
             type Target = Proxy<$role>;
 
             fn deref(&self) -> &Self::Target {
-                match self.guard.as_ref() {
+                match self.guard.as_ref().map(AppletState::singleton) {
                     Some(AppletSingleton::$variant(slot)) => &slot.proxy,
                     // SAFETY: `from_guard`'s caller verified the variant, and
                     // the read lock held by `self.guard` prevents the variant
