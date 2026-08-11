@@ -14,11 +14,25 @@ Every module opens with the same five parts, in this order, separated by blank l
 0. **Module documentation** — the `//!` block, before any item.
 1. **`core` and `alloc` imports**.
 2. **External crate imports**.
-3. **`mod` declarations**, `pub` and private together in one alphabetical block.
+3. **`mod` declarations**, `pub` and private together in one alphabetical block; feature-gated ones form a
+   second block after it.
 4. **Local imports and re-exports** — `use`/`pub use` of `self::`, `crate::`, and `super::`.
 
 The declarations come **before** the local imports because the local imports refer to them: a reader meets the
 module's structure first, then what it pulls out of that structure.
+
+When some of the sub-modules are feature-gated, the unconditional ones come first as one alphabetical block,
+and the `#[cfg(...)]`-gated ones follow as a second. Alphabetical order across the whole set would interleave
+the two, and a reader scanning for what a default build contains would have to read every attribute to find
+out. The split is what makes the always-present set legible at a glance.
+
+```rust
+// ✅ Good — the unconditional block, then the gated one.
+pub mod sm;
+
+#[cfg(feature = "service-applet")]
+pub mod applet;
+```
 
 Every crate here is `#![no_std]`, so the first group is `core` and `alloc` — there is no `std` group to write.
 A crate root carries two more lines before the groups: the inner attributes (`#![no_std]`) and the
@@ -217,7 +231,8 @@ Before committing code, verify:
 
 - [ ] The module opens with its `//!` documentation, before any item
 - [ ] `core`/`alloc` imports, then external crate imports, each in its own group
-- [ ] `mod` declarations form one block after the external imports and before the local imports
+- [ ] `mod` declarations form one block after the external imports and before the local imports, with any
+      feature-gated ones in a second block after the unconditional set
 - [ ] Local `use`/`pub use` of `self::`, `crate::`, and `super::` come last
 - [ ] Submodule types are imported and re-exported through `self::`, never through `crate::` or a bare name
 - [ ] Items are imported from the module that declares them, not through a re-export
