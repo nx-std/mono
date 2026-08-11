@@ -71,24 +71,24 @@ pub fn init() {
     mount_sdmc();
     cwd::init();
 
-    // SAFETY: both hooks run on the startup thread with every service above
-    // already open, which is the state libnx calls them in.
-    unsafe {
-        win_init();
-        user_app_init();
-    }
+    // SAFETY: runs on the startup thread, after every service this sequence
+    // opens is open, which is the state the hook is called in.
+    unsafe { win_init() };
+    // SAFETY: runs on the startup thread, after every service this sequence
+    // opens is open, which is the state the hook is called in.
+    unsafe { user_app_init() };
 }
 
 /// Closes what [`init`] opened, in the reverse order.
 ///
 /// Corresponds to `__appExit()` in `runtime/init.c`.
 pub fn exit() {
-    // SAFETY: both hooks run on the exiting thread with every service still
-    // open, which is the state libnx calls them in.
-    unsafe {
-        user_app_exit();
-        win_exit();
-    }
+    // SAFETY: the hook runs on the exiting thread with every service still
+    // open, which is the state it is called in.
+    unsafe { user_app_exit() };
+    // SAFETY: runs on the exiting thread with every service still open, which
+    // is the state it is called in.
+    unsafe { win_exit() };
 
     unmount_all();
     exit_fs();
@@ -162,25 +162,26 @@ fn resolve_hos_version() {
                 fn setsysExit();
             }
 
-            // SAFETY: the Service Manager is open, which is all `setsysInitialize`
-            // requires, and the out-pointer below addresses a live local.
-            unsafe {
-                if setsysInitialize() != 0 {
-                    return;
-                }
-
-                let mut fw = FirmwareVersion {
-                    major: 0,
-                    minor: 0,
-                    micro: 0,
-                    rest: [0; 0xFD],
-                };
-                if setsysGetFirmwareVersion(&raw mut fw) == 0 {
-                    hos_version::set(HosVersion::new(fw.major, fw.minor, fw.micro).as_u32());
-                }
-
-                setsysExit();
+            // SAFETY: the Service Manager is open, which is all this requires.
+            if unsafe { setsysInitialize() } != 0 {
+                return;
             }
+
+            let mut fw = FirmwareVersion {
+                major: 0,
+                minor: 0,
+                micro: 0,
+                rest: [0; 0xFD],
+            };
+            // SAFETY: the session is open, and the out-pointer addresses a live
+            // local that outlives the call.
+            if unsafe { setsysGetFirmwareVersion(&raw mut fw) } == 0 {
+                hos_version::set(HosVersion::new(fw.major, fw.minor, fw.micro).as_u32());
+            }
+
+            // SAFETY: `setsysInitialize` returned success, so a session is open,
+            // and nothing has closed it since.
+            unsafe { setsysExit() };
         }
     }
 }
@@ -297,14 +298,13 @@ fn init_time() {
                 fn __libnx_init_time();
             }
 
-            // SAFETY: the Service Manager is open, which is what these require.
-            unsafe {
-                let rc = timeInitialize();
-                if rc != 0 {
-                    panic!("startup: Time failed to initialize: {rc:#x}");
-                }
-                __libnx_init_time();
+            // SAFETY: the Service Manager is open, which is what this requires.
+            let rc = unsafe { timeInitialize() };
+            if rc != 0 {
+                panic!("startup: Time failed to initialize: {rc:#x}");
             }
+            // SAFETY: the Time service is open, which is what this requires.
+            unsafe { __libnx_init_time() };
         }
     }
 }
@@ -384,7 +384,10 @@ fn mount_sdmc() {
                 fn fsdevMountSdmc() -> u32;
             }
 
-            // Discarded for the reason above.
+            // A failed mount is not fatal to startup: the SD card may be absent or
+            // unreadable, and a program that needs it finds out when its first path
+            // that resolves through `sdmc:` reports it again, to a caller that can
+            // act on it.
             // SAFETY: the `fsp-srv` session is open, which is what this requires.
             let _ = unsafe { fsdevMountSdmc() };
         }
@@ -402,9 +405,8 @@ fn unmount_all() {
                 fn fsdevUnmountAll() -> u32;
             }
 
-            // A mount that failed to come down is one this call wanted gone anyway, and the
-            // process is exiting, so there is no caller left to report it to. The Rust arm
-            // above returns nothing for the same reason.
+            // A mount that failed to come down is one this call wanted gone anyway,
+            // and the process is exiting, so there is no caller left to report it to.
             // SAFETY: teardown of the mounts this sequence made.
             let _ = unsafe { fsdevUnmountAll() };
         }

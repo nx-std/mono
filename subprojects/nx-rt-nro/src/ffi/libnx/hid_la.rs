@@ -173,7 +173,8 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_la_create_controller_support_arg
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_la_create_controller_firmware_update_arg(
     arg: *mut ControllerFirmwareUpdateArg,
 ) {
-    // SAFETY: As above.
+    // SAFETY: the caller guarantees `arg` is null or points to a writable
+    // `ControllerFirmwareUpdateArg`.
     let Some(arg) = (unsafe { arg.as_mut() }) else {
         return;
     };
@@ -192,7 +193,8 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_la_create_controller_firmware_up
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_la_create_controller_key_remapping_arg(
     arg: *mut ControllerKeyRemappingArg,
 ) {
-    // SAFETY: As above.
+    // SAFETY: the caller guarantees `arg` is null or points to a writable
+    // `ControllerKeyRemappingArg`.
     let Some(arg) = (unsafe { arg.as_mut() }) else {
         return;
     };

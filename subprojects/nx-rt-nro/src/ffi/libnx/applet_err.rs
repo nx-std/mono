@@ -70,8 +70,9 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_application_create(
     let Some(dialog) = (unsafe { borrow_c_str(dialog_message) }) else {
         return GENERIC_ERROR;
     };
-    // SAFETY: As above; a null fullscreen message is the documented "no details"
-    // case rather than an error.
+    // SAFETY: the caller guarantees the message pointers are null or live
+    // NUL-terminated strings; a null fullscreen message is the documented
+    // "no details" case rather than an error.
     let fullscreen = unsafe { borrow_c_str(fullscreen_message) };
 
     let arg = ErrorApplicationArg::new(dialog, fullscreen);

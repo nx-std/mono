@@ -69,7 +69,8 @@ pub fn init_main_thread() {
                 fn __libnx_init_thread();
             }
 
-            // SAFETY: as above.
+            // SAFETY: this is the main thread, the heap is up, and no other
+            // thread API has run yet.
             unsafe { __libnx_init_thread() };
         }
     }

@@ -385,18 +385,20 @@ fn wait_in_focus(common_state_getter: CommonStateGetter<'_>) -> Result<(), WaitI
 
     while focus_state != AppletFocusState::InFocus {
         // SAFETY: `event` owns the handle for the whole of this loop, so it
-        // names a live kernel event; the Application Manager issues it as a
-        // resettable one, which is what `reset_signal` requires.
-        unsafe {
-            nx_svc::sync::wait_synchronization_single(event.as_handle(), u64::MAX)
-                .map_err(WaitInFocusError::WaitSynchronization)?;
-            // The event does not clear itself, so the signal is cleared here;
-            // leaving it set would make the next wait return at once and spin
-            // this loop. A refusal costs only that: the loop re-reads the
-            // focus state each time round, so it still terminates on the
-            // state itself rather than on the signal.
-            let _ = nx_svc::sync::reset_signal(event.as_handle());
-        }
+        // names a live kernel event.
+        unsafe { nx_svc::sync::wait_synchronization_single(event.as_handle(), u64::MAX) }
+            .map_err(WaitInFocusError::WaitSynchronization)?;
+
+        // The event does not clear itself, so the signal is cleared here;
+        // leaving it set would make the next wait return at once and spin this
+        // loop. A refusal costs only that: the loop re-reads the focus state
+        // each time round, so it still terminates on the state itself rather
+        // than on the signal.
+        //
+        // SAFETY: `event` owns the handle for the whole of this loop, so it
+        // names a live kernel event, and the Application Manager issues it as a
+        // resettable one, which is what this requires.
+        let _ = unsafe { nx_svc::sync::reset_signal(event.as_handle()) };
 
         if let Ok(Some(msg)) = common_state_getter.receive_message()
             && matches!(msg, AppletMessage::FocusStateChanged)

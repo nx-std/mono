@@ -60,6 +60,7 @@ pub unsafe extern "C" fn __nx_rt_nso__libnx_init(
 /// service the startup sequence opened still open.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nso__libnx_exit(status: i32) -> ! {
-    // SAFETY: the caller guarantees the exiting-thread contract above.
+    // SAFETY: the caller guarantees this runs at most once, on the thread that
+    // is exiting, with every service the startup sequence opened still open.
     unsafe { init::exit(status) }
 }

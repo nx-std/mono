@@ -96,6 +96,8 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_time_to_calendar_time_with_my_rule(
     match crate::services::time::get_service() {
         Some(service) => match service.to_calendar_time_with_my_rule(timestamp) {
             Ok((cal, inf)) => {
+                // SAFETY: both pointers were checked non-null above, and the
+                // caller guarantees each addresses a writable value of its type.
                 unsafe {
                     *caltime = cal;
                     *info = inf;
