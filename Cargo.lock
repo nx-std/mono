@@ -154,7 +154,9 @@ dependencies = [
  "nx-svc",
  "nx-sys-net",
  "nx-sys-sync",
+ "nx-sys-thread",
  "nx-sys-thread-tls",
+ "nx-sys-virtmem",
  "thiserror",
 ]
 
@@ -164,7 +166,6 @@ version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
  "nx-rt-core",
- "nx-svc",
 ]
 
 [[package]]
@@ -204,9 +205,7 @@ dependencies = [
  "nx-std-sync",
  "nx-svc",
  "nx-sys-mem",
- "nx-sys-thread",
  "nx-sys-thread-tls",
- "nx-sys-virtmem",
  "nx-time",
  "thiserror",
  "zerocopy",
@@ -221,8 +220,6 @@ dependencies = [
  "nx-rt-core",
  "nx-service-applet",
  "nx-svc",
- "nx-sys-thread",
- "nx-sys-virtmem",
 ]
 
 [[package]]

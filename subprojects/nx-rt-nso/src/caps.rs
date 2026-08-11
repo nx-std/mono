@@ -28,7 +28,7 @@
 //! | `none`               | `None`              | base            | -              |
 //!
 //! - **base**: heap bring-up, the `__argdata__` probe, and Service Manager
-//!   IPC (see [`Svc::base`]).
+//!   IPC.
 //! - **base + sync**: the base set plus the two synchronization SVCs the
 //!   `Application` / `SystemApplication` InFocus wait invokes. The other applet
 //!   roles open their Application Manager proxy but skip the InFocus wait, so
@@ -39,51 +39,10 @@
 //! [`CAPABILITIES`] is the fragment for this build's applet identity;
 //! [`for_applet`] yields the fragment for any applet type.
 
+pub use nx_rt_core::caps::Svc;
 use nx_service_applet::AppletType;
-use nx_svc::code;
 
 use crate::applet::APPLET_TYPE;
-
-/// A supervisor call (SVC) the runtime startup invokes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Svc {
-    /// Kernel SVC number: the immediate operand of the `svc` instruction.
-    pub number: u16,
-    /// libnx-style name, e.g. `"svcSetHeapSize"`.
-    pub name: &'static str,
-}
-
-impl Svc {
-    /// `svcSetHeapSize`: the SVC-backed heap path allocates the process heap.
-    pub const SET_HEAP_SIZE: Self = Self::new(code::SET_HEAP_SIZE, "svcSetHeapSize");
-    /// `svcQueryMemory`: the argv reader probes the `__argdata__` mapping.
-    pub const QUERY_MEMORY: Self = Self::new(code::QUERY_MEMORY, "svcQueryMemory");
-    /// `svcConnectToNamedPort`: opens the `sm:` session.
-    pub const CONNECT_TO_NAMED_PORT: Self =
-        Self::new(code::CONNECT_TO_NAMED_PORT, "svcConnectToNamedPort");
-    /// `svcSendSyncRequest`: issues every CMIF / TIPC IPC request.
-    pub const SEND_SYNC_REQUEST: Self = Self::new(code::SEND_SYNC_REQUEST, "svcSendSyncRequest");
-    /// `svcCloseHandle`: releases session and event handles.
-    pub const CLOSE_HANDLE: Self = Self::new(code::CLOSE_HANDLE, "svcCloseHandle");
-    /// `svcWaitSynchronization`: blocks on the applet message event during
-    /// the InFocus wait.
-    pub const WAIT_SYNCHRONIZATION: Self =
-        Self::new(code::WAIT_SYNCHRONIZATION, "svcWaitSynchronization");
-    /// `svcResetSignal`: clears the applet message event during the InFocus
-    /// wait.
-    pub const RESET_SIGNAL: Self = Self::new(code::RESET_SIGNAL, "svcResetSignal");
-
-    /// The supervisor calls every NSO startup invokes regardless of applet
-    /// identity: heap bring-up, the `__argdata__` probe, and Service Manager
-    /// IPC.
-    pub const fn base() -> &'static [Svc] {
-        &BASE_SVCS
-    }
-
-    const fn new(number: u16, name: &'static str) -> Self {
-        Self { number, name }
-    }
-}
 
 /// A system service the runtime startup connects to through the Service
 /// Manager.

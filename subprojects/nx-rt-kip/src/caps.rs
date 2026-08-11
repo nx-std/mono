@@ -35,32 +35,7 @@
 //! `sm`-brokered service, so the startup declares no service-access capability
 //! at all: only the supervisor calls above.
 
-use nx_svc::code;
-
-/// A supervisor call (SVC) the KIP runtime startup invokes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Svc {
-    /// Kernel SVC number: the immediate operand of the `svc` instruction.
-    pub number: u16,
-    /// libnx-style name, e.g. `"svcSetHeapSize"`.
-    pub name: &'static str,
-}
-
-impl Svc {
-    /// `svcSetHeapSize`: the SVC-backed heap path allocates the process heap.
-    pub const SET_HEAP_SIZE: Self = Self::new(code::SET_HEAP_SIZE, "svcSetHeapSize");
-    /// `svcConnectToNamedPort`: opens the `sm:` session.
-    pub const CONNECT_TO_NAMED_PORT: Self =
-        Self::new(code::CONNECT_TO_NAMED_PORT, "svcConnectToNamedPort");
-    /// `svcSendSyncRequest`: issues every CMIF / TIPC IPC request.
-    pub const SEND_SYNC_REQUEST: Self = Self::new(code::SEND_SYNC_REQUEST, "svcSendSyncRequest");
-    /// `svcCloseHandle`: releases the Service Manager session handle.
-    pub const CLOSE_HANDLE: Self = Self::new(code::CLOSE_HANDLE, "svcCloseHandle");
-
-    const fn new(number: u16, name: &'static str) -> Self {
-        Self { number, name }
-    }
-}
+pub use nx_rt_core::caps::Svc;
 
 /// The minimum kernel capabilities one KIP's runtime startup needs.
 ///

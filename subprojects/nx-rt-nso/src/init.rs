@@ -66,9 +66,9 @@ pub unsafe fn init(main_thread: ThreadHandle) {
     // known, and no thread-local has been touched yet.
     unsafe { env::main_thread::setup() };
 
-    setup_virtmem();
+    nx_rt_core::init::setup_virtmem();
     nx_rt_core::init::setup_heap();
-    init_main_thread();
+    nx_rt_core::init::init_main_thread();
 
     // SAFETY: the heap is up, which is what the argument scanner allocates
     // from, and no other thread exists to race the parse.
@@ -109,48 +109,6 @@ pub unsafe fn exit(_status: i32) -> ! {
     // SAFETY: the function pointer is the one environment bring-up installed,
     // and nothing runs after this.
     unsafe { __nx_exit(0, env::exit_func_ptr()) }
-}
-
-/// Initializes the reservation map that address-space lookups are served from.
-///
-/// Corresponds to `virtmemSetup()` in `virtmem.c`.
-fn setup_virtmem() {
-    #[cfg(feature = "sys-virtmem")]
-    nx_sys_virtmem::virtmem::lock().init();
-
-    #[cfg(not(feature = "sys-virtmem"))]
-    {
-        unsafe extern "C" {
-            fn virtmemSetup();
-        }
-
-        // SAFETY: no other thread exists yet, which is the only thing this
-        // step requires.
-        unsafe { virtmemSetup() };
-    }
-}
-
-/// Fills in the thread bookkeeping for the thread the process started on.
-///
-/// Corresponds to `__libnx_init_thread()` in `thread.c`. Runs after the heap
-/// so the bookkeeping it registers has somewhere to live.
-fn init_main_thread() {
-    #[cfg(feature = "sys-thread")]
-    {
-        // SAFETY: this is the main thread, the heap is up, and no other thread
-        // API has run yet.
-        unsafe { nx_sys_thread::thread::init_main_thread() };
-    }
-
-    #[cfg(not(feature = "sys-thread"))]
-    {
-        unsafe extern "C" {
-            fn __libnx_init_thread();
-        }
-
-        // SAFETY: as above.
-        unsafe { __libnx_init_thread() };
-    }
 }
 
 unsafe extern "C" {

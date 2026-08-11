@@ -67,6 +67,22 @@ if get_option('use_nx_net').enabled()
     deps += nx_net_dep
 endif
 
+# nx-sys-thread (backs the `sys-thread` feature's main-thread registration)
+if get_option('use_nx_sys_thread').enabled()
+    nx_sys_thread_proj = subproject('nx-sys-thread')
+    nx_sys_thread_dep = nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
+    deps += nx_sys_thread_dep
+endif
+
+# nx-sys-virtmem (backs the `sys-virtmem` feature's reservation map). Gated on
+# `use_nx_sys_mem` rather than an option of its own: the heap-free `virtmem`
+# substrate rides along with `nx-sys-mem`, as it does in `nx-std`.
+if get_option('use_nx_sys_mem').enabled()
+    nx_sys_virtmem_proj = subproject('nx-sys-virtmem')
+    nx_sys_virtmem_dep = nx_sys_virtmem_proj.get_variable('nx_sys_virtmem_dep')
+    deps += nx_sys_virtmem_dep
+endif
+
 # nx-service-bsd + nx-sys-net (back the `sys-net` feature's socket-driver
 # bring-up, whose interface revision follows the running firmware)
 if get_option('use_nx_sys_net').enabled()

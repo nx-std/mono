@@ -21,10 +21,10 @@ rt-link = []
 # Main-thread bring-up — gates the Rust arm of the `__libnx_init_thread`
 # startup step. With it off that step calls libnx's own, which is the only
 # implementation in the link when the matching Meson option is off.
-sys-thread = ["dep:nx-sys-thread"]
+sys-thread = ["nx-rt-core/sys-thread"]
 # Virtual-memory reservation map — gates the Rust arm of the `virtmemSetup`
 # startup step, on the same terms as `sys-thread`.
-sys-virtmem = ["dep:nx-sys-virtmem"]
+sys-virtmem = ["nx-rt-core/sys-virtmem"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
@@ -32,8 +32,6 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", features = ["service-applet"] }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
-nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
-nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem", optional = true }
 
 # The build-time Application Manager identity arrives as the `nso_applet_type`
 # cfg value, set by the Meson option of the same name. Denying the lint turns a
