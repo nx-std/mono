@@ -8,10 +8,7 @@ use alloc::string::{
     String,
     ToString,
 };
-use core::{
-    ffi::CStr,
-    str::FromStr,
-};
+use core::str::FromStr;
 
 /// Maximum length, in bytes, of a [`Hostname`].
 ///
@@ -59,15 +56,6 @@ impl FromStr for Hostname {
     }
 }
 
-impl TryFrom<&CStr> for Hostname {
-    type Error = HostnameError;
-
-    fn try_from(value: &CStr) -> Result<Self, Self::Error> {
-        let text = value.to_str().map_err(HostnameError::NotUtf8)?;
-        text.parse()
-    }
-}
-
 /// Errors produced when validating a [`Hostname`].
 #[derive(Debug, thiserror::Error)]
 pub enum HostnameError {
@@ -83,11 +71,4 @@ pub enum HostnameError {
     /// A DNS name longer than 255 octets is not representable on the wire.
     #[error("hostname exceeds the maximum length of 255 bytes")]
     TooLong,
-
-    /// A C-string hostname contained bytes that are not valid UTF-8.
-    ///
-    /// Occurs only on the [`TryFrom<&CStr>`](Hostname) path; hostnames are
-    /// expected to be ASCII (or, at most, valid UTF-8) text.
-    #[error("hostname is not valid UTF-8")]
-    NotUtf8(#[source] core::str::Utf8Error),
 }

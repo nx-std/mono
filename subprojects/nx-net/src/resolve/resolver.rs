@@ -28,7 +28,7 @@
 //! design.
 
 use alloc::{
-    ffi::CString,
+    borrow::Cow,
     string::ToString,
     vec::Vec,
 };
@@ -115,17 +115,16 @@ pub fn lookup_addrinfo(
     service: Option<&ServiceSpec>,
     hints: &AddrInfoHints,
 ) -> Result<AddrInfoList, ResolveError> {
-    // `node` / `service` travel as C strings; the `CString` helpers carry the
-    // NUL terminator the resolver expects.
-    let node_buf = node.map(hostname_cstring);
-    let service_buf = service.map(service_cstring);
+    // A service identifier is a port or a name; only the port has to be rendered,
+    // so the borrow is kept for the name that is already text.
+    let service_text = service.map(service_text);
 
     let result = svc
         .get_addr_info(
             None,
             false,
-            node_buf.as_deref(),
-            service_buf.as_deref(),
+            node.map(Hostname::as_str),
+            service_text.as_deref(),
             &to_sf_hints(hints),
         )
         .map_err(ResolveError::Ipc)?;
@@ -183,10 +182,8 @@ pub fn lookup_host_by_name(
     name: &Hostname,
     family: AddrFamily,
 ) -> Result<HostEntry, HostLookupError> {
-    let name_buf = hostname_cstring(name);
-
     let result = svc
-        .get_host_by_name(None, false, Some(name_buf.as_c_str()))
+        .get_host_by_name(None, false, Some(name.as_str()))
         .map_err(HostLookupError::ByName)?;
 
     if let Some(failure) = result.failure {
@@ -348,35 +345,14 @@ fn to_sf_hints(hints: &AddrInfoHints) -> SfAddrInfoHints {
     }
 }
 
-/// Encodes a hostname as the NUL-terminated [`CString`] `sfdnsres` expects.
+/// Renders a service identifier as the text `sfdnsres` parses.
 ///
-/// The resolver consumes node names as C strings; the [`CString`] carries the
-/// NUL terminator the C resolver appends to the validated hostname text.
-fn hostname_cstring(name: &Hostname) -> CString {
-    cstring_truncating(name.as_bytes())
-}
-
-/// Encodes a service identifier as the NUL-terminated [`CString`] `sfdnsres`
-/// expects.
-///
-/// A numeric port is sent as its decimal text — the wire form the resolver
-/// parses for both named and numeric services.
-fn service_cstring(service: &ServiceSpec) -> CString {
-    let bytes = match service {
-        ServiceSpec::Port(port) => port.to_string().into_bytes(),
-        ServiceSpec::Name(name) => name.clone().into_bytes(),
-    };
-    cstring_truncating(&bytes)
-}
-
-/// Builds a [`CString`] from `bytes`, truncating at the first interior NUL.
-///
-/// An interior NUL is a `strlen` boundary on the C side anyway, so the prefix
-/// before it is the meaningful value; truncating keeps construction infallible.
-fn cstring_truncating(bytes: &[u8]) -> CString {
-    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-    // SAFETY: `end` is the index of the first NUL, or the length when there is
-    // none, so `bytes[..end]` contains no NUL at all and the one failure
-    // `CString::new` reports cannot arise.
-    CString::new(&bytes[..end]).expect("prefix contains no interior NUL")
+/// A numeric port becomes its decimal text, which is the wire form the resolver
+/// reads for both named and numeric services. A name is already that text, so it
+/// is borrowed rather than copied.
+fn service_text(service: &ServiceSpec) -> Cow<'_, str> {
+    match service {
+        ServiceSpec::Port(port) => Cow::Owned(port.to_string()),
+        ServiceSpec::Name(name) => Cow::Borrowed(name),
+    }
 }

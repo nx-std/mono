@@ -491,16 +491,13 @@ fn host_fail(h_errno: c_int, errno: c_int) -> *mut hostent {
 /// # Safety
 ///
 /// `ptr` must be null or point to a NUL-terminated C string.
-unsafe fn parse_arg<T>(ptr: *const c_char) -> Result<Option<T>, ()>
-where
-    for<'a> T: TryFrom<&'a CStr>,
-{
+unsafe fn parse_arg<T: core::str::FromStr>(ptr: *const c_char) -> Result<Option<T>, ()> {
     if ptr.is_null() {
         return Ok(None);
     }
     // SAFETY: `ptr` is non-null and, by contract, a NUL-terminated C string.
-    let cstr = unsafe { CStr::from_ptr(ptr) };
-    T::try_from(cstr).map(Some).map_err(|_| ())
+    let text = unsafe { CStr::from_ptr(ptr) }.to_str().map_err(|_| ())?;
+    text.parse().map(Some).map_err(|_| ())
 }
 
 /// Converts a caller-supplied C `addrinfo` hints record into the resolver's

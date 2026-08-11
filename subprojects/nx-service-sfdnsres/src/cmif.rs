@@ -11,9 +11,11 @@
 //! Nothing here is `unsafe`: the IPC buffer arrives as a checked borrow and
 //! the response is decoded through `zerocopy`.
 
-use alloc::vec;
+use alloc::{
+    vec,
+    vec::Vec,
+};
 use core::{
-    ffi::CStr,
     mem::size_of,
     net::{
         IpAddr,
@@ -172,14 +174,15 @@ pub struct GetHostByNameResult {
 /// decodes it into an owned [`HostEntry`]. On a resolver failure (`h_errno`
 /// non-zero) the resolver writes no record, so `host` is the empty entry.
 ///
-/// `name` is sent NUL-terminated, which is the length the service reads; the `&CStr`
-/// carries its own terminator. Pass `None` to send a zero-length buffer
+/// `name` is sent NUL-terminated, which is the length the service reads;
+/// appending the terminator is this function's job, since it belongs to the
+/// wire rather than to a hostname. Pass `None` to send a zero-length buffer
 /// (the service accepts a null pointer).
 pub fn get_host_by_name(
     session: BorrowedSessionHandle<'_>,
     cancel_handle: Option<CancelHandle>,
     use_nsd: bool,
-    name: Option<&CStr>,
+    name: Option<&str>,
 ) -> Result<GetHostByNameResult, CommandError> {
     let input = GetHostByNameIn {
         use_nsd: u32::from(use_nsd),
@@ -187,7 +190,8 @@ pub fn get_host_by_name(
         pid_placeholder: 0,
     };
 
-    let name_bytes = name.map(CStr::to_bytes_with_nul).unwrap_or_default();
+    let name_buf = name.map(nul_terminated);
+    let name_bytes = name_buf.as_deref().unwrap_or_default();
     let mut out_buffer = vec![0u8; HOSTENT_BUF_LEN];
 
     let out: GetHostByNameOut = invoke(session, CMD_GET_HOST_BY_NAME, &input, |builder| {
@@ -297,8 +301,8 @@ pub struct GetAddrInfoResult {
 
 /// Performs a `getaddrinfo`-style resolution.
 ///
-/// `node`, `service` are sent NUL-terminated (the `&CStr` carries its own
-/// terminator) or `None` for a null pointer with zero length. `hints` is the
+/// `node`, `service` are sent NUL-terminated, with the terminator appended
+/// here, or `None` for a null pointer with zero length. `hints` is the
 /// typed lookup template; it is serialized into the request buffer here. The
 /// command allocates its own scratch buffer and decodes the serialized
 /// addrinfo chain into an owned [`AddrInfoList`].
@@ -306,8 +310,8 @@ pub fn get_addr_info(
     session: BorrowedSessionHandle<'_>,
     cancel_handle: Option<CancelHandle>,
     use_nsd: bool,
-    node: Option<&CStr>,
-    service: Option<&CStr>,
+    node: Option<&str>,
+    service: Option<&str>,
     hints: &AddrInfoHints,
 ) -> Result<GetAddrInfoResult, CommandError> {
     let input = GetAddrInfoIn {
@@ -316,8 +320,10 @@ pub fn get_addr_info(
         pid_placeholder: 0,
     };
 
-    let node_bytes = node.map(CStr::to_bytes_with_nul).unwrap_or_default();
-    let svc_bytes = service.map(CStr::to_bytes_with_nul).unwrap_or_default();
+    let node_buf = node.map(nul_terminated);
+    let svc_buf = service.map(nul_terminated);
+    let node_bytes = node_buf.as_deref().unwrap_or_default();
+    let svc_bytes = svc_buf.as_deref().unwrap_or_default();
     let hints_buf = wire::encode_hints(hints);
     let mut out_buffer = vec![0u8; ADDRINFO_BUF_LEN];
 
@@ -414,6 +420,25 @@ pub fn cancel(
     invoke(session, CMD_CANCEL, &input, |builder| {
         builder.with_send_pid()
     })
+}
+
+/// Encodes `text` as the NUL-terminated buffer the resolver reads.
+///
+/// The terminator is a property of this wire format rather than of a hostname
+/// or a service identifier, so it is appended here and nowhere above.
+///
+/// An interior NUL ends the value as far as the resolver is concerned, since it
+/// reads a C string out of the buffer. Truncating there keeps the length sent
+/// equal to the value the service will actually act on, rather than promising
+/// bytes it is going to ignore.
+fn nul_terminated(text: &str) -> Vec<u8> {
+    let bytes = text.as_bytes();
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+
+    let mut buf = Vec::with_capacity(end + 1);
+    buf.extend_from_slice(&bytes[..end]);
+    buf.push(0);
+    buf
 }
 
 #[inline]

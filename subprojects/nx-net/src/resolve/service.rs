@@ -8,10 +8,7 @@ use alloc::string::{
     String,
     ToString,
 };
-use core::{
-    ffi::CStr,
-    str::FromStr,
-};
+use core::str::FromStr;
 
 /// A resolver service identifier: either a numeric port or a service name.
 ///
@@ -40,15 +37,6 @@ impl FromStr for ServiceSpec {
     }
 }
 
-impl TryFrom<&CStr> for ServiceSpec {
-    type Error = ServiceSpecError;
-
-    fn try_from(value: &CStr) -> Result<Self, Self::Error> {
-        let text = value.to_str().map_err(ServiceSpecError::NotUtf8)?;
-        text.parse()
-    }
-}
-
 /// Errors produced when parsing a [`ServiceSpec`].
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceSpecError {
@@ -58,8 +46,4 @@ pub enum ServiceSpecError {
     /// empty string.
     #[error("service identifier must not be empty")]
     Empty,
-
-    /// A C-string service identifier contained bytes that are not valid UTF-8.
-    #[error("service identifier is not valid UTF-8")]
-    NotUtf8(#[source] core::str::Utf8Error),
 }

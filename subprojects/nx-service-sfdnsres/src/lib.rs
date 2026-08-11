@@ -33,12 +33,9 @@
 extern crate alloc; // String, Vec
 extern crate nx_panic_handler; // Provide #![panic_handler]
 
-use core::{
-    ffi::CStr,
-    net::{
-        IpAddr,
-        SocketAddr,
-    },
+use core::net::{
+    IpAddr,
+    SocketAddr,
 };
 
 use nx_service_sm::SmService;
@@ -100,7 +97,7 @@ impl SfdnsresService {
         &self,
         cancel_handle: Option<CancelHandle>,
         use_nsd: bool,
-        name: Option<&CStr>,
+        name: Option<&str>,
     ) -> Result<GetHostByNameResult, CommandError> {
         cmif::get_host_by_name(self.0.handle(), cancel_handle, use_nsd, name)
     }
@@ -136,8 +133,8 @@ impl SfdnsresService {
         &self,
         cancel_handle: Option<CancelHandle>,
         use_nsd: bool,
-        node: Option<&CStr>,
-        service: Option<&CStr>,
+        node: Option<&str>,
+        service: Option<&str>,
         hints: &AddrInfoHints,
     ) -> Result<GetAddrInfoResult, CommandError> {
         cmif::get_addr_info(
