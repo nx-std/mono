@@ -26,14 +26,9 @@ nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep'
 nx_rt_core_proj = subproject('nx-rt-core')
 nx_rt_core_dep = nx_rt_core_proj.get_variable('nx_rt_core_dep')
 
-# nx-svc (SVC bindings — the SVC numbers in the startup capability fragment)
-nx_svc_proj = subproject('nx-svc')
-nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
-
 deps = [
     nx_panic_handler_dep,
     nx_rt_core_dep,
-    nx_svc_dep,
 ]
 
 #---------------------------------------------------------------------------------

@@ -263,9 +263,9 @@ pub fn process_message(msg: AppletMessage) {
 pub fn as_application() -> Option<ApplicationHandle> {
     let guard = state().read();
     match guard.as_ref().map(AppletState::singleton) {
-        // SAFETY: variant verified by the match arm above; the read lock held
-        // by `guard` prevents the variant from changing for the handle's
-        // lifetime.
+        // SAFETY: the arm this comment sits on matches the variant the handle
+        // projects to, and the read lock held by `guard` keeps the singleton on
+        // that variant for the handle's lifetime.
         Some(AppletSingleton::Application(_)) => {
             Some(unsafe { ApplicationHandle::from_guard(guard) })
         }
@@ -278,7 +278,9 @@ pub fn as_application() -> Option<ApplicationHandle> {
 pub fn as_library_applet() -> Option<LibraryAppletHandle> {
     let guard = state().read();
     match guard.as_ref().map(AppletState::singleton) {
-        // SAFETY: see `as_application`.
+        // SAFETY: the arm this comment sits on matches the variant the handle
+        // projects to, and the read lock held by `guard` keeps the singleton on
+        // that variant for the handle's lifetime.
         Some(AppletSingleton::LibraryApplet(_)) => {
             Some(unsafe { LibraryAppletHandle::from_guard(guard) })
         }
@@ -291,7 +293,9 @@ pub fn as_library_applet() -> Option<LibraryAppletHandle> {
 pub fn as_system_applet() -> Option<SystemAppletHandle> {
     let guard = state().read();
     match guard.as_ref().map(AppletState::singleton) {
-        // SAFETY: see `as_application`.
+        // SAFETY: the arm this comment sits on matches the variant the handle
+        // projects to, and the read lock held by `guard` keeps the singleton on
+        // that variant for the handle's lifetime.
         Some(AppletSingleton::SystemApplet(_)) => {
             Some(unsafe { SystemAppletHandle::from_guard(guard) })
         }
@@ -304,7 +308,9 @@ pub fn as_system_applet() -> Option<SystemAppletHandle> {
 pub fn as_overlay_applet() -> Option<OverlayAppletHandle> {
     let guard = state().read();
     match guard.as_ref().map(AppletState::singleton) {
-        // SAFETY: see `as_application`.
+        // SAFETY: the arm this comment sits on matches the variant the handle
+        // projects to, and the read lock held by `guard` keeps the singleton on
+        // that variant for the handle's lifetime.
         Some(AppletSingleton::OverlayApplet(_)) => {
             Some(unsafe { OverlayAppletHandle::from_guard(guard) })
         }
@@ -317,7 +323,9 @@ pub fn as_overlay_applet() -> Option<OverlayAppletHandle> {
 pub fn as_system_application() -> Option<SystemApplicationHandle> {
     let guard = state().read();
     match guard.as_ref().map(AppletState::singleton) {
-        // SAFETY: see `as_application`.
+        // SAFETY: the arm this comment sits on matches the variant the handle
+        // projects to, and the read lock held by `guard` keeps the singleton on
+        // that variant for the handle's lifetime.
         Some(AppletSingleton::SystemApplication(_)) => {
             Some(unsafe { SystemApplicationHandle::from_guard(guard) })
         }

@@ -304,16 +304,15 @@ fn set_sm_ffi_session() {
         // of the kernel handle and closes it on `Drop` via `sm::exit`. A
         // `own_handle = 1` snapshot here would risk a double-close if libnx
         // ever invoked `serviceClose` on the cached pointer.
-        // SAFETY: Called only during initialization, single-threaded access.
-        unsafe {
-            let service = Service {
-                session: sm.session().to_handle(),
-                own_handle: 0,
-                object_id: 0,
-                pointer_buffer_size: 0,
-            };
-            SM_FFI_SESSION.get().cast::<Service>().write(service);
-        }
+        let service = Service {
+            session: sm.session().to_handle(),
+            own_handle: 0,
+            object_id: 0,
+            pointer_buffer_size: 0,
+        };
+        // SAFETY: called only during initialization, single-threaded, so
+        // nothing else holds a reference to the cell.
+        unsafe { SM_FFI_SESSION.get().cast::<Service>().write(service) };
     }
 }
 

@@ -18,3 +18,17 @@ option(
     description : 'Enable the resolver overrides that need the service-manager session',
     yield : true
 )
+
+option(
+    'use_nx_sys_thread',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-core `sys-thread` feature',
+    yield : true
+)
+
+option(
+    'use_nx_sys_mem',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-core `sys-virtmem` feature',
+    yield : true
+)

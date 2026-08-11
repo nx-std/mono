@@ -30,11 +30,11 @@ pub static mut __nx_rt_nso__libnx_system_argv: *mut *mut c_char =
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nso__libnx_argv_setup() {
     // SAFETY: the caller guarantees the allocator is up, which is what the
-    // parse and the publication below both require.
-    unsafe {
-        argv::setup();
-        publish();
-    }
+    // argument scanner allocates from.
+    unsafe { argv::setup() };
+    // SAFETY: the arguments were just parsed, which is what leaves something
+    // to publish.
+    unsafe { publish() };
 }
 
 /// Points the C-facing globals at the parsed command line.

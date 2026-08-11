@@ -29,6 +29,13 @@ service-applet = ["dep:nx-service-applet"]
 # Socket driver initialization — gates the one socket symbol whose interface
 # revision follows the running firmware, which only this crate can read.
 sys-net = ["dep:nx-service-bsd", "dep:nx-sys-net"]
+# Main-thread bring-up. Gates the Rust arm of the thread-registration startup
+# step; with it off that step calls the C entry point, which is the only
+# implementation in the link when the matching Meson option is off.
+sys-thread = ["dep:nx-sys-thread"]
+# Virtual-memory reservation map. Gates the Rust arm of the reservation-map
+# startup step, on the same terms as `sys-thread`.
+sys-virtmem = ["dep:nx-sys-virtmem"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
@@ -42,5 +49,7 @@ nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-net = { version = "0.1.0", path = "../nx-sys-net", optional = true }
 nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
+nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
+nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem", optional = true }
 thiserror = { version = "2", default-features = false }

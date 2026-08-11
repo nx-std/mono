@@ -92,10 +92,10 @@ service-vi = ["dep:nx-service-vi", "service-applet"]
 # Main-thread bring-up — gates the Rust arm of the `__libnx_init_thread`
 # startup step. With it off that step calls libnx's own, which is the only
 # implementation in the link when the matching Meson option is off.
-sys-thread = ["dep:nx-sys-thread"]
+sys-thread = ["nx-rt-core/sys-thread"]
 # Virtual-memory reservation map — gates the Rust arm of the `virtmemSetup`
 # startup step, on the same terms as `sys-thread`.
-sys-virtmem = ["dep:nx-sys-virtmem"]
+sys-virtmem = ["nx-rt-core/sys-virtmem"]
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
@@ -123,9 +123,7 @@ nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
-nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
-nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
 thiserror = { version = "2", default-features = false }
 zerocopy = { workspace = true }
