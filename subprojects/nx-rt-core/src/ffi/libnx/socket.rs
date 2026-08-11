@@ -49,12 +49,11 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_socketInitialize(config: *const c_v
     // A process gets one service manager session and this crate holds it, so the driver is handed
     // the session rather than opening a second one — which does not get a second session, it
     // fails.
-    let guard = sm::sm_session();
-    let Some(sm) = guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return nx_sys_net::ffi::driver::NO_SERVICE_MANAGER;
     };
 
-    nx_sys_net::ffi::driver::initialize(sm, &config, version())
+    nx_sys_net::ffi::driver::initialize(&sm, &config, version())
 }
 
 /// Picks the interface revision the running firmware introduced.

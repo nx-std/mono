@@ -1,5 +1,6 @@
 //! Time service FFI
 
+use nx_rt_core::error::ToResultCode as _;
 use nx_service_time;
 use nx_sf::error::ToResultCode;
 
@@ -12,31 +13,9 @@ use crate::ffi::common::GENERIC_ERROR;
 pub unsafe extern "C" fn __nx_rt_nro__libnx_time_initialize() -> u32 {
     match crate::services::time::init() {
         Ok(()) => 0,
-        Err(err) => {
-            // Convert error to result code
-            let crate::services::time::ConnectError(conn_err) = err;
-            match conn_err {
-                nx_service_time::ConnectError::GetService(sm_err) => match sm_err {
-                    nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                    _ => GENERIC_ERROR,
-                },
-                nx_service_time::ConnectError::GetUserSystemClock(clock_err) => match clock_err {
-                    nx_service_time::GetSystemClockError::SendRequest(e) => e.to_rc(),
-                    nx_service_time::GetSystemClockError::ParseResponse(e) => e.to_rc(),
-                    nx_service_time::GetSystemClockError::MissingHandle => GENERIC_ERROR,
-                },
-                nx_service_time::ConnectError::GetSteadyClock(steady_err) => match steady_err {
-                    nx_service_time::GetSteadyClockError::SendRequest(e) => e.to_rc(),
-                    nx_service_time::GetSteadyClockError::ParseResponse(e) => e.to_rc(),
-                    nx_service_time::GetSteadyClockError::MissingHandle => GENERIC_ERROR,
-                },
-                nx_service_time::ConnectError::GetTimeZoneService(tz_err) => match tz_err {
-                    nx_service_time::GetTimeZoneServiceError::SendRequest(e) => e.to_rc(),
-                    nx_service_time::GetTimeZoneServiceError::ParseResponse(e) => e.to_rc(),
-                    nx_service_time::GetTimeZoneServiceError::MissingHandle => GENERIC_ERROR,
-                },
-            }
-        }
+        // The manager owns the mapping for its own failures; a second copy
+        // here would drift from it.
+        Err(err) => err.to_rc(),
     }
 }
 

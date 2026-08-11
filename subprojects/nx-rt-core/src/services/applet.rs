@@ -93,9 +93,11 @@ fn state() -> &'static RwLock<Option<AppletState>> {
 /// surface still held a snapshot of them, and the first [`exit`] would tear
 /// the session down for everyone.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if SM is not initialized.
+/// Returns an error when the Service Manager is not open, when the proxy could
+/// not be opened, or when a command in the per-role bring-up was refused.
+/// Nothing is left half-open.
 pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<(), ConnectError> {
     if matches!(applet_type, AppletType::None) {
         return Ok(());
@@ -109,29 +111,28 @@ pub fn init(applet_type: AppletType, process_handle: ProcessHandle) -> Result<()
         }
     }
 
-    let sm_guard = sm::sm_session();
-    let sm = sm_guard.as_ref().expect("SM not initialized");
+    let sm = sm::session().map_err(ConnectError::SmNotInitialized)?;
 
     let singleton = match applet_type {
         // appletOE cmd 0
         AppletType::Application | AppletType::Default => {
-            AppletSingleton::Application(init::open_application(sm, process_handle)?)
+            AppletSingleton::Application(init::open_application(&sm, process_handle)?)
         }
         // appletAE cmd 200·201
         AppletType::LibraryApplet => {
-            AppletSingleton::LibraryApplet(init::open_library_applet(sm, process_handle)?)
+            AppletSingleton::LibraryApplet(init::open_library_applet(&sm, process_handle)?)
         }
         // appletAE cmd 100
         AppletType::SystemApplet => {
-            AppletSingleton::SystemApplet(init::open_system_applet(sm, process_handle)?)
+            AppletSingleton::SystemApplet(init::open_system_applet(&sm, process_handle)?)
         }
         // appletAE cmd 300
         AppletType::OverlayApplet => {
-            AppletSingleton::OverlayApplet(init::open_overlay_applet(sm, process_handle)?)
+            AppletSingleton::OverlayApplet(init::open_overlay_applet(&sm, process_handle)?)
         }
         // appletAE cmd 350
         AppletType::SystemApplication => {
-            AppletSingleton::SystemApplication(init::open_system_application(sm, process_handle)?)
+            AppletSingleton::SystemApplication(init::open_system_application(&sm, process_handle)?)
         }
         AppletType::None => unreachable!("AppletType::None handled at function entry"),
     };

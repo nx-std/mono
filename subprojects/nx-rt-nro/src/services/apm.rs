@@ -32,9 +32,10 @@ fn state() -> &'static RwLock<Option<ApmState>> {
 /// [`exit`]. Without the count, two independent users of this service in one
 /// process would each close it under the other.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if SM is not initialized.
+/// Returns an error when the Service Manager is not open, or when the
+/// connection was refused. Nothing was opened.
 pub fn init() -> Result<(), ConnectError> {
     {
         let mut guard = state().write();
@@ -44,11 +45,10 @@ pub fn init() -> Result<(), ConnectError> {
         }
     }
 
-    let sm_guard = sm::sm_session();
-    let sm = sm_guard.as_ref().expect("SM not initialized");
+    let sm = sm::session().map_err(ConnectError::SmNotInitialized)?;
 
     // Connect to APM service
-    let service = nx_service_apm::connect(sm).map_err(ConnectError::Connect)?;
+    let service = nx_service_apm::connect(&sm).map_err(ConnectError::Connect)?;
 
     let session = service.open_session().map_err(ConnectError::OpenSession)?;
 
@@ -135,6 +135,12 @@ impl core::ops::Deref for ApmSessionRef {
 /// Error returned by [`init`].
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the connection is attempted before the Service Manager is
+    /// open, or after it is closed. Nothing was opened.
+    #[error("the Service Manager is not initialized")]
+    SmNotInitialized(#[source] nx_rt_core::services::sm::NotInitializedError),
     /// Failed to connect to APM service.
     #[error("failed to connect to APM service")]
     Connect(#[source] nx_service_apm::ConnectError),
@@ -149,6 +155,7 @@ impl nx_rt_core::error::ToResultCode for ConnectError {
         use nx_sf::error::ToResultCode as _;
 
         match self {
+            Self::SmNotInitialized(err) => err.to_rc(),
             Self::Connect(err) => err.to_rc(),
             Self::OpenSession(err) => err.to_rc(),
         }

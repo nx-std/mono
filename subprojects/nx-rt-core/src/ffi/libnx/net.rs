@@ -38,13 +38,12 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_getaddrinfo(
     hints: *const addrinfo,
     res: *mut *mut addrinfo,
 ) -> c_int {
-    let guard = sm::sm_session();
-    let Some(sm) = guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return nx_net::ffi::abi::EAI_AGAIN;
     };
 
     // SAFETY: the pointer contract is this function's own, forwarded unchanged.
-    unsafe { nx_net::ffi::getaddrinfo(sm, node, service, hints, res) }
+    unsafe { nx_net::ffi::getaddrinfo(&sm, node, service, hints, res) }
 }
 
 /// Resolves a host name into a `hostent`.
@@ -54,13 +53,12 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_getaddrinfo(
 /// As [`nx_net::ffi::gethostbyname`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_gethostbyname(name: *const c_char) -> *mut hostent {
-    let guard = sm::sm_session();
-    let Some(sm) = guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return core::ptr::null_mut();
     };
 
     // SAFETY: the pointer contract is this function's own, forwarded unchanged.
-    unsafe { nx_net::ffi::gethostbyname(sm, name) }
+    unsafe { nx_net::ffi::gethostbyname(&sm, name) }
 }
 
 /// Resolves a host name in a named address family.
@@ -73,13 +71,12 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_gethostbyname2(
     name: *const c_char,
     af: c_int,
 ) -> *mut hostent {
-    let guard = sm::sm_session();
-    let Some(sm) = guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return core::ptr::null_mut();
     };
 
     // SAFETY: the pointer contract is this function's own, forwarded unchanged.
-    unsafe { nx_net::ffi::gethostbyname2(sm, name, af) }
+    unsafe { nx_net::ffi::gethostbyname2(&sm, name, af) }
 }
 
 /// Resolves an address into a `hostent`.
@@ -93,13 +90,12 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_gethostbyaddr(
     len: c_uint,
     af: c_int,
 ) -> *mut hostent {
-    let guard = sm::sm_session();
-    let Some(sm) = guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return core::ptr::null_mut();
     };
 
     // SAFETY: the pointer contract is this function's own, forwarded unchanged.
-    unsafe { nx_net::ffi::gethostbyaddr(sm, addr, len, af) }
+    unsafe { nx_net::ffi::gethostbyaddr(&sm, addr, len, af) }
 }
 
 /// Resolves a socket address into a host and service name.
@@ -117,11 +113,10 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_getnameinfo(
     serv_len: u32,
     flags: c_int,
 ) -> c_int {
-    let guard = sm::sm_session();
-    let Some(sm) = guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return nx_net::ffi::abi::EAI_AGAIN;
     };
 
     // SAFETY: the pointer contract is this function's own, forwarded unchanged.
-    unsafe { nx_net::ffi::getnameinfo(sm, addr, addr_len, host, host_len, serv, serv_len, flags) }
+    unsafe { nx_net::ffi::getnameinfo(&sm, addr, addr_len, host, host_len, serv, serv_len, flags) }
 }
