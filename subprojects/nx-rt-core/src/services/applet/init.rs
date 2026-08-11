@@ -50,7 +50,7 @@ use super::{
 /// Application-only runtime handshake: InFocus wait → AcquireForegroundRights
 /// → SetFocusHandlingMode(SuspendHomeSleep) → NotifyRunning → cache snapshot
 /// → enable mode notifications.
-pub(super) fn open_application(
+pub(crate) fn open_application(
     sm: &SmService,
     ph: ProcessHandle,
 ) -> Result<Slot<Application>, ConnectError> {
@@ -78,7 +78,7 @@ pub(super) fn open_application(
 ///
 /// Same as [`open_application`] minus `SetFocusHandlingMode` (AM rejects it
 /// for any role other than `Application`).
-pub(super) fn open_system_application(
+pub(crate) fn open_system_application(
     sm: &SmService,
     ph: ProcessHandle,
 ) -> Result<Slot<SystemApplication>, ConnectError> {
@@ -106,7 +106,7 @@ pub(super) fn open_system_application(
 /// No InFocus wait, no foreground rights, no `NotifyRunning` — those are
 /// Application-only in libnx. Just snapshot initial state and enable mode
 /// notifications.
-pub(super) fn open_library_applet(
+pub(crate) fn open_library_applet(
     sm: &SmService,
     ph: ProcessHandle,
 ) -> Result<Slot<LibraryApplet>, ConnectError> {
@@ -117,7 +117,7 @@ pub(super) fn open_library_applet(
 }
 
 /// Brings up a [`SystemApplet`]-role applet.
-pub(super) fn open_system_applet(
+pub(crate) fn open_system_applet(
     sm: &SmService,
     ph: ProcessHandle,
 ) -> Result<Slot<SystemApplet>, ConnectError> {
@@ -128,7 +128,7 @@ pub(super) fn open_system_applet(
 }
 
 /// Brings up an [`OverlayApplet`]-role applet.
-pub(super) fn open_overlay_applet(
+pub(crate) fn open_overlay_applet(
     sm: &SmService,
     ph: ProcessHandle,
 ) -> Result<Slot<OverlayApplet>, ConnectError> {
