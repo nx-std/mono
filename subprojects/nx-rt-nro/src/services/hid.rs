@@ -22,15 +22,29 @@ fn state() -> &'static RwLock<Option<HidState>> {
     HID_STATE.get_or_init(|| RwLock::new(None))
 }
 
-/// Initializes the HID service.
+/// Opens the input service for this process.
 ///
-/// This matches libnx's `hidInitialize()` behavior, which connects to the
-/// service using the applet resource user ID.
+/// The session is bound to the applet resource user id, which is what ties the
+/// input the process receives to the role it was launched in.
+///
+/// Counts its callers: a second caller joins the session the first opened
+/// rather than replacing it, and it closes when the last of them calls
+/// [`exit`]. Without the count, two independent users of this service in one
+/// process would each close it under the other, leaving the survivor reading
+/// shared memory that has already been unmapped.
 ///
 /// # Panics
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
+    {
+        let mut guard = state().write();
+        if let Some(ref mut hid_state) = *guard {
+            hid_state.ref_count += 1;
+            return Ok(());
+        }
+    }
+
     let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
@@ -41,7 +55,10 @@ pub fn init() -> Result<(), ConnectError> {
     let service = nx_service_hid::connect(sm, aruid).map_err(ConnectError)?;
 
     let mut guard = state().write();
-    *guard = Some(HidState { service });
+    *guard = Some(HidState {
+        service,
+        ref_count: 1,
+    });
 
     Ok(())
 }
@@ -57,17 +74,27 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = HidService> + 'sta
 }
 
 /// Exits the HID service.
+///
+/// Decrements the caller count. The session closes when it reaches zero.
 pub fn exit() {
     let mut guard = state().write();
-    // `HidService` is RAII; dropping the taken state closes both kernel handles
-    // (main session + IAppletResource) and unmaps the shared memory.
-    let _ = guard.take();
+    if let Some(ref mut hid_state) = *guard {
+        hid_state.ref_count = hid_state.ref_count.saturating_sub(1);
+        if hid_state.ref_count == 0 {
+            // `HidService` is RAII; dropping the taken state closes both
+            // kernel handles (main session + IAppletResource) and unmaps the
+            // shared memory.
+            let _ = guard.take();
+        }
+    }
 }
 
 /// Internal storage for HID service.
 struct HidState {
     /// HID service (IHidServer with IAppletResource and shared memory)
     service: HidService,
+    /// How many callers of [`init`] have not yet called [`exit`]
+    ref_count: u32,
 }
 
 /// Wrapper for accessing HidService through RwLockReadGuard.

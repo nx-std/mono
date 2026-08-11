@@ -595,3 +595,43 @@ impl ToResultCode for ResetSignalError {
 }
 
 impl _sealed::Sealed for ResetSignalError {}
+
+/// Closes an event handle, decrementing the kernel reference count.
+///
+/// A service that hands out an event does so as a copy handle, which makes the
+/// receiver its owner: the kernel object outlives the reply and stays until
+/// every handle naming it is closed.
+pub fn close_handle(handle: EventHandle) -> Result<(), CloseHandleError> {
+    // SAFETY: the kernel validates the handle and reports an error rather than
+    // faulting, including for a handle that was already closed.
+    let rc = unsafe { raw::close_handle(handle.to_raw()) };
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidHandle == desc => CloseHandleError::InvalidHandle,
+        _ => CloseHandleError::Unknown(Error::from(rc)),
+    })
+}
+
+/// Error returned by [`close_handle`].
+#[derive(Debug, thiserror::Error)]
+pub enum CloseHandleError {
+    /// The supplied handle does not name a kernel object.
+    ///
+    /// Occurs when the handle was never valid or has already been closed.
+    /// Nothing was closed.
+    #[error("invalid handle")]
+    InvalidHandle,
+    /// An unknown error occurred.
+    #[error("unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for CloseHandleError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            CloseHandleError::InvalidHandle => KError::InvalidHandle.to_rc(),
+            CloseHandleError::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for CloseHandleError {}

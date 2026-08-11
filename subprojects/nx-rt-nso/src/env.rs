@@ -30,7 +30,6 @@ pub use nx_rt_core::env::{
     has_next_load,
     heap_override,
     hos_version,
-    is_nso,
     last_load_result,
     loader_info,
     main_thread,
@@ -60,14 +59,12 @@ use nx_svc::thread::Handle as ThreadHandle;
 /// homebrew NRO, but for this output kind the value is not a return path:
 /// branching to it would resume the launch stub rather than end the process.
 pub fn setup(main_thread: ThreadHandle) {
-    init_once(|state| {
+    init_once(main_thread, |state| {
         // An NSO process is unconditionally an NSO.
         state.is_nso = true;
-        // Seed the main-thread handle from the kernel-supplied argument.
-        state.main_thread_handle = Some(main_thread);
         // An NSO is granted the full supervisor-call set; there are no loader
         // hints restricting it, so mark every syscall available.
-        state.syscall_hints = Some(SyscallHints::all_available());
+        state.syscall_hints = SyscallHints::all_available();
 
         set_exit_func_ptr(Some(exit_process));
     });

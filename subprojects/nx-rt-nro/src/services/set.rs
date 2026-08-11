@@ -23,10 +23,23 @@ fn state() -> &'static RwLock<Option<SetState>> {
 ///
 /// Selects CMIF or TIPC protocol based on HOS version.
 ///
+/// Counts its callers: a second caller joins the session the first opened
+/// rather than replacing it, and the session closes when the last of them
+/// calls [`exit`]. Without the count, two independent users of this service in
+/// one process would each close it under the other.
+///
 /// # Panics
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
+    {
+        let mut guard = state().write();
+        if let Some(ref mut set_state) = *guard {
+            set_state.ref_count += 1;
+            return Ok(());
+        }
+    }
+
     let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
@@ -38,7 +51,10 @@ pub fn init() -> Result<(), ConnectError> {
     };
 
     let mut guard = state().write();
-    *guard = Some(SetState { service });
+    *guard = Some(SetState {
+        service,
+        ref_count: 1,
+    });
 
     Ok(())
 }
@@ -106,6 +122,21 @@ pub enum FirmwareVersionError {
     Tipc(#[source] nx_service_set::GetFirmwareVersionTipcError),
 }
 
+#[cfg(feature = "ffi")]
+impl nx_rt_core::error::ToResultCode for FirmwareVersionError {
+    fn to_rc(self) -> nx_rt_core::error::ResultCode {
+        use nx_sf::error::ToResultCode as _;
+
+        match self {
+            Self::NotInitialized => {
+                nx_rt_core::error::libnx_error(nx_rt_core::error::LibnxError::NotInitialized)
+            }
+            Self::Cmif(err) => err.to_rc(),
+            Self::Tipc(err) => err.to_rc(),
+        }
+    }
+}
+
 /// Gets the `set:sys` service.
 pub fn get_service() -> Option<impl core::ops::Deref<Target = SetSysService> + 'static> {
     let guard = state().read();
@@ -117,16 +148,25 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = SetSysService> + '
 }
 
 /// Exits the `set:sys` service.
+///
+/// Decrements the caller count. The session closes when it reaches zero.
 pub fn exit() {
     let mut guard = state().write();
-    // SetSysService is RAII; dropping it closes the session.
-    let _ = guard.take();
+    if let Some(ref mut set_state) = *guard {
+        set_state.ref_count = set_state.ref_count.saturating_sub(1);
+        if set_state.ref_count == 0 {
+            // SetSysService is RAII; dropping it closes the session.
+            let _ = guard.take();
+        }
+    }
 }
 
 /// Internal storage for `set:sys` service.
 struct SetState {
     /// `set:sys` service session
     service: SetSysService,
+    /// How many callers of [`init`] have not yet called [`exit`]
+    ref_count: u32,
 }
 
 /// Wrapper for accessing SetSysService through RwLockReadGuard.

@@ -34,7 +34,6 @@ pub use nx_rt_core::env::{
     has_next_load,
     heap_override,
     hos_version,
-    is_nso,
     last_load_result,
     loader_info,
     main_thread,
@@ -69,30 +68,33 @@ const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
 /// Parses the homebrew loader configuration and populates the runtime
 /// environment state.
 ///
-/// Runs exactly once — repeat calls are no-ops. A homebrew NRO is always a
-/// non-NSO process launched with a loader-supplied configuration block, so
-/// there is no NSO branch: `ctx` is non-null by construction. Loader-supplied
-/// service overrides are registered with the Service Manager as they are
-/// parsed.
+/// Runs exactly once; repeat calls are no-ops. Loader-supplied service
+/// overrides are registered with the Service Manager as they are parsed.
+///
+/// A launch with no configuration block is malformed, and the block is the
+/// only thing missing: the main-thread handle and the return address are
+/// arguments in their own right, so they are recorded either way and the rest
+/// of startup runs on the defaults.
 ///
 /// # Safety
 ///
-/// `ctx` must point to a valid `ConfigEntry` array terminated by an
-/// `EndOfList` entry, and `main_thread` must be the handle the loader supplied
-/// for the process main thread.
+/// `ctx`, when present, must point to a valid `ConfigEntry` array terminated
+/// by an `EndOfList` entry, and `main_thread` must be the handle the loader
+/// supplied for the process main thread.
 pub unsafe fn setup(
-    ctx: NonNull<ConfigEntry>,
+    ctx: Option<NonNull<ConfigEntry>>,
     main_thread: ThreadHandle,
     saved_lr: LoaderReturnFn,
 ) {
-    init_once(|state| {
+    init_once(main_thread, |state| {
         // A homebrew NRO is unconditionally a non-NSO process.
         state.is_nso = false;
-        // Seed the main-thread handle from the kernel-supplied argument; the
-        // loader config's MainThreadHandle entry, when present, confirms it.
-        state.main_thread_handle = Some(main_thread);
 
         set_exit_func_ptr(saved_lr);
+
+        let Some(ctx) = ctx else {
+            return;
+        };
 
         // SAFETY: the caller guarantees `ctx` points to a valid ConfigEntry
         // array terminated by EndOfList.
@@ -131,16 +133,11 @@ pub unsafe fn setup(
                     hint_0_3f,
                     hint_40_7f,
                 } => {
-                    state
-                        .syscall_hints
-                        .get_or_insert_with(SyscallHints::new)
-                        .set_hint_0_7f(hint_0_3f, hint_40_7f);
+                    state.syscall_hints.set_hints_0_3f(hint_0_3f);
+                    state.syscall_hints.set_hints_40_7f(hint_40_7f);
                 }
                 Entry::SyscallHint2 { hint_80_bf } => {
-                    state
-                        .syscall_hints
-                        .get_or_insert_with(SyscallHints::new)
-                        .set_hint_80_bf(hint_80_bf);
+                    state.syscall_hints.set_hints_80_bf(hint_80_bf);
                 }
                 Entry::UserIdStorage(ptr) => {
                     state.user_id_storage = ptr;
@@ -189,10 +186,15 @@ pub unsafe fn setup(
         }
     });
 
-    // Publish the parsed applet type to the C-facing global that libnx code
-    // left in the link reads directly. It sits here rather than in the
-    // `envSetup` override so both callers carry it: that override, and the
-    // startup sequence in [`crate::init`].
+    // Publish the parsed applet type to the C-facing global that code left in
+    // the link reads directly. It sits here rather than in the `envSetup`
+    // override so both callers carry it: that override, and the startup
+    // sequence in [`crate::init`].
+    //
+    // The global is unsigned because the C declaration is, so `Default` (-1)
+    // arrives there as `0xFFFF_FFFF`. That is the bit pattern C reads back and
+    // compares against its own -1, so the reinterpretation is the interchange
+    // format rather than a loss.
     #[cfg(feature = "ffi")]
-    crate::ffi::set_applet_type(applet_type().as_raw());
+    crate::ffi::set_applet_type(applet_type().as_raw() as u32);
 }

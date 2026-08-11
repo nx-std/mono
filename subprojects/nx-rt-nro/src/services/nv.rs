@@ -51,8 +51,7 @@ pub fn init(config: NvConfig) -> Result<(), ConnectError> {
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
     // Get applet info for service connection via Rust APIs
-    let applet_type = nx_service_applet::AppletType::from_raw(env::applet_type().as_raw() as i32)
-        .unwrap_or(nx_service_applet::AppletType::None);
+    let applet_type: nx_service_applet::AppletType = env::applet_type().into();
     let aruid = applet::get_applet_resource_user_id();
 
     // Connect to NV service

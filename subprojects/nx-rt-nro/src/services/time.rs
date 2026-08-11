@@ -24,15 +24,28 @@ fn state() -> &'static RwLock<Option<TimeState>> {
     TIME_STATE.get_or_init(|| RwLock::new(None))
 }
 
-/// Initializes the Time service.
+/// Opens the time service for this process.
 ///
-/// This matches libnx's `timeInitialize()` behavior, which connects to the
-/// time:u service by default.
+/// Connects to the user clock, which is the one a program is entitled to read
+/// without a system role.
+///
+/// Counts its callers: a second caller joins the session the first opened
+/// rather than replacing it, and it closes when the last of them calls
+/// [`exit`]. Without the count, two independent users of this service in one
+/// process would each close it under the other.
 ///
 /// # Panics
 ///
 /// Panics if SM is not initialized.
 pub fn init() -> Result<(), ConnectError> {
+    {
+        let mut guard = state().write();
+        if let Some(ref mut time_state) = *guard {
+            time_state.ref_count += 1;
+            return Ok(());
+        }
+    }
+
     let sm_guard = sm::sm_session();
     let sm = sm_guard.as_ref().expect("SM not initialized");
 
@@ -40,7 +53,10 @@ pub fn init() -> Result<(), ConnectError> {
     let service = nx_service_time::connect(sm, TimeServiceType::User).map_err(ConnectError)?;
 
     let mut guard = state().write();
-    *guard = Some(TimeState { service });
+    *guard = Some(TimeState {
+        service,
+        ref_count: 1,
+    });
 
     Ok(())
 }
@@ -116,14 +132,22 @@ pub fn get_service() -> Option<impl core::ops::Deref<Target = TimeService> + 'st
 /// Exits the Time service.
 pub fn exit() {
     let mut guard = state().write();
-    // `TimeService` is RAII; dropping the taken state closes the kernel handle.
-    let _ = guard.take();
+    if let Some(ref mut time_state) = *guard {
+        time_state.ref_count = time_state.ref_count.saturating_sub(1);
+        if time_state.ref_count == 0 {
+            // `TimeService` is RAII; dropping the taken state closes the
+            // kernel handle.
+            let _ = guard.take();
+        }
+    }
 }
 
 /// Internal storage for Time service.
 struct TimeState {
     /// Time service (IStaticService with clock and timezone services)
     service: TimeService,
+    /// How many callers of [`init`] have not yet called [`exit`]
+    ref_count: u32,
 }
 
 /// Wrapper for accessing TimeService through RwLockReadGuard.

@@ -89,13 +89,12 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_get_focus_state() -> u8 {
 /// No special requirements beyond typical FFI safety.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_applet_get_message_event_handle() -> u32 {
-    let Some(csg) = applet::get_common_state_getter() else {
-        return INVALID_HANDLE;
-    };
-
-    match csg.get().get_event_handle() {
-        Ok(handle) => handle.to_raw(),
-        Err(_) => INVALID_HANDLE,
+    // The session's own event, named rather than re-requested: asking the
+    // Application Manager again would mint a second handle that neither side
+    // closes. The C caller receives the number to wait on, not ownership.
+    match applet::message_event_handle() {
+        Some(handle) => handle,
+        None => INVALID_HANDLE,
     }
 }
 
@@ -132,22 +131,17 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_get_message_event(out: *mut 
         return GENERIC_ERROR;
     }
 
-    let Some(csg) = applet::get_common_state_getter() else {
+    let Some(handle) = applet::message_event_handle() else {
         return GENERIC_ERROR;
     };
 
-    match csg.get().get_event_handle() {
-        Ok(handle) => {
-            // SAFETY: caller guarantees `out` is writable.
-            unsafe {
-                (*out).revent = handle.to_raw();
-                (*out).wevent = INVALID_HANDLE;
-                (*out).autoclear = false;
-            }
-            0
-        }
-        Err(_) => GENERIC_ERROR,
+    // SAFETY: caller guarantees `out` is writable.
+    unsafe {
+        (*out).revent = handle;
+        (*out).wevent = INVALID_HANDLE;
+        (*out).autoclear = false;
     }
+    0
 }
 
 /// Sets the focus handling mode.

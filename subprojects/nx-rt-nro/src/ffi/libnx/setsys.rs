@@ -3,10 +3,7 @@
 use core::mem::MaybeUninit;
 
 use nx_rt_core::error::ToResultCode as _;
-use nx_sf::{
-    error::ToResultCode,
-    ffi::Service,
-};
+use nx_sf::ffi::Service;
 
 use crate::{
     ffi::common::{
@@ -91,11 +88,12 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_setsys_get_firmware_version(
         return GENERIC_ERROR;
     }
 
-    let Some(setsys) = set::get_service() else {
-        return GENERIC_ERROR;
-    };
-
-    let fw = match setsys.get_firmware_version_cmif() {
+    // Which command carries the version, and which protocol the session
+    // speaks, are both decided by the manager: it opened the session and knows
+    // what it opened it as. Asking the service object directly here would pick
+    // one of each and be wrong on any console where the manager chose the
+    // other.
+    let fw = match set::firmware_version() {
         Ok(fw) => fw,
         Err(err) => return err.to_rc(),
     };

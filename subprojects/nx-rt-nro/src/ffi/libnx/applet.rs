@@ -45,5 +45,5 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_applet_initialize() -> u32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_applet_get_applet_type() -> i32 {
     // Report the loader-supplied applet type from the parsed environment state.
-    env::applet_type().as_raw() as i32
+    env::applet_type().as_raw()
 }

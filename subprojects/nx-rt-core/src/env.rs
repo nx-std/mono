@@ -27,10 +27,6 @@ use core::{
         self,
         NonNull,
     },
-    sync::atomic::{
-        AtomicPtr,
-        Ordering,
-    },
 };
 
 pub use nx_sf::ServiceName;
@@ -63,27 +59,34 @@ static ENV_STATE: EnvStateWrapper = EnvStateWrapper::new();
 /// Initialization guard to ensure the env state is populated exactly once
 static ENV_INIT: Once = Once::new();
 
-/// Exit function pointer (mutable at runtime)
-static EXIT_FUNC: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+/// Where to return to when the process is done (mutable at runtime)
+static EXIT_FUNC: ExitFunc = ExitFunc::new();
 
 /// Serializes writes into the loader's chain-load buffers.
 static NEXT_LOAD_LOCK: Mutex = Mutex::new();
 
 /// Populate the global environment state exactly once.
 ///
+/// `main_thread` is the handle the kernel gave the process for the thread it
+/// started on. It is a parameter rather than something the `populate` closure
+/// fills because it does not come from the startup source: an entry crate that
+/// finds nothing to parse still knows it, and the steps that run straight
+/// after startup read it back before anything else.
+///
 /// The `populate` closure receives exclusive `&mut` access to the [`EnvState`]
-/// container and is responsible for filling it from whatever startup source
-/// the calling entry crate owns — the homebrew loader configuration for an
-/// NRO, a build-time profile for an NSO, and so on.
+/// container and is responsible for filling the rest from whatever startup
+/// source the calling entry crate owns: the homebrew loader configuration for
+/// an NRO, a build-time profile for an NSO, and so on.
 ///
 /// Subsequent calls are no-ops: the state is written once here and is
 /// read-only afterwards, which is what makes the unsynchronized accessor
 /// functions below sound.
-pub fn init_once(populate: impl FnOnce(&mut EnvState)) {
+pub fn init_once(main_thread: ThreadHandle, populate: impl FnOnce(&mut EnvState)) {
     ENV_INIT.call_once(|| {
         // SAFETY: `Once::call_once` guarantees this runs exactly once with
         // exclusive access; no accessor can observe the state mid-write.
         let state = unsafe { &mut *ENV_STATE.get() };
+        state.main_thread_handle = Some(main_thread);
         populate(state);
     });
 }
@@ -96,17 +99,20 @@ pub fn loader_info() -> Option<(NonNull<c_char>, u64)> {
     state.loader_info
 }
 
-/// Get main thread handle
+/// The handle of the thread the process started on.
 ///
 /// # Panics
 ///
-/// Panics if called before the environment is initialized.
+/// Panics when the runtime environment has not been set up yet. [`init_once`]
+/// takes the handle as an argument, so every startup path records it whether
+/// or not its startup source described one; reaching this beforehand means the
+/// startup sequence itself is out of order.
 pub fn main_thread_handle() -> ThreadHandle {
     // SAFETY: ENV_STATE is initialized once via init_once() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
     state
         .main_thread_handle
-        .expect("main thread handle not set")
+        .expect("the runtime environment has not been initialized")
 }
 
 /// Returns true if running as NSO, false if NRO
@@ -133,15 +139,16 @@ pub fn argv() -> Option<*const c_char> {
     state.argv.map(|ptr| ptr.as_ptr() as *const c_char)
 }
 
-/// Get syscall availability hints
+/// Which syscalls the startup source said this process may issue.
 ///
-/// # Panics
-///
-/// Panics if called before the environment is initialized.
+/// A startup source that says nothing leaves every syscall unhinted, which is
+/// the same answer as a source that named none: the hints are a permission
+/// list, so the absence of an entry is the absence of permission rather than a
+/// missing fact.
 pub fn syscall_hints() -> SyscallHints {
     // SAFETY: ENV_STATE is initialized once via init_once() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.syscall_hints.expect("syscall hints not set")
+    state.syscall_hints
 }
 
 /// Get process handle if present
@@ -153,24 +160,12 @@ pub fn own_process_handle() -> Option<ProcessHandle> {
 
 /// Set exit function pointer
 pub fn set_exit_func_ptr(func: LoaderReturnFn) {
-    let ptr = match func {
-        None => ptr::null_mut(),
-        Some(f) => f as *mut c_void,
-    };
-    EXIT_FUNC.store(ptr, Ordering::Release);
+    EXIT_FUNC.set(func);
 }
 
 /// Get exit function pointer
 pub fn exit_func_ptr() -> LoaderReturnFn {
-    let ptr = EXIT_FUNC.load(Ordering::Acquire);
-    if ptr.is_null() {
-        None
-    } else {
-        // SAFETY: The pointer was stored via set_exit_func_ptr which ensures validity
-        Some(unsafe {
-            core::mem::transmute::<*mut core::ffi::c_void, unsafe extern "C" fn(i32) -> !>(ptr)
-        })
-    }
+    EXIT_FUNC.get()
 }
 
 /// Get last load result
@@ -295,7 +290,7 @@ pub struct EnvState {
     pub process_handle: Option<ProcessHandle>,
 
     /// Syscall availability hints (192 bits for SVCs 0x00-0xBF)
-    pub syscall_hints: Option<SyscallHints>,
+    pub syscall_hints: SyscallHints,
 
     /// Random seed data
     pub random_seed: Option<[u64; 2]>,
@@ -332,7 +327,7 @@ impl EnvState {
             argv: None,
             main_thread_handle: None,
             process_handle: None,
-            syscall_hints: None,
+            syscall_hints: SyscallHints::new(),
             random_seed: None,
             last_load_result: 0,
             loader_info: None,
@@ -347,7 +342,7 @@ impl EnvState {
 }
 
 /// A service override entry (name + handle)
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ServiceOverride {
     pub name: ServiceName,
     pub handle: ServiceHandle,
@@ -367,9 +362,12 @@ pub struct AccountUid {
     pub uid: [u64; 2],
 }
 
-/// Applet type values (matches libnx AppletType enum)
+/// What role the process was launched in.
+///
+/// The discriminants are the wire values the startup source uses and the
+/// C-facing surface publishes, which is why the representation is pinned.
 #[repr(i32)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppletType {
     /// Default/unset
     Default = -1,
@@ -410,9 +408,79 @@ impl AppletType {
         applet_type
     }
 
-    /// Get raw value for FFI
-    pub const fn as_raw(self) -> u32 {
-        self as i32 as u32
+    /// The wire value, at the enum's own representation.
+    ///
+    /// Signed, because [`AppletType::Default`] is `-1`: an unsigned result
+    /// would make that one variant `0xFFFF_FFFF` and every caller that wanted
+    /// a number back would have to undo the reinterpretation.
+    pub const fn as_raw(self) -> i32 {
+        self as i32
+    }
+}
+
+/// Holds the loader's return address as a function rather than as a pointer.
+///
+/// An `AtomicPtr` would store it as a data pointer, and handing it back would
+/// mean reinterpreting that pointer as a function, which the language permits
+/// only through `transmute`. Keeping the value at its own type means it is
+/// never reinterpreted at all. The lock costs a pair of uncontended atomics on
+/// a path taken twice in the lifetime of a process.
+struct ExitFunc {
+    lock: Mutex,
+    func: UnsafeCell<LoaderReturnFn>,
+}
+
+impl ExitFunc {
+    const fn new() -> Self {
+        Self {
+            lock: Mutex::new(),
+            func: UnsafeCell::new(None),
+        }
+    }
+
+    /// Records where to return to, replacing whatever was there.
+    fn set(&self, func: LoaderReturnFn) {
+        self.lock.lock();
+        // SAFETY: the lock is held, so no other thread holds a reference to
+        // the cell for the duration of the write.
+        unsafe { *self.func.get() = func };
+        self.lock.unlock();
+    }
+
+    /// Reads back what was recorded, or `None` if nothing was.
+    fn get(&self) -> LoaderReturnFn {
+        self.lock.lock();
+        // SAFETY: the lock is held, so no writer can be running; the value is
+        // a plain function pointer, so the copy leaves nothing borrowed.
+        let func = unsafe { *self.func.get() };
+        self.lock.unlock();
+        func
+    }
+}
+
+// SAFETY: the only path to the `UnsafeCell` is through `set`/`get`, both of
+// which hold `lock` for the whole of their access, so no two threads touch the
+// cell at once and no reference outlives the critical section.
+unsafe impl Sync for ExitFunc {}
+
+/// Names the same role to the Applet Manager client.
+///
+/// Total in both directions: the startup parse folds anything it does not
+/// recognise into [`AppletType::Default`], so every value that reaches here is
+/// one the client also names. There is no "unknown role" for a caller to
+/// handle, and the exhaustive match below is what keeps that true as either
+/// side gains variants.
+#[cfg(feature = "service-applet")]
+impl From<AppletType> for nx_service_applet::AppletType {
+    fn from(applet_type: AppletType) -> Self {
+        match applet_type {
+            AppletType::Default => Self::Default,
+            AppletType::Application => Self::Application,
+            AppletType::SystemApplet => Self::SystemApplet,
+            AppletType::LibraryApplet => Self::LibraryApplet,
+            AppletType::OverlayApplet => Self::OverlayApplet,
+            AppletType::SystemApplication => Self::SystemApplication,
+        }
     }
 }
 

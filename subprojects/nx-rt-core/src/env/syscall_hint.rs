@@ -3,7 +3,7 @@
 /// Syscall availability hints (192 bits for SVCs 0x00-0xBF).
 ///
 /// Each bit represents a syscall: bit 0 = SVC 0, bit 1 = SVC 1, etc.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SyscallHints([u64; 3]);
 
 impl SyscallHints {
@@ -17,15 +17,24 @@ impl SyscallHints {
         Self([u64::MAX, u64::MAX, u64::MAX])
     }
 
-    /// Sets hints for SVCs 0x00-0x7F (first 128 syscalls).
-    pub fn set_hint_0_7f(&mut self, low: u64, high: u64) {
-        self.0[0] = low;
-        self.0[1] = high;
+    /// Sets hints for SVCs 0x00-0x3F (the first 64 syscalls).
+    ///
+    /// The three ranges are set one at a time rather than in pairs: the words
+    /// are indistinguishable to the compiler, so a caller that swapped two of
+    /// them would mark the wrong 64 syscalls available and nothing would fail
+    /// until one of them was issued.
+    pub fn set_hints_0_3f(&mut self, bits: u64) {
+        self.0[0] = bits;
+    }
+
+    /// Sets hints for SVCs 0x40-0x7F (syscalls 64-127).
+    pub fn set_hints_40_7f(&mut self, bits: u64) {
+        self.0[1] = bits;
     }
 
     /// Sets hints for SVCs 0x80-0xBF (syscalls 128-191).
-    pub fn set_hint_80_bf(&mut self, value: u64) {
-        self.0[2] = value;
+    pub fn set_hints_80_bf(&mut self, bits: u64) {
+        self.0[2] = bits;
     }
 
     /// Returns true if the given syscall is hinted as available.
