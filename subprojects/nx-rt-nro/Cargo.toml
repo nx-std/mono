@@ -76,6 +76,9 @@ service-fs = ["dep:nx-service-fs", "dep:nx-fsdev", "nx-fsdev/ffi"]
 service-hid = ["dep:nx-service-hid", "service-applet"]
 # NVIDIA driver service — gates `services::nv` + `ffi::nv`. Pulls `service-applet` (aruid lookup).
 service-nv = ["dep:nx-service-nv", "service-applet"]
+# Memory objects on the NV driver — gates `ffi::nvmap`. Pulls `service-nv`: the
+# device is opened on the driver session that feature establishes.
+nvmap = ["dep:nx-nv", "service-nv"]
 # System Settings (set:sys) service — gates `services::set` + `ffi::setsys`.
 service-set = ["dep:nx-service-set"]
 # Time service — gates `services::time` + `ffi::time`. Pulls `nx-time`, which owns the
@@ -111,6 +114,7 @@ nx-service-applet-pctlauth = { version = "0.1.0", path = "../nx-service-applet-p
 nx-service-applet-psel = { version = "0.1.0", path = "../nx-service-applet-psel", optional = true }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs", optional = true }
 nx-service-hid = { version = "0.1.0", path = "../nx-service-hid", optional = true }
+nx-nv = { version = "0.1.0", path = "../nx-nv", optional = true }
 nx-service-nv = { version = "0.1.0", path = "../nx-service-nv", optional = true }
 nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }

@@ -301,6 +301,13 @@ option(
 )
 
 option(
+    'use_nx_nvmap',
+    type : 'feature', value : 'disabled', # Disable by default, WIP (implies use_nx_service_nv)
+    description : 'Enable nx-nv memory objects (nvmap; requires use_nx_service_nv)',
+    yield : true
+)
+
+option(
     'use_nx_wlaninf',
     type : 'feature', value : 'disabled',
     description : 'Enable nx-wlaninf (idiomatic WLAN InfraManager API; implies use_nx_service_wlaninf)',

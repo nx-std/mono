@@ -161,6 +161,18 @@ if get_option('use_nx_service_nv').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_nv.ld'
 endif
 
+# nx-nv (memory objects; the device is opened on the nv driver session)
+if get_option('use_nx_nvmap').enabled()
+    if not get_option('use_nx_service_nv').enabled()
+        error('use_nx_nvmap requires -Duse_nx_service_nv=enabled')
+    endif
+
+    nx_nv_proj = subproject('nx-nv')
+    deps += nx_nv_proj.get_variable('nx_nv_dep')
+    cargo_features += 'nvmap'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_nvmap.ld'
+endif
+
 # nx-service-set
 if get_option('use_nx_service_set').enabled()
     nx_service_set_proj = subproject('nx-service-set')

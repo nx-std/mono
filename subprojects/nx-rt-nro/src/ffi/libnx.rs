@@ -36,6 +36,8 @@ mod mii;
 mod nfp;
 #[cfg(feature = "service-nv")]
 mod nv;
+#[cfg(feature = "nvmap")]
+mod nvmap;
 #[cfg(feature = "service-applet-pctlauth")]
 mod pctlauth;
 #[cfg(feature = "service-applet-psel")]
