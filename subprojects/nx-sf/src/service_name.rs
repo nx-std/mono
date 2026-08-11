@@ -197,20 +197,6 @@ impl PartialEq<ServiceName> for &str {
     }
 }
 
-impl PartialEq<core::ffi::CStr> for ServiceName {
-    #[inline]
-    fn eq(&self, other: &core::ffi::CStr) -> bool {
-        self.as_bytes() == other.to_bytes()
-    }
-}
-
-impl PartialEq<ServiceName> for core::ffi::CStr {
-    #[inline]
-    fn eq(&self, other: &ServiceName) -> bool {
-        other == self
-    }
-}
-
 // PartialEq implementations for numeric/raw types
 
 impl PartialEq<u64> for ServiceName {
