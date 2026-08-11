@@ -29,7 +29,7 @@ fn state() -> &'static RwLock<Option<NvState>> {
 
 /// Initializes the NV service with the given configuration.
 ///
-/// This matches libnx's `nvInitialize()` behavior with reference counting.
+/// Counts its callers, so a second caller joins the open session.
 /// Multiple calls increment the reference count; actual initialization only
 /// happens on the first call.
 ///
@@ -106,7 +106,7 @@ pub fn is_initialized() -> bool {
 struct NvState {
     /// NV service session
     service: NvService,
-    /// Reference count for service guard pattern (like libnx's NX_GENERATE_SERVICE_GUARD)
+    /// How many callers of [`init`] have not yet called [`exit`]
     ref_count: u32,
 }
 
@@ -117,8 +117,13 @@ impl core::ops::Deref for NvServiceRef {
     type Target = NvService;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create NvServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
+        match self.0.as_ref() {
+            Some(state) => &state.service,
+            // SAFETY: the module accessor builds a `NvServiceRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 
@@ -153,7 +158,7 @@ impl nx_rt_core::error::ToResultCode for ConnectError {
 
 /// Global configuration storage.
 ///
-/// These mirror the weak symbols in libnx:
+/// Overridable at run time, for a caller that needs a different driver:
 /// - `__nx_nv_service_type`
 /// - `__nx_nv_transfermem_size`
 static NV_CONFIG: OnceLock<RwLock<NvConfigState>> = OnceLock::new();
@@ -173,7 +178,7 @@ impl Default for NvConfigState {
 }
 
 /// Gets the current NV service type configuration.
-pub fn get_service_type() -> NvServiceType {
+pub fn service_type() -> NvServiceType {
     NV_CONFIG
         .get_or_init(|| RwLock::new(NvConfigState::default()))
         .read()
@@ -191,7 +196,7 @@ pub fn set_service_type(service_type: NvServiceType) {
 }
 
 /// Gets the current transfer memory size configuration.
-pub fn get_transfer_mem_size() -> usize {
+pub fn transfer_mem_size() -> usize {
     NV_CONFIG
         .get_or_init(|| RwLock::new(NvConfigState::default()))
         .read()
@@ -209,9 +214,9 @@ pub fn set_transfer_mem_size(size: usize) {
 }
 
 /// Creates a configuration from the global settings.
-pub fn make_config() -> NvConfig {
+pub fn config() -> NvConfig {
     NvConfig {
-        service_type: get_service_type(),
-        transfer_mem_size: get_transfer_mem_size(),
+        service_type: service_type(),
+        transfer_mem_size: transfer_mem_size(),
     }
 }

@@ -108,6 +108,10 @@ impl Entry {
 
     /// Parse a [`ConfigEntry`] into a typed [`Entry`].
     pub fn from_config(entry: &ConfigEntry) -> Self {
+        // The loader packs each entry's payload into two 64-bit words, and a field
+        // narrower than the word it travels in occupies the low half: handles and
+        // result codes are 32-bit fields, sizes are pointer-width. Narrowing them
+        // here therefore discards bits the ABI leaves zero.
         match entry.key {
             Self::KEY_LOADER_INFO => Entry::LoaderInfo {
                 ptr: NonNull::new(entry.value[0] as *mut c_char),

@@ -50,7 +50,7 @@ use crate::error::{
 /// Loader return function type
 pub type LoaderReturnFn = Option<unsafe extern "C" fn(i32) -> !>;
 
-/// Maximum number of service overrides (matches libnx MAX_OVERRIDES)
+/// Maximum number of service overrides the loader may supply
 pub const MAX_SERVICE_OVERRIDES: usize = 32;
 
 /// Global environment state (immutable after initialization)
@@ -355,7 +355,7 @@ impl ServiceOverride {
     }
 }
 
-/// Account UserId structure (matches libnx AccountUid)
+/// The 128-bit account id the loader writes a selected user into
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct AccountUid {

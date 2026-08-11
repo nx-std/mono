@@ -118,7 +118,10 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_add_override_handle(
 ) {
     // SAFETY: Caller guarantees handle is valid.
     let handle = nx_svc::ipc::Handle::from_raw_unchecked(handle);
-    // Ignore error (matches libnx behavior)
+    // The only failure is a full override table. Losing the entry means this
+    // name resolves through the Service Manager instead of the handle the
+    // caller supplied, which is the same answer a process that never
+    // registered one gets. The C signature returns nothing either way.
     let _ = sm::add_override(name, handle);
 }
 

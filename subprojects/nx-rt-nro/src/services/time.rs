@@ -64,7 +64,7 @@ pub fn init() -> Result<(), ConnectError> {
 
 /// Anchors the realtime clock and publishes the device's timezone to the C environment.
 ///
-/// This is libnx's `__libnx_init_time`. Horizon exposes no realtime clock a process can read
+/// Horizon exposes no realtime clock a process can read
 /// directly, so the wall clock is read once here, over IPC, and handed to [`nx_time::realtime`],
 /// which derives every later reading from the counter-timer. The device's timezone rule is then
 /// rendered as a POSIX `TZ` specification for newlib.
@@ -158,8 +158,13 @@ impl core::ops::Deref for TimeServiceRef {
     type Target = TimeService;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create TimeServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
+        match self.0.as_ref() {
+            Some(state) => &state.service,
+            // SAFETY: the module accessor builds a `TimeServiceRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 

@@ -30,7 +30,7 @@ static NV_FFI_SESSION: SyncUnsafeCell<MaybeUninit<Service>> =
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_initialize() -> u32 {
     // Build config from global settings
-    let config = crate::services::nv::make_config();
+    let config = crate::services::nv::config();
 
     // Check if this is the first initialization
     let was_initialized = crate::services::nv::is_initialized();
@@ -284,6 +284,9 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_convert_error(rc: i32) -> u32 {
     if rc == 0 {
         return 0;
     }
+    // The mapping keys on the bit pattern, and a driver error arrives as a
+    // negative `int`; reinterpreting it is what recovers the code the driver
+    // sent rather than a sign-extended reading of it.
     nv_error_to_result_code(rc as u32)
 }
 

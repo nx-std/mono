@@ -215,7 +215,9 @@ fn wait_in_focus(common_state_getter: CommonStateGetter<'_>) -> Result<(), Conne
                 .map_err(ConnectError::WaitSynchronization)?;
             // The event does not clear itself, so the signal is cleared here;
             // leaving it set would make the next wait return at once and spin
-            // this loop.
+            // this loop. A refusal costs only that: the loop re-reads the
+            // focus state each time round, so it still terminates on the
+            // state itself rather than on the signal.
             let _ = nx_svc::sync::reset_signal(event.as_handle());
         }
 

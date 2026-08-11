@@ -115,8 +115,13 @@ impl core::ops::Deref for ApmServiceRef {
     type Target = ApmService;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create ApmServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
+        match self.0.as_ref() {
+            Some(state) => &state.service,
+            // SAFETY: the module accessor builds a `ApmServiceRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 
@@ -127,8 +132,13 @@ impl core::ops::Deref for ApmSessionRef {
     type Target = ApmSession;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create ApmSessionRef when the option is Some
-        &self.0.as_ref().unwrap().session
+        match self.0.as_ref() {
+            Some(state) => &state.session,
+            // SAFETY: the module accessor builds a `ApmSessionRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 

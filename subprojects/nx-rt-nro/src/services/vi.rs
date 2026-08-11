@@ -32,7 +32,7 @@ fn state() -> &'static RwLock<Option<ViState>> {
 
 /// Initializes the VI service with the given service type.
 ///
-/// This matches libnx's `viInitialize()` behavior with reference counting.
+/// Counts its callers, so a second caller joins the open session.
 /// Multiple calls increment the reference count; actual initialization only
 /// happens on the first call.
 ///
@@ -119,7 +119,7 @@ pub fn is_initialized() -> bool {
 struct ViState {
     /// VI service session
     service: ViService,
-    /// Reference count for service guard pattern (like libnx's NX_GENERATE_SERVICE_GUARD)
+    /// How many callers of [`init`] have not yet called [`exit`]
     ref_count: u32,
 }
 
@@ -130,8 +130,13 @@ impl core::ops::Deref for ViServiceRef {
     type Target = ViService;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create ViServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
+        match self.0.as_ref() {
+            Some(state) => &state.service,
+            // SAFETY: the module accessor builds a `ViServiceRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 
@@ -166,7 +171,7 @@ impl nx_rt_core::error::ToResultCode for ConnectError {
 
 /// Global configuration storage for VI service type.
 ///
-/// Mirrors the weak symbol pattern from libnx:
+/// Overridable at run time, for a caller that needs a different display:
 /// - `__nx_vi_service_type`
 static VI_CONFIG: OnceLock<RwLock<ViConfigState>> = OnceLock::new();
 
@@ -183,7 +188,7 @@ impl Default for ViConfigState {
 }
 
 /// Gets the current VI service type configuration.
-pub fn get_service_type() -> ViServiceType {
+pub fn service_type() -> ViServiceType {
     VI_CONFIG
         .get_or_init(|| RwLock::new(ViConfigState::default()))
         .read()
@@ -202,10 +207,10 @@ pub fn set_service_type(service_type: ViServiceType) {
 
 /// Creates configuration and initializes using the global service type setting.
 pub fn init_with_config() -> Result<(), ConnectError> {
-    init(get_service_type())
+    init(service_type())
 }
 
-/// Global override storage mirroring libnx's weak symbols:
+/// Global override storage, read when a session is opened:
 ///
 /// - `__nx_vi_layer_id`: non-zero forces `viCreateLayer` to use that exact
 ///   layer ID (skipping the applet-managed-layer fallback).
@@ -233,7 +238,7 @@ fn layer_overrides() -> &'static RwLock<ViLayerOverrides> {
 }
 
 /// Returns the current `__nx_vi_layer_id` override (0 if unset).
-pub fn get_layer_id_override() -> u64 {
+pub fn layer_id_override() -> u64 {
     layer_overrides().read().layer_id
 }
 
@@ -247,7 +252,7 @@ pub fn set_layer_id_override(layer_id: u64) {
 
 /// Returns the current `__nx_vi_stray_layer_flags` override
 /// (defaults to [`ViLayerFlags::Default`]).
-pub fn get_stray_layer_flags_override() -> ViLayerFlags {
+pub fn stray_layer_flags_override() -> ViLayerFlags {
     layer_overrides().read().stray_layer_flags
 }
 

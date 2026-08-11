@@ -168,8 +168,11 @@ pub unsafe fn setup(
                             Some(ServiceOverride::new(name, service_handle));
                         state.service_override_count += 1;
                     }
-                    // Register the override with the Service Manager so SM
-                    // lookups resolve to the loader-supplied session.
+                    // Register the override with the Service Manager so
+                    // lookups resolve to the loader-supplied session. A full
+                    // table drops this one, and that name then resolves
+                    // through the Service Manager as it would for a process
+                    // the loader handed no override at all.
                     let _ = sm::add_override(name, service_handle);
                 }
                 Entry::AppletType { kind, flags } => {

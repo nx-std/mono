@@ -18,7 +18,7 @@ use super::sm;
 
 /// Initializes the `fsp-srv` service.
 ///
-/// This matches libnx's `fsInitialize()`: it looks the service up through SM, converts the session
+/// Looks the service up through the Service Manager, converts the session
 /// to a domain, announces the current process, and clones the session into the request pool.
 ///
 /// # Errors
@@ -41,7 +41,7 @@ pub fn init() -> Result<(), InitError> {
 pub enum InitError {
     /// The Service Manager has not been bootstrapped
     ///
-    /// Occurs when `fsInitialize` runs before `smInitialize`, which is the order libnx's startup
+    /// Occurs when the filesystem is opened before the Service Manager, which is the order startup
     /// establishes. Nothing was connected and no session was installed.
     #[error("the Service Manager is not initialized")]
     SmNotInitialized,
