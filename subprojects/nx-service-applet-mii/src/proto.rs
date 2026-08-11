@@ -111,10 +111,11 @@ impl AppletInputPayload {
     pub fn valid_uuids(uuids: &[Uuid]) -> Self {
         let mut payload = Self::empty();
 
-        // `chunks_exact_mut` yields exactly `VALID_UUID_ARRAY_LEN` slots, so
+        // The byte array splits into exactly `VALID_UUID_ARRAY_LEN` slots, so
         // zipping against the input truncates a longer array rather than
         // rejecting it.
-        for (slot, uuid) in payload.bytes.chunks_exact_mut(size_of::<Uuid>()).zip(uuids) {
+        let (slots, _) = payload.bytes.as_chunks_mut::<{ size_of::<Uuid>() }>();
+        for (slot, uuid) in slots.iter_mut().zip(uuids) {
             slot.copy_from_slice(uuid.as_bytes());
         }
 

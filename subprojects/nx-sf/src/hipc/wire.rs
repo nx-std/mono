@@ -5,7 +5,7 @@
 //! building) live in the sibling `request`/`response` modules and consume
 //! these types.
 
-#![expect(unused_parens, clippy::identity_op)]
+#![expect(clippy::identity_op)]
 
 use core::mem::size_of;
 

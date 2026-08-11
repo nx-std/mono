@@ -121,9 +121,10 @@ fn get_rng() -> &'static mut ChaCha20Rng {
 /// This function will panic if it fails to obtain entropy from the system TRNG.
 fn init_rng() {
     let mut seed = [0u8; 32];
-    for (index, chunk) in seed.chunks_exact_mut(size_of::<u64>()).enumerate() {
+    let (chunks, _) = seed.as_chunks_mut::<{ size_of::<u64>() }>();
+    for (index, chunk) in chunks.iter_mut().enumerate() {
         // Get process TRNG seeds from kernel using the new helper
-        // `chunks_exact_mut` yields four chunks, so `index` is at most 3.
+        // The seed splits into four `u64`-sized chunks, so `index` is at most 3.
         match nx_svc::misc::get_random_entropy(index as u64) {
             // Native-endian, matching the in-memory layout the seed previously
             // took on by being reinterpreted from `[u64; 4]`.

@@ -120,7 +120,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_save_data_info_reader_read(
     match with_reader(object_id, |reader| reader.read(entries)) {
         Ok(count) => {
             // SAFETY: the caller guarantees `total_entries` is null or writable.
-            if let Some(total_entries) = (unsafe { total_entries.as_mut() }) {
+            if let Some(total_entries) = unsafe { total_entries.as_mut() } {
                 *total_entries = count;
             }
             0
