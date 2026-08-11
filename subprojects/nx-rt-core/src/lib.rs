@@ -16,22 +16,22 @@
 //!
 //! ## The runtime crate family
 //!
-//! A Switch binary is exactly one *output kind* — an `NRO`, an `NSO`, a
+//! A Switch binary is exactly one *output kind*: an `NRO`, an `NSO`, a
 //! dynamically loadable module, or a boot-time `KIP`. Each output kind is a
 //! distinct entry crate stacked on top of `nx-rt-core`; a final binary depends
 //! on exactly one entry crate, and that dependency *is* its output kind. The
 //! output kind cannot be a Cargo feature, because features are additive and
-//! unify across a dependency graph — they cannot model mutual exclusivity.
+//! unify across a dependency graph: they cannot model mutual exclusivity.
 //!
-//! The *applet type* — the Application Manager identity a process registers as
+//! The *applet type*, the Application Manager identity a process registers as
 //! (`Application`, `SystemApplet`, `LibraryApplet`, `OverlayApplet`,
-//! `SystemApplication`, or `None` for a background sysmodule) — is **not** a
+//! `SystemApplication`, or `None` for a background sysmodule), is **not** a
 //! separate entry crate. All Application Manager identities share one process
 //! startup ABI; only which AM proxy to open (or whether to skip AM entirely)
 //! differs. The applet type is therefore a runtime-profile sub-axis: homebrew
 //! NROs source it at runtime from the loader configuration, while NSO and KIP
 //! processes select it at build time. It always flows as a value into the
-//! applet-init entry point — never as a link-time global.
+//! applet-init entry point: never as a link-time global.
 //!
 //! ## App-Type / Output-Kind matrix
 //!
@@ -41,8 +41,8 @@
 //!
 //! | App type / kind | Executable | Launched by | Entry crate | Applet type | Applet type sourced | AM behavior |
 //! |-----------------|-----------|-------------|-------------|-------------|---------------------|-------------|
-//! | Homebrew application | NRO | hbloader (hbmenu) | `nx-rt-nro` | `Application` (or `LibraryApplet` on album-launch; `SystemApplication`→`Application` via `ApplicationOverride`) | **Runtime** — hbl `EntryType_AppletType` config | `appletOE` cmd 0 / `appletAE` cmd 200·201 |
-//! | Homebrew library applet | NRO | hbloader / album | `nx-rt-nro` | `LibraryApplet` | **Runtime** — hbl config | `appletAE` cmd 200·201 |
+//! | Homebrew application | NRO | hbloader (hbmenu) | `nx-rt-nro` | `Application` (or `LibraryApplet` on album-launch; `SystemApplication`→`Application` via `ApplicationOverride`) | **Runtime**: hbl `EntryType_AppletType` config | `appletOE` cmd 0 / `appletAE` cmd 200·201 |
+//! | Homebrew library applet | NRO | hbloader / album | `nx-rt-nro` | `LibraryApplet` | **Runtime**: hbl config | `appletAE` cmd 200·201 |
 //! | Regular application | NSO | `pm` | `nx-rt-nso` | `Application` | **Build time** | `appletOE` cmd 0 |
 //! | System applet (qlaunch) | NSO | `pm` | `nx-rt-nso` | `SystemApplet` | **Build time** | `appletAE` cmd 100 |
 //! | Library applet (system) | NSO | `pm` | `nx-rt-nso` | `LibraryApplet` | **Build time** | `appletAE` cmd 200·201 |
@@ -52,7 +52,7 @@
 //! | Dynamically loadable module | NRO + NRR | `ro` dynamic load | `nx-rt-module` | inherited from host process | n/a | n/a (no own `_start`) |
 //! | Boot-time sysmodule | KIP | kernel | `nx-rt-kip` | `None` | **Build time** | skip AM entirely |
 //!
-//! The entry-crate axis is the output **format** — not the app role and not
+//! The entry-crate axis is the output **format**: not the app role and not
 //! the applet type. All six AM identities share the NSO startup ABI, so the
 //! applet type is a runtime-profile sub-axis owned by the NRO and NSO entry
 //! crates, never a fifth, sixth, … entry crate.

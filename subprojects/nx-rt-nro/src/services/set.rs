@@ -9,7 +9,7 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::services::sm;
+use super::sm;
 
 /// Global `set:sys` state, lazily initialized.
 static SET_STATE: OnceLock<RwLock<Option<SetState>>> = OnceLock::new();

@@ -1,7 +1,7 @@
 //! Common utilities for FFI modules.
 //!
-//! The kind-agnostic helpers — `GENERIC_ERROR`, `SyncUnsafeCell`, and the
-//! libnx result vocabulary — are re-exported from `nx-rt-core`, their single
+//! The kind-agnostic helpers: `GENERIC_ERROR`, `SyncUnsafeCell`, and the
+//! libnx result vocabulary: are re-exported from `nx-rt-core`, their single
 //! authoritative home. Each re-export is gated to the service features that
 //! consume it, mirroring the per-service gating of the FFI modules themselves.
 //!

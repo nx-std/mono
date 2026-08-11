@@ -4,7 +4,7 @@
 //! the typed [`Proxy<R>`](nx_service_applet::proxy::Proxy) from
 //! `nx-service-applet`. Constructed only via the matching `as_<role>()`
 //! accessor in the parent module, which verifies the variant before yielding
-//! the handle — that's what makes the inner projection infallible.
+//! the handle: that's what makes the inner projection infallible.
 //!
 //! All method surface lives on `Proxy<R>` in `nx-service-applet`; this module
 //! is just the lock-holding glue.

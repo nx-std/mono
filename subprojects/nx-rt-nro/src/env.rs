@@ -14,8 +14,6 @@
 //! re-exported from [`nx_rt_core::env`] so callers continue to reach them
 //! through `crate::env::*`.
 
-mod config;
-
 use core::ptr::NonNull;
 
 pub use nx_rt_core::env::{
@@ -55,6 +53,8 @@ use nx_svc::{
     process::Handle as ProcessHandle,
     thread::Handle as ThreadHandle,
 };
+
+mod config;
 
 pub use self::config::{
     ConfigEntries,

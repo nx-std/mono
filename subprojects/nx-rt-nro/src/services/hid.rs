@@ -9,7 +9,7 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::services::{
+use super::{
     applet,
     sm,
 };

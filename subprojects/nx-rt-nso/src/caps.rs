@@ -1,7 +1,7 @@
 //! # Startup capability fragment (NSO)
 //!
 //! Declarative description of the kernel and service capabilities an NSO
-//! process's *runtime startup* needs — the supervisor calls it invokes and the
+//! process's *runtime startup* needs: the supervisor calls it invokes and the
 //! system services it connects to before handing control to the application.
 //!
 //! A Switch process declares its permitted supervisor calls and service access
@@ -14,7 +14,7 @@
 //! ## Per-applet-type fragments
 //!
 //! Every NSO startup brings up the heap, probes the `__argdata__` command-line
-//! region, and talks to the Service Manager — that base set is invariant. The
+//! region, and talks to the Service Manager: that base set is invariant. The
 //! Application Manager (applet) handshake adds to it, and the additions depend
 //! on the build-time applet identity:
 //!
@@ -25,11 +25,11 @@
 //! | `system-applet`      | `SystemApplet`      | base            | `appletAE`     |
 //! | `library-applet`     | `LibraryApplet`     | base            | `appletAE`     |
 //! | `overlay-applet`     | `OverlayApplet`     | base            | `appletAE`     |
-//! | `none`               | `None`              | base            | —              |
+//! | `none`               | `None`              | base            | -              |
 //!
-//! - **base** — heap bring-up, the `__argdata__` probe, and Service Manager
+//! - **base**: heap bring-up, the `__argdata__` probe, and Service Manager
 //!   IPC (see [`Svc::base`]).
-//! - **base + sync** — the base set plus the two synchronization SVCs the
+//! - **base + sync**: the base set plus the two synchronization SVCs the
 //!   `Application` / `SystemApplication` InFocus wait invokes. The other applet
 //!   roles open their Application Manager proxy but skip the InFocus wait, so
 //!   the base set suffices.
@@ -47,29 +47,29 @@ use crate::applet::APPLET_TYPE;
 /// A supervisor call (SVC) the runtime startup invokes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Svc {
-    /// Kernel SVC number — the immediate operand of the `svc` instruction.
+    /// Kernel SVC number: the immediate operand of the `svc` instruction.
     pub number: u16,
     /// libnx-style name, e.g. `"svcSetHeapSize"`.
     pub name: &'static str,
 }
 
 impl Svc {
-    /// `svcSetHeapSize` — the SVC-backed heap path allocates the process heap.
+    /// `svcSetHeapSize`: the SVC-backed heap path allocates the process heap.
     pub const SET_HEAP_SIZE: Self = Self::new(code::SET_HEAP_SIZE, "svcSetHeapSize");
-    /// `svcQueryMemory` — the argv reader probes the `__argdata__` mapping.
+    /// `svcQueryMemory`: the argv reader probes the `__argdata__` mapping.
     pub const QUERY_MEMORY: Self = Self::new(code::QUERY_MEMORY, "svcQueryMemory");
-    /// `svcConnectToNamedPort` — opens the `sm:` session.
+    /// `svcConnectToNamedPort`: opens the `sm:` session.
     pub const CONNECT_TO_NAMED_PORT: Self =
         Self::new(code::CONNECT_TO_NAMED_PORT, "svcConnectToNamedPort");
-    /// `svcSendSyncRequest` — issues every CMIF / TIPC IPC request.
+    /// `svcSendSyncRequest`: issues every CMIF / TIPC IPC request.
     pub const SEND_SYNC_REQUEST: Self = Self::new(code::SEND_SYNC_REQUEST, "svcSendSyncRequest");
-    /// `svcCloseHandle` — releases session and event handles.
+    /// `svcCloseHandle`: releases session and event handles.
     pub const CLOSE_HANDLE: Self = Self::new(code::CLOSE_HANDLE, "svcCloseHandle");
-    /// `svcWaitSynchronization` — blocks on the applet message event during
+    /// `svcWaitSynchronization`: blocks on the applet message event during
     /// the InFocus wait.
     pub const WAIT_SYNCHRONIZATION: Self =
         Self::new(code::WAIT_SYNCHRONIZATION, "svcWaitSynchronization");
-    /// `svcResetSignal` — clears the applet message event during the InFocus
+    /// `svcResetSignal`: clears the applet message event during the InFocus
     /// wait.
     pub const RESET_SIGNAL: Self = Self::new(code::RESET_SIGNAL, "svcResetSignal");
 
@@ -94,9 +94,9 @@ pub struct Service {
 }
 
 impl Service {
-    /// `appletOE` — the Application Manager service for the `Application` role.
+    /// `appletOE`: the Application Manager service for the `Application` role.
     pub const APPLET_OE: Self = Self::new("appletOE");
-    /// `appletAE` — the Application Manager service for every non-`Application`
+    /// `appletAE`: the Application Manager service for every non-`Application`
     /// applet role.
     pub const APPLET_AE: Self = Self::new("appletAE");
 
@@ -143,13 +143,13 @@ const FOREGROUND_SVCS: [Svc; BASE_SVCS.len() + 2] = {
     svcs
 };
 
-/// No service access — a background sysmodule contacts no Application Manager.
+/// No service access: a background sysmodule contacts no Application Manager.
 const NO_SERVICES: [Service; 0] = [];
 
-/// `appletOE` access — the `Application` role.
+/// `appletOE` access: the `Application` role.
 const APPLET_OE_SERVICES: [Service; 1] = [Service::APPLET_OE];
 
-/// `appletAE` access — every non-`Application` applet role.
+/// `appletAE` access: every non-`Application` applet role.
 const APPLET_AE_SERVICES: [Service; 1] = [Service::APPLET_AE];
 
 /// Returns the startup capability fragment for a given Application Manager

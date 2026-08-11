@@ -16,12 +16,10 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::{
-    env::hos_version::{
-        self,
-        HosVersion,
-    },
-    services::sm,
+use super::sm;
+use crate::env::hos_version::{
+    self,
+    HosVersion,
 };
 
 /// Global VI state, lazily initialized.
@@ -209,9 +207,9 @@ pub fn init_with_config() -> Result<(), ConnectError> {
 
 /// Global override storage mirroring libnx's weak symbols:
 ///
-/// - `__nx_vi_layer_id` — non-zero forces `viCreateLayer` to use that exact
+/// - `__nx_vi_layer_id`: non-zero forces `viCreateLayer` to use that exact
 ///   layer ID (skipping the applet-managed-layer fallback).
-/// - `__nx_vi_stray_layer_flags` — flags passed to `_viCreateStrayLayer` when
+/// - `__nx_vi_stray_layer_flags`: flags passed to `_viCreateStrayLayer` when
 ///   no managed layer is available.
 static VI_LAYER_OVERRIDES: OnceLock<RwLock<ViLayerOverrides>> = OnceLock::new();
 

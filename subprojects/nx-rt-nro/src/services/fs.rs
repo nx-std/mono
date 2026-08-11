@@ -14,7 +14,7 @@ pub use nx_fsdev::service::{
     get as get_service,
 };
 
-use crate::services::sm;
+use super::sm;
 
 /// Initializes the `fsp-srv` service.
 ///

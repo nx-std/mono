@@ -15,10 +15,9 @@
  * __nx_applet_type in any given final link.
  */
 EXTERN(__nx_rt_nro__libnx_applet_type);
-__nx_applet_type = __nx_rt_nro__libnx_applet_type;
-
 EXTERN(__nx_rt_nro__libnx_applet_initialize);
 EXTERN(__nx_rt_nro__libnx_applet_get_applet_type);
 
+__nx_applet_type = __nx_rt_nro__libnx_applet_type;
 appletInitialize = __nx_rt_nro__libnx_applet_initialize;
 appletGetAppletType = __nx_rt_nro__libnx_applet_get_applet_type;

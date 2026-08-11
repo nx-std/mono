@@ -103,7 +103,7 @@ pub(crate) fn open_system_application(
 
 /// Brings up a [`LibraryApplet`]-role applet.
 ///
-/// No InFocus wait, no foreground rights, no `NotifyRunning` — those are
+/// No InFocus wait, no foreground rights, no `NotifyRunning`: those are
 /// Application-only in libnx. Just snapshot initial state and enable mode
 /// notifications.
 pub(crate) fn open_library_applet(

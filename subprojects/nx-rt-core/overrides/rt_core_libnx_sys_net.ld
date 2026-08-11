@@ -7,7 +7,7 @@
  * the runtime, which nx-sys-net may not depend on.
  *
  * This fragment is gated by use_nx_sys_net on the consumer side: the
- * __nx_rt_core__libnx_socketInitialize symbol exists only when the `sys-net`
+ * __nx_rt_core__libnx_socket_initialize symbol exists only when the `sys-net`
  * Cargo feature is active.
  *
  * Organization:
@@ -15,6 +15,6 @@
  *   - Driver:    subprojects/nx-sys-net/sys_net_override.ld
  */
 
-EXTERN(__nx_rt_core__libnx_socketInitialize);
+EXTERN(__nx_rt_core__libnx_socket_initialize);
 
-socketInitialize = __nx_rt_core__libnx_socketInitialize;
+socketInitialize = __nx_rt_core__libnx_socket_initialize;

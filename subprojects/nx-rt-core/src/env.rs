@@ -12,10 +12,6 @@
 //! back through the accessor functions below, which are sound precisely
 //! because the state is written once and immutable thereafter.
 
-pub mod hos_version;
-pub mod main_thread;
-mod syscall_hint;
-
 use core::{
     cell::UnsafeCell,
     ffi::{
@@ -39,6 +35,10 @@ use nx_sys_sync::{
     Mutex,
     Once,
 };
+
+pub mod hos_version;
+pub mod main_thread;
+mod syscall_hint;
 
 pub use self::syscall_hint::SyscallHints;
 #[cfg(feature = "ffi")]

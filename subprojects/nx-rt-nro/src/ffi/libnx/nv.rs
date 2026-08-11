@@ -38,7 +38,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_nv_initialize() -> u32 {
     match crate::services::nv::init(config) {
         Ok(()) => {
             // Only update FFI session buffer on first actual initialization.
-            // Non-owning view (`own_handle = 0`, `object_id = 0` — libnx's
+            // Non-owning view (`own_handle = 0`, `object_id = 0`: libnx's
             // "override" mode): the Rust `NvService` retains exclusive
             // ownership and closes the kernel handle on `Drop` via
             // `nv::exit`. A `own_handle = 1` snapshot would risk a

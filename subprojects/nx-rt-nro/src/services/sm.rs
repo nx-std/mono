@@ -1,4 +1,4 @@
-//! Service Manager (SM) — re-exported from [`nx_rt_core`].
+//! Service Manager (SM): re-exported from [`nx_rt_core`].
 //!
 //! The Service Manager bootstrap is kind-agnostic: every output kind shares
 //! one SM session and one override table. Its single authoritative

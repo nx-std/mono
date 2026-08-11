@@ -1,16 +1,16 @@
 //! Kind-agnostic Application Manager (applet) FFI.
 //!
-//! Redirects the role-independent `libnx` `applet*` accessor surface — the
+//! Redirects the role-independent `libnx` `applet*` accessor surface: the
 //! operation/performance/focus-mode queries, the message-event pair, the
 //! notification setters, the ARUID and managed-display-layer calls, and
-//! `appletExit` — to `nx-rt-core`. Every Switch executable kind performs the
+//! `appletExit`: to `nx-rt-core`. Every Switch executable kind performs the
 //! same calls against the runtime applet singleton in
 //! [`crate::services::applet`]; none of them read the applet-type value, so
 //! the single authoritative implementation lives here and both the NRO and
 //! NSO entry crates expose the full ABI from it.
 //!
-//! The applet-type-sourcing entry points — `appletInitialize` and
-//! `appletGetAppletType` — are **not** here. They are kind-specific (an NRO
+//! The applet-type-sourcing entry points, `appletInitialize` and
+//! `appletGetAppletType`, are **not** here. They are kind-specific (an NRO
 //! reads the applet type from the loader configuration, an NSO from a
 //! build-time selection), so each entry crate owns them and reuses the shared
 //! `ToResultCode` mappings for the rich `appletInitialize`
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_receive_message(msg: *mut u3
             applet::process_message(message);
             0
         }
-        // No message available — propagate libnx's "queue empty" result code so
+        // No message available: propagate libnx's "queue empty" result code so
         // callers (e.g. `appletReceiveMessage` consumers) can distinguish empty
         // from success the same way they would against libnx.
         Ok(None) => 0x680,

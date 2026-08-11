@@ -12,7 +12,7 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::services::sm;
+use super::sm;
 
 /// Global APM state, lazily initialized.
 static APM_STATE: OnceLock<RwLock<Option<ApmState>>> = OnceLock::new();

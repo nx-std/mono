@@ -1,8 +1,8 @@
 //! Command-line argument parsing (NSO)
 //!
 //! Ports `libnx`'s `argvSetup` for the NSO output kind: an NSO receives its
-//! command line through the `__argdata__` linker symbol — a page-aligned
-//! region the process manager maps at the end of the executable — rather than
+//! command line through the `__argdata__` linker symbol (a page-aligned
+//! region the process manager maps at the end of the executable) rather than
 //! through a homebrew-loader `argv` pointer.
 //!
 //! [`get_nso_args`] is the NSO-specific `__argdata__` reader; the kind-agnostic
@@ -23,13 +23,13 @@ use nx_svc::mem::query_memory;
 /// Byte offset of the argument string within the `__argdata__` region.
 const ARGS_OFFSET: usize = 0x20;
 
-/// Size of the `__argdata__` header — two `u32`s: the total allocation size
+/// Size of the `__argdata__` header, two `u32`s: the total allocation size
 /// and the argument-string length.
 const HEADER_SIZE: usize = 2 * size_of::<u32>();
 
 /// Sets up argv parsing.
 ///
-/// This function can be called multiple times safely — initialization only
+/// This function can be called multiple times safely: initialization only
 /// happens once. Subsequent calls are no-ops.
 ///
 /// # Safety
@@ -80,7 +80,7 @@ unsafe fn get_nso_args() -> Option<&'static str> {
     }
     let region_offset = argdata_addr - meminfo.addr;
 
-    // Hard shell — reject a region that cannot hold the fixed-size header at
+    // Hard shell: reject a region that cannot hold the fixed-size header at
     // `argdata_ptr` before reading it, rather than relying on the unchecked
     // page-alignment of the `__argdata__` linker symbol.
     if region_offset + HEADER_SIZE > meminfo.size {
@@ -116,7 +116,7 @@ unsafe fn get_nso_args() -> Option<&'static str> {
     let args_slice = unsafe { slice::from_raw_parts(args_ptr, argdata_strsize) };
 
     // `argdata_strsize` is the upper bound on the readable region, not the
-    // exact content length — it may count the NUL terminator or be a buffer
+    // exact content length: it may count the NUL terminator or be a buffer
     // capacity. `libnx`'s `argvSetup` walks the argument string with a
     // `while (*i)` loop, treating the NUL as authoritative; mirror that here.
     //

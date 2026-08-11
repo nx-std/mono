@@ -56,7 +56,7 @@ pub use self::{
         SystemApplicationHandle,
     },
 };
-use crate::services::sm;
+use super::sm;
 
 /// Sentinel for "focus state not yet known". `AppletFocusState` discriminants
 /// start at 1 (`InFocus`) so 0 is safe as a tombstone.

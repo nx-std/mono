@@ -196,7 +196,7 @@ impl AppletSingleton {
     }
 
     // NOTE: AudioController / DisplayController / DebugFunctions projections
-    // are not yet exposed at the runtime layer — no top-level accessor or FFI
+    // are not yet exposed at the runtime layer: no top-level accessor or FFI
     // shim consumes them. Add them here when a consumer materialises rather
     // than carrying dead infrastructure.
 }

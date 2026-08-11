@@ -1,12 +1,12 @@
 //! # Application Manager (applet) bring-up (NSO)
 //!
 //! Exposes the single applet-init entry point for an NSO process. The applet
-//! handshake itself — the per-role libnx-faithful bring-up and the runtime
-//! singleton — is kind-agnostic and lives in [`nx_rt_core::services::applet`];
+//! handshake itself: the per-role libnx-faithful bring-up and the runtime
+//! singleton: is kind-agnostic and lives in [`nx_rt_core::services::applet`];
 //! this module only sources the [`AppletType`] value the handshake consumes.
 //!
-//! Unlike a homebrew NRO — which receives its applet type at runtime from the
-//! homebrew loader's configuration block — an NSO has no loader block to read.
+//! Unlike a homebrew NRO, which receives its applet type at runtime from the
+//! homebrew loader's configuration block, an NSO has no loader block to read.
 //! Its Application Manager identity is fixed when the process image is built,
 //! so the applet type flows in as the [`APPLET_TYPE`] build-time value rather
 //! than a parsed-at-runtime one.
@@ -27,7 +27,7 @@
 //! | `library-applet`     | [`AppletType::LibraryApplet`]| `open_library_applet`     | `appletAE` cmd 200·201 |
 //! | `overlay-applet`     | [`AppletType::OverlayApplet`]| `open_overlay_applet`     | `appletAE` cmd 300     |
 //! | `system-application` | [`AppletType::SystemApplication`]| `open_system_application` | `appletAE` cmd 350 |
-//! | `none`               | [`AppletType::None`]        | — (handshake skipped)      | none                   |
+//! | `none`               | [`AppletType::None`]        | - (handshake skipped)      | none                   |
 //!
 //! The `none` background-sysmodule profile contacts no Application Manager:
 //! `init` returns early before opening any proxy, so the process burns no AM
@@ -41,7 +41,7 @@ use nx_svc::process::Handle as ProcessHandle;
 /// The Application Manager identity this NSO process registers as.
 ///
 /// Every NSO declares exactly one applet type for the lifetime of the build.
-/// Unlike a homebrew NRO — which the loader hands an applet type at runtime —
+/// Unlike a homebrew NRO, which the loader hands an applet type at runtime,
 /// an NSO has no loader block, so the identity is fixed in the process image.
 ///
 /// The value is selected at build time by the `nso_applet_type` cfg value,
@@ -70,7 +70,7 @@ pub const APPLET_TYPE: AppletType = AppletType::SystemApplication;
 /// applet identity ([`APPLET_TYPE`]).
 ///
 /// Each of the five applet roles runs its libnx-faithful per-role handshake;
-/// [`AppletType::None`] — a background sysmodule — skips the Application
+/// [`AppletType::None`]: a background sysmodule: skips the Application
 /// Manager entirely. `process_handle` is this process's own handle, which the
 /// Application Manager associates with the applet.
 ///

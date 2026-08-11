@@ -13,13 +13,11 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::{
-    env,
-    services::{
-        applet,
-        sm,
-    },
+use super::{
+    applet,
+    sm,
 };
+use crate::env;
 
 /// Global NV state, lazily initialized.
 static NV_STATE: OnceLock<RwLock<Option<NvState>>> = OnceLock::new();
@@ -92,7 +90,7 @@ pub fn exit() {
     if let Some(ref mut nv_state) = *guard {
         nv_state.ref_count = nv_state.ref_count.saturating_sub(1);
         if nv_state.ref_count == 0 {
-            // Take and drop the service — `NvService` is RAII, so dropping
+            // Take and drop the service: `NvService` is RAII, so dropping
             // releases both session handles and frees the tmem backing.
             let _ = guard.take();
         }

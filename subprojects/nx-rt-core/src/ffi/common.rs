@@ -29,7 +29,7 @@ pub struct SyncUnsafeCell<T>(UnsafeCell<T>);
 // exactly once by its owner's `*_initialize` hook (or zeroed by the matching
 // `*_exit`) and read only after that publication, with no concurrent access.
 // libnx guarantees a given service's `*_initialize`/`*_exit` runs once,
-// single-threaded, before/after any FFI access to its cache — so no two
+// single-threaded, before/after any FFI access to its cache: so no two
 // accesses race. Callers placing a `SyncUnsafeCell` in `static` storage must
 // uphold this no-races contract; it is an internal runtime utility, not a
 // general-purpose cell.

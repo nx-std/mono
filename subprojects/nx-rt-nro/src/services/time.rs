@@ -14,7 +14,7 @@ use nx_std_sync::{
 };
 use nx_time::tz::TzSpec;
 
-use crate::services::sm;
+use super::sm;
 
 /// Global Time state, lazily initialized.
 static TIME_STATE: OnceLock<RwLock<Option<TimeState>>> = OnceLock::new();
@@ -85,7 +85,7 @@ pub fn init_wall_clock() -> Result<(), InitWallClockError> {
         .map_err(InitWallClockError::GetCurrentTime)?;
 
     // Anchored before the timezone is resolved so that a timezone failure costs only the `TZ`
-    // variable, not the clock — libnx sequences its two steps the same way.
+    // variable, not the clock: libnx sequences its two steps the same way.
     nx_time::realtime::set_anchor(unix_secs);
 
     let (_calendar, info) = service
