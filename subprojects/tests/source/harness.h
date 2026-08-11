@@ -89,11 +89,26 @@ typedef struct {
  * debugger attached afterwards, which the compiler cannot see. Without it the
  * stores are dead and the whole array is optimised away, leaving a debugger
  * with a symbol that is not in the binary.
+ *
+ * Declared here and defined once per binary by `TEST_RESULTS_STORAGE`. A
+ * `static` definition in this header would give every translation unit that
+ * includes it its own copy — and `volatile` keeps the unused ones, so a suite
+ * of thirty files would leave a reader thirty tables to search for the one that
+ * was filled.
  */
-static volatile TestResult g_test_results[TEST_RESULTS_CAPACITY];
+extern volatile TestResult g_test_results[TEST_RESULTS_CAPACITY];
 
 /** @brief How many entries of `g_test_results` are filled. */
-static volatile int g_test_result_count = 0;
+extern volatile int g_test_result_count;
+
+/**
+ * @brief Defines the storage the declarations above name.
+ *
+ * Expanded exactly once per test binary, at file scope in its `main.c`.
+ */
+#define TEST_RESULTS_STORAGE \
+    volatile TestResult g_test_results[TEST_RESULTS_CAPACITY]; \
+    volatile int g_test_result_count = 0;
 
 /**
  * @brief Records one result, ignoring anything past the table's capacity.
