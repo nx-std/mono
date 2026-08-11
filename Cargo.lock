@@ -94,6 +94,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-nv"
+version = "0.1.0"
+dependencies = [
+ "nx-cpu",
+ "nx-panic-handler",
+ "nx-service-nv",
+ "nx-svc",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
 name = "nx-panic-handler"
 version = "0.1.0"
 
@@ -165,6 +177,7 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-fsdev",
+ "nx-nv",
  "nx-panic-handler",
  "nx-rt-core",
  "nx-service-apm",
