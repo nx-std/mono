@@ -539,10 +539,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_fs_close(fs_ptr: *mut Service) {
 ///
 /// `fs` must point to a `Service` this module handed out, the buffers to their
 /// stated sizes, and `path` to a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_fs_query_entry(
     _fs: *mut Service,
@@ -562,10 +558,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_fs_query_entry(
 ///
 /// `fs` must point to a `Service` this module handed out, and `out` to a
 /// writable `FsFileSystemAttribute`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_fs_get_file_system_attribute(
     _fs: *mut Service,

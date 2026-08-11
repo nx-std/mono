@@ -38,9 +38,10 @@ fn state() -> &'static RwLock<Option<ViState>> {
 /// Multiple calls increment the reference count; actual initialization only
 /// happens on the first call.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if SM is not initialized.
+/// Returns an error when the Service Manager is not open, or when the
+/// connection was refused. Nothing was opened.
 pub fn init(service_type: ViServiceType) -> Result<(), ConnectError> {
     let mut guard = state().write();
 
@@ -50,8 +51,7 @@ pub fn init(service_type: ViServiceType) -> Result<(), ConnectError> {
         return Ok(());
     }
 
-    let sm_guard = sm::sm_session();
-    let sm = sm_guard.as_ref().expect("SM not initialized");
+    let sm = sm::session().map_err(ConnectError::SmNotInitialized)?;
 
     // libnx gates root-service retention (fatal-display commands) on HOS ≥ 16.0.0
     // and gates the indirect-binder sub-service on HOS ≥ 2.0.0. Compute the
@@ -63,8 +63,8 @@ pub fn init(service_type: ViServiceType) -> Result<(), ConnectError> {
     };
 
     // Connect to VI service
-    let service =
-        nx_service_vi::connect_with_options(sm, service_type, options).map_err(ConnectError)?;
+    let service = nx_service_vi::connect_with_options(&sm, service_type, options)
+        .map_err(ConnectError::Connect)?;
 
     *guard = Some(ViState {
         service,
@@ -139,15 +139,30 @@ impl core::ops::Deref for ViServiceRef {
 
 /// Error returned by [`init`] when connecting to the VI service fails.
 #[derive(Debug, thiserror::Error)]
-#[error("failed to connect to VI service")]
-pub struct ConnectError(#[source] pub nx_service_vi::ConnectError);
+pub enum ConnectError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the connection is attempted before the Service Manager is
+    /// open, or after it is closed. Nothing was opened.
+    #[error("the Service Manager is not initialized")]
+    SmNotInitialized(#[source] nx_rt_core::services::sm::NotInitializedError),
+    /// The display service refused the connection.
+    ///
+    /// Occurs when the server was unreachable or rejected the request. Nothing
+    /// was opened.
+    #[error("failed to connect to VI service")]
+    Connect(#[source] nx_service_vi::ConnectError),
+}
 
 #[cfg(feature = "ffi")]
 impl nx_rt_core::error::ToResultCode for ConnectError {
     fn to_rc(self) -> nx_rt_core::error::ResultCode {
         use nx_sf::error::ToResultCode as _;
 
-        self.0.to_rc()
+        match self {
+            Self::SmNotInitialized(err) => err.to_rc(),
+            Self::Connect(err) => err.to_rc(),
+        }
     }
 }
 

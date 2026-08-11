@@ -33,9 +33,10 @@ fn state() -> &'static RwLock<Option<HidState>> {
 /// process would each close it under the other, leaving the survivor reading
 /// shared memory that has already been unmapped.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if SM is not initialized.
+/// Returns an error when the Service Manager is not open, or when the
+/// connection was refused. Nothing was opened.
 pub fn init() -> Result<(), ConnectError> {
     {
         let mut guard = state().write();
@@ -45,14 +46,13 @@ pub fn init() -> Result<(), ConnectError> {
         }
     }
 
-    let sm_guard = sm::sm_session();
-    let sm = sm_guard.as_ref().expect("SM not initialized");
+    let sm = sm::session().map_err(ConnectError::SmNotInitialized)?;
 
     // Get applet resource user ID from applet manager
     let aruid = applet::get_applet_resource_user_id();
 
     // Connect to HID service
-    let service = nx_service_hid::connect(sm, aruid).map_err(ConnectError)?;
+    let service = nx_service_hid::connect(&sm, aruid).map_err(ConnectError::Connect)?;
 
     let mut guard = state().write();
     *guard = Some(HidState {
@@ -109,16 +109,31 @@ impl core::ops::Deref for HidServiceRef {
     }
 }
 
-/// Error returned by [`init`] when connecting to the HID service fails.
+/// Error returned by [`init`].
 #[derive(Debug, thiserror::Error)]
-#[error("failed to connect to HID service")]
-pub struct ConnectError(#[source] pub nx_service_hid::ConnectError);
+pub enum ConnectError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the connection is attempted before the Service Manager is
+    /// open, or after it is closed. Nothing was opened.
+    #[error("the Service Manager is not initialized")]
+    SmNotInitialized(#[source] nx_rt_core::services::sm::NotInitializedError),
+    /// The HID service refused the connection.
+    ///
+    /// Occurs when the server was unreachable or rejected the request. Nothing
+    /// was opened.
+    #[error("failed to connect to the HID service")]
+    Connect(#[source] nx_service_hid::ConnectError),
+}
 
 #[cfg(feature = "ffi")]
 impl nx_rt_core::error::ToResultCode for ConnectError {
     fn to_rc(self) -> nx_rt_core::error::ResultCode {
         use nx_sf::error::ToResultCode as _;
 
-        self.0.to_rc()
+        match self {
+            Self::SmNotInitialized(err) => err.to_rc(),
+            Self::Connect(err) => err.to_rc(),
+        }
     }
 }

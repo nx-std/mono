@@ -2,6 +2,7 @@
 
 use core::ffi::c_void;
 
+use nx_rt_core::error::ToResultCode as _;
 use nx_service_hid;
 use nx_sf::error::ToResultCode;
 
@@ -14,28 +15,9 @@ use crate::ffi::common::GENERIC_ERROR;
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize() -> u32 {
     match crate::services::hid::init() {
         Ok(()) => 0,
-        Err(err) => {
-            // Convert error to result code
-            let crate::services::hid::ConnectError(conn_err) = err;
-            match conn_err {
-                nx_service_hid::ConnectError::GetService(sm_err) => match sm_err {
-                    nx_service_sm::GetServiceCmifError::SendRequest(e) => e.to_rc(),
-                    _ => GENERIC_ERROR,
-                },
-                nx_service_hid::ConnectError::CreateAppletResource(ar_err) => match ar_err {
-                    nx_service_hid::CreateAppletResourceError::SendRequest(e) => e.to_rc(),
-                    nx_service_hid::CreateAppletResourceError::ParseResponse(e) => e.to_rc(),
-                    nx_service_hid::CreateAppletResourceError::MissingHandle => GENERIC_ERROR,
-                },
-                nx_service_hid::ConnectError::GetSharedMemoryHandle(sh_err) => match sh_err {
-                    nx_service_hid::GetSharedMemoryHandleError::SendRequest(e) => e.to_rc(),
-                    nx_service_hid::GetSharedMemoryHandleError::ParseResponse(e) => e.to_rc(),
-                    nx_service_hid::GetSharedMemoryHandleError::MissingHandle => GENERIC_ERROR,
-                },
-                nx_service_hid::ConnectError::MapSharedMemory(_) => GENERIC_ERROR,
-                nx_service_hid::ConnectError::NullPointer => GENERIC_ERROR,
-            }
-        }
+        // The manager owns the mapping for its own failures; a second copy
+        // here would drift from it.
+        Err(err) => err.to_rc(),
     }
 }
 

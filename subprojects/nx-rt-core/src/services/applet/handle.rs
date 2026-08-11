@@ -53,7 +53,7 @@ macro_rules! define_handle {
             /// is `Some(AppletSingleton::$variant(_))`. The read lock held by
             /// `guard` then prevents the variant from changing for the
             /// handle's lifetime.
-            pub(super) unsafe fn from_guard(
+            pub(crate) unsafe fn from_guard(
                 guard: RwLockReadGuard<'static, Option<AppletState>>,
             ) -> Self {
                 Self { guard }

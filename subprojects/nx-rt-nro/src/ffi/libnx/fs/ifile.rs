@@ -181,10 +181,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_file_close(file: *mut Service) {
 ///
 /// `f` must point to a `Service` this module handed out, and `out` to a
 /// writable `FsRangeInfo`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_file_operate_range(
     _f: *mut Service,

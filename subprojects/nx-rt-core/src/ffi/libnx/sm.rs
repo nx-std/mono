@@ -295,8 +295,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_get_service_session() -> *mut Se
 }
 
 fn set_sm_ffi_session() {
-    let guard = sm::sm_session();
-    if let Some(sm) = guard.as_ref() {
+    if let Ok(sm) = sm::session() {
         // Non-owning FFI view (`own_handle = 0`, `object_id = 0` — libnx's
         // "override" mode): the Rust `SmService` retains exclusive ownership
         // of the kernel handle and closes it on `Drop` via `sm::exit`. A

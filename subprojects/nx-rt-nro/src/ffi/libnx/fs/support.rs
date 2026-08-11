@@ -29,7 +29,7 @@ use crate::{
 /// path reach the server. Rejecting here is the hard shell the C caller does
 /// not have; the code is the generic one because no server ever saw the
 /// request.
-pub(super) const PATH_TOO_LONG: u32 = GENERIC_ERROR;
+pub(crate) const PATH_TOO_LONG: u32 = GENERIC_ERROR;
 /// Copies a C path into the fixed-size buffer every `fsp-srv` path command
 /// takes, NUL-terminating it.
 ///
@@ -39,7 +39,7 @@ pub(super) const PATH_TOO_LONG: u32 = GENERIC_ERROR;
 /// # Safety
 ///
 /// `path` must be null or point to a NUL-terminated string.
-pub(super) unsafe fn copy_path(path: *const c_char) -> Option<[u8; FS_MAX_PATH]> {
+pub(crate) unsafe fn copy_path(path: *const c_char) -> Option<[u8; FS_MAX_PATH]> {
     if path.is_null() {
         return None;
     }
@@ -65,7 +65,7 @@ pub(super) unsafe fn copy_path(path: *const c_char) -> Option<[u8; FS_MAX_PATH]>
 /// `own_handle = 0` with a non-zero `object_id` is libnx's domain-subservice
 /// encoding. The zero says this crate keeps the close obligation, so a stray
 /// `serviceClose` on the C side tears nothing down.
-pub(super) fn sub_object_view(session: nx_svc::ipc::Handle, object_id: u32) -> Service {
+pub(crate) fn sub_object_view(session: nx_svc::ipc::Handle, object_id: u32) -> Service {
     Service {
         session,
         own_handle: 0,
@@ -78,7 +78,7 @@ pub(super) fn sub_object_view(session: nx_svc::ipc::Handle, object_id: u32) -> S
 ///
 /// The close obligation goes straight back to C, which discharges it with
 /// `fsFsClose`; see the parent module.
-pub(super) fn open_filesystem(
+pub(crate) fn open_filesystem(
     out: &mut Service,
     open: impl FnOnce(&FsService) -> Result<FsFileSystem<'_>, DispatchError>,
 ) -> u32 {
@@ -102,7 +102,7 @@ pub(super) fn open_filesystem(
 /// # Safety
 ///
 /// `service` must be null or point to a readable `Service`.
-pub(super) unsafe fn object_id_of(service: *const Service) -> Option<u32> {
+pub(crate) unsafe fn object_id_of(service: *const Service) -> Option<u32> {
     if service.is_null() {
         return None;
     }
@@ -119,7 +119,7 @@ pub(super) unsafe fn object_id_of(service: *const Service) -> Option<u32> {
 /// # Safety
 ///
 /// `fs` must be null or point to a readable `Service`.
-pub(super) unsafe fn with_filesystem<R>(
+pub(crate) unsafe fn with_filesystem<R>(
     fs: *const Service,
     f: impl FnOnce(&FsFileSystem<'_>) -> Result<R, nx_sf::service::DispatchError>,
 ) -> Result<R, u32> {
@@ -146,7 +146,7 @@ pub(super) unsafe fn with_filesystem<R>(
 /// # Safety
 ///
 /// `file` must be null or point to a readable `Service`.
-pub(super) unsafe fn with_file<R>(
+pub(crate) unsafe fn with_file<R>(
     file: *const Service,
     f: impl FnOnce(&FsFile<'_>) -> Result<R, nx_sf::service::DispatchError>,
 ) -> Result<R, u32> {
@@ -171,7 +171,7 @@ pub(super) unsafe fn with_file<R>(
 /// # Safety
 ///
 /// `dir` must be null or point to a readable `Service`.
-pub(super) unsafe fn with_dir<R>(
+pub(crate) unsafe fn with_dir<R>(
     dir: *const Service,
     f: impl FnOnce(&FsDir<'_>) -> Result<R, nx_sf::service::DispatchError>,
 ) -> Result<R, u32> {
@@ -192,7 +192,7 @@ pub(super) unsafe fn with_dir<R>(
 }
 
 /// Renders a `Result<(), u32>` as the bare result code C expects.
-pub(super) fn to_rc(result: Result<(), u32>) -> u32 {
+pub(crate) fn to_rc(result: Result<(), u32>) -> u32 {
     match result {
         Ok(()) => 0,
         Err(rc) => rc,
@@ -206,7 +206,7 @@ pub(super) fn to_rc(result: Result<(), u32>) -> u32 {
 ///
 /// `fs_ptr` must be null or point to a readable `Service`, `path` must be null
 /// or NUL-terminated, and `out` must be null or writable.
-pub(super) unsafe fn fs_space_query(
+pub(crate) unsafe fn fs_space_query(
     fs_ptr: *const Service,
     path: *const c_char,
     out: *mut i64,

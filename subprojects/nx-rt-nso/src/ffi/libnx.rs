@@ -17,4 +17,7 @@ mod env;
 mod init;
 
 // Called by `argv::setup()` after parsing the `__argdata__` command line.
-pub(crate) use self::argv::set_system_argv;
+// The startup sequence parses the command line, then calls this to point the
+// C-facing globals at what it parsed. The parse and the publication are
+// separate so that `crate::argv` does not have to reach into this module.
+pub(crate) use self::argv::publish as publish_argv;

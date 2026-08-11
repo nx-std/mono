@@ -21,6 +21,12 @@ use crate::error::ToResultCode;
 /// Error returned by [`super::init`].
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the applet bring-up runs before the Service Manager is
+    /// connected. Nothing was opened.
+    #[error("the Service Manager is not initialized")]
+    SmNotInitialized(#[source] crate::services::sm::NotInitializedError),
     /// Failed to open the applet proxy (service-layer: connect + open + drain
     /// extras + obtain the core seven sub-interfaces).
     #[error("failed to open applet proxy")]
@@ -65,6 +71,7 @@ pub enum ConnectError {
 impl ToResultCode for ConnectError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::SmNotInitialized(err) => err.to_rc(),
             Self::Open(err) => err.to_rc(),
             Self::GetEventHandle(err) => err.to_rc(),
             Self::GetFocusState(err) => err.to_rc(),

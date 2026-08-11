@@ -34,9 +34,20 @@ pub(crate) fn set_nxlink_host(addr: u32) {
 #[unsafe(no_mangle)]
 pub static mut __nx_rt_nro__libnx_applet_type: u32 = 0;
 
-/// Publishes the parsed applet type to the libnx-facing global.
-pub(crate) fn set_applet_type(applet_type: u32) {
-    unsafe { __nx_rt_nro__libnx_applet_type = applet_type };
+/// Points the C-facing global at the parsed applet type.
+///
+/// The startup sequence calls this too. The parse and the publication are
+/// separate steps so that the module holding the parsed environment does not
+/// have to reach up into this one to announce it.
+///
+/// The global is unsigned because the C declaration is, so the default role
+/// (-1) arrives there as `0xFFFF_FFFF`. That is the bit pattern C reads back
+/// and compares against its own -1, so the reinterpretation is the interchange
+/// format rather than a loss.
+pub(crate) fn publish_applet_type() {
+    // SAFETY: written on the startup thread before any other thread exists,
+    // and read-only afterwards.
+    unsafe { __nx_rt_nro__libnx_applet_type = env::applet_type().as_raw() as u32 };
 }
 
 /// Parse the homebrew loader environment configuration.
@@ -63,5 +74,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_env_setup(
     // SAFETY: the caller guarantees `ctx` is null or points to a valid
     // ConfigEntry array terminated by EndOfList, and `main_thread` is the
     // kernel-supplied main-thread handle.
-    unsafe { env::setup(ctx, ThreadHandle::from_raw_unchecked(main_thread), saved_lr) }
+    unsafe { env::setup(ctx, ThreadHandle::from_raw_unchecked(main_thread), saved_lr) };
+    publish_applet_type();
 }

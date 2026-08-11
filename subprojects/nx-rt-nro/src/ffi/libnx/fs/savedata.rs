@@ -373,10 +373,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_read_only_save_data_file_sys
 ///
 /// `attr`, `creation_info` and `meta` must point to readable structs of the
 /// matching libnx types.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_create_save_data_file_system(
     _attr: *const c_void,
@@ -392,10 +388,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_create_save_data_file_system(
 ///
 /// `attr` and `creation_info` must point to readable structs of the matching
 /// libnx types.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_create_save_data_file_system_by_system_save_data_id(
     _attr: *const c_void,
@@ -405,10 +397,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_create_save_data_file_system_by_s
 }
 
 /// Stands in for libnx's `fsCreate_SystemSaveData`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_create_system_save_data(
     _save_data_space_id: i32,
@@ -421,10 +409,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_create_system_save_data(
 }
 
 /// Stands in for libnx's `fsCreate_SystemSaveDataWithOwner`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_create_system_save_data_with_owner(
     _save_data_space_id: i32,
@@ -439,10 +423,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_create_system_save_data_with_owner(
 }
 
 /// Stands in for libnx's `fsCreate_TemporaryStorage`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_create_temporary_storage(
     _application_id: u64,
@@ -454,10 +434,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_create_temporary_storage(
 }
 
 /// Stands in for libnx's `fsDeleteSaveDataFileSystem`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_delete_save_data_file_system(_application_id: u64) -> u32 {
     todo!("fsDeleteSaveDataFileSystem")
@@ -468,10 +444,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_delete_save_data_file_system(_applicatio
 /// # Safety
 ///
 /// `attr` must point to a readable `FsSaveDataAttribute`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_data_attribute(
     _save_data_space_id: i32,
@@ -481,10 +453,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_delete_save_data_file_system_by_s
 }
 
 /// Stands in for libnx's `fsDeleteSaveDataFileSystemBySaveDataSpaceId`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_data_space_id(
     _save_data_space_id: i32,
@@ -494,10 +462,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_delete_save_data_file_system_by_save_dat
 }
 
 /// Stands in for libnx's `fsExtendSaveDataFileSystem`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_extend_save_data_file_system(
     _save_data_space_id: i32,
@@ -513,10 +477,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_extend_save_data_file_system(
 /// # Safety
 ///
 /// `buf` must point to `len` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_read_save_data_file_system_extra_data(
     _buf: *mut c_void,
@@ -531,10 +491,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_read_save_data_file_system_extra_
 /// # Safety
 ///
 /// `buf` must point to `len` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_read_save_data_file_system_extra_data_by_save_data_space_id(
     _buf: *mut c_void,
@@ -550,10 +506,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_read_save_data_file_system_extra_
 /// # Safety
 ///
 /// `buf` must point to `len` readable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_write_save_data_file_system_extra_data(
     _buf: *const c_void,
@@ -565,10 +517,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_write_save_data_file_system_extra
 }
 
 /// Stands in for libnx's `fsDisableAutoSaveDataCreation`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_disable_auto_save_data_creation() -> u32 {
     todo!("fsDisableAutoSaveDataCreation")

@@ -26,12 +26,11 @@ use crate::services::sm;
 /// Returns [`InitError::SmNotInitialized`] when the Service Manager has not been bootstrapped
 /// yet, and [`InitError::Connect`] when `fsp-srv` could not be reached through it.
 pub fn init() -> Result<(), InitError> {
-    let sm_guard = sm::sm_session();
-    let Some(sm) = sm_guard.as_ref() else {
+    let Ok(sm) = sm::session() else {
         return Err(InitError::SmNotInitialized);
     };
 
-    let service = nx_service_fs::connect_cmif(sm).map_err(InitError::Connect)?;
+    let service = nx_service_fs::connect_cmif(&sm).map_err(InitError::Connect)?;
     nx_fsdev::service::set(service);
 
     Ok(())

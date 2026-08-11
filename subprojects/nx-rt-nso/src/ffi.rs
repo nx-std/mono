@@ -10,4 +10,3 @@ pub mod libnx;
 
 // Re-exported for the `argv` runtime path, which publishes the C-facing
 // argc/argv globals through this setter.
-pub(crate) use self::libnx::set_system_argv;

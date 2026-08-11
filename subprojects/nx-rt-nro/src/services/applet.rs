@@ -11,7 +11,35 @@
 //! handing it to the shared handshake is the one piece that is this crate's
 //! own, and it is [`init_from_env`] below.
 
-pub use nx_rt_core::services::applet::*;
+pub use nx_rt_core::services::applet::{
+    ApplicationHandle,
+    CommonStateGetterRef,
+    ConnectError,
+    LibraryAppletCreatorRef,
+    LibraryAppletHandle,
+    OverlayAppletHandle,
+    SelfControllerRef,
+    SystemAppletHandle,
+    SystemApplicationHandle,
+    WindowControllerRef,
+    as_application,
+    as_library_applet,
+    as_overlay_applet,
+    as_system_applet,
+    as_system_application,
+    cached_focus_state,
+    cached_operation_mode,
+    cached_performance_mode,
+    exit,
+    get_applet_resource_user_id,
+    get_common_state_getter,
+    get_library_applet_creator,
+    get_self_controller,
+    get_window_controller,
+    init,
+    message_event_handle,
+    process_message,
+};
 use nx_svc::process::Handle as ProcessHandle;
 
 use crate::env;

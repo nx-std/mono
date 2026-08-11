@@ -4,6 +4,8 @@
 //! service overrides. It wraps `nx_service_sm` protocol operations with
 //! state management and override support.
 
+use core::ops::Deref;
+
 pub use nx_service_sm::ConnectError;
 use nx_service_sm::SmService;
 #[cfg(feature = "ffi")]
@@ -16,7 +18,10 @@ use nx_sf::{
 };
 use nx_std_sync::{
     once_lock::OnceLock,
-    rwlock::RwLock,
+    rwlock::{
+        RwLock,
+        RwLockReadGuard,
+    },
 };
 #[cfg(feature = "ffi")]
 use nx_svc::error::ResultCode;
@@ -40,8 +45,16 @@ pub const MAX_OVERRIDES: usize = 32;
 static SM_SESSION: RwLock<Option<SmService>> = RwLock::new(None);
 
 /// Static override table.
-#[allow(clippy::declare_interior_mutable_const)]
 static OVERRIDES: [OnceLock<Override>; MAX_OVERRIDES] = {
+    // The table is fixed-size and every slot starts empty, so the array is
+    // built by repeating one empty cell. Repeating a `const` is the only way
+    // to write that for a type without `Copy`, and the interior mutability the
+    // lint warns about is the point: each slot is filled at most once, later,
+    // through `OnceLock`.
+    #[expect(
+        clippy::declare_interior_mutable_const,
+        reason = "the const is a template for array repetition, never read as a value"
+    )]
     const INIT: OnceLock<Override> = OnceLock::new();
     [INIT; MAX_OVERRIDES]
 };
@@ -149,20 +162,35 @@ pub fn get_service(name: ServiceName) -> Result<Service, GetServiceError> {
 ///
 /// Returns the raw session handle.
 pub fn get_service_handle(name: ServiceName) -> Result<OwnedSessionHandle, GetServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
-    sm.get_service_handle_cmif(name).map_err(GetServiceError)
+    let sm = session().map_err(GetServiceError::NotInitialized)?;
+    sm.get_service_handle_cmif(name)
+        .map_err(GetServiceError::Protocol)
 }
 
 /// Error returned by [`get_service`] and [`get_service_handle`].
 #[derive(Debug, thiserror::Error)]
-#[error("protocol error")]
-pub struct GetServiceError(#[source] pub nx_service_sm::GetServiceCmifError);
+pub enum GetServiceError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the lookup is attempted before the session is opened or
+    /// after it is closed. Nothing was sent.
+    #[error("the Service Manager is not initialized")]
+    NotInitialized(#[source] NotInitializedError),
+    /// The server refused the lookup, or the reply could not be decoded.
+    ///
+    /// Occurs when the name is not registered, or the caller is not permitted
+    /// to reach it. No handle was issued.
+    #[error("protocol error")]
+    Protocol(#[source] nx_service_sm::GetServiceCmifError),
+}
 
 #[cfg(feature = "ffi")]
 impl ToResultCode for GetServiceError {
     fn to_rc(self) -> ResultCode {
-        self.0.to_rc()
+        match self {
+            Self::NotInitialized(err) => err.to_rc(),
+            Self::Protocol(err) => err.to_rc(),
+        }
     }
 }
 
@@ -174,8 +202,7 @@ pub fn register_service(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<OwnedSessionHandle, RegisterServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(RegisterServiceError::NotInitialized)?;
 
     if should_use_tipc() {
         sm.register_service_tipc(name, is_light, max_sessions)
@@ -192,8 +219,7 @@ pub fn register_service_cmif(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<OwnedSessionHandle, RegisterServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(RegisterServiceError::NotInitialized)?;
     sm.register_service_cmif(name, is_light, max_sessions)
         .map_err(RegisterServiceError::Cmif)
 }
@@ -204,8 +230,7 @@ pub fn register_service_tipc(
     is_light: bool,
     max_sessions: i32,
 ) -> Result<OwnedSessionHandle, RegisterServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(RegisterServiceError::NotInitialized)?;
     sm.register_service_tipc(name, is_light, max_sessions)
         .map_err(RegisterServiceError::Tipc)
 }
@@ -213,6 +238,12 @@ pub fn register_service_tipc(
 /// Error returned by [`register_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum RegisterServiceError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the registration is attempted before the session is opened or
+    /// after it is closed. Nothing was sent.
+    #[error("the Service Manager is not initialized")]
+    NotInitialized(#[source] NotInitializedError),
     /// CMIF protocol error.
     #[error("CMIF protocol error")]
     Cmif(#[source] nx_service_sm::RegisterServiceCmifError),
@@ -225,6 +256,7 @@ pub enum RegisterServiceError {
 impl ToResultCode for RegisterServiceError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NotInitialized(err) => err.to_rc(),
             Self::Cmif(err) => err.to_rc(),
             Self::Tipc(err) => err.to_rc(),
         }
@@ -235,8 +267,7 @@ impl ToResultCode for RegisterServiceError {
 ///
 /// Uses CMIF or TIPC based on system version.
 pub fn unregister_service(name: ServiceName) -> Result<(), UnregisterServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(UnregisterServiceError::NotInitialized)?;
 
     if should_use_tipc() {
         sm.unregister_service_tipc(name)
@@ -249,16 +280,14 @@ pub fn unregister_service(name: ServiceName) -> Result<(), UnregisterServiceErro
 
 /// Unregisters a service using CMIF protocol.
 pub fn unregister_service_cmif(name: ServiceName) -> Result<(), UnregisterServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(UnregisterServiceError::NotInitialized)?;
     sm.unregister_service_cmif(name)
         .map_err(UnregisterServiceError::Cmif)
 }
 
 /// Unregisters a service using TIPC protocol.
 pub fn unregister_service_tipc(name: ServiceName) -> Result<(), UnregisterServiceError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(UnregisterServiceError::NotInitialized)?;
     sm.unregister_service_tipc(name)
         .map_err(UnregisterServiceError::Tipc)
 }
@@ -266,6 +295,12 @@ pub fn unregister_service_tipc(name: ServiceName) -> Result<(), UnregisterServic
 /// Error returned by [`unregister_service`].
 #[derive(Debug, thiserror::Error)]
 pub enum UnregisterServiceError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the deregistration is attempted before the session is opened or
+    /// after it is closed. Nothing was sent.
+    #[error("the Service Manager is not initialized")]
+    NotInitialized(#[source] NotInitializedError),
     /// CMIF protocol error.
     #[error("CMIF protocol error")]
     Cmif(#[source] nx_service_sm::UnregisterServiceCmifError),
@@ -278,6 +313,7 @@ pub enum UnregisterServiceError {
 impl ToResultCode for UnregisterServiceError {
     fn to_rc(self) -> ResultCode {
         match self {
+            Self::NotInitialized(err) => err.to_rc(),
             Self::Cmif(err) => err.to_rc(),
             Self::Tipc(err) => err.to_rc(),
         }
@@ -288,8 +324,7 @@ impl ToResultCode for UnregisterServiceError {
 ///
 /// Only available on HOS 11.0.0-11.0.1 (CMIF) or Atmosphere (TIPC).
 pub fn detach_client() -> Result<(), DetachClientError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(DetachClientError::NotInitialized)?;
 
     if hos_version::is_atmosphere() {
         sm.detach_client_tipc().map_err(DetachClientError::Tipc)
@@ -304,21 +339,25 @@ pub fn detach_client() -> Result<(), DetachClientError> {
 
 /// Detaches using CMIF protocol.
 pub fn detach_client_cmif() -> Result<(), DetachClientError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(DetachClientError::NotInitialized)?;
     sm.detach_client_cmif().map_err(DetachClientError::Cmif)
 }
 
 /// Detaches using TIPC protocol.
 pub fn detach_client_tipc() -> Result<(), DetachClientError> {
-    let session = SM_SESSION.read();
-    let sm = session.as_ref().expect("SM not initialized");
+    let sm = session().map_err(DetachClientError::NotInitialized)?;
     sm.detach_client_tipc().map_err(DetachClientError::Tipc)
 }
 
 /// Error returned by [`detach_client`].
 #[derive(Debug, thiserror::Error)]
 pub enum DetachClientError {
+    /// No Service Manager session is open.
+    ///
+    /// Occurs when the detach is attempted before the session is opened or
+    /// after it is closed. Nothing was sent.
+    #[error("the Service Manager is not initialized")]
+    NotInitialized(#[source] NotInitializedError),
     /// Detach is not supported on this system version.
     #[error("incompatible system version")]
     IncompatibleVersion,
@@ -334,8 +373,9 @@ pub enum DetachClientError {
 impl ToResultCode for DetachClientError {
     fn to_rc(self) -> ResultCode {
         match self {
-            // A refusal this layer decides, so it reports a libnx code: no
-            // request went out and no server named one.
+            Self::NotInitialized(err) => err.to_rc(),
+            // A refusal this layer decides, so it reports a result code of its
+            // own: no request went out and no server named one.
             Self::IncompatibleVersion => libnx_error(LibnxError::IncompatSysVer),
             Self::Cmif(err) => err.to_rc(),
             Self::Tipc(err) => err.to_rc(),
@@ -343,16 +383,54 @@ impl ToResultCode for DetachClientError {
     }
 }
 
-/// Returns a read guard to the SM session.
+/// Borrows the process's Service Manager session.
+///
+/// A process gets one session, and this module holds it. Callers borrow it for
+/// the length of a request rather than being handed the container it lives in,
+/// so "is it open?" is answered once, here, instead of at every call site.
+///
+/// # Errors
+///
+/// Returns an error when no session is open: either [`initialize`] has not run
+/// yet, or [`exit`] has already closed it. Nothing was sent.
 #[inline]
-pub fn sm_session() -> nx_std_sync::rwlock::RwLockReadGuard<'static, Option<SmService>> {
-    SM_SESSION.read()
+pub fn session() -> Result<SmSession, NotInitializedError> {
+    let guard = SM_SESSION.read();
+    if guard.is_none() {
+        return Err(NotInitializedError);
+    }
+    Ok(SmSession(guard))
 }
 
-/// Returns a write guard to the SM session.
-#[inline]
-pub fn sm_session_mut() -> nx_std_sync::rwlock::RwLockWriteGuard<'static, Option<SmService>> {
-    SM_SESSION.write()
+/// A borrow of the Service Manager session.
+///
+/// Holds the read lock, so the session cannot be closed while it is in use.
+pub struct SmSession(RwLockReadGuard<'static, Option<SmService>>);
+
+impl Deref for SmSession {
+    type Target = SmService;
+
+    fn deref(&self) -> &Self::Target {
+        match self.0.as_ref() {
+            Some(sm) => sm,
+            // SAFETY: `session` is the only constructor, and it returns an
+            // error rather than a guard when the session is closed. The read
+            // lock this holds keeps it open for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+/// Error returned by [`session`].
+#[derive(Debug, thiserror::Error)]
+#[error("the Service Manager is not initialized")]
+pub struct NotInitializedError;
+
+#[cfg(feature = "ffi")]
+impl ToResultCode for NotInitializedError {
+    fn to_rc(self) -> ResultCode {
+        libnx_error(LibnxError::NotInitialized)
+    }
 }
 
 /// Registers a pre-connected service handle that bypasses SM lookup.

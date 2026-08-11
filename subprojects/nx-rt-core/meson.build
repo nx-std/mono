@@ -14,11 +14,6 @@ nx_alloc_dep = nx_alloc_proj.get_variable('nx_alloc_dep')
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-service-applet (optional — backs the `service-applet` feature's shared
-# applet manager; activated transitively by the NRO/NSO entry crates)
-nx_service_applet_proj = subproject('nx-service-applet')
-nx_service_applet_dep = nx_service_applet_proj.get_variable('nx_service_applet_dep')
-
 # nx-service-sm (sm is the foundation for every other service)
 nx_service_sm_proj = subproject('nx-service-sm')
 nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
@@ -46,7 +41,6 @@ nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_d
 deps = [
     nx_alloc_dep,
     nx_panic_handler_dep,
-    nx_service_applet_dep,
     nx_service_sm_dep,
     nx_sf_dep,
     nx_std_sync_dep,
@@ -54,6 +48,36 @@ deps = [
     nx_sys_sync_dep,
     nx_sys_thread_tls_dep,
 ]
+
+# The optional dependencies, each behind the option that selects the Cargo
+# feature it backs, so Meson builds exactly what Cargo will compile.
+
+# nx-service-applet (backs the `service-applet` feature's shared applet
+# manager; activated transitively by the NRO/NSO entry crates)
+if get_option('use_nx_service_applet').enabled()
+    nx_service_applet_proj = subproject('nx-service-applet')
+    nx_service_applet_dep = nx_service_applet_proj.get_variable('nx_service_applet_dep')
+    deps += nx_service_applet_dep
+endif
+
+# nx-net (backs the `net` feature's name-resolution symbols)
+if get_option('use_nx_net').enabled()
+    nx_net_proj = subproject('nx-net')
+    nx_net_dep = nx_net_proj.get_variable('nx_net_dep')
+    deps += nx_net_dep
+endif
+
+# nx-service-bsd + nx-sys-net (back the `sys-net` feature's socket-driver
+# bring-up, whose interface revision follows the running firmware)
+if get_option('use_nx_sys_net').enabled()
+    nx_service_bsd_proj = subproject('nx-service-bsd')
+    nx_service_bsd_dep = nx_service_bsd_proj.get_variable('nx_service_bsd_dep')
+    deps += nx_service_bsd_dep
+
+    nx_sys_net_proj = subproject('nx-sys-net')
+    nx_sys_net_dep = nx_sys_net_proj.get_variable('nx_sys_net_dep')
+    deps += nx_sys_net_dep
+endif
 
 #---------------------------------------------------------------------------------
 # Static library
