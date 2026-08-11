@@ -16,7 +16,6 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
-use core::ffi::CStr;
 
 use nx_service_fs::{
     CreateOption,
@@ -26,6 +25,11 @@ use nx_service_fs::{
     FsFile,
     FsFileSystem,
     OpenMode,
+};
+use nx_std_path::{
+    OsString,
+    Path,
+    PathBuf,
 };
 use nx_std_sync::mutex::Mutex;
 use nx_sys_fd::device::{
@@ -54,7 +58,7 @@ use crate::{
 /// A filesystem reachable under one name.
 pub struct FsDevice {
     /// The name paths address this device by, without the `":"` that follows it in a path.
-    name: &'static CStr,
+    name: &'static str,
     /// What this device is mounted on, or `None` while it is not mounted.
     state: Mutex<Option<Mounted>>,
 }
@@ -64,12 +68,12 @@ struct Mounted {
     /// Domain object id of the `IFileSystem` every command is addressed to.
     filesystem: u32,
     /// Working directory relative paths are joined onto: absolute, without a trailing slash.
-    cwd: Vec<u8>,
+    cwd: PathBuf,
 }
 
 impl FsDevice {
     /// Creates an unmounted device reachable by `name`.
-    pub const fn new(name: &'static CStr) -> Self {
+    pub const fn new(name: &'static str) -> Self {
         Self {
             name,
             state: Mutex::new(None),
@@ -88,7 +92,7 @@ impl FsDevice {
 
         *state = Some(Mounted {
             filesystem: filesystem.into_raw_object_id(),
-            cwd: b"/".into(),
+            cwd: PathBuf::from("/"),
         });
     }
 
@@ -126,7 +130,7 @@ impl FsDevice {
     ///
     /// Returns [`DeviceError::NotFound`] when the device is not mounted, and whatever
     /// [`FsPath::create`] rejected the path with.
-    pub fn locate(&self, path: &CStr) -> Result<(u32, FsPath), DeviceError> {
+    pub fn locate(&self, path: &Path) -> Result<(u32, FsPath), DeviceError> {
         let state = self.state.lock();
         let Some(mounted) = state.as_ref() else {
             return Err(DeviceError::NotFound);
@@ -161,7 +165,7 @@ impl FsDevice {
     /// the creation failed.
     pub fn create_file(
         &self,
-        path: &CStr,
+        path: &Path,
         size: i64,
         option: CreateOption,
     ) -> Result<(), DeviceError> {
@@ -175,7 +179,7 @@ impl FsDevice {
     ///
     /// Returns [`DeviceError::NotFound`] when the path names nothing, and [`DeviceError::Io`] when
     /// the removal failed.
-    pub fn remove_dir_all(&self, path: &CStr) -> Result<(), DeviceError> {
+    pub fn remove_dir_all(&self, path: &Path) -> Result<(), DeviceError> {
         let (filesystem, path) = self.locate(path)?;
         service::with_filesystem(filesystem, |fs| {
             fs.delete_directory_recursively(path.as_buf())
@@ -184,11 +188,11 @@ impl FsDevice {
 }
 
 impl Device for FsDevice {
-    fn name(&self) -> &'static CStr {
+    fn name(&self) -> &'static str {
         self.name
     }
 
-    fn open(&self, path: &CStr, flags: OpenFlags) -> Result<Box<dyn File>, DeviceError> {
+    fn open(&self, path: &Path, flags: OpenFlags) -> Result<Box<dyn File>, DeviceError> {
         // Appending to a descriptor that cannot be written is the one flag combination the C
         // standard library forwards without rejecting first.
         if flags.append && !flags.write {
@@ -255,7 +259,7 @@ impl Device for FsDevice {
         )))
     }
 
-    fn open_dir(&self, path: &CStr) -> Result<Box<dyn Dir>, DeviceError> {
+    fn open_dir(&self, path: &Path) -> Result<Box<dyn Dir>, DeviceError> {
         let (filesystem, path) = self.locate(path)?;
 
         let object_id = service::with_filesystem(filesystem, |fs| {
@@ -272,7 +276,7 @@ impl Device for FsDevice {
         )))
     }
 
-    fn metadata(&self, path: &CStr) -> Result<Metadata, DeviceError> {
+    fn metadata(&self, path: &Path) -> Result<Metadata, DeviceError> {
         let (filesystem, path) = self.locate(path)?;
 
         let entry_type =
@@ -317,22 +321,22 @@ impl Device for FsDevice {
         }))
     }
 
-    fn remove_file(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn remove_file(&self, path: &Path) -> Result<(), DeviceError> {
         let (filesystem, path) = self.locate(path)?;
         service::with_filesystem(filesystem, |fs| fs.delete_file(path.as_buf()))
     }
 
-    fn create_dir(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn create_dir(&self, path: &Path) -> Result<(), DeviceError> {
         let (filesystem, path) = self.locate(path)?;
         service::with_filesystem(filesystem, |fs| fs.create_directory(path.as_buf()))
     }
 
-    fn remove_dir(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn remove_dir(&self, path: &Path) -> Result<(), DeviceError> {
         let (filesystem, path) = self.locate(path)?;
         service::with_filesystem(filesystem, |fs| fs.delete_directory(path.as_buf()))
     }
 
-    fn rename(&self, from: &CStr, to: &CStr) -> Result<(), DeviceError> {
+    fn rename(&self, from: &Path, to: &Path) -> Result<(), DeviceError> {
         let (filesystem, from) = self.locate(from)?;
         let (_, to) = self.locate(to)?;
 
@@ -346,7 +350,7 @@ impl Device for FsDevice {
         })
     }
 
-    fn set_current_dir(&self, path: &CStr) -> Result<(), DeviceError> {
+    fn set_current_dir(&self, path: &Path) -> Result<(), DeviceError> {
         let (filesystem, resolved) = self.locate(path)?;
 
         // A working directory that names a file, or nothing at all, would fail every relative path
@@ -364,6 +368,7 @@ impl Device for FsDevice {
         while cwd.len() > 1 && cwd.ends_with(b"/") {
             cwd.pop();
         }
+        let cwd = PathBuf::from(OsString::from(cwd));
 
         let mut state = self.state.lock();
         let Some(mounted) = state.as_mut() else {
@@ -376,7 +381,7 @@ impl Device for FsDevice {
         Ok(())
     }
 
-    fn space_info(&self, path: &CStr) -> Result<SpaceInfo, DeviceError> {
+    fn space_info(&self, path: &Path) -> Result<SpaceInfo, DeviceError> {
         let (filesystem, path) = self.locate(path)?;
 
         let free = service::with_filesystem(filesystem, |fs| fs.get_free_space(path.as_buf()))?;

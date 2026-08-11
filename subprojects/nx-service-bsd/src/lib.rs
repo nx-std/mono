@@ -40,7 +40,6 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
-use core::ffi::CStr;
 
 use nx_service_sm::SmService;
 use nx_sf::{
@@ -50,6 +49,7 @@ use nx_sf::{
         Session,
     },
 };
+use nx_std_path::Path;
 use nx_svc::mem::tmem::MemoryPermission;
 use nx_sys_mem::tmem::{
     self,
@@ -168,7 +168,7 @@ impl BsdService {
     /// [`CommandError::Service`] carrying [`PosixError::NotFound`] for a path the
     /// service does not know, or [`PosixError::PermissionDenied`] for one it will
     /// not open to this client.
-    pub fn open(&self, path: &CStr, flags: i32) -> Result<BsdSockFd, CommandError> {
+    pub fn open(&self, path: &Path, flags: i32) -> Result<BsdSockFd, CommandError> {
         let g = self.pool.acquire();
         cmif::open(g.session(), path, flags)
     }

@@ -8,11 +8,12 @@
 //! resolve a path before dispatching, and the shims resolve it again because the operations that
 //! take a path are handed no other clue about which device they are being called for.
 
-use core::{
-    cell::UnsafeCell,
-    ffi::CStr,
-};
+use core::cell::UnsafeCell;
 
+use nx_std_path::{
+    OsStr,
+    Path,
+};
 use nx_sys_sync::Mutex;
 
 use crate::{
@@ -32,28 +33,28 @@ static DEFAULT_DEVICE: DefaultDevice = DefaultDevice(UnsafeCell::new(None));
 /// Resolves a path to the device that should serve it.
 ///
 /// A `"name:"` prefix names the device; a path without one goes to the default device.
-pub fn device_for_path(path: &CStr) -> Option<DeviceId> {
-    match prefix_end(path) {
-        Some(end) => registry::find_by_name_bytes(&path.to_bytes()[..end]),
+pub fn device_for_path(path: &Path) -> Option<DeviceId> {
+    let Some(end) = prefix_end(path) else {
         // SAFETY: the default device slot was bounds-checked when it was set.
-        None => default_device().map(DeviceId::from_index_unchecked),
-    }
+        return default_device().map(DeviceId::from_index_unchecked);
+    };
+
+    // A device registers under a name that is text, so a prefix that is not UTF-8 matches nothing
+    // and resolves to no device. Reading it as text here costs the same answer and keeps the
+    // registry from having to compare raw bytes.
+    let name = core::str::from_utf8(&path.as_os_str().as_bytes()[..end]).ok()?;
+    registry::find_by_name(name)
 }
 
 /// Returns `path` with any `"name:"` prefix removed.
 ///
 /// What remains is the device's own business, and it is what a [`crate::device::Device`] is handed.
-/// The result borrows from `path`: stripping a prefix only moves the start, so the original nul
-/// still terminates it.
-pub fn strip_device_prefix(path: &CStr) -> &CStr {
+pub fn strip_device_prefix(path: &Path) -> &Path {
     let Some(end) = prefix_end(path) else {
         return path;
     };
 
-    // SAFETY: `end` indexes the colon inside `path`, so advancing past it stays within the same
-    // allocation and lands on or before the original nul terminator, which still terminates the
-    // remainder.
-    unsafe { CStr::from_ptr(path.as_ptr().add(end + 1)) }
+    Path::new(OsStr::from_bytes(&path.as_os_str().as_bytes()[end + 1..]))
 }
 
 /// Sets the default device slot.
@@ -78,8 +79,11 @@ fn default_device() -> Option<usize> {
 }
 
 /// Returns where the device name ends, or `None` when the path carries no `"name:"` prefix.
-fn prefix_end(path: &CStr) -> Option<usize> {
-    path.to_bytes().iter().position(|&byte| byte == b':')
+fn prefix_end(path: &Path) -> Option<usize> {
+    path.as_os_str()
+        .as_bytes()
+        .iter()
+        .position(|&byte| byte == b':')
 }
 
 /// Storage for the default device slot.

@@ -38,6 +38,11 @@ use core::{
     },
 };
 
+use nx_std_path::{
+    OsStr,
+    Path,
+};
+
 use super::{
     ctypes::{
         DirIter,
@@ -285,13 +290,17 @@ impl CDevice {
 }
 
 impl Device for CDevice {
-    fn name(&self) -> &'static CStr {
+    fn name(&self) -> &'static str {
         let table = self.table();
         if table.is_null() {
-            return c"";
+            return "";
         }
         // SAFETY: a bound table is live and its name outlives it.
-        unsafe { CStr::from_ptr((*table).name) }
+        let name = unsafe { CStr::from_ptr((*table).name) };
+        // A device name is an identifier rather than a path, so it is text. A table whose name is
+        // not reports the empty name, which no path resolves to: it stays registered and inert
+        // instead of making every name comparison fallible for the one table that is malformed.
+        name.to_str().unwrap_or("")
     }
 }
 
@@ -304,7 +313,7 @@ impl Device for CDevice {
 pub unsafe fn register_c_device(table: *const DevOpTab) -> Option<usize> {
     // SAFETY: the caller guarantees the table and its name are live.
     let name = unsafe { CStr::from_ptr((*table).name) };
-    let index = registry::free_slot_for(name)?;
+    let index = registry::free_slot_for(name.to_str().ok()?)?;
 
     // SAFETY: the caller guarantees the table outlives its descriptors.
     unsafe { C_DEVICES[index].bind(table) };
@@ -783,7 +792,7 @@ unsafe extern "C" fn shim_dirclose(r: *mut Reent, iter: *mut DirIter) -> c_int {
 /// `path` must be null or point to a live nul-terminated string.
 unsafe fn with_device<T>(
     path: *const c_char,
-    operation: impl FnOnce(&'static dyn Device, &CStr) -> Result<T, DeviceError>,
+    operation: impl FnOnce(&'static dyn Device, &Path) -> Result<T, DeviceError>,
 ) -> Result<T, c_int> {
     // SAFETY: the caller guarantees `path` is null or a live nul-terminated string.
     let Some(full_path) = (unsafe { borrow_path(path) }) else {
@@ -807,13 +816,21 @@ fn report(r: *mut Reent, result: Result<(), c_int>) -> c_int {
 
 /// Borrows a path handed in by C, refusing a null pointer.
 ///
+/// This is the only place a `*const c_char` path becomes a [`Path`], and it is where the nul
+/// terminator stops travelling: what comes out is the bytes between the pointer and the terminator,
+/// which is the path itself. Nothing below is handed a pointer or a terminator again.
+///
+/// The bytes are not checked for an encoding. A path is bytes on this platform, so one that is not
+/// UTF-8 is carried to the filesystem rather than refused by a layer that only transports it.
+///
 /// # Safety
 ///
 /// `path` must be null or point to a live nul-terminated string that outlives the returned borrow.
-unsafe fn borrow_path<'a>(path: *const c_char) -> Option<&'a CStr> {
+unsafe fn borrow_path<'a>(path: *const c_char) -> Option<&'a Path> {
     if path.is_null() {
         return None;
     }
     // SAFETY: the caller guarantees `path` is a live nul-terminated string.
-    Some(unsafe { CStr::from_ptr(path) })
+    let bytes = unsafe { CStr::from_ptr(path) }.to_bytes();
+    Some(Path::new(OsStr::from_bytes(bytes)))
 }

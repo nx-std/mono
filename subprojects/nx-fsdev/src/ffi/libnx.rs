@@ -32,6 +32,10 @@ use nx_sf::{
     ffi::Service,
     service::DispatchError,
 };
+use nx_std_path::{
+    OsStr,
+    Path,
+};
 use nx_sys_fd::device::{
     DeviceError,
     MAX_DEVICES,
@@ -108,7 +112,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_device(
     fs: Service,
 ) -> c_int {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return -1;
     };
     if fs.object_id == 0 {
@@ -145,7 +149,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_device(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_unmount_device(name: *const c_char) -> c_int {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return -1;
     };
 
@@ -167,7 +171,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_unmount_device(name: *const c_c
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_commit_device(name: *const c_char) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return NOT_FOUND;
     };
     let Some(device) = mount::find(name) else {
@@ -195,11 +199,11 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_get_device_file_system(
     name: *const c_char,
 ) -> *mut Service {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return core::ptr::null_mut();
     };
 
-    filesystem_view(name.to_bytes())
+    filesystem_view(name)
 }
 
 /// Splits `path` into the filesystem serving it and the path that filesystem takes.
@@ -316,7 +320,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_is_valid_signed_system_partitio
     out: *mut bool,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return NOT_FOUND;
     };
     if mount::find(name).is_none() {
@@ -394,7 +398,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_save_data(
     uid: AccountUid,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -417,7 +421,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_save_data_read_only(
     uid: AccountUid,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -439,7 +443,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_bcat_save_data(
     application_id: u64,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -461,7 +465,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_device_save_data(
     application_id: u64,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -482,7 +486,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_temporary_storage(
     name: *const c_char,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -503,7 +507,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_cache_storage(
     save_data_index: u16,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -531,7 +535,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_system_save_data(
     };
 
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -553,7 +557,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_system_bcat_save_data(
     system_save_data_id: u64,
 ) -> u32 {
     // SAFETY: the caller guarantees a NUL-terminated string.
-    let Some(name) = (unsafe { as_cstr(name) }) else {
+    let Some(name) = (unsafe { borrow_name(name) }) else {
         return BAD_INPUT;
     };
 
@@ -571,7 +575,7 @@ pub unsafe extern "C" fn __nx_fsdev__libnx_fsdev_mount_system_bcat_save_data(
 /// not have is answered by the server instead, so the difference is which result
 /// code comes back rather than whether the call is refused.
 fn mount_save_data(
-    name: &CStr,
+    name: &str,
     open: impl FnOnce(&FsService) -> Result<FsFileSystem<'_>, DispatchError>,
 ) -> u32 {
     let Some(fs_service) = service::get() else {
@@ -600,17 +604,34 @@ fn mount_error_to_rc(err: mount::MountError) -> u32 {
     }
 }
 
-/// Borrows `ptr` as a string, or reports that it is null.
+/// Borrows `ptr` as the bytes between it and its terminator, or reports that it is null.
+///
+/// This is where the terminator stops travelling: what comes out is the string itself, and nothing
+/// below is handed a pointer again.
 ///
 /// # Safety
 ///
 /// `ptr` must be null or point to a NUL-terminated string.
-unsafe fn as_cstr<'a>(ptr: *const c_char) -> Option<&'a CStr> {
+unsafe fn borrow_bytes<'a>(ptr: *const c_char) -> Option<&'a [u8]> {
     if ptr.is_null() {
         return None;
     }
     // SAFETY: the caller guarantees a NUL-terminated string.
-    Some(unsafe { CStr::from_ptr(ptr) })
+    Some(unsafe { CStr::from_ptr(ptr) }.to_bytes())
+}
+
+/// Borrows `ptr` as a device name, or reports that it is null or not text.
+///
+/// A device registers under a name that is text, so a name that is not UTF-8 matches nothing. It is
+/// read as text here so the lookups below compare names rather than raw bytes.
+///
+/// # Safety
+///
+/// `ptr` must be null or point to a NUL-terminated string.
+unsafe fn borrow_name<'a>(ptr: *const c_char) -> Option<&'a str> {
+    // SAFETY: forwarded to this function's own caller.
+    let bytes = unsafe { borrow_bytes(ptr) }?;
+    core::str::from_utf8(bytes).ok()
 }
 
 /// Splits a prefixed path into the device serving it, the path that device takes, and the name it
@@ -619,19 +640,15 @@ unsafe fn as_cstr<'a>(ptr: *const c_char) -> Option<&'a CStr> {
 /// # Safety
 ///
 /// `path` must be null or point to a NUL-terminated string.
-unsafe fn split_path<'a>(path: *const c_char) -> Option<(&'static FsDevice, &'a CStr, &'a [u8])> {
+unsafe fn split_path<'a>(path: *const c_char) -> Option<(&'static FsDevice, &'a Path, &'a str)> {
     // SAFETY: forwarded to this function's own caller.
-    let path = unsafe { as_cstr(path) }?;
-    let bytes = path.to_bytes();
+    let bytes = unsafe { borrow_bytes(path) }?;
 
     let colon = bytes.iter().position(|byte| *byte == b':')?;
-    let name = &bytes[..colon];
-    let device = mount::find_by_bytes(name)?;
+    let name = core::str::from_utf8(&bytes[..colon]).ok()?;
+    let device = mount::find(name)?;
 
-    // SAFETY: `colon` indexes the colon inside `path`, so advancing past it stays within the same
-    // allocation and lands on or before the original nul terminator, which still terminates the
-    // remainder.
-    let relative = unsafe { CStr::from_ptr(path.as_ptr().add(colon + 1)) };
+    let relative = Path::new(OsStr::from_bytes(&bytes[colon + 1..]));
 
     Some((device, relative, name))
 }
@@ -640,14 +657,14 @@ unsafe fn split_path<'a>(path: *const c_char) -> Option<(&'static FsDevice, &'a 
 ///
 /// The view lives in this module's own storage, indexed by the registry slot the device holds, so
 /// the pointer stays valid for as long as the device holds that slot.
-fn filesystem_view(name: &[u8]) -> *mut Service {
-    let Some(device) = mount::find_by_bytes(name) else {
+fn filesystem_view(name: &str) -> *mut Service {
+    let Some(device) = mount::find(name) else {
         return core::ptr::null_mut();
     };
     let Some(object_id) = device.filesystem() else {
         return core::ptr::null_mut();
     };
-    let Some(id) = nx_sys_fd::registry::find_by_name_bytes(name) else {
+    let Some(id) = nx_sys_fd::registry::find_by_name(name) else {
         return core::ptr::null_mut();
     };
     let Some(session) = service::session_handle() else {

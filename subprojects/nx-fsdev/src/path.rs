@@ -9,9 +9,8 @@
 //! second colon is a caller writing a path this device cannot serve rather than a device name. It
 //! is rejected, matching what libnx does with the same input.
 
-use core::ffi::CStr;
-
 use nx_service_fs::FS_MAX_PATH;
+use nx_std_path::Path;
 use nx_sys_fd::device::DeviceError;
 
 /// A path in the form a `fsp-srv` command takes: nul-terminated, in a fixed buffer.
@@ -26,12 +25,16 @@ impl FsPath {
     /// `cwd`. `cwd` is expected to be absolute and without a trailing slash, which is how a device
     /// keeps it.
     ///
+    /// This is where a path stops being a [`Path`] and becomes what the wire takes: the bytes are
+    /// copied into the fixed buffer and the zeroed remainder supplies the terminator the command
+    /// expects. Nothing above this carries that terminator.
+    ///
     /// # Errors
     ///
     /// Returns [`ResolveError::TooLong`] when the result does not fit the buffer with room for its
     /// nul terminator, and [`ResolveError::InvalidPath`] when `path` carries a colon.
-    pub(crate) fn create(cwd: &[u8], path: &CStr) -> Result<Self, ResolveError> {
-        let path = path.to_bytes();
+    pub(crate) fn create(cwd: &Path, path: &Path) -> Result<Self, ResolveError> {
+        let path = path.as_os_str().as_bytes();
         if path.contains(&b':') {
             return Err(ResolveError::InvalidPath);
         }
@@ -50,7 +53,7 @@ impl FsPath {
         };
 
         if !path.starts_with(b"/") {
-            push(cwd)?;
+            push(cwd.as_os_str().as_bytes())?;
             push(b"/")?;
         }
         push(path)?;
@@ -107,18 +110,21 @@ impl From<ResolveError> for DeviceError {
 
 #[cfg(test)]
 mod tests {
+    use nx_std_path::OsStr;
+
     use super::*;
 
     /// Working directory the relative fixtures are resolved against.
-    const CWD: &[u8] = b"/nx-tests-fs";
+    const CWD: &str = "/nx-tests-fs";
 
     #[test]
-    fn absolute_path_is_used_as_it_stands() {
+    fn create_with_an_absolute_path_uses_it_as_it_stands() {
         //* Given
-        let path = c"/switch/app.nro";
+        let path = Path::new("/switch/app.nro");
 
         //* When
-        let resolved = FsPath::create(CWD, path).expect("an absolute path should resolve");
+        let resolved =
+            FsPath::create(Path::new(CWD), path).expect("an absolute path should resolve");
 
         //* Then
         assert_eq!(
@@ -129,12 +135,13 @@ mod tests {
     }
 
     #[test]
-    fn relative_path_is_joined_onto_the_working_directory() {
+    fn create_with_a_relative_path_joins_it_onto_the_working_directory() {
         //* Given
-        let path = c"save.dat";
+        let path = Path::new("save.dat");
 
         //* When
-        let resolved = FsPath::create(CWD, path).expect("a relative path should resolve");
+        let resolved =
+            FsPath::create(Path::new(CWD), path).expect("a relative path should resolve");
 
         //* Then
         assert_eq!(
@@ -145,15 +152,15 @@ mod tests {
     }
 
     #[test]
-    fn resolved_path_is_nul_terminated_in_the_command_buffer() {
+    fn create_with_any_path_terminates_it_in_the_command_buffer() {
         //* Given
-        let path = c"save.dat";
+        let resolved = FsPath::create(Path::new(CWD), Path::new("save.dat"))
+            .expect("a relative path should resolve");
 
         //* When
-        let resolved = FsPath::create(CWD, path).expect("a relative path should resolve");
+        let buf = resolved.as_buf();
 
         //* Then
-        let buf = resolved.as_buf();
         assert_eq!(
             buf[resolved.as_bytes().len()],
             0,
@@ -162,14 +169,14 @@ mod tests {
     }
 
     #[test]
-    fn path_carrying_a_colon_is_rejected() {
+    fn create_with_a_path_carrying_a_colon_is_rejected() {
         //* Given
         // The descriptor table strips the device prefix, so a colon that survives is a caller
         // writing a path this device cannot serve.
-        let path = c"sdmc:/save.dat";
+        let path = Path::new("sdmc:/save.dat");
 
         //* When
-        let result = FsPath::create(CWD, path);
+        let result = FsPath::create(Path::new(CWD), path);
 
         //* Then
         assert!(
@@ -179,14 +186,14 @@ mod tests {
     }
 
     #[test]
-    fn path_that_overruns_the_command_buffer_is_rejected() {
+    fn create_with_a_path_that_overruns_the_command_buffer_is_rejected() {
         //* Given
         // One byte longer than the buffer can hold with its terminator.
         let long = alloc::vec![b'a'; FS_MAX_PATH];
-        let path = alloc::ffi::CString::new(long).expect("the fixture holds no interior nul");
+        let path = Path::new(OsStr::from_bytes(&long));
 
         //* When
-        let result = FsPath::create(b"/", &path);
+        let result = FsPath::create(Path::new("/"), path);
 
         //* Then
         assert!(
@@ -196,19 +203,37 @@ mod tests {
     }
 
     #[test]
-    fn working_directory_counts_towards_the_buffer_limit() {
+    fn create_with_a_long_working_directory_counts_it_towards_the_buffer_limit() {
         //* Given
         // The name fits on its own; joined onto the working directory it does not.
         let cwd = alloc::vec![b'a'; FS_MAX_PATH - 4];
-        let path = c"file";
+        let cwd = Path::new(OsStr::from_bytes(&cwd));
 
         //* When
-        let result = FsPath::create(&cwd, path);
+        let result = FsPath::create(cwd, Path::new("file"));
 
         //* Then
         assert!(
             matches!(result, Err(ResolveError::TooLong)),
             "the join must be measured, not just the path handed in"
+        );
+    }
+
+    #[test]
+    fn create_with_a_path_that_is_not_utf8_carries_the_bytes_through() {
+        //* Given
+        // A byte no UTF-8 sequence can start with, which the resolver must not judge.
+        let path = Path::new(OsStr::from_bytes(b"save\xffdat"));
+
+        //* When
+        let resolved =
+            FsPath::create(Path::new(CWD), path).expect("a path that is not text should resolve");
+
+        //* Then
+        assert_eq!(
+            resolved.as_bytes(),
+            b"/nx-tests-fs/save\xffdat",
+            "the bytes must reach the command unchanged rather than be refused on the way"
         );
     }
 }

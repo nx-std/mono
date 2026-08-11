@@ -20,6 +20,7 @@ nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-alloca
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-path = { version = "0.1.0", path = "../nx-std-path" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd" }

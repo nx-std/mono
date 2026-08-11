@@ -12,13 +12,10 @@
 
 use alloc::{
     boxed::Box,
-    ffi::CString,
+    string::String,
     vec::Vec,
 };
-use core::ffi::{
-    CStr,
-    c_int,
-};
+use core::ffi::c_int;
 
 use nx_service_fs::FsFileSystem;
 use nx_sf::service::DispatchError;
@@ -40,7 +37,7 @@ use crate::{
 static DEVICES: Mutex<Vec<&'static FsDevice>> = Mutex::new(Vec::new());
 
 /// The name the SD card is mounted under.
-pub(crate) const SDMC: &CStr = c"sdmc";
+pub(crate) const SDMC: &str = "sdmc";
 
 unsafe extern "C" {
     /// libsysbase's `setDefaultDevice`, naming the device a path without a prefix resolves to.
@@ -59,7 +56,7 @@ unsafe extern "C" {
 /// Returns [`MountError::AlreadyMounted`] when the name is taken, and
 /// [`MountError::RegistryFull`] when the descriptor table has no slot left. The filesystem is
 /// closed either way, since nothing else holds it.
-pub(crate) fn mount(name: &CStr, filesystem: FsFileSystem<'_>) -> Result<DeviceId, MountError> {
+pub(crate) fn mount(name: &str, filesystem: FsFileSystem<'_>) -> Result<DeviceId, MountError> {
     let device = device_for(name);
     if device.is_mounted() {
         return Err(MountError::AlreadyMounted);
@@ -151,7 +148,7 @@ pub enum MountSdmcError {
 /// # Errors
 ///
 /// Returns [`NotMounted`] when nothing is mounted under that name.
-pub(crate) fn unmount(name: &CStr) -> Result<(), NotMounted> {
+pub(crate) fn unmount(name: &str) -> Result<(), NotMounted> {
     let Some(device) = find(name) else {
         return Err(NotMounted);
     };
@@ -188,20 +185,15 @@ pub fn unmount_all() {
 }
 
 /// Returns the device mounted under `name`.
-pub(crate) fn find(name: &CStr) -> Option<&'static FsDevice> {
-    find_by_bytes(name.to_bytes())
-}
-
-/// Returns the device whose name is `name`, which carries no trailing nul.
 ///
-/// The C boundary splits the `"name:"` prefix off a path, which leaves a slice of the path rather
-/// than a string of its own.
-pub(crate) fn find_by_bytes(name: &[u8]) -> Option<&'static FsDevice> {
+/// A device that has been mounted before but is not mounted now is not a match: the table keeps
+/// every device it has ever created, so being present in it says nothing about being reachable.
+pub(crate) fn find(name: &str) -> Option<&'static FsDevice> {
     DEVICES
         .lock()
         .iter()
         .copied()
-        .find(|device| device.name().to_bytes() == name && device.is_mounted())
+        .find(|device| device.name() == name && device.is_mounted())
 }
 
 /// Returns how many devices are currently mounted.
@@ -232,13 +224,13 @@ pub(crate) fn set_default_device_if_first(slot: usize) {
 ///
 /// The device outlives the call because the registry demands it, so the allocation is deliberate
 /// and made once per name.
-fn device_for(name: &CStr) -> &'static FsDevice {
+fn device_for(name: &str) -> &'static FsDevice {
     let mut devices = DEVICES.lock();
     if let Some(device) = devices.iter().copied().find(|device| device.name() == name) {
         return device;
     }
 
-    let name: &'static CStr = Box::leak(CString::from(name).into_boxed_c_str());
+    let name: &'static str = Box::leak(String::from(name).into_boxed_str());
     let device: &'static FsDevice = Box::leak(Box::new(FsDevice::new(name)));
     devices.push(device);
 

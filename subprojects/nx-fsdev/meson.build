@@ -22,6 +22,10 @@ nx_service_fs_dep = nx_service_fs_proj.get_variable('nx_service_fs_dep')
 nx_sf_proj = subproject('nx-sf')
 nx_sf_dep = nx_sf_proj.get_variable('nx_sf_dep')
 
+# nx-std-path
+nx_std_path_proj = subproject('nx-std-path')
+nx_std_path_dep = nx_std_path_proj.get_variable('nx_std_path_dep')
+
 # nx-std-sync
 nx_std_sync_proj = subproject('nx-std-sync')
 nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
@@ -40,6 +44,7 @@ deps = [
     nx_panic_handler_dep,
     nx_service_fs_dep,
     nx_sf_dep,
+    nx_std_path_dep,
     nx_std_sync_dep,
     nx_svc_dep,
     nx_sys_fd_dep,

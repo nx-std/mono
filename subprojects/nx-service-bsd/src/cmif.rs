@@ -11,7 +11,7 @@
 //! the raw wire number — see [`crate::posix`] for why that distinction is
 //! load-bearing.
 
-use core::ffi::CStr;
+use alloc::vec::Vec;
 
 use nx_sf::{
     cmif::{
@@ -26,6 +26,7 @@ use nx_sf::{
     },
     service::BorrowedSessionHandle,
 };
+use nx_std_path::Path;
 use nx_svc::mem::tmem::Handle as TmemHandle;
 use nx_sys_thread_tls::IpcBuffer;
 use zerocopy::IntoBytes as _;
@@ -370,22 +371,24 @@ pub(crate) fn socket_exempt(
 
 /// Opens a path in the service's own namespace.
 ///
-/// The path travels with its terminating NUL, which is the length the
-/// service expects.
+/// The path travels with a terminating NUL, which is the length the service
+/// expects. Appending it is this function's job: the terminator is a property
+/// of the wire, so nothing above builds a path that carries one.
 pub(crate) fn open(
     session: BorrowedSessionHandle<'_>,
-    path: &CStr,
+    path: &Path,
     flags: i32,
 ) -> Result<BsdSockFd, CommandError> {
     let command = Command::Open;
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
+    let mut path_bytes = Vec::with_capacity(path.as_os_str().len() + 1);
+    path_bytes.extend_from_slice(path.as_os_str().as_bytes());
+    path_bytes.push(0);
+
     let req = cmif::CmifRequestBuilder::new(command.id())
         .with_data_value(&flags)
-        .add_in_auto_buffer(InputBuffer::new(
-            path.to_bytes_with_nul(),
-            BufferMode::Normal,
-        ))
+        .add_in_auto_buffer(InputBuffer::new(&path_bytes, BufferMode::Normal))
         .build();
     req.send(&mut buf, session)
         .map_err(|err| CommandError::SendRequest {

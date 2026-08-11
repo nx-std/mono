@@ -6,10 +6,7 @@
 //! Slots 0, 1 and 2 belong to stdin, stdout and stderr. Registration hands out slots from 3 upward,
 //! so taking over stdout means [`bind_at`] rather than [`register`].
 
-use core::{
-    cell::UnsafeCell,
-    ffi::CStr,
-};
+use core::cell::UnsafeCell;
 
 use nx_sys_sync::Mutex;
 
@@ -93,7 +90,7 @@ pub fn bind_at(index: usize, device: &'static dyn Device) {
 /// replaces rather than exhausting the registry.
 ///
 /// Returns `None` when every slot from 3 upward is taken.
-pub fn free_slot_for(name: &CStr) -> Option<usize> {
+pub fn free_slot_for(name: &str) -> Option<usize> {
     let mut registry = REGISTRY.lock();
     registry
         .devices()
@@ -126,20 +123,15 @@ pub fn get(id: DeviceId) -> Option<&'static dyn Device> {
 }
 
 /// Returns the device registered under `name`.
-pub fn find_by_name(name: &CStr) -> Option<DeviceId> {
-    find_by_name_bytes(name.to_bytes())
-}
-
-/// Returns the device whose name is `name`, which carries no trailing nul.
 ///
-/// The C boundary resolves the `"name:"` prefix of a path, which is a slice of the path rather than
-/// a string of its own, so it has bytes to match rather than a [`CStr`].
-pub fn find_by_name_bytes(name: &[u8]) -> Option<DeviceId> {
+/// `name` is the bare device name, without the `":"` that follows it in a path, so the `"name:"`
+/// prefix the C boundary splits off a path can be matched directly.
+pub fn find_by_name(name: &str) -> Option<DeviceId> {
     let mut registry = REGISTRY.lock();
     registry
         .devices()
         .iter()
-        .position(|slot| slot.is_some_and(|device| device.name().to_bytes() == name))
+        .position(|slot| slot.is_some_and(|device| device.name() == name))
         // SAFETY: `position` indexes the registry, so the slot is in range by construction.
         .map(DeviceId::from_index_unchecked)
 }
@@ -151,8 +143,8 @@ pub fn find_by_name_bytes(name: &[u8]) -> Option<DeviceId> {
 struct NullDevice;
 
 impl Device for NullDevice {
-    fn name(&self) -> &'static CStr {
-        c"stdnull"
+    fn name(&self) -> &'static str {
+        "stdnull"
     }
 
     fn write(&self, buf: &[u8]) -> Result<usize, DeviceError> {

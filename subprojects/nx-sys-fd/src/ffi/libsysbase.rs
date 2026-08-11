@@ -23,6 +23,10 @@ use core::{
     },
 };
 
+use nx_std_path::{
+    OsStr,
+    Path,
+};
 use nx_sys_sync::Mutex;
 
 mod ctypes;
@@ -93,7 +97,8 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_FindDevice(name: *const c_char)
     }
 
     // SAFETY: the caller guarantees `name` is a live nul-terminated string.
-    let path = unsafe { CStr::from_ptr(name) };
+    let bytes = unsafe { CStr::from_ptr(name) }.to_bytes();
+    let path = Path::new(OsStr::from_bytes(bytes));
 
     let Some(id) = path::device_for_path(path) else {
         return -1;
