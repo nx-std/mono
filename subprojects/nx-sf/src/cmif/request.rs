@@ -397,6 +397,63 @@ impl<'a> CmifRequestBuilder<'a> {
         self
     }
 
+    /// Adds an input map-alias buffer.
+    ///
+    /// Encodes the buffer as a mapped send buffer and nothing else — no paired
+    /// pointer descriptor, and no contribution to the pointer-buffer budget.
+    /// That is what separates this from [`Self::add_in_auto_buffer`], which
+    /// reserves the unused half of the pair to satisfy the auto-select layout.
+    ///
+    /// A command whose interface declares a plain map-alias buffer needs this
+    /// rather than the auto variant, because the extra descriptor an auto
+    /// buffer reserves is part of the wire layout: a server reading its
+    /// arguments from the send-buffer list finds them shifted, and the kernel
+    /// can reject the request before the server ever sees it.
+    ///
+    /// Empty slices encode null descriptors instead of taking a dangling
+    /// pointer from the slice.
+    #[inline]
+    pub fn add_in_map_alias(mut self, buf: InputBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let slice = buf.as_slice();
+        let len = slice.len();
+        let ptr = if slice.is_empty() {
+            ptr::null()
+        } else {
+            slice.as_ptr()
+        };
+
+        self.hipc = self
+            .hipc
+            .with_send_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+        self.input_buffers.push(buf);
+        self
+    }
+
+    /// Adds an output map-alias buffer.
+    ///
+    /// The output counterpart of [`Self::add_in_map_alias`], and bound by the
+    /// same reasoning.
+    ///
+    /// Empty slices encode null descriptors instead of taking a dangling
+    /// pointer from the slice.
+    #[inline]
+    pub fn add_out_map_alias(mut self, mut buf: OutputBuffer<'a>) -> Self {
+        let mode = buf.mode();
+        let len = buf.as_slice().len();
+        let ptr = if len == 0 {
+            ptr::null_mut()
+        } else {
+            buf.as_mut_slice().as_mut_ptr()
+        };
+
+        self.hipc = self
+            .hipc
+            .with_recv_buffer(BufferDescriptor::new_buffer(ptr, len, mode));
+        self.output_buffers.push(buf);
+        self
+    }
+
     /// Adds a bidirectional auto-buffer from a single exclusive loan.
     ///
     /// Encodes the input half and then the output half over the same memory,

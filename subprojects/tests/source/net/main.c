@@ -6,20 +6,29 @@
 // to start fails the whole suite for reasons that have nothing to do with the
 // code. Keeping them apart means that cannot take the unattended suite down.
 //
-// Every test runs over loopback, with both ends of each connection in this
-// process. That is deliberate: it makes the suite self-contained, so a run does
-// not depend on the console being on a network, on a peer being reachable, or
-// on which address the console was assigned. What it does not cover is anything
+// The socket tests run over loopback, with both ends of each connection in this
+// process. That is deliberate: it makes them self-contained, so a run does not
+// depend on the console being on a network, on a peer being reachable, or on
+// which address the console was assigned. What it does not cover is anything
 // only a real peer would exercise — a route, an MTU, a connection that fails.
+//
+// The resolver tests follow the same rule with one exception. A literal address
+// is still a full round trip through the resolver service, so resolving one
+// covers the whole path without leaving the console; only the single test that
+// resolves a public name needs the console online, and it reports a skip rather
+// than a failure when it cannot, since from inside the process an offline
+// console and a broken lookup look the same.
 //
 // What is exercised is the whole stack rather than the service's commands
 // alone: newlib and the descriptor table sit above the driver, and `read` and
 // `write` reach a socket only because a socket device is registered. The same
 // binary links whichever way the build is configured — with `use_nx_sys_net`
-// off the calls resolve to libnx's own socket driver and show what the stock
-// implementation does; with it on they resolve to `__nx_sys_net__*` and
-// `__nx_rt_core__libnx_socketInitialize`, and Rust owns the driver, the device
-// and the session. Running both is the comparison worth making.
+// and `use_nx_net` off the calls resolve to libnx's own socket driver and
+// resolver and show what the stock implementations do; with them on they
+// resolve to `__nx_sys_net__*`, `__nx_rt_core__libnx_socketInitialize` and the
+// `__nx_rt_core__libnx_get*` resolver entry points, and Rust owns the driver,
+// the device, the sessions and the lookups. Running both is the comparison
+// worth making.
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -27,6 +36,7 @@
 #include <switch.h>
 
 #include "../harness.h"
+#include "resolve/suite.h"
 #include "socket/suite.h"
 
 /**
@@ -35,6 +45,7 @@
 static TestSuiteFn test_suites[] = {
     // net
     net_socket_suite,
+    net_resolve_suite,
 };
 
 int main()
