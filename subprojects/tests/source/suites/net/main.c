@@ -35,6 +35,7 @@
 
 #include <switch.h>
 
+#include "../handback.h"
 #include "../harness.h"
 #include "resolve/suite.h"
 #include "socket/suite.h"
@@ -62,12 +63,11 @@ int main()
     PadState pad;
     padInitializeDefault(&pad);
 
-    // Print the test header
-    printf("NX-TESTS-NET (%s)\n", VERSION);
-    u32 ver = hosversionGet();
-    printf("HOS %d.%d.%d%s\n",
-        HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
-        hosversionIsAtmosphere() ? " (AMS)" : "");
+    // Launched by the runner, this suite has no reader waiting on it and no
+    // reason to wait for one back.
+    const bool unattended = suite_is_unattended();
+
+    tap_begin("net", VERSION, unattended);
 
     // The driver is brought up once for the whole binary rather than per test.
     // It is process-wide state, so a test that initialized it would be setting
@@ -75,10 +75,9 @@ int main()
     // the ground out from under them.
     const Result socket_rc = socketInitialize(NULL);
     if (R_FAILED(socket_rc)) {
-        printf(CONSOLE_RED "socketInitialize failed (0x%X)" CONSOLE_RESET "\n", socket_rc);
-        printf("Press + to exit\n");
-    } else {
-        printf("Press + to exit\n");
+        char reason[64];
+        snprintf(reason, sizeof(reason), "the socket driver did not come up (0x%X)", socket_rc);
+        tap_comment(reason);
     }
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
@@ -104,14 +103,28 @@ int main()
                 test_suites[curr_test_suite]();
             }
             curr_test_suite++;
+        } else if (unattended) {
+            // Everything has run and there is nobody to read it: the runner is
+            // waiting for its turn back.
+            break;
         }
 
         consoleUpdate(NULL);
     }
 
+    tap_plan();
+
+    // Reported before the driver goes down, and told that it is up: reaching
+    // the host needs a socket, and this suite owns the one there is.
+    tap_report("net", R_SUCCEEDED(socket_rc));
+
     if (R_SUCCEEDED(socket_rc)) {
         socketExit();
     }
+
+    // Back to the runner that launched this suite, if one did: a run is
+    // several suites, and it ends here otherwise.
+    handback_to_runner("net");
 
     consoleExit(NULL);
     return 0;

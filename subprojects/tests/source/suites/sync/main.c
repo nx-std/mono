@@ -19,6 +19,7 @@
 
 #include <switch.h>
 
+#include "../handback.h"
 #include "../harness.h"
 #include "suite.h"
 
@@ -50,13 +51,11 @@ int main()
     PadState pad;
     padInitializeDefault(&pad);
 
-    // Print the test header
-    printf("NX-TESTS-SYNC (%s)\n", VERSION);
-    u32 ver = hosversionGet();
-    printf("HOS %d.%d.%d%s\n",
-        HOSVER_MAJOR(ver), HOSVER_MINOR(ver), HOSVER_MICRO(ver),
-        hosversionIsAtmosphere() ? " (AMS)" : "");
-    printf("Press + to exit\n");
+    // Launched by the runner, this suite has no reader waiting on it and no
+    // reason to wait for one back.
+    const bool unattended = suite_is_unattended();
+
+    tap_begin("sync", VERSION, unattended);
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
     uint64_t curr_test_suite = 0;
@@ -77,10 +76,21 @@ int main()
         if (curr_test_suite < test_suites_count) {
             test_suites[curr_test_suite]();
             curr_test_suite++;
+        } else if (unattended) {
+            // Everything has run and there is nobody to read it: the runner is
+            // waiting for its turn back.
+            break;
         }
 
         consoleUpdate(NULL);
     }
+
+    tap_plan();
+    tap_report("sync", false);
+
+    // Back to the runner that launched this suite, if one did: a run is
+    // several suites, and it ends here otherwise.
+    handback_to_runner("sync");
 
     consoleExit(NULL);
     return 0;

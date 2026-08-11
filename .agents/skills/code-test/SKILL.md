@@ -1,6 +1,6 @@
 ---
 name: code-test
-description: Run nx-std tests on Nintendo Switch hardware after format/check/clippy are green. Builds the nx-tests NRO, deploys via cargo-nx, and asks the user to confirm results on the console.
+description: Run nx-std tests on Nintendo Switch hardware after format/check/clippy are green. Builds the test NROs, launches the runner once, pushes suites to it back to back without a person at the console, and reads their TAP results off the wire.
 allowed-tools: "Bash(just build-tests:*), Bash(just deploy:*), Bash(just list-options-configured:*), Bash(just reconfigure:*), Bash(.agents/skills/code-test/read-test-results.sh:*)"
 ---
 
@@ -14,14 +14,20 @@ Runs the nx-std test suite. Tests are C-code linked against the Rust crates that
 
 ## Scope Selection
 
-This project has **one** test target: the `nx-tests` NRO. There are no per-crate Rust unit-test profiles — coverage is exercised via the integrated NRO suite under `subprojects/tests/`.
+There are no per-crate Rust unit-test profiles — coverage is exercised via the NRO binaries under
+`subprojects/tests/`, one per area (`nx-tests-rand`, `nx-tests-rt`, `nx-tests-thread`,
+`nx-tests-sync`, `nx-tests-fs`, `nx-tests-net`, and the interactive `nx-tests-applet-*`). Pick the
+binaries whose area the change touches.
 
-| Blast radius                                                          | Action                                          |
-|-----------------------------------------------------------------------|-------------------------------------------------|
-| None (docs/comments only)                                             | Skip; state why                                 |
-| Pure-Rust changes with no FFI surface impact                          | `/code-check` is sufficient — no NRO test run   |
-| FFI surface change, foundation crate, or behavior change              | Build + deploy nx-tests NRO; confirm on console |
-| Linker scripts, `nx-std` crate, or `use_nx*` Meson option behaviour   | Build + deploy nx-tests NRO; confirm on console |
+`nx-tests` itself is **not** a suite: it is the runner that receives a suite over the netloader
+protocol and launches it (see Step 3).
+
+| Blast radius                                                          | Action                                            |
+|-----------------------------------------------------------------------|---------------------------------------------------|
+| None (docs/comments only)                                             | Skip; state why                                   |
+| Pure-Rust changes with no FFI surface impact                          | `/code-check` is sufficient — no NRO test run     |
+| FFI surface change, foundation crate, or behavior change              | Build + deploy the affected suites; confirm       |
+| Linker scripts, `nx-std` crate, or `use_nx*` Meson option behaviour   | Build + deploy the affected suites; confirm       |
 
 **Signals that require running the NRO test suite:**
 - Changed any `__nx_*` FFI function signature, return value, or behavior.
@@ -47,40 +53,110 @@ If not enabled:
 just reconfigure -Duse_nx=enabled
 ```
 
-### Step 2 — build the test NRO
+### Step 2 — build the test NROs
 
 ```bash
 just build-tests
 ```
 
-Compiles `buildDir/subprojects/tests/nx-tests.nro`. (Equivalent to `just build nx-tests.nro`; see `/code-build`.)
+Compiles the runner and every suite into `buildDir/subprojects/tests/`. To build one binary on its
+own, `just build nx-tests-sync.nro`; see `/code-build`.
 
-### Step 3 — deploy to the Switch
+### Step 3 — start the runner
+
+Ask the user to arm hbmenu's netloader, then push the runner to it **once**:
 
 ```bash
-just deploy buildDir/subprojects/tests/nx-tests.nro
+just deploy buildDir/subprojects/tests/nx-tests.nro --retries 40
 ```
 
-Network transfer via `cargo nx link`. See `/code-deploy` for prerequisites (Atmosphère, nxlink, network).
+The runner comes up showing the console's address and waits. From here it is the thing listening,
+and it survives the whole run: each suite it launches hands control back when it finishes, so the
+runner returns to the address screen and listens again on its own.
 
-**On deploy failure:** retry up to 3 times with a 10-second delay (Switch may not yet be on the network or nxlink not running).
+### Step 4 — push the suites
 
-### Step 4 — read the results
+One command per suite, back to back, with nobody at the console:
 
-The harness records every case's verdict in a table (`g_test_results` in
-`source/harness.h`) precisely so the run can be read back afterwards. Prefer reading it:
+```bash
+just deploy buildDir/subprojects/tests/nx-tests-rand.nro --retries 60
+just deploy buildDir/subprojects/tests/nx-tests-sync.nro --retries 60
+```
+
+A suite launched by the runner runs unattended: it prints `Running unattended`, runs its cases,
+reports its tally back, and leaves — it does not wait for `+`. `--retries` is what absorbs the gap
+while the previous suite is still running, so a push aimed at a busy console keeps knocking rather
+than failing.
+
+**A push that is refused means nothing is listening**, which means the run broke: either the runner
+never came back (a suite crashed or hung) or it was exited. Say so rather than retrying blindly; a
+suite that took the console down is a test result.
+
+Pushing to **hbmenu's netloader** instead sends one binary per visit to the menu, and a suite landed
+that way waits at `Press + to exit` like it always did. That is the path to take when you want the
+per-case detail of Step 5.
+
+See `/code-deploy` for prerequisites (Atmosphère, network).
+
+### Step 5 — read the results
+
+Suites report in [TAP 14](https://testanything.org/), to three readers that cannot reach each other.
+**Prefer the host stream** — it is the only one you can read yourself.
+
+**TAP to the host — add `--server` to the push.**
+
+```bash
+just deploy buildDir/subprojects/tests/nx-tests-sync.nro --retries 60 --server
+```
+
+`--server` keeps a stdio server up after the transfer, and the suite connects to it once its cases
+are over and writes its document. You get per-case results in the terminal, so **a run can be
+confirmed without asking the user anything**:
+
+```
+TAP version 14
+# suite: sync
+# build: 0.1.0
+# hos: 20.1.5 (AMS)
+# mode: unattended
+ok 1 - mutex_lock_unlock_single_thread
+not ok 2 - remutex_reentrancy_single_thread
+  ---
+  rc: 0xFFFFFF9B
+  ...
+ok 3 - condvar_basic_wait_wake_one # SKIP
+1..3
+```
+
+`# SKIP` is a case that declined to run (missing console state); `# TODO` is one not written yet —
+a TAP harness counts neither as a failure. A `not ok` with no directive is a real failure, and the
+indented block carries the result code.
+
+**TAP on the SD card** — the same document at `sdmc:/switch/nx-tests/<suite>.tap`, written whether
+or not a host is listening. It is the record when a suite was launched by hand; retrieval is out of
+band.
+
+**The runner's screen — the run at a glance.** The per-suite tallies accumulate into a table (suite,
+ok, failed, skipped, totals, and a `PASSED`/`N FAILED` verdict), kept in
+`sdmc:/switch/nx-tests/results.log` so it survives the runner's own restarts. Ask the user what it
+shows when you have no host stream. `-` clears it and deletes the log; `+` exits.
+
+**The recording table — a fallback with no network in it.**
 
 ```bash
 .agents/skills/code-test/read-test-results.sh <console-ip> buildDir/subprojects/tests/<binary>.elf
 ```
 
-Works for any harness-based binary — `nx-tests`, `nx-tests-sync`, `nx-tests-fs`,
-`nx-tests-net`. The interactive applet binaries (`nx-tests-applet-*`) have no test cases
-and record nothing, so they still need a person watching the screen.
+It attaches over Atmosphère's GDB stub and reads `g_test_results` out of the **running** process, so
+it needs that process to still be there — and a suite the runner launched has already exited. Reach
+for it when the console has no network to report over, or to inspect a suite still sitting on screen
+after being launched from hbmenu. Otherwise the TAP stream carries the same per-case detail with far
+less ceremony.
 
-It prints one line per case and a pass/fail tally. Run it any time after the suite has
-finished — it attaches over Atmosphère's GDB stub and reads memory, so there is no
-breakpoint and no race with the run.
+Works for any harness-based binary. The `nx-tests` runner runs no cases, and the interactive applet
+binaries (`nx-tests-applet-*`) record none, so those still need a person watching the screen.
+
+**Never assume tests passed**: the result reaches you over TAP, from the console, or not at all.
 
 **Requires** `enable_standalone_gdbstub=u8!0x1` and `enable_htc=u8!0x0` in
 `atmosphere/config/system_settings.ini` (reboot after changing). Without the stub, fall
@@ -95,7 +171,9 @@ the result reaches you from the console or not at all.
 The console has no text buffer to dump. libnx draws each character straight to the
 framebuffer through `renderer->drawChar`; `PrintConsole` holds a font, cursor, colours
 and dimensions and nothing else. Anything a test only `printf`s is unreadable
-afterwards — so a diagnostic worth capturing goes in a `volatile` global, not a print.
+afterwards — which is why the same TAP document is also written to the SD card and sent
+to the host, and why a diagnostic worth capturing goes in a `volatile` global or a TAP
+line, never a bare print.
 
 #### Why the script works the way it does
 
@@ -116,11 +194,44 @@ This gdb build has no Python, so the address arithmetic is done in the shell.
 ## Test Architecture
 
 Tests live in `subprojects/tests/`:
-- `source/main.c` — test harness entry point
-- `source/harness.h` — test framework macros
-- `source/sync/` — synchronization primitive tests
-- `source/rand/` — RNG tests
-- `source/net/` — socket driver and resolver tests (own binary; brings up a network stack)
+- `source/runner/` — the `nx-tests` runner: serves the netloader protocol, launches what it receives,
+  and keeps the run's results (`ledger.c`) across its own restarts
+- `source/runner/handback.h` — the two arguments the runner and a suite say things to each other with
+- `source/suites/handback.h` — the suite side of them: am I unattended, and reporting on the way out
+- `source/suites/tap.h`, `tap.c` — TAP 14 reporting: the console as cases finish, the SD card and the
+  host once they are all over. The only place that knows what the protocol looks like
+- `source/suites/harness.h` — test framework macros, which report through `tap.h`
+- `source/suites/rand/` — RNG tests
+- `source/suites/rt/` — runtime tests (working directory derived from the command line)
+- `source/suites/thread/` — thread tests
+- `source/suites/sync/` — synchronization primitive tests
+- `source/suites/fs/` — SD card and savedata tests (own binary; needs a card)
+- `source/suites/net/` — socket driver and resolver tests (own binary; brings up a network stack)
+
+Each area is its own binary, with its `main.c` beside its cases.
+
+### How a run holds together
+
+The runner tells every suite it launches where to come back to (`--nx-tests-runner=<path>`). That one
+argument carries two things:
+
+- **Where to return.** The suite asks the process loader to run the runner next, so the runner comes
+  back instead of the homebrew menu and the run continues past the first suite.
+- **That nobody is watching.** A suite launched with it runs unattended and exits on its own; a suite
+  launched without it waits at `Press + to exit` as before. Nothing else distinguishes the two.
+
+On the way back the suite reports its tally (`--nx-tests-result=<suite>:<passed>:<failed>:<skipped>`),
+which the runner appends to `sdmc:/switch/nx-tests/results.log`. The runner is a fresh process after
+every hand-back, so a result it is not told at startup is one it never learns — and a runner started
+any other way is a new run, which is why **pushing the runner itself clears the table and the log**.
+
+A new suite joins the run by opening with `tap_begin("<name>", VERSION, unattended)`, closing with
+`tap_plan()` and `tap_report("<name>", …)`, calling `handback_to_runner("<name>")` on its way out of
+`main`, and breaking out of its loop when `suite_is_unattended()`. A suite that does none of that
+still runs; it just reports nothing and ends the run at itself.
+
+The one name it passes to all four is what it is known by everywhere: the TAP document, the `.tap`
+file, the runner's table, and the ledger.
 
 Suites that need console state — a network, savedata, a particular firmware — report
 `TEST_SKIPPED` from `//* Given` rather than failing, since that state is a property of
@@ -136,7 +247,17 @@ C code links against the Rust crates to verify FFI correctness; the linker scrip
 
 - Running tests before `/code-check` is green.
 - Using `cargo test` — there is no host-runnable cargo test suite for the Switch target. Tests are NRO-based.
-- Building `nx-tests.nro` without `use_nx=enabled` — the suite would link against libnx and not exercise the Rust replacements.
+- Building the suites without `use_nx=enabled` — they would link against libnx and not exercise the Rust replacements.
+- Deploying `nx-tests.nro` expecting test results — it is the runner, and it runs no cases. Pushing
+  it mid-run also clears the table, since a new runner is a new run.
+- Reading a suite the runner launched with `read-test-results.sh` — it exited as soon as its cases
+  finished, so there is no process to attach to. Use `--server` and read its TAP instead.
+- Pushing a suite without `--server` and then asking the user what the screen said — the TAP stream
+  is there for the asking and carries every case.
+- Printing a diagnostic with a bare `printf` inside a suite — it lands in the middle of a TAP
+  document and corrupts it. Use `tap_comment()`, which a TAP reader ignores.
+- Treating a refused push as a flaky network without checking the console — mid-run it means the
+  runner never came back, which is a test result.
 - Assuming a deploy succeeded without on-console confirmation.
 - Skipping the NRO run on FFI-surface changes.
 - Reporting a suite as passing without either reading the result table or asking the user.
@@ -147,7 +268,7 @@ C code links against the Rust crates to verify FFI correctness; the linker scrip
 Runnable without user permission:
 - `just list-options-configured`
 - `just build-tests`
-- `just deploy <nro-path>`
+- `just deploy <nro-path>`, `just deploy <nro-path> --retries <n> --server`
 - `just reconfigure -Duse_nx=enabled`
 - `.agents/skills/code-test/read-test-results.sh <ip> <elf>` — attaches read-only over the GDB stub and detaches.
 
@@ -157,4 +278,3 @@ Runnable without user permission:
 - `/code-check` — Must be green before running this skill.
 - `/code-build` — Building targets (including `just build-tests`).
 - `/code-deploy` — Deploying NRO files to the Switch.
-- `/code-test` — Equivalent hardware-test workflow (this skill is the more detailed variant).
