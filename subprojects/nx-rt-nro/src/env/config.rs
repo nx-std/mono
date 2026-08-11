@@ -36,8 +36,11 @@ pub enum Entry {
     MainThreadHandle(u32),
     /// Process handle (raw u32 value)
     ProcessHandle(u32),
-    /// Chain loading path buffer available
-    NextLoadPath,
+    /// The loader's buffers for naming the program to run next
+    NextLoadPath {
+        path: Option<NonNull<c_char>>,
+        argv: Option<NonNull<c_char>>,
+    },
     /// Heap override (address and size)
     OverrideHeap {
         addr: Option<NonNull<c_void>>,
@@ -112,7 +115,10 @@ impl Entry {
             },
             Self::KEY_MAIN_THREAD_HANDLE => Entry::MainThreadHandle(entry.value[0] as u32),
             Self::KEY_PROCESS_HANDLE => Entry::ProcessHandle(entry.value[0] as u32),
-            Self::KEY_NEXT_LOAD_PATH => Entry::NextLoadPath,
+            Self::KEY_NEXT_LOAD_PATH => Entry::NextLoadPath {
+                path: NonNull::new(entry.value[0] as *mut c_char),
+                argv: NonNull::new(entry.value[1] as *mut c_char),
+            },
             Self::KEY_OVERRIDE_HEAP => Entry::OverrideHeap {
                 addr: NonNull::new(entry.value[0] as *mut c_void),
                 size: entry.value[1] as usize,

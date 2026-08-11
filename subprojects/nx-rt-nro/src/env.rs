@@ -23,6 +23,7 @@ pub use nx_rt_core::env::{
     AppletType,
     LoaderReturnFn,
     MAX_SERVICE_OVERRIDES,
+    NextLoad,
     ServiceName,
     ServiceOverride,
     SyscallHints,
@@ -147,8 +148,16 @@ pub unsafe fn setup(
                 Entry::LastLoadResult(result) => {
                     state.last_load_result = result;
                 }
-                Entry::NextLoadPath => {
-                    state.has_next_load = true;
+                Entry::NextLoadPath { path, argv } => {
+                    // Both buffers or neither: naming a program without a
+                    // command line to run it with, or the reverse, is not a
+                    // request any loader can act on.
+                    state.next_load = path.zip(argv).map(|(path, argv)| {
+                        // SAFETY: The pointers come straight from the loader's
+                        // configuration, which is where `from_loader` expects
+                        // them from.
+                        unsafe { NextLoad::from_loader(path, argv) }
+                    });
                 }
                 Entry::OverrideService { name, handle } => {
                     // SAFETY: The handle is provided by the loader and guaranteed valid.

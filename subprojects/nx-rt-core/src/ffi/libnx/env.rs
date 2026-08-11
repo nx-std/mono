@@ -13,6 +13,7 @@
 //! obligations beyond upholding that ABI.
 
 use core::ffi::{
+    CStr,
     c_char,
     c_uint,
     c_void,
@@ -25,6 +26,11 @@ use crate::{
         self,
         AccountUid,
         LoaderReturnFn,
+    },
+    error::{
+        LibnxError,
+        ToResultCode as _,
+        libnx_error,
     },
     init,
 };
@@ -250,14 +256,29 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_set_exit_func_ptr(func: LoaderR
 ///
 /// # Safety
 ///
-/// `path` and `argv` must each be a valid NUL-terminated C string or null.
+/// `path` must be a valid NUL-terminated C string, and `argv` must be one or
+/// null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_set_next_load(
     path: *const c_char,
     argv: *const c_char,
 ) -> u32 {
-    // SAFETY: Caller guarantees path and argv are valid C strings or null.
-    unsafe { env::set_next_load(path, argv) }
+    // Naming no program at all is not a request the loader can act on, and a
+    // null command line is: the program is simply started without one.
+    if path.is_null() {
+        return libnx_error(LibnxError::BadInput);
+    }
+
+    // SAFETY: Caller guarantees a valid NUL-terminated C string for a non-null
+    // pointer, and the strings outlive this call: `set_next_load` copies out of
+    // them before returning.
+    let path = unsafe { CStr::from_ptr(path) };
+    let argv = (!argv.is_null()).then(|| unsafe { CStr::from_ptr(argv) });
+
+    match env::set_next_load(path, argv) {
+        Ok(()) => 0,
+        Err(err) => err.to_rc(),
+    }
 }
 
 /// Returns true if chain loading is supported.
