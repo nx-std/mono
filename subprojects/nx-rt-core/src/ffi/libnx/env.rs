@@ -1,8 +1,8 @@
 //! Kind-agnostic environment FFI.
 //!
 //! Redirects the `libnx` runtime entry points that every Switch executable
-//! kind shares — heap initialization, main-thread TLS, the environment
-//! read accessors, and the HOS-version API — to `nx-rt-core`.
+//! kind shares: heap initialization, main-thread TLS, the environment
+//! read accessors, and the HOS-version API: to `nx-rt-core`.
 //!
 //! The kind-specific entry points (`envSetup`, `argvSetup`, `__system_argc` /
 //! `__system_argv`, `__nxlink_host`, `__nx_applet_type`) are intentionally
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_setup_main_thread_tls() {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_loader_info() -> *const c_char {
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_loader_info() -> *const c_c
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_loader_info_size() -> u64 {
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_loader_info_size() -> u64 {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_main_thread_handle() -> u32 {
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_main_thread_handle() -> u32
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_is_nso() -> bool {
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_is_nso() -> bool {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_heap_override() -> bool {
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_heap_override() -> bool {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_heap_override_addr() -> *mut c_void {
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_heap_override_addr() -> *mu
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_heap_override_size() -> u64 {
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_heap_override_size() -> u64
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_argv() -> bool {
@@ -190,7 +190,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_argv() -> bool {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_argv() -> *const c_char {
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_argv() -> *const c_char {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_is_syscall_hinted(svc: c_uint) -> bool {
@@ -216,7 +216,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_is_syscall_hinted(svc: c_uint) 
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_own_process_handle() -> u32 {
@@ -229,7 +229,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_own_process_handle() -> u32
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_exit_func_ptr() -> LoaderReturnFn {
@@ -287,7 +287,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_set_next_load(
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_next_load() -> bool {
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_next_load() -> bool {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_last_load_result() -> u32 {
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_last_load_result() -> u32 {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_random_seed() -> bool {
@@ -349,7 +349,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_random_seed(out: *mut u64) 
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_user_id_storage() -> *mut AccountUid {
@@ -365,7 +365,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_user_id_storage() -> *mut A
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_hosversion_get() -> u32 {
@@ -380,7 +380,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_hosversion_get() -> u32 {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. Intended to run only
+/// FFI entry point: the caller upholds the C ABI. Intended to run only
 /// during `envSetup` / `appInit`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_hosversion_set(version: u32) {
@@ -393,7 +393,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_hosversion_set(version: u32) {
 ///
 /// # Safety
 ///
-/// FFI entry point — the caller upholds the C ABI. No further precondition:
+/// FFI entry point: the caller upholds the C ABI. No further precondition:
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_hosversion_is_atmosphere() -> bool {

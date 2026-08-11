@@ -2,7 +2,7 @@
 //!
 //! NSO-process entry crate for the Nintendo Switch runtime crate family.
 //!
-//! `nx-rt-nso` is the runtime for one output kind — the `NSO` process
+//! `nx-rt-nso` is the runtime for one output kind: the `NSO` process
 //! launched by the process manager (`pm`): installed applications, every
 //! system-applet kind, and background sysmodules. It stacks the NSO-specific
 //! startup on top of the kind-agnostic [`nx_rt_core`]: the `pm`-handoff
@@ -21,8 +21,8 @@
 //! | System application | NSO | `pm` | `SystemApplication` | **Build time** |
 //! | Background sysmodule | NSO | `pm` | `None` | **Build time** |
 //!
-//! Unlike a homebrew NRO — which receives its applet type at runtime from the
-//! homebrew loader's configuration block — every NSO selects its applet type
+//! Unlike a homebrew NRO, which receives its applet type at runtime from the
+//! homebrew loader's configuration block, every NSO selects its applet type
 //! at build time. All six Application Manager identities share the single NSO
 //! startup ABI; the build picks one, producing an applet-type *value* that
 //! flows into the applet handshake. A `None` background sysmodule skips the
@@ -35,11 +35,11 @@
 //! sysmodule: a `pm`-launched NSO that exists to provide a service and has no
 //! Application Manager identity. Its startup profile is deliberately minimal:
 //!
-//! - **Service set** — only the Service Manager (`sm`) is brought up. The
+//! - **Service set**: only the Service Manager (`sm`) is brought up. The
 //!   Application Manager handshake is skipped, so no `appletOE` / `appletAE`
 //!   proxy session is opened and no AM handle is held. A sysmodule that needs
 //!   a further service opens it explicitly; nothing else starts on its behalf.
-//! - **Applet identity** — the `__nx_applet_type` global reports `None`. That
+//! - **Applet identity**: the `__nx_applet_type` global reports `None`. That
 //!   value *is* the skip signal: the applet-init entry point returns before
 //!   contacting the Application Manager, and the libnx applet runtime likewise
 //!   treats `None` as "do not initialize".
@@ -53,8 +53,8 @@
 //! An NSO process declares the supervisor calls it may invoke and the system
 //! services it may reach in its NPDM. Those permissions are the union of what
 //! the application needs and what its runtime startup needs. [`caps`] owns the
-//! *runtime* half as inspectable data — a [`caps::CapabilityFragment`] keyed by
-//! applet identity — so a build tool can merge it with the application-declared
+//! *runtime* half as inspectable data (a [`caps::CapabilityFragment`] keyed by
+//! applet identity) so a build tool can merge it with the application-declared
 //! capabilities instead of an NPDM being hand-written. The fragment varies with
 //! the build-time applet type: a background sysmodule needs no Application
 //! Manager service access; a foreground applet additionally needs the
@@ -62,13 +62,13 @@
 //!
 //! # Cargo features
 //!
-//! - `ffi` — gates the [`ffi`] module: the `__nx_rt_nso__libnx_*` C-FFI symbols that
+//! - `ffi`: gates the [`ffi`] module: the `__nx_rt_nso__libnx_*` C-FFI symbols that
 //!   redirect the NSO-specific `libnx` runtime entry points (`envSetup`,
 //!   `argvSetup`, `appletInitialize`, `__nx_applet_type`). Without it no
 //!   override symbols are emitted and the linker fragments have nothing to
 //!   bind. The kind-agnostic runtime symbols are owned by [`nx_rt_core`]'s
 //!   FFI surface.
-//! - `rt-link` — emits this crate's `pm`-launch `.crt0` (the NSO process
+//! - `rt-link`: emits this crate's `pm`-launch `.crt0` (the NSO process
 //!   `_start`) for the opt-in `rustc`-driven link pipeline. It is off on the
 //!   default GCC pipeline, where `_start` is supplied by libnx's
 //!   `switch_crt0.s`; enabling it there would collide with that `_start`.

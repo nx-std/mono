@@ -1,8 +1,8 @@
 //! Environment / loader bring-up FFI (NSO).
 //!
 //! Redirects the NSO-specific `libnx` runtime entry point `envSetup` to
-//! `nx-rt-nso`. The kind-agnostic runtime symbols — heap init, main-thread
-//! TLS, the environment read accessors, the HOS-version API — are owned by
+//! `nx-rt-nso`. The kind-agnostic runtime symbols: heap init, main-thread
+//! TLS, the environment read accessors, the HOS-version API: are owned by
 //! `nx-rt-core`'s FFI surface.
 
 use core::ffi::c_void;
@@ -17,8 +17,8 @@ use crate::env::{
 /// Brings up the NSO runtime environment state.
 ///
 /// Corresponds to `envSetup()` in `env.h`. An NSO process receives no
-/// homebrew-loader configuration block, so the `ctx` argument — meaningful
-/// only for a homebrew NRO — is ignored. Neither is the loader-return function
+/// homebrew-loader configuration block, so the `ctx` argument: meaningful
+/// only for a homebrew NRO: is ignored. Neither is the loader-return function
 /// a return path for this kind: an NSO leaves through the process-exit
 /// syscall, which [`env::setup`] installs itself. That leaves the
 /// kernel-supplied main-thread handle as the only input reaching it.

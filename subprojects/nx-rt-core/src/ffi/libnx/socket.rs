@@ -1,7 +1,7 @@
 //! Socket driver initialization.
 //!
 //! The socket driver itself lives in [`nx_sys_net`], and every one of its C symbols is exported
-//! from there — except this one.
+//! from there: except this one.
 //!
 //! # Why this entry point is here
 //!
@@ -38,7 +38,7 @@ use crate::{
 ///
 /// `config` must be null or point to a readable [`SocketInitConfig`].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_rt_core__libnx_socketInitialize(config: *const c_void) -> u32 {
+pub unsafe extern "C" fn __nx_rt_core__libnx_socket_initialize(config: *const c_void) -> u32 {
     let config = if config.is_null() {
         DEFAULT_INIT_CONFIG
     } else {
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_socketInitialize(config: *const c_v
     };
 
     // A process gets one service manager session and this crate holds it, so the driver is handed
-    // the session rather than opening a second one — which does not get a second session, it
+    // the session rather than opening a second one: which does not get a second session, it
     // fails.
     let Ok(sm) = sm::session() else {
         return nx_sys_net::ffi::driver::NO_SERVICE_MANAGER;

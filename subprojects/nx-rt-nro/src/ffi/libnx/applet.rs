@@ -1,6 +1,6 @@
 //! Applet service FFI (NRO).
 //!
-//! Exposes only the applet-type-sourcing entry points — `appletInitialize`
+//! Exposes only the applet-type-sourcing entry points: `appletInitialize`
 //! and `appletGetAppletType`. The homebrew NRO reads its applet type at
 //! runtime from the parsed loader configuration block.
 //!

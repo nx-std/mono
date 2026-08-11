@@ -46,7 +46,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_get_sharedmem_addr() -> *const c
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_npad() {
     if let Some(service) = crate::services::hid::get_service() {
-        // Ignore errors - libnx diagAborts on failure, but we'll just return
+        // A refusal leaves the npad style set as the system had it: the
+        // process still reads input, under whatever styles were already
+        // permitted. The C signature returns nothing, so there is nowhere to
+        // report it.
         let _ = service.activate_npad();
     }
 }
@@ -103,6 +106,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_set_supported_npad_id_type(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_touch_screen() {
     if let Some(service) = crate::services::hid::get_service() {
+        // A refusal leaves that one input source inactive: the process
+        // reads no touch screen state, and every other source
+        // it activated still works. The C signature returns nothing, so
+        // there is nowhere to report it.
         let _ = service.activate_touch_screen();
     }
 }
@@ -113,6 +120,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_touch_screen() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_mouse() {
     if let Some(service) = crate::services::hid::get_service() {
+        // A refusal leaves that one input source inactive: the process
+        // reads no mouse state, and every other source
+        // it activated still works. The C signature returns nothing, so
+        // there is nowhere to report it.
         let _ = service.activate_mouse();
     }
 }
@@ -123,6 +134,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_mouse() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_keyboard() {
     if let Some(service) = crate::services::hid::get_service() {
+        // A refusal leaves that one input source inactive: the process
+        // reads no keyboard state, and every other source
+        // it activated still works. The C signature returns nothing, so
+        // there is nowhere to report it.
         let _ = service.activate_keyboard();
     }
 }
@@ -133,6 +148,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_keyboard() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_hid_initialize_gesture() {
     if let Some(service) = crate::services::hid::get_service() {
+        // A refusal leaves that one input source inactive: the process
+        // reads no gesture state, and every other source
+        // it activated still works. The C signature returns nothing, so
+        // there is nowhere to report it.
         let _ = service.activate_gesture();
     }
 }

@@ -27,7 +27,7 @@ A crate's C-FFI surface and the linker scripts that redirect upstream archive sy
 
 | Aspect                     | Rule                                                                                      |
 |----------------------------|-------------------------------------------------------------------------------------------|
-| Declaration                | `ffi = []` in `[features]` — no implicit dependencies, just a compile-time switch.        |
+| Declaration                | `ffi = []` in `[features]`, plus any `<dep>?/ffi` whose gated item only this crate's C boundary calls ([§2](#2-declaration)). |
 | Source gating              | `#[cfg(feature = "ffi")] pub mod ffi;` in `src/lib.rs`.                                   |
 | Symbol naming              | `__nx_<aspect>__<symbol>` with `#[unsafe(no_mangle)] pub extern "C"`.                     |
 | Direct producer build      | The producer's own `meson.build` does NOT pass `--features ffi` to `cargo build`.         |
@@ -46,6 +46,31 @@ ffi = []
 - The feature value is empty (`[]`) — it gates a compile-time `#[cfg(...)]` branch in the producer crate and contributes nothing else.
 - No transitive feature activation belongs in this list. The `ffi` feature MUST NOT pull in additional crates or enable other features.
 - The `# Enable the __nx_<aspect> FFI` comment is the canonical descriptor and must accompany the feature declaration ([rust-crates](rust-crates.md)).
+
+### The one exception: a dependency that gates its own mapping on `ffi`
+
+A crate may list `<dep>?/ffi` when that dependency compiles something **only this crate's C boundary calls**,
+and gates it on its own `ffi` feature. The result-code mapping is the case in practice: `nx-sf` and the
+`nx-service-*` crates put `ToResultCode` behind their `ffi` feature, and the only caller of `to_rc` is an
+adapter below a `__nx_*` entry point. A pure-Rust consumer of those crates then compiles none of it.
+
+Activating that from the consumer instead would be wrong, not merely different: the consumer would have to
+name every service crate the producer happens to depend on, and would re-name them each time the producer's
+dependency list changed. The producer is the crate that knows.
+
+```toml
+[features]
+# Enable the __nx_rt_core FFI
+# `nx-service-applet?/ffi` arrives here rather than under `service-applet`: that
+# crate gates its result-code mapping on the feature, and only this crate's C
+# boundary calls `to_rc`.
+ffi = ["nx-sf/ffi", "nx-service-applet?/ffi"]
+```
+
+Each such entry carries a comment saying which item the dependency gates and why this crate is the one that
+needs it. An entry without that comment is the violation this section otherwise describes. The exception does
+not extend to pulling in a `dep:` or enabling a sibling feature of the producer's own — those still belong to
+whichever feature owns them.
 
 ---
 
@@ -159,7 +184,8 @@ Do NOT add `ffi = []` "for symmetry" — its presence is a strong signal that an
 Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
 
 - [ ] `[features]` contains `ffi = []` with the `# Enable the __nx_<aspect> FFI` comment.
-- [ ] The `ffi` feature value is `[]` — it does NOT pull in additional crates or feature toggles.
+- [ ] The `ffi` feature value is `[]`, except for `<dep>?/ffi` entries that each carry the comment saying
+      which item the dependency gates and why this crate is the caller
 - [ ] `src/lib.rs` gates the FFI module with `#[cfg(feature = "ffi")] pub mod ffi;`.
 - [ ] All `extern "C"` exports live inside `src/ffi.rs` (or submodules under `src/ffi/`), not scattered across other modules.
 - [ ] Every exported symbol uses the `__nx_<aspect>__<symbol>` naming with `#[unsafe(no_mangle)] pub extern "C"`.

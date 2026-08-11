@@ -8,7 +8,7 @@
 //!
 //! This is the *only* startup work a module owns. The heap, environment,
 //! Service Manager session, and applet identity all belong to the host
-//! process — see the crate root for the module-versus-process split.
+//! process: see the crate root for the module-versus-process split.
 
 /// A C-ABI constructor or destructor, as stored in `.init_array` /
 /// `.fini_array`.
@@ -30,7 +30,7 @@ unsafe extern "C" {
 ///
 /// - Must be called exactly once, after the `ro` service has applied the
 ///   module's relocations and before any other module code runs.
-/// - Must run single-threaded — no other thread may observe partially
+/// - Must run single-threaded: no other thread may observe partially
 ///   constructed module state.
 /// - The `.init_array` bounds symbols must be supplied by the final link.
 pub unsafe fn run_init_array() {
@@ -57,7 +57,7 @@ pub unsafe fn run_init_array() {
 ///
 /// - Must be called exactly once, before the module is unloaded, and after
 ///   [`run_init_array`].
-/// - Must run single-threaded — no other thread may observe module state
+/// - Must run single-threaded: no other thread may observe module state
 ///   while it is being torn down.
 /// - The `.fini_array` bounds symbols must be supplied by the final link.
 pub unsafe fn run_fini_array() {
@@ -67,7 +67,7 @@ pub unsafe fn run_fini_array() {
     let mut cur = end;
     while cur > start {
         // SAFETY: `cur > start`, so the preceding slot is within
-        // `[start, end)` — a valid `.fini_array` slot.
+        // `[start, end)`: a valid `.fini_array` slot.
         cur = unsafe { cur.sub(1) };
         // SAFETY: `cur` now points at a valid `.fini_array` slot, so the read
         // yields a real destructor.

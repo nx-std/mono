@@ -1,8 +1,8 @@
 //! Application Manager (applet) bring-up FFI (NSO).
 //!
 //! Redirects the `libnx` `applet*` startup entry points to `nx-rt-nso`. Unlike
-//! the homebrew-NRO surface — which sources the applet type at runtime from
-//! the loader configuration block — the NSO surface reports the build-time
+//! the homebrew-NRO surface, which sources the applet type at runtime from
+//! the loader configuration block, the NSO surface reports the build-time
 //! [`APPLET_TYPE`](crate::applet::APPLET_TYPE) selected by the
 //! `nso_applet_type` cfg value.
 //!
@@ -26,7 +26,7 @@ use crate::{
 /// Backing storage for libnx's `__nx_applet_type` global. For an NSO the
 /// Application Manager identity is fixed at build time, so the value is the
 /// constant [`APPLET_TYPE`](crate::applet::APPLET_TYPE) rather than a
-/// loader-supplied one — hence an immutable `static`.
+/// loader-supplied one: hence an immutable `static`.
 #[unsafe(no_mangle)]
 pub static __nx_rt_nso__libnx_applet_type: u32 = nso_applet::APPLET_TYPE.as_raw() as u32;
 

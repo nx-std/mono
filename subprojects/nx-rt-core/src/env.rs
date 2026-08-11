@@ -12,10 +12,6 @@
 //! back through the accessor functions below, which are sound precisely
 //! because the state is written once and immutable thereafter.
 
-pub mod hos_version;
-pub mod main_thread;
-mod syscall_hint;
-
 use core::{
     cell::UnsafeCell,
     ffi::{
@@ -40,6 +36,10 @@ use nx_sys_sync::{
     Once,
 };
 
+pub mod hos_version;
+pub mod main_thread;
+mod syscall_hint;
+
 pub use self::syscall_hint::SyscallHints;
 #[cfg(feature = "ffi")]
 use crate::error::{
@@ -50,7 +50,7 @@ use crate::error::{
 /// Loader return function type
 pub type LoaderReturnFn = Option<unsafe extern "C" fn(i32) -> !>;
 
-/// Maximum number of service overrides (matches libnx MAX_OVERRIDES)
+/// Maximum number of service overrides the loader may supply
 pub const MAX_SERVICE_OVERRIDES: usize = 32;
 
 /// Global environment state (immutable after initialization)
@@ -355,7 +355,7 @@ impl ServiceOverride {
     }
 }
 
-/// Account UserId structure (matches libnx AccountUid)
+/// The 128-bit account id the loader writes a selected user into
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct AccountUid {

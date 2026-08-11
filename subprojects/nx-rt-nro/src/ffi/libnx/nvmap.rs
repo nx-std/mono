@@ -5,8 +5,8 @@
 //! in `nx-nv`: the descriptor has to sit beside the driver session it borrows,
 //! and the runtime is what owns that session's lifetime.
 //!
-//! Every entry point below therefore does the same two things — take the
-//! driver session for the length of one call, and borrow the device over it —
+//! Every entry point below therefore does the same two things: take the
+//! driver session for the length of one call, and borrow the device over it,
 //! before handing the actual work to `nx-nv`.
 
 use core::{

@@ -118,7 +118,10 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_add_override_handle(
 ) {
     // SAFETY: Caller guarantees handle is valid.
     let handle = nx_svc::ipc::Handle::from_raw_unchecked(handle);
-    // Ignore error (matches libnx behavior)
+    // The only failure is a full override table. Losing the entry means this
+    // name resolves through the Service Manager instead of the handle the
+    // caller supplied, which is the same answer a process that never
+    // registered one gets. The C signature returns nothing either way.
     let _ = sm::add_override(name, handle);
 }
 
@@ -296,7 +299,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_sm_get_service_session() -> *mut Se
 
 fn set_sm_ffi_session() {
     if let Ok(sm) = sm::session() {
-        // Non-owning FFI view (`own_handle = 0`, `object_id = 0` — libnx's
+        // Non-owning FFI view (`own_handle = 0`, `object_id = 0`: libnx's
         // "override" mode): the Rust `SmService` retains exclusive ownership
         // of the kernel handle and closes it on `Drop` via `sm::exit`. A
         // `own_handle = 1` snapshot here would risk a double-close if libnx

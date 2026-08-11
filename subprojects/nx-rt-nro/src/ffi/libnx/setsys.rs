@@ -30,7 +30,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_setsys_initialize() -> u32 {
         return err.to_rc();
     }
     if let Some(setsys) = set::get_service() {
-        // Non-owning FFI view (`own_handle = 0`, `object_id = 0` — libnx's
+        // Non-owning FFI view (`own_handle = 0`, `object_id = 0`: libnx's
         // "override" mode): the Rust `SetSysService` retains exclusive
         // ownership and closes the kernel handle on `Drop` via `set::exit`.
         // A `own_handle = 1` snapshot would risk a double-close if libnx

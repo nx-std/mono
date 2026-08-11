@@ -135,6 +135,34 @@ unreachable is the exception: it carries a `// SAFETY:` comment on its statement
 and gets **no** `# Panics` section — documenting a panic that cannot occur would mislead the caller. That
 comment and the proof behind it are owned by [rust-errors-handling](rust-errors-handling.md).
 
+A `todo!()` stub is the other exception, for a different reason. Its rustdoc describes what the function is
+for, which is what a reader wants and what stays true; whether the body has been written yet is a property of
+the moment, not of the contract. Recording the stub's abort means implementing the function requires deleting
+the paragraph that described it, so the doc churns on a change that does not alter the contract at all.
+
+```rust
+// ❌ Bad — documents the stub rather than the contract, so implementing the body
+// means deleting a section the caller was never the audience for.
+/// Opens the device operator on the filesystem session.
+///
+/// # Panics
+///
+/// Always: the command is not implemented yet.
+pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
+    todo!("fsOpenDeviceOperator")
+}
+
+// ✅ Good — the contract, which implementing the body will not change.
+/// Opens the device operator on the filesystem session.
+///
+/// # Safety
+///
+/// `out` must point to a writable `Service`.
+pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
+    todo!("fsOpenDeviceOperator")
+}
+```
+
 **`# Errors`** — any fallible public function describes what its failures mean. The variants themselves are
 documented on the error type, which [rust-errors-reporting](rust-errors-reporting.md) governs; this section
 says which of them a caller can expect here, and what they imply.
@@ -163,6 +191,7 @@ Before committing code, verify:
 - [ ] Every function that can panic has a `# Panics` section naming the condition
 - [ ] A provably-unreachable `unwrap`/`expect` has a `// SAFETY:` comment on its statement and no `# Panics`
       section
+- [ ] A `todo!()` stub documents what the function is for and has no `# Panics` section for the stub itself
 - [ ] Every fallible public function has an `# Errors` section saying what its failures mean
 - [ ] Every `unsafe` item has a `# Safety` section; a safe validation-skipping constructor states its
       precondition in prose instead

@@ -273,6 +273,10 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_vi_get_display_resolution(
     match service.get_display_resolution(display_id) {
         Ok(res) => {
             if !width.is_null() {
+                // A display resolution is a pixel count the server reports in a
+                // 64-bit field; the C surface takes the `int` pair the caller
+                // declared, and no panel this addresses is anywhere near
+                // `i32::MAX` pixels on a side.
                 unsafe { *width = res.width as i32 };
             }
             if !height.is_null() {
@@ -575,7 +579,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_vi_create_layer(
         .unwrap_or(0);
 
     // libnx: `layer->layer_id = __nx_vi_layer_id;` (weak override default 0).
-    let mut layer_id = vi::get_layer_id_override();
+    let mut layer_id = vi::layer_id_override();
 
     // libnx: when no override and we have an applet ARUID, attempt to allocate
     // a managed display layer; propagate any error verbatim.
@@ -602,7 +606,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_vi_create_layer(
         }
     } else {
         // Stray-layer path: dispatch to the right sub-service.
-        let flags = vi::get_stray_layer_flags_override();
+        let flags = vi::stray_layer_flags_override();
         let rc = create_stray_layer_for_service(&service, flags, display_id);
         match rc {
             Ok((id, nw)) => {

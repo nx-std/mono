@@ -29,7 +29,7 @@ pub(crate) fn set_nxlink_host(addr: u32) {
 ///
 /// Backing storage for libnx's `__nx_applet_type` global, kept in sync with
 /// the parsed environment state for C consumers that read it directly. The
-/// Rust applet-init dispatch never reads this back — it sources the applet
+/// Rust applet-init dispatch never reads this back: it sources the applet
 /// type from [`env::applet_type`], the loader-supplied runtime value.
 #[unsafe(no_mangle)]
 pub static mut __nx_rt_nro__libnx_applet_type: u32 = 0;

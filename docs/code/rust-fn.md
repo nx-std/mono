@@ -107,11 +107,11 @@ Trait impls hold to the same rule, which is also what `std` writes: `fn from(val
 The three conversion prefixes are a promise about what a call costs and what it does to the receiver. Getting
 one wrong is not a style issue: a caller reads `as_` and puts it in a per-request dispatch loop.
 
-| Prefix   | Receiver | Cost                  | Returns                          |
-|----------|----------|-----------------------|----------------------------------|
-| `as_*`   | `&self`  | Free; never allocates | A borrowed view (`&str`, `&[u8]`)|
-| `to_*`   | `&self`  | May allocate          | A new owned value                |
-| `into_*` | `self`   | Free or near-free     | A different owned type           |
+| Prefix   | Receiver          | Cost                  | Returns                          |
+|----------|-------------------|-----------------------|----------------------------------|
+| `as_*`   | `&self`           | Free; never allocates | A borrowed view (`&str`, `&[u8]`)|
+| `to_*`   | `&self`, or `self` when `Copy` | May allocate | A new owned value      |
+| `into_*` | `self`            | Free or near-free     | A different owned type           |
 
 ```rust
 // ❌ Bad — `as_` on something that allocates, so a caller formats a service name on
@@ -142,6 +142,21 @@ impl ServiceName {
 
 impl RawRequest {
     pub fn into_checked(self) -> CheckedRequest {}
+}
+```
+
+A `Copy` receiver takes `self` by value and still gets `to_*`. What `into_*` warns a caller about is losing
+the receiver, and a `Copy` type does not lose it: `f64::to_bits(self)` and `char::to_ascii_uppercase(self)`
+are `to_` for that reason. Reading the receiver alone is therefore not enough to call the prefix wrong; the
+question is whether the caller gives anything up.
+
+```rust
+// ✅ Good — `self` by value, and still `to_`, because the caller keeps its copy.
+#[derive(Debug, Clone, Copy)]
+pub struct PageIndex(u32);
+
+impl PageIndex {
+    pub fn to_address(self) -> Address {}
 }
 ```
 
@@ -206,6 +221,11 @@ The receiver is part of the promise. `as_*` and `to_*` borrow; `into_*` and `wit
 `&mut self`. A method that consumes `self` under a borrowing name forces callers into clones they should not
 need; one that borrows under a consuming name leaves a value alive the caller expected to have given away.
 
+The promise is about what the caller gives up, not about the receiver's spelling. A `Copy` type gives up
+nothing, so `to_*` taking `self` by value keeps its prefix
+([§3](#3-conversions-predict-cost-and-ownership)); the mismatch worth catching is a *non-`Copy`* receiver
+consumed under a borrowing name.
+
 Consuming is not a cost to avoid. Taking `self` is how a type moves through a pipeline without a clone, and it
 is what makes an invalid intermediate state unconstructible — see [pattern-typestate](pattern-typestate.md).
 
@@ -238,6 +258,7 @@ Before committing code, verify:
 - [ ] No `make` was introduced, and `build` appears only as a builder's terminal method
 - [ ] Inside an `impl`, the enclosing type is written `Self` in return types, in `Result`, and in literals
 - [ ] `as_*` borrows without allocating, `to_*` returns an owned value, `into_*` consumes `self`
+- [ ] A `to_*` taking `self` by value was only flagged when the receiver is not `Copy`
 - [ ] A wrapper exposes `into_inner` rather than leaving callers to reach for `.0`
 - [ ] `is_*` and `has_*` return `bool`; a type with `len` also has `is_empty`
 - [ ] `try_*` is used only where the infallible counterpart exists

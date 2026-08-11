@@ -5,7 +5,7 @@
 //! kind-agnostic core.
 //!
 //! The Application Manager (`applet`) manager is also shared: every NRO and
-//! NSO process performs the same libnx-faithful applet handshake — only the
+//! NSO process performs the same libnx-faithful applet handshake: only the
 //! source of the [`AppletType`](nx_service_applet::AppletType) value differs
 //! (an NRO reads it from the loader config at runtime; an NSO selects it at
 //! build time). The manager is therefore re-homed here behind the

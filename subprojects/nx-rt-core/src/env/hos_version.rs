@@ -35,7 +35,7 @@ pub fn set(version: u32) {
 }
 
 /// Represents a Horizon OS version (major.minor.patch).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HosVersion(u32);
 
 impl HosVersion {

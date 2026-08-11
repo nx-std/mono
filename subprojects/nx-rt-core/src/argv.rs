@@ -4,9 +4,9 @@
 //! argument-string scanner ([`parse_argv`]), the parsed-argument store
 //! ([`ParsedArgs`]), and the [`Args`] iterator that mirrors `std::env::args`.
 //!
-//! Each output kind reads its command line from a different source — a
+//! Each output kind reads its command line from a different source (a
 //! homebrew NRO from the loader-supplied `argv` pointer, an NSO from the
-//! page-aligned `__argdata__` region — and hands the already-read argument
+//! page-aligned `__argdata__` region) and hands the already-read argument
 //! string to [`setup_from`]. The kind-specific reader, and the NRO-only
 //! nxlink-suffix handling, stay with each entry crate; only the scanner,
 //! storage, and iterator are shared here.
@@ -30,7 +30,7 @@ use core::{
 
 use nx_sys_sync::Once;
 
-/// Initialization guard — ensures [`setup_from`] installs arguments once.
+/// Initialization guard: ensures [`setup_from`] installs arguments once.
 static ARGV_INIT: Once = Once::new();
 
 /// Parsed arguments (owns all argument memory).
@@ -79,7 +79,7 @@ pub fn setup_from(source: &str) {
         let parsed_args = Box::new(ParsedArgs {
             args,
             #[cfg(feature = "ffi")]
-            c_args,
+            _c_args: c_args,
             #[cfg(feature = "ffi")]
             argv_ptrs,
         });
@@ -90,7 +90,7 @@ pub fn setup_from(source: &str) {
 /// C-style `(argc, argv)` for the installed command line, or `None` when no
 /// arguments were installed.
 ///
-/// The returned `argv` points into the leaked [`ParsedArgs`] allocation — a
+/// The returned `argv` points into the leaked [`ParsedArgs`] allocation: a
 /// NULL-terminated pointer array that lives for the rest of the program. Each
 /// entry crate's FFI surface publishes it into its own
 /// `__nx_<aspect>__system_argv` global.
@@ -128,7 +128,7 @@ impl EmptyArgv {
     }
 }
 
-/// Shared empty argv — a null-terminated array with zero arguments.
+/// Shared empty argv: a null-terminated array with zero arguments.
 #[cfg(feature = "ffi")]
 pub static EMPTY_ARGV: EmptyArgv = EmptyArgv([ptr::null_mut()]);
 
@@ -183,15 +183,13 @@ struct ParsedArgs {
     args: Vec<String>,
     /// Nul-terminated copies of `args`, owning what `argv_ptrs` points at.
     ///
-    /// Compiled only with the C-FFI surface, because the terminator is what
-    /// that surface needs and nothing else here does.
+    /// Never read: it is held so that dropping it, which never happens because
+    /// the store is leaked, would be what frees the strings `argv_ptrs`
+    /// addresses. Compiled only with the C-FFI surface, because the terminator
+    /// is what that surface needs and nothing else here does.
     #[cfg(feature = "ffi")]
-    #[expect(
-        dead_code,
-        reason = "holds the allocations `argv_ptrs` points into; read through those pointers by C, never through this field"
-    )]
-    c_args: Vec<CString>,
-    /// Pre-built C-style argv array — pointers into `c_args` plus a NULL
+    _c_args: Vec<CString>,
+    /// Pre-built C-style argv array: pointers into `_c_args` plus a NULL
     /// terminator. Exists to keep the allocation alive: each entry crate's
     /// `__nx_<aspect>__system_argv` points into it.
     #[cfg(feature = "ffi")]

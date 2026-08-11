@@ -9,7 +9,7 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::services::{
+use super::{
     applet,
     sm,
 };
@@ -104,8 +104,13 @@ impl core::ops::Deref for HidServiceRef {
     type Target = HidService;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create HidServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
+        match self.0.as_ref() {
+            Some(state) => &state.service,
+            // SAFETY: the module accessor builds a `HidServiceRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 

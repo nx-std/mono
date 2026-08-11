@@ -41,7 +41,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_apm_initialize() -> u32 {
     }
 
     // Populate FFI service buffers from the owned Session wrappers as
-    // non-owning views (`own_handle = 0`, `object_id = 0` — libnx's
+    // non-owning views (`own_handle = 0`, `object_id = 0`: libnx's
     // "override" mode): Rust's `ApmService`/`ApmSession` retain exclusive
     // ownership of the kernel handles and close them on `Drop` via
     // `apm::exit`. A `own_handle = 1` snapshot here would risk a

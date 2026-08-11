@@ -3,11 +3,11 @@
 //! Brings up the kind-agnostic [runtime environment state][nx_rt_core::env]
 //! for an NSO process launched by the process manager (`pm`).
 //!
-//! Unlike a homebrew NRO — which the homebrew loader hands a `ConfigEntry`
+//! Unlike a homebrew NRO, which the homebrew loader hands a `ConfigEntry`
 //! array describing its heap override, command-line arguments, service
-//! overrides, applet type, and HOS version — an NSO process receives no such
+//! overrides, applet type, and HOS version, an NSO process receives no such
 //! configuration block. [`setup`] therefore has nothing to parse: it records
-//! only what the NSO launch ABI guarantees directly — that the process runs
+//! only what the NSO launch ABI guarantees directly: that the process runs
 //! as an NSO, that every supervisor call is available, and the kernel-supplied
 //! main-thread handle and loader-return function.
 //!
@@ -46,7 +46,7 @@ use nx_svc::thread::Handle as ThreadHandle;
 
 /// Populates the runtime environment state for an NSO process.
 ///
-/// Runs exactly once — repeat calls are no-ops. An NSO has no homebrew-loader
+/// Runs exactly once: repeat calls are no-ops. An NSO has no homebrew-loader
 /// configuration block, so there is nothing to parse: no heap override, no
 /// `argv` pointer, and no loader-supplied service overrides. The bring-up
 /// records that the process is an NSO, marks every supervisor call available
@@ -73,7 +73,7 @@ pub fn setup(main_thread: ThreadHandle) {
 /// The way out of an NSO process: the process-exit supervisor call.
 ///
 /// libnx installs `svcExitProcess` in this slot by casting it to the
-/// loader-return signature — the syscall takes no arguments, that signature
+/// loader-return signature: the syscall takes no arguments, that signature
 /// takes a status. The shim performs the same widening through the type system
 /// rather than a cast, and drops the status for the reason the cast ignored
 /// it: nothing outlives the call to read one.

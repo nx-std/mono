@@ -1,6 +1,6 @@
 //! Name resolution entry points that need the service-manager session.
 //!
-//! The resolver lives in [`nx_net`], and most of its C symbols are exported from there — the ones
+//! The resolver lives in [`nx_net`], and most of its C symbols are exported from there: the ones
 //! that only format a string or free a block need nothing from this crate. These five are the ones
 //! that talk to `sfdnsres`, and acquiring that service needs the process's service-manager
 //! session, which this crate owns.

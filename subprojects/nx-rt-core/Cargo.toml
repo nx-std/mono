@@ -20,12 +20,12 @@ bench = false
 # calls the socket driver's C-shaped entry, and it is gated on that crate's own
 # `ffi` feature.
 ffi = ["nx-sf/ffi", "nx-net?/ffi", "nx-service-applet?/ffi", "nx-sys-net?/ffi"]
-# Application Manager (am) manager — gates the shared `services::applet`
-# applet handshake. Entry crates enable it and source the applet-type value.
-service-applet = ["dep:nx-service-applet"]
 # Name resolution — gates the five resolver symbols that reach `sfdnsres`, which
 # is acquired over the service-manager session this crate owns.
 net = ["dep:nx-net"]
+# Application Manager (am) manager — gates the shared `services::applet`
+# applet handshake. Entry crates enable it and source the applet-type value.
+service-applet = ["dep:nx-service-applet"]
 # Socket driver initialization — gates the one socket symbol whose interface
 # revision follows the running firmware, which only this crate can read.
 sys-net = ["dep:nx-service-bsd", "dep:nx-sys-net"]

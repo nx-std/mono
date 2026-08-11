@@ -9,7 +9,7 @@ use nx_std_sync::{
     rwlock::RwLock,
 };
 
-use crate::services::sm;
+use super::sm;
 
 /// Global `set:sys` state, lazily initialized.
 static SET_STATE: OnceLock<RwLock<Option<SetState>>> = OnceLock::new();
@@ -176,8 +176,13 @@ impl core::ops::Deref for SetServiceRef {
     type Target = SetSysService;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY: We only create SetServiceRef when the option is Some
-        &self.0.as_ref().unwrap().service
+        match self.0.as_ref() {
+            Some(state) => &state.service,
+            // SAFETY: the module accessor builds a `SetServiceRef` only
+            // after finding the state present, and the read lock this
+            // holds keeps it present for the borrow's lifetime.
+            None => unsafe { core::hint::unreachable_unchecked() },
+        }
     }
 }
 

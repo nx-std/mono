@@ -1,9 +1,9 @@
 //! `libnx` symbol-override FFI for `nx-rt-core`.
 //!
 //! Holds the `__nx_rt_core__libnx_*` symbols that redirect the kind-agnostic
-//! `libnx` runtime entry points — heap init, main-thread TLS, the environment
+//! `libnx` runtime entry points: heap init, main-thread TLS, the environment
 //! read accessors, the HOS-version API, the Service Manager set, and the
-//! role-independent Application Manager (`applet*`) accessor surface — to this
+//! role-independent Application Manager (`applet*`) accessor surface: to this
 //! crate. The override aliases that bind them live in
 //! `overrides/rt_core_libnx_core.ld`, `overrides/rt_core_libnx_service_applet.ld` and
 //! `overrides/rt_core_libnx_sys_net.ld`.

@@ -3,7 +3,7 @@
 //! Dynamically-loadable-module entry crate for the Nintendo Switch runtime
 //! crate family.
 //!
-//! `nx-rt-module` is the runtime for one output kind — a relocatable `NRO`
+//! `nx-rt-module` is the runtime for one output kind: a relocatable `NRO`
 //! module that an already-running process loads at runtime through the `ro`
 //! service. Unlike an application or a sysmodule, a module is **not a
 //! process**: it has no `_start`, opens no environment, and is launched by
@@ -30,13 +30,13 @@
 //! done all of it, so a module **inherits** its runtime rather than
 //! **initializing** one:
 //!
-//! - **No entry point** — a module has no `_start`. The `ro` service relocates
+//! - **No entry point**: a module has no `_start`. The `ro` service relocates
 //!   it; there is no kind-specific startup ABI for this crate to implement.
-//! - **No environment** — the heap, the Horizon OS version, the main-thread
+//! - **No environment**: the heap, the Horizon OS version, the main-thread
 //!   TLS, and the Service Manager session all belong to the host process. A
 //!   module reuses them as they are and never re-runs [`nx_rt_core`]'s
 //!   process bring-up.
-//! - **No applet identity** — the Application Manager identity is whatever the
+//! - **No applet identity**: the Application Manager identity is whatever the
 //!   host process registered. A module never selects an applet type and never
 //!   runs an applet handshake.
 //!
@@ -46,7 +46,7 @@
 //!
 //! ## Export visibility
 //!
-//! A loadable module is reached through its dynamic symbol table — the host
+//! A loadable module is reached through its dynamic symbol table: the host
 //! resolves the module's exports against the `NRR` it was registered with.
 //! Which symbols land in `.dynsym` is governed by symbol visibility at link
 //! time, not by this crate's Rust surface. Owning that export-visibility
