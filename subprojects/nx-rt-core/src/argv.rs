@@ -11,9 +11,10 @@
 //! nxlink-suffix handling, stay with each entry crate; only the scanner,
 //! storage, and iterator are shared here.
 
+#[cfg(feature = "ffi")]
+use alloc::ffi::CString;
 use alloc::{
     boxed::Box,
-    ffi::CString,
     string::String,
     vec::Vec,
 };
@@ -52,31 +53,33 @@ pub fn args() -> Args {
 /// unsynchronized [`Args`] reads sound.
 pub fn setup_from(source: &str) {
     ARGV_INIT.call_once(|| {
-        let parsed = parse_argv(source);
-        if parsed.is_empty() {
+        let args = parse_argv(source);
+        if args.is_empty() {
             return;
         }
 
-        // Convert to CStrings (owns the null-terminated argument data).
-        let cstrings: Vec<CString> = parsed
-            .into_iter()
-            .filter_map(|s| CString::new(s).ok())
-            .collect();
+        // The nul-terminated copies exist only so the C surface has something to
+        // point at. Building them here rather than storing them as the arguments
+        // is what keeps the terminator out of the Rust iterator below.
+        #[cfg(feature = "ffi")]
+        let c_args: Vec<CString> = args.iter().map(|arg| c_form(arg)).collect();
 
-        // Build the C-style argv pointer array — pointers into `cstrings`
-        // followed by a NULL terminator — backing the `__system_argv` export.
+        // Build the C-style argv pointer array: pointers into `c_args` followed
+        // by a NULL terminator, backing the `__system_argv` export.
         #[cfg(feature = "ffi")]
         let argv_ptrs = {
-            let mut argv_ptrs: Vec<*mut c_char> = cstrings
+            let mut argv_ptrs: Vec<*mut c_char> = c_args
                 .iter()
-                .map(|cs| cs.as_ptr() as *mut c_char)
+                .map(|arg| arg.as_ptr() as *mut c_char)
                 .collect();
             argv_ptrs.push(ptr::null_mut()); // NULL terminator.
             argv_ptrs.into_boxed_slice()
         };
 
         let parsed_args = Box::new(ParsedArgs {
-            cstrings,
+            args,
+            #[cfg(feature = "ffi")]
+            c_args,
             #[cfg(feature = "ffi")]
             argv_ptrs,
         });
@@ -99,7 +102,7 @@ pub fn system_argv() -> Option<(i32, *mut *mut c_char)> {
     }
     // SAFETY: PARSED_ARGS is set once during setup_from() and never freed.
     let parsed = unsafe { &*parsed_ptr };
-    let argc = parsed.cstrings.len() as i32;
+    let argc = parsed.args.len() as i32;
     let argv = parsed.argv_ptrs.as_ptr() as *mut *mut c_char;
     Some((argc, argv))
 }
@@ -147,10 +150,10 @@ impl Iterator for Args {
         // SAFETY: PARSED_ARGS is set once during setup_from() and never freed.
         let parsed = unsafe { &*parsed_ptr };
 
-        if self.index < parsed.cstrings.len() {
-            let cstr = &parsed.cstrings[self.index];
+        if self.index < parsed.args.len() {
+            let arg = parsed.args[self.index].clone();
             self.index += 1;
-            Some(cstr.to_string_lossy().into_owned())
+            Some(arg)
         } else {
             None
         }
@@ -163,7 +166,7 @@ impl Iterator for Args {
         }
         // SAFETY: PARSED_ARGS is set once during setup_from() and never freed.
         let parsed = unsafe { &*parsed_ptr };
-        let remaining = parsed.cstrings.len().saturating_sub(self.index);
+        let remaining = parsed.args.len().saturating_sub(self.index);
         (remaining, Some(remaining))
     }
 }
@@ -174,14 +177,45 @@ impl ExactSizeIterator for Args {}
 ///
 /// Written exactly once during [`setup_from`], then read-only.
 struct ParsedArgs {
-    /// CString storage — owns the null-terminated argument data.
-    cstrings: Vec<CString>,
-    /// Pre-built C-style argv array — pointers into `cstrings` plus a NULL
+    /// The arguments themselves, in the order the command line gave them.
+    ///
+    /// This is the storage; everything below is a view of it built for C.
+    args: Vec<String>,
+    /// Nul-terminated copies of `args`, owning what `argv_ptrs` points at.
+    ///
+    /// Compiled only with the C-FFI surface, because the terminator is what
+    /// that surface needs and nothing else here does.
+    #[cfg(feature = "ffi")]
+    #[expect(
+        dead_code,
+        reason = "holds the allocations `argv_ptrs` points into; read through those pointers by C, never through this field"
+    )]
+    c_args: Vec<CString>,
+    /// Pre-built C-style argv array — pointers into `c_args` plus a NULL
     /// terminator. Exists to keep the allocation alive: each entry crate's
-    /// `__nx_<aspect>__system_argv` points into it. Compiled only with the
-    /// C-FFI surface; the Rust [`Args`] iterator reads `cstrings` directly.
+    /// `__nx_<aspect>__system_argv` points into it.
     #[cfg(feature = "ffi")]
     argv_ptrs: Box<[*mut c_char]>,
+}
+
+/// Renders `arg` as the nul-terminated string the C surface hands out.
+///
+/// An argument carrying an interior nul is truncated there, because that is
+/// where a C caller reading the pointer would stop anyway. Truncating keeps
+/// `argv` and the Rust iterator the same length, which dropping the argument
+/// outright would not.
+#[cfg(feature = "ffi")]
+fn c_form(arg: &str) -> CString {
+    let bytes = arg.as_bytes();
+    let end = bytes
+        .iter()
+        .position(|&byte| byte == 0)
+        .unwrap_or(bytes.len());
+
+    // SAFETY: `end` is the index of the first nul, or the length when there is
+    // none, so the prefix holds no nul at all and the one failure `CString::new`
+    // reports cannot arise.
+    CString::new(&bytes[..end]).expect("the prefix before the first nul holds none")
 }
 
 // SAFETY: ParsedArgs is only written once during init, then read-only.
