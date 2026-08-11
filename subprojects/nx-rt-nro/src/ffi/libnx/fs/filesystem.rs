@@ -22,10 +22,6 @@ use crate::ffi::common::GENERIC_ERROR;
 ///
 /// `out` must point to a writable `Service`, and `string` to a NUL-terminated
 /// string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_bis_file_system(
     _out: *mut Service,
@@ -40,10 +36,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_bis_file_system(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_content_storage_file_system(
     _out: *mut Service,
@@ -57,10 +49,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_content_storage_file_system(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_custom_storage_file_system(
     _out: *mut Service,
@@ -74,10 +62,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_custom_storage_file_system(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_file_system_by_current_process(
     _out: *mut Service,
@@ -90,10 +74,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_file_system_by_current_
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_file_system_by_program_id(
     _out: *mut Service,
@@ -108,10 +88,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_file_system_by_program_
 ///
 /// `out` must point to a writable `Service`, and `content_path` to a
 /// NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_file_system(
     _out: *mut Service,
@@ -127,10 +103,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_file_system(
 ///
 /// `out` must point to a writable `Service`, and `content_path` to a
 /// NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_file_system_with_id(
     _out: *mut Service,
@@ -147,10 +119,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_file_system_with_id(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_file_system_with_patch(
     _out: *mut Service,
@@ -166,10 +134,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_file_system_with_patch(
 ///
 /// `out` must point to a writable `Service`, and `handle` to a readable
 /// `FsGameCardHandle`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_game_card_file_system(
     _out: *mut Service,
@@ -185,10 +149,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_game_card_file_system(
 ///
 /// `out` must point to a writable `Service`, and `path` to a NUL-terminated
 /// string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_host_file_system(
     _out: *mut Service,
@@ -203,10 +163,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_host_file_system(
 ///
 /// `out` must point to a writable `Service`, and `path` to a NUL-terminated
 /// string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_host_file_system_with_option(
     _out: *mut Service,
@@ -221,10 +177,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_host_file_system_with_option
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_image_directory_file_system(
     _out: *mut Service,

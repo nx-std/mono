@@ -122,10 +122,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_application_show(
 /// # Safety
 ///
 /// `ctx` must be null or point to a readable `ErrorContext`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_result_show(
     _res: u32,
@@ -150,10 +146,6 @@ pub struct ErrorCode {
 /// # Safety
 ///
 /// `ctx` must be null or point to a readable `ErrorContext`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_code_show(
     _error_code: ErrorCode,
@@ -164,10 +156,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_code_show(
 }
 
 /// Stands in for libnx's `errorCodeRecordShow`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_code_record_show(
     _error_code: ErrorCode,
@@ -182,10 +170,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_code_record_show(
 ///
 /// `backtrace` must point to a writable `ErrorResultBacktrace`, and `entries` to
 /// `count` readable results.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_result_backtrace_create(
     _backtrace: *mut c_void,
@@ -200,10 +184,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_result_backtrace_create(
 /// # Safety
 ///
 /// `backtrace` must point to a readable `ErrorResultBacktrace`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_result_backtrace_show(
     _res: u32,
@@ -218,10 +198,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_result_backtrace_show(
 ///
 /// `config` must point to a writable `ErrorSystemConfig`, and each message must
 /// be null or a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_create(
     _config: *mut c_void,
@@ -236,10 +212,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_create(
 /// # Safety
 ///
 /// `config` must point to a readable `ErrorSystemConfig`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_show(_config: *mut c_void) -> u32 {
     todo!("errorSystemShow")
@@ -251,10 +223,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_show(_config: *mut c_vo
 ///
 /// `config` must point to a writable `ErrorSystemConfig`, and `ctx` to a
 /// readable `ErrorContext`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_set_context(
     _config: *mut c_void,
@@ -264,10 +232,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_set_context(
 }
 
 /// Stands in for libnx's `errorEulaShow`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_eula_show(_region_code: u32) -> u32 {
     todo!("errorEulaShow")
@@ -278,10 +242,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_error_eula_show(_region_code: u32) -
 /// # Safety
 ///
 /// `eula` must point to a readable `ErrorEulaData`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_error_system_update_eula_show(
     _region_code: u32,

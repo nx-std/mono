@@ -15,10 +15,6 @@ use nx_sf::ffi::Service;
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
     todo!("fsOpenDeviceOperator")
@@ -29,10 +25,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut S
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_is_sd_card_inserted(
     _d: *mut Service,
@@ -46,10 +38,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_is_sd_card_insert
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_speed_mode(
     _d: *mut Service,
@@ -64,10 +52,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_speed
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_cid(
     _d: *mut Service,
@@ -83,10 +67,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_cid(
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_user_area_size(
     _d: *mut Service,
@@ -100,10 +80,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_user_
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_protected_area_size(
     _d: *mut Service,
@@ -118,10 +94,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_sd_card_prote
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_and_clear_sd_card_error_info(
     _d: *mut Service,
@@ -140,10 +112,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_and_clear_sd_
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_cid(
     _d: *mut Service,
@@ -159,10 +127,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_cid(
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_speed_mode(
     _d: *mut Service,
@@ -176,10 +140,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_speed_mod
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_patrol_count(
     _d: *mut Service,
@@ -194,10 +154,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_patrol_co
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_extended_csd(
     _d: *mut Service,
@@ -214,10 +170,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_mmc_extended_
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_and_clear_mmc_error_info(
     _d: *mut Service,
@@ -235,10 +187,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_and_clear_mmc
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_is_game_card_inserted(
     _d: *mut Service,
@@ -252,10 +200,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_is_game_card_inse
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_handle(
     _d: *mut Service,
@@ -270,10 +214,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_han
 ///
 /// `d` must point to a `Service` this module handed out, and `handle` to a
 /// readable `FsGameCardHandle`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_attribute(
     _d: *mut Service,
@@ -289,10 +229,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_att
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_device_id(
     _d: *mut Service,
@@ -309,10 +245,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_dev
 ///
 /// `d` must point to a `Service` this module handed out, `handle` to a readable
 /// `FsGameCardHandle`, and `dst` to `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_device_certificate(
     _d: *mut Service,
@@ -331,10 +263,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_dev
 ///
 /// `d` must point to a `Service` this module handed out, and `dst` to
 /// `dst_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_id_set(
     _d: *mut Service,
@@ -350,10 +278,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_id_
 /// # Safety
 ///
 /// `d` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_error_report_info(
     _d: *mut Service,
@@ -368,10 +292,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_err
 ///
 /// `d` must point to a `Service` this module handed out, and `handle` to a
 /// readable `FsGameCardHandle`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_update_partition_info(
     _d: *mut Service,
@@ -387,10 +307,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_get_game_card_upd
 ///
 /// `d` must point to a `Service` this module handed out, `handle` to a readable
 /// `FsGameCardHandle`, and each buffer to its stated number of bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_challenge_card_existence(
     _d: *mut Service,
@@ -411,10 +327,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_challenge_card_ex
 ///
 /// `d` must point to a `Service` this module handed out, and must not be closed
 /// twice.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_device_operator_close(_d: *mut Service) {
     todo!("fsDeviceOperatorClose")

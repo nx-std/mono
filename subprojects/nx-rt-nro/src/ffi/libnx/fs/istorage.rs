@@ -15,10 +15,6 @@ use nx_sf::ffi::Service;
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_bis_storage(
     _out: *mut Service,
@@ -32,10 +28,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_bis_storage(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_storage_by_current_process(
     _out: *mut Service,
@@ -48,10 +40,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_storage_by_current_proc
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_storage_by_data_id(
     _out: *mut Service,
@@ -66,10 +54,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_storage_by_data_id(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_storage_by_program_id(
     _out: *mut Service,
@@ -83,10 +67,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_data_storage_by_program_id(
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_patch_data_storage_by_current_process(
     _out: *mut Service,
@@ -100,10 +80,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_patch_data_storage_by_curren
 ///
 /// `s` must point to a `Service` this module handed out, and `buf` to
 /// `read_size` writable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_read(
     _s: *mut Service,
@@ -120,10 +96,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_read(
 ///
 /// `s` must point to a `Service` this module handed out, and `buf` to
 /// `write_size` readable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_write(
     _s: *mut Service,
@@ -139,10 +111,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_write(
 /// # Safety
 ///
 /// `s` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_flush(_s: *mut Service) -> u32 {
     todo!("fsStorageFlush")
@@ -153,10 +121,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_flush(_s: *mut Service) -
 /// # Safety
 ///
 /// `s` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_set_size(_s: *mut Service, _sz: i64) -> u32 {
     todo!("fsStorageSetSize")
@@ -167,10 +131,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_set_size(_s: *mut Service
 /// # Safety
 ///
 /// `s` must point to a `Service` this module handed out.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_get_size(
     _s: *mut Service,
@@ -185,10 +145,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_get_size(
 ///
 /// `s` must point to a `Service` this module handed out, and `out` to a
 /// writable `FsRangeInfo`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_operate_range(
     _s: *mut Service,
@@ -206,10 +162,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_operate_range(
 ///
 /// `s` must point to a `Service` this module handed out, and must not be closed
 /// twice.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_storage_close(_s: *mut Service) {
     todo!("fsStorageClose")

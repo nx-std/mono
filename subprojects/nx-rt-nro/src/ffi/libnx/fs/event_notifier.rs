@@ -15,10 +15,6 @@ use nx_sf::ffi::Service;
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_sd_card_detection_event_notifier(
     _out: *mut Service,
@@ -32,10 +28,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_sd_card_detection_event_noti
 ///
 /// `e` must point to a `Service` this module handed out, and `out` to a
 /// writable `Event`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_event_notifier_get_event_handle(
     _e: *mut Service,
@@ -51,10 +43,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_event_notifier_get_event_handle(
 ///
 /// `e` must point to a `Service` this module handed out, and must not be closed
 /// twice.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_event_notifier_close(_e: *mut Service) {
     todo!("fsEventNotifierClose")

@@ -16,10 +16,6 @@ use core::ffi::{
 /// # Safety
 ///
 /// `out` must point to a writable `FsFileSystemProxyErrorInfo`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_and_clear_error_info(_out: *mut c_void) -> u32 {
     todo!("fsGetAndClearErrorInfo")
@@ -30,10 +26,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_and_clear_error_info(_out: *m
 /// # Safety
 ///
 /// `out` must point to a writable `FsMemoryReportInfo`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_and_clear_memory_report_info(
     _out: *mut c_void,
@@ -46,10 +38,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_and_clear_memory_report_info(
 /// # Safety
 ///
 /// `out` must point to a writable `s32`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_content_storage_info_index(
     _out: *mut i32,
@@ -62,10 +50,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_content_storage_info_index(
 /// # Safety
 ///
 /// `out_mode` must point to a writable `u32`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_global_access_log_mode(
     _out_mode: *mut u32,
@@ -74,10 +58,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_global_access_log_mode(
 }
 
 /// Stands in for libnx's `fsSetGlobalAccessLogMode`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_rt_nro__libnx_fs_set_global_access_log_mode(_mode: u32) -> u32 {
     todo!("fsSetGlobalAccessLogMode")
@@ -88,10 +68,6 @@ pub extern "C" fn __nx_rt_nro__libnx_fs_set_global_access_log_mode(_mode: u32) -
 /// # Safety
 ///
 /// `out` must point to a writable `u64`, and `path` to a NUL-terminated string.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_program_id(
     _out: *mut u64,
@@ -106,10 +82,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_program_id(
 /// # Safety
 ///
 /// Both out-parameters must point to writable `u32`s.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_program_index_for_access_log(
     _out_program_index: *mut u32,
@@ -124,10 +96,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_program_index_for_access_log(
 ///
 /// `path` must be a NUL-terminated string, and `out_rights_id` must point to a
 /// writable `FsRightsId`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_rights_id_by_path(
     _path: *const c_char,
@@ -142,10 +110,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_rights_id_by_path(
 ///
 /// `path` must be a NUL-terminated string, and both out-parameters must point
 /// to writable storage of the matching libnx types.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_rights_id_and_key_generation_by_path(
     _path: *const c_char,
@@ -161,10 +125,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_get_rights_id_and_key_generation_
 /// # Safety
 ///
 /// `out` must point to a writable `bool`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_is_ex_fat_supported(_out: *mut bool) -> u32 {
     todo!("fsIsExFatSupported")
@@ -175,10 +135,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_is_ex_fat_supported(_out: *mut bo
 /// # Safety
 ///
 /// `out` must point to a writable `bool`.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_is_signed_system_partition_on_sd_card_valid(
     _out: *mut bool,
@@ -191,10 +147,6 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_is_signed_system_partition_on_sd_
 /// # Safety
 ///
 /// `log` must point to `size` readable bytes.
-///
-/// # Panics
-///
-/// Always: the command is not implemented yet.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_output_access_log_to_sd_card(
     _log: *const c_char,
