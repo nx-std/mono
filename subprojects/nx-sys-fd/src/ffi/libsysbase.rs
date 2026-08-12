@@ -14,6 +14,7 @@
 //! - libgloss/libsysbase/handle_manager.c
 //! - libgloss/libsysbase/iosupport.c
 
+use alloc::sync::Arc;
 use core::{
     cell::UnsafeCell,
     ffi::{
@@ -42,7 +43,6 @@ use self::{
     errno::{
         EBADF,
         ENODEV,
-        ENOSYS,
         ToErrno as _,
     },
     handle::Handle,
@@ -61,15 +61,19 @@ use crate::{
     },
 };
 
-/// Orders access to the per-descriptor C state pointers.
+/// Orders access to the per-descriptor C state.
 static STATE_LOCK: Mutex = Mutex::new();
 
 /// Per-descriptor state belonging to devices registered from C.
 ///
 /// A C device declares how many bytes each of its descriptors needs and reaches them through the
 /// `file_struct` pointer in the descriptor header. Rust devices keep nothing here, so their entries
-/// stay null and nothing is allocated for them.
-static C_STATES: CStates = CStates(UnsafeCell::new([core::ptr::null_mut(); MAX_FD]));
+/// stay empty and nothing is allocated for them.
+///
+/// An entry is shared rather than owned by one descriptor, because duplication gives two
+/// descriptors one state: they must be handed the same bytes, and the device must be told to close
+/// them once rather than once each.
+static C_STATES: CStates = CStates(UnsafeCell::new([const { None }; MAX_FD]));
 
 /// Registers a device and returns its registry slot, or -1 when the registry is full.
 ///
@@ -170,8 +174,7 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_alloc_handle(device: c_int) -> 
 
     // A C device keeps its own per-descriptor state. It is allocated before the descriptor exists,
     // so no slot is held across the allocation and nothing has to be rolled back.
-    let size = devoptab::state_size_at(slot);
-    let state = match allocate_c_state(size) {
+    let state = match create_c_state(slot) {
         Ok(state) => state,
         Err(err) => {
             errno::set_thread_errno(err);
@@ -182,7 +185,9 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_alloc_handle(device: c_int) -> 
     let fd = match table::open(device) {
         Ok(fd) => fd,
         Err(err) => {
-            release_c_state(state, size);
+            // The state is released by dropping it here: no descriptor was taken, so nothing else
+            // shares it and no device has been told it exists.
+            drop(state);
             errno::set_thread_errno(err.to_errno());
             return -1;
         }
@@ -218,9 +223,10 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_release_handle(fd: c_int) {
         return;
     };
 
-    let size = table::device_of(fd).map_or(0, |id| devoptab::state_size_at(id.index()));
     table::take(fd);
-    release_c_state(set_c_state(fd.number(), core::ptr::null_mut()), size);
+    // Released rather than closed, as in `table::take`: the state is freed once the last descriptor
+    // sharing it lets go, and no device is told.
+    drop(set_c_state(fd.number(), None));
 }
 
 /// Closes `fd`, telling its device.
@@ -242,7 +248,7 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_close_r(r: *mut Reent, fd: c_in
     }
 
     let result = table::close(fd);
-    set_c_state(fd.number(), core::ptr::null_mut());
+    drop(set_c_state(fd.number(), None));
 
     match result {
         Ok(()) => 0,
@@ -250,29 +256,73 @@ pub unsafe extern "C" fn __nx_sys_fd__libsysbase_close_r(r: *mut Reent, fd: c_in
     }
 }
 
-/// Duplicates `fd` onto the lowest free descriptor.
+/// Duplicates `oldfd` onto the lowest free descriptor, returning it or -1 with the error number
+/// set.
 ///
 /// Corresponds to libsysbase's `dup`.
-// TODO: implement descriptor duplication - this reports ENOSYS, so a caller that duplicates a
-//  descriptor gets a failure instead of a second reference to the same open device. Doing it
-//  properly means reference counting what a descriptor holds, because two descriptors would then
-//  share one device state and only the last close may release it.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_fd__libsysbase_dup(_oldfd: c_int) -> c_int {
-    errno::set_thread_errno(ENOSYS);
-    -1
+pub unsafe extern "C" fn __nx_sys_fd__libsysbase_dup(oldfd: c_int) -> c_int {
+    let Some(oldfd) = parse_fd(oldfd) else {
+        errno::set_thread_errno(EBADF);
+        return -1;
+    };
+
+    // Shared before the descriptor exists, for the same reason a C device's state is allocated
+    // before one: no slot is held while it happens, and a refused descriptor drops the share below.
+    let state = share_c_state(oldfd.number());
+
+    let fd = match table::duplicate(oldfd) {
+        Ok(fd) => fd,
+        Err(err) => {
+            drop(state);
+            errno::set_thread_errno(err.to_errno());
+            return -1;
+        }
+    };
+
+    set_c_state(fd.number(), state);
+    fd.number() as c_int
 }
 
-/// Duplicates `oldfd` onto `newfd`, closing whatever `newfd` held.
+/// Duplicates `oldfd` onto `newfd`, closing whatever `newfd` held, and returns `newfd` or -1 with
+/// the error number set.
 ///
 /// Corresponds to libsysbase's `dup2`.
-// TODO: implement descriptor duplication - this reports ENOSYS. Beyond the reference counting
-//  `dup` needs, whatever is displaced from `newfd` must be released after the table lock is
-//  dropped, because closing a device can block or reach back into the table.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_fd__libsysbase_dup2(_oldfd: c_int, _newfd: c_int) -> c_int {
-    errno::set_thread_errno(ENOSYS);
-    -1
+pub unsafe extern "C" fn __nx_sys_fd__libsysbase_dup2(oldfd: c_int, newfd: c_int) -> c_int {
+    let (Some(oldfd), Some(newfd)) = (parse_fd(oldfd), parse_fd(newfd)) else {
+        errno::set_thread_errno(EBADF);
+        return -1;
+    };
+
+    let state = share_c_state(oldfd.number());
+
+    let displaced = match table::duplicate_to(oldfd, newfd) {
+        Ok(displaced) => displaced,
+        Err(err) => {
+            drop(state);
+            errno::set_thread_errno(err.to_errno());
+            return -1;
+        }
+    };
+
+    let displaced_state = set_c_state(newfd.number(), state);
+
+    // What was displaced is released only now, with both locks gone, because a device's close may
+    // block or reach back into the table it was displaced from.
+    if let Some(device) = displaced.device()
+        && devoptab::is_c_device(device.index())
+    {
+        // A C device is told through its own table, as in the close above.
+        close_c_state(errno::thread_reent(), device, displaced_state);
+    }
+
+    // A descriptor on a C device holds no file of its own, so this closes a Rust device's file and
+    // does nothing otherwise. What the file reported is discarded: this call reports whether the
+    // descriptor was rebound, which it was, and not what closing the old one ran into.
+    let _ = displaced.close();
+
+    newfd.number() as c_int
 }
 
 /// Parses a descriptor number handed in by a C caller.
@@ -294,70 +344,79 @@ fn parse_device(device: c_int) -> Option<DeviceId> {
 
 /// Closes a descriptor on a C device by calling that device's own close.
 fn close_c_descriptor(r: *mut Reent, fd: Fd, device: DeviceId) -> c_int {
-    let table = devoptab::table_at(device.index());
-    let size = devoptab::state_size_at(device.index());
-
     // Free the descriptor before the device runs, so a device that blocks in close does not hold up
     // the table and the number is reusable either way.
     table::take(fd);
-    let state = set_c_state(fd.number(), core::ptr::null_mut());
+    let state = set_c_state(fd.number(), None);
 
-    let mut ret = 0;
-    if !table.is_null() {
-        // SAFETY: a registered C table is live for as long as its descriptors are.
-        if let Some(close) = unsafe { (*table).close_r } {
-            // SAFETY: `state` is the state this descriptor was opened with.
-            ret = unsafe { close(r, state.cast()) };
-        }
-    }
-
-    release_c_state(state, size);
-    ret
+    close_c_state(r, device, state)
 }
 
-/// Allocates `size` zeroed bytes of C device state, or null when the device declares none.
-fn allocate_c_state(size: usize) -> Result<*mut u8, c_int> {
-    if size == 0 {
-        return Ok(core::ptr::null_mut());
-    }
-
-    let Ok(layout) = core::alloc::Layout::from_size_align(size, align_of::<*mut u8>()) else {
-        return Err(errno::EINVAL);
+/// Tells `device` to close `state`, if it was the last descriptor sharing it.
+///
+/// Returns what the device's close reported, or 0 when there was nothing to tell it: another
+/// descriptor still shares the state, the device registered no close, or it is gone.
+fn close_c_state(r: *mut Reent, device: DeviceId, state: Option<Arc<CState>>) -> c_int {
+    let Some(state) = state.and_then(Arc::into_inner) else {
+        return 0;
     };
-    // SAFETY: `layout` has a non-zero size.
-    let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) };
-    if ptr.is_null() {
-        return Err(errno::ENFILE);
+
+    let table = devoptab::table_at(device.index());
+    if table.is_null() {
+        return 0;
     }
 
-    Ok(ptr)
-}
-
-/// Releases C device state allocated by [`allocate_c_state`].
-fn release_c_state(state: *mut u8, size: usize) {
-    if state.is_null() || size == 0 {
-        return;
-    }
-
-    let Ok(layout) = core::alloc::Layout::from_size_align(size, align_of::<*mut u8>()) else {
-        return;
+    // SAFETY: a registered C table is live for as long as its descriptors are.
+    let Some(close) = (unsafe { (*table).close_r }) else {
+        return 0;
     };
-    // SAFETY: the pointer came from `allocate_c_state` with this layout, and the descriptor that
-    // owned it is gone, so nothing can reach it again.
-    unsafe { alloc::alloc::dealloc(state, layout) };
+
+    // SAFETY: `state` is the state the descriptors sharing it were opened with, and this is the
+    // last of them.
+    unsafe { close(r, state.as_ptr().cast()) }
 }
 
-/// Returns the C state pointer recorded for `fd`.
+/// Allocates the state a descriptor on the device in registry slot `index` needs.
+///
+/// Returns `None` for a device implemented in Rust, which keeps nothing here. A C device gets an
+/// entry even when it declares no bytes, because the entry is also what counts the descriptors
+/// sharing it, and a device with no state to free still expects exactly one close.
+fn create_c_state(index: usize) -> Result<Option<Arc<CState>>, c_int> {
+    if !devoptab::is_c_device(index) {
+        return Ok(None);
+    }
+
+    let state = CState::create(devoptab::state_size_at(index))?;
+    Ok(Some(Arc::new(state)))
+}
+
+/// Returns the state pointer recorded for `fd`, or null when it has none.
 fn c_state_of(fd: usize) -> *mut u8 {
     STATE_LOCK.lock();
     // SAFETY: the lock is held and `fd` is in range.
-    let state = unsafe { (*C_STATES.0.get())[fd] };
+    let state = unsafe {
+        (*C_STATES.0.get())[fd]
+            .as_ref()
+            .map_or(core::ptr::null_mut(), |state| state.as_ptr())
+    };
     STATE_LOCK.unlock();
     state
 }
 
-/// Records `state` as the C state for `fd`, returning what it replaced.
-fn set_c_state(fd: usize, state: *mut u8) -> *mut u8 {
+/// Returns another share of the state recorded for `fd`, for a descriptor duplicated from it.
+fn share_c_state(fd: usize) -> Option<Arc<CState>> {
+    STATE_LOCK.lock();
+    // SAFETY: the lock is held and `fd` is in range.
+    let state = unsafe { (*C_STATES.0.get())[fd].clone() };
+    STATE_LOCK.unlock();
+    state
+}
+
+/// Records `state` as the state for `fd`, returning what it replaced.
+///
+/// What comes back travels out of the lock so the caller drops it with the lock gone, which is what
+/// keeps a free off it.
+fn set_c_state(fd: usize, state: Option<Arc<CState>>) -> Option<Arc<CState>> {
     STATE_LOCK.lock();
     // SAFETY: the lock is held and `fd` is in range.
     let previous = unsafe { core::mem::replace(&mut (*C_STATES.0.get())[fd], state) };
@@ -365,8 +424,78 @@ fn set_c_state(fd: usize, state: *mut u8) -> *mut u8 {
     previous
 }
 
-/// Storage for the per-descriptor C state pointers.
-struct CStates(UnsafeCell<[*mut u8; MAX_FD]>);
+/// Per-descriptor state a C device asked for, owned by the descriptors sharing it.
+///
+/// Frees the allocation when the last of them lets go. Telling the device happens first and
+/// elsewhere ([`close_c_state`]): this owns the memory and nothing else.
+struct CState {
+    ptr: *mut u8,
+    size: usize,
+}
+
+// SAFETY: the pointer addresses an allocation this crate never reads or writes. It hands it to the
+// device that asked for it and frees it once the last descriptor sharing it is gone, which the
+// reference count orders after every other descriptor let go. What the device does with those bytes
+// across threads was its own business when the C table held this pointer, and remains so.
+unsafe impl Send for CState {}
+
+// SAFETY: a shared reference reaches the pointer value and nothing behind it, so two threads
+// holding one share the address of an allocation this crate never reads or writes. What the device
+// that asked for those bytes does with them across threads was its own business when the C table
+// held this pointer, and remains so.
+unsafe impl Sync for CState {}
+
+impl CState {
+    /// Allocates `size` zeroed bytes, allocating nothing when the device declares no state.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error number to report when the size is one no layout can describe, or when the
+    /// allocator has no room for it.
+    fn create(size: usize) -> Result<Self, c_int> {
+        if size == 0 {
+            return Ok(Self {
+                ptr: core::ptr::null_mut(),
+                size,
+            });
+        }
+
+        let Ok(layout) = core::alloc::Layout::from_size_align(size, align_of::<*mut u8>()) else {
+            return Err(errno::EINVAL);
+        };
+        // SAFETY: `layout` has a non-zero size.
+        let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) };
+        if ptr.is_null() {
+            return Err(errno::ENFILE);
+        }
+
+        Ok(Self { ptr, size })
+    }
+
+    /// Returns what the device is handed as its per-descriptor state.
+    fn as_ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+}
+
+impl Drop for CState {
+    fn drop(&mut self) {
+        if self.ptr.is_null() || self.size == 0 {
+            return;
+        }
+
+        let Ok(layout) = core::alloc::Layout::from_size_align(self.size, align_of::<*mut u8>())
+        else {
+            return;
+        };
+        // SAFETY: the pointer came from `create` with this layout, and the last descriptor sharing
+        // it is gone, so nothing can reach it again.
+        unsafe { alloc::alloc::dealloc(self.ptr, layout) };
+    }
+}
+
+/// Storage for the per-descriptor C state.
+struct CStates(UnsafeCell<[Option<Arc<CState>>; MAX_FD]>);
 
 // SAFETY: entries are only touched while `STATE_LOCK` is held.
 unsafe impl Sync for CStates {}

@@ -140,6 +140,33 @@ test_rc_t test_0016_statvfs_reports_the_card_capacity(void);
 test_rc_t test_0017_exclusive_create_on_an_existing_file_reports_eexist(void);
 
 /**
+ * @brief Test that a duplicated descriptor names the same open file.
+ *
+ * Writes through both descriptors and checks the second carried on from where
+ * the first stopped, which only holds if they share one position rather than
+ * each holding a file of its own.
+ */
+test_rc_t test_0018_dup_gives_a_second_descriptor_onto_one_file(void);
+
+/**
+ * @brief Test that closing one of two descriptors on a file leaves it open.
+ *
+ * Writes through the survivor after the other is closed, which fails if the
+ * first close told the device to close the file instead of counting the
+ * descriptors still naming it.
+ */
+test_rc_t test_0019_closing_one_duplicate_leaves_the_file_open(void);
+
+/**
+ * @brief Test that a descriptor rebound onto another file reaches that file.
+ *
+ * Checks both halves of the exchange: the write through the rebound number
+ * lands in the file it now names, and the file it stopped naming was closed
+ * with what it had.
+ */
+test_rc_t test_0020_dup2_rebinds_a_descriptor_onto_another_file(void);
+
+/**
  * Test suite for the SD card filesystem device.
  */
 static void fs_sdmc_suite(void) {
@@ -212,5 +239,17 @@ static void fs_sdmc_suite(void) {
     TEST_CASE(
         "Test 0017: exclusive_create_on_an_existing_file_reports_eexist",
         test_0017_exclusive_create_on_an_existing_file_reports_eexist
+    )
+    TEST_CASE(
+        "Test 0018: dup_gives_a_second_descriptor_onto_one_file",
+        test_0018_dup_gives_a_second_descriptor_onto_one_file
+    )
+    TEST_CASE(
+        "Test 0019: closing_one_duplicate_leaves_the_file_open",
+        test_0019_closing_one_duplicate_leaves_the_file_open
+    )
+    TEST_CASE(
+        "Test 0020: dup2_rebinds_a_descriptor_onto_another_file",
+        test_0020_dup2_rebinds_a_descriptor_onto_another_file
     )
 }

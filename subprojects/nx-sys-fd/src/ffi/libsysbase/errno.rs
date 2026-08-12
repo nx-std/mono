@@ -26,6 +26,8 @@ use crate::{
     table::{
         AttachError,
         CloseError,
+        DuplicateError,
+        DuplicateToError,
         MetadataError,
         OpenError,
         ReadError,
@@ -140,6 +142,25 @@ impl ToErrno for CloseError {
 }
 
 impl _sealed::Sealed for CloseError {}
+
+impl ToErrno for DuplicateError {
+    fn to_errno(self) -> c_int {
+        match self {
+            Self::BadDescriptor => EBADF,
+            Self::NoDescriptors => ENFILE,
+        }
+    }
+}
+
+impl _sealed::Sealed for DuplicateError {}
+
+impl ToErrno for DuplicateToError {
+    fn to_errno(self) -> c_int {
+        EBADF
+    }
+}
+
+impl _sealed::Sealed for DuplicateToError {}
 
 impl ToErrno for WriteError {
     fn to_errno(self) -> c_int {
@@ -259,21 +280,32 @@ pub unsafe fn set_errno(r: *mut Reent, errno: c_int) {
 /// structure yet, which happens only before the thread runtime has set the thread up, when there is
 /// no reader for the error either.
 pub fn set_thread_errno(errno: c_int) {
+    // SAFETY: the pointer is this thread's own reentrancy structure, or null.
+    unsafe { set_errno(thread_reent(), errno) };
+}
+
+/// Returns the calling thread's reentrancy structure, or null when it has none.
+///
+/// The entry points whose C prototypes take no reentrancy pointer have one more reason to want it
+/// than reporting failure: an operation they hand on to a device expects to be passed one, and the
+/// calling thread's is the one that operation would have been given had it been reached the usual
+/// way.
+pub fn thread_reent() -> *mut Reent {
     let vars = nx_sys_thread_tls::thread_vars_ptr();
     if vars.is_null() {
-        return;
+        return core::ptr::null_mut();
     }
 
     // SAFETY: `thread_vars_ptr` returns a pointer into the calling thread's own thread-local
     // region, which is live for as long as the thread is.
     let vars = unsafe { &*vars };
     if vars.magic != nx_sys_thread_tls::THREAD_VARS_MAGIC {
-        return;
+        return core::ptr::null_mut();
     }
 
-    // SAFETY: the magic value says the thread runtime initialized these variables, so `reent`
-    // either is null or points to this thread's reentrancy structure.
-    unsafe { set_errno(vars.reent.to_raw().cast::<Reent>(), errno) };
+    // The magic value says the thread runtime initialized these variables, so `reent` either is
+    // null or points to this thread's reentrancy structure.
+    vars.reent.to_raw().cast::<Reent>()
 }
 
 pub(crate) mod _sealed {

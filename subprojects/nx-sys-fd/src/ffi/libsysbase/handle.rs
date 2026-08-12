@@ -32,7 +32,10 @@ pub struct Handle {
     pub device: u32,
     /// Number of descriptors sharing this header.
     ///
-    /// Always 1: duplication is not implemented, so no two descriptors share a header.
+    /// Always 1, whatever the real number is. The C descriptor table was the only reader of this
+    /// field and is replaced whole, so nothing left on the C side decides anything by it; what the
+    /// count governs, which is when a device is told to close, is answered where the descriptors
+    /// are counted instead.
     pub refcount: u32,
     /// What the device is handed as its per-descriptor state.
     pub file_struct: *mut c_void,

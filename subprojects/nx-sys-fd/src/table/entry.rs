@@ -14,9 +14,24 @@
 //! across it would stall every unrelated descriptor and risk a deadlock against a device whose own
 //! path reaches back into the table. So a caller clones the handle out under the table lock,
 //! releases it, and only then locks the file.
+//!
+//! ## Two counts, two questions
+//!
+//! Duplication lets several descriptors name one open file, and that raises a question the
+//! [`Arc`](alloc::sync::Arc) around it cannot answer. The `Arc` counts everything holding the file
+//! alive, which includes the handle an in-flight write cloned out of the table; the device's close
+//! must run when the last *descriptor* goes, not when the last holder does. So the descriptors are
+//! counted separately, in [`OpenFile::links`]: the `Arc` decides when the object is freed, the link
+//! count decides when the device is told.
 
 use alloc::boxed::Box;
-use core::cell::UnsafeCell;
+use core::{
+    cell::UnsafeCell,
+    sync::atomic::{
+        AtomicU32,
+        Ordering,
+    },
+};
 
 use nx_sys_sync::Mutex;
 
@@ -24,12 +39,13 @@ use crate::device::File;
 
 /// An open file, and the lock ordering access to it.
 ///
-/// Shared through an [`Arc`] so that a caller can hold the file alive after releasing the table
-/// lock. The last handle to go releases it, which is why closing a descriptor never drops a file
-/// under the table lock even when another thread is mid-operation.
+/// Shared through an [`Arc`](alloc::sync::Arc) so that a caller can hold the file alive after
+/// releasing the table lock. The last handle to go releases it, which is why closing a descriptor
+/// never drops a file under the table lock even when another thread is mid-operation.
 pub struct OpenFile {
     mutex: Mutex,
     file: UnsafeCell<Box<dyn File>>,
+    links: AtomicU32,
 }
 
 // SAFETY: `file` is only reached through `lock`, which holds `mutex` for the life of the guard it
@@ -41,11 +57,31 @@ unsafe impl Send for OpenFile {}
 
 impl OpenFile {
     /// Wraps `file` so it can be shared between the table and the callers operating on it.
+    ///
+    /// Starts with one link, for the descriptor this file is about to be attached to.
     pub fn new(file: Box<dyn File>) -> Self {
         Self {
             mutex: Mutex::new(),
             file: UnsafeCell::new(file),
+            links: AtomicU32::new(1),
         }
+    }
+
+    /// Records that one more descriptor names this file.
+    pub fn add_link(&self) {
+        // Relaxed: the caller holds the table lock, so nothing observes the count out of order, and
+        // the descriptor being added cannot be closed before it exists.
+        self.links.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Drops one descriptor's claim on this file, reporting whether it was the last.
+    ///
+    /// The last one is what decides the close: a file still named by another descriptor must not be
+    /// told to close, however the one being released was reached.
+    pub fn remove_link(&self) -> bool {
+        // AcqRel: the caller that sees the count reach zero closes the file, so it must observe
+        // everything every other link did before letting go of it.
+        self.links.fetch_sub(1, Ordering::AcqRel) == 1
     }
 
     /// Locks the file for the lifetime of the returned guard.
