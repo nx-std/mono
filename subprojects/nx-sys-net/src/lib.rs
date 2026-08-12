@@ -91,6 +91,7 @@ extern crate alloc;
 // `nx-alloc` exposes the `#[global_allocator]` backing `alloc` for this crate.
 extern crate nx_alloc as _;
 
+pub mod addr;
 pub mod device;
 pub mod driver;
 pub mod session;
@@ -104,5 +105,10 @@ pub use self::{
         exit,
         initialize,
     },
-    socket::Socket,
+    socket::{
+        Domain,
+        Error,
+        SockType,
+        Socket,
+    },
 };
