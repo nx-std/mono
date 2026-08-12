@@ -1,7 +1,7 @@
 ---
 name: code-debug
-description: Trap and debug crashes in deployed Switch homebrew (NRO) using Atmosphère's dmnt.gen2 GDB stub. Use when a deployed NRO faults — whether the console shows a 2XXX-YYYY fatal screen or only a generic "software was closed" dialog — to attach GDB and capture a backtrace, decode a crash address (PC/LR) to a source location, or decode a 2XXX-YYYY fatal code.
-allowed-tools: "Bash(just --list:*), Bash(just gdb:*), Bash(just addr2line:*), Bash(just objdump:*), Bash(just nm:*), Bash(just readelf:*), Bash(just cxxfilt:*), Bash(just size:*), Bash(just deploy:*), Bash(ping:*), Bash(timeout:*), Bash(grep:*), Bash(mkdir:*), Write, Read"
+description: Trap and debug crashes in deployed Switch homebrew (NRO) using Atmosphère's dmnt.gen2 GDB stub, and drive a program already running on the console through the same stub. Use when a deployed NRO faults — whether the console shows a 2XXX-YYYY fatal screen or only a generic "software was closed" dialog — to attach GDB and capture a backtrace, decode a crash address (PC/LR) to a source location, or decode a 2XXX-YYYY fatal code; or when a run needs a button pressed with nobody at the console, such as arming hbmenu's netloader between suites.
+allowed-tools: "Bash(just --list:*), Bash(just gdb:*), Bash(just addr2line:*), Bash(just objdump:*), Bash(just nm:*), Bash(just readelf:*), Bash(just cxxfilt:*), Bash(just size:*), Bash(just deploy:*), Bash(ping:*), Bash(timeout:*), Bash(grep:*), Bash(mkdir:*), Bash(.agents/skills/code-debug/press-button.sh:*), Bash(.agents/skills/code-debug/arm-netloader.sh:*), Write, Read"
 ---
 
 # Code Debug Skill
@@ -22,6 +22,8 @@ the complete fatal-code tables. Consult it for anything this skill summarizes.
 - You need to find *where* a deployed build faulted — capture a live backtrace and register state.
 - You have a crash `pc`/`x30` and need to decode it to a source location.
 - You need to decode an Atmosphère `2XXX-YYYY` fatal code to a fault kind.
+- A run needs a button pressed and nobody is at the console — most often arming hbmenu's
+  netloader between suites (see [Pressing a Button Without Touching the Console](#pressing-a-button-without-touching-the-console)).
 
 ## Prerequisites
 
@@ -272,6 +274,75 @@ Read `<workdir>/session.log` and extract, in this order:
 - The `bt` / `thread apply all bt` backtrace — **see the caveat below**.
 - The `Modules:` block — runtime base addresses, needed for the next section.
 
+## Pressing a Button Without Touching the Console
+
+The stub writes memory as well as reading it, so it can hand a running program an input it never
+received. That turns the one step of a test run that needs a person into a command: hbmenu's
+netloader disarms after every transfer, so a run of six suites otherwise costs six visits to the
+console.
+
+```bash
+# Arm hbmenu's netloader, then push a suite to it.
+.agents/skills/code-debug/arm-netloader.sh <ip>
+just deploy buildDir/subprojects/tests/nx-tests-fs.nro --retries 60 --server
+
+# Any button, in any program whose ELF you have.
+.agents/skills/code-debug/press-button.sh <ip> Plus \
+    --elf buildDir/subprojects/tests/nx-tests.elf --module nx-tests.elf
+```
+
+### Why not fake the HID layer
+
+The obvious approach — write the button into the shared memory HID publishes — does not work. The
+system rewrites that memory every frame, so a poked value is gone before the program looks at it,
+and what it holds is a sampled ring buffer of controller states rather than a set of button bits.
+
+What a program actually reads is its own `PadState`: `padUpdate` refreshes it once a frame, and
+`padGetButtonsDown` reduces it to `~buttons_old & buttons_cur`. The press is injected between those
+two — set the bit in `buttons_cur`, clear it in `buttons_old` — and the next `padGetButtonsDown`
+reports it as newly pressed. The following frame's `padUpdate` overwrites both fields with what the
+controller really says, so the press lasts exactly one frame and there is no release to deliver.
+
+`padUpdate`'s first argument is the `PadState` itself, which is what lets one script serve any
+program without knowing where it keeps one: a local in the runner's `main`, a global in hbmenu.
+`padGetButtonsDown` is `NX_CONSTEXPR` and inlines away, so it is not a symbol and not a
+breakpoint site; `padUpdate` is the only symbol that has to resolve.
+
+### Finding the press site, in any build
+
+`--module` is the only thing required: the name the console reports for the loaded module. The
+press site is then found by searching that module for `padUpdate`'s own opening instructions, which
+asks nothing of where the build happened to put it. That is what lets this drive a stock homebrew
+menu with no copy of it on this machine.
+
+Two patterns are searched, because `padUpdate` comes from libnx and which libnx decides what it
+compiles to. devkitPro's prebuilt libnx — what a released binary links — saves registers and keeps
+the argument in one; the build this repository produces spills it to the stack. They share no
+opening bytes, so searching for one alone finds nothing in half the binaries worth pressing a
+button in.
+
+`--elf` is an optional shortcut for a binary this repository deployed: it takes `padUpdate`'s offset
+from the ELF and skips the search. It is **only** valid when that ELF produced the running module.
+Measured against a stock hbmenu v3.6.1, the offset from this repository's hbmenu is out by more
+than `0xB000`, and using it would address unrelated memory in the process drawing the menu.
+
+Verified on hardware: `+` pressed in this repository's test runner, and `Y` pressed in a stock
+hbmenu v3.6.1 to arm its netloader, with the push that followed confirming the arming.
+
+Arming is in any case rarely what a run needs — the test runner listens continuously and has
+nothing to arm.
+
+### The helpers
+
+| Script             | Does                                                                        |
+|--------------------|-----------------------------------------------------------------------------|
+| `gdb-lib.sh`       | Sourced helpers: `console_pid`, `module_base`, `symbol_offset`, `gdb_batch` |
+| `press-button.sh`  | Injects one press of any of the sixteen buttons, by name                    |
+| `arm-netloader.sh` | Presses Y on hbmenu, which is what schedules `netloaderTask`                |
+
+Each opens its own GDB session and disconnects, because the stub serves one client at a time —
+which is also why none of them can be run while another session is attached.
+
 ## Decoding a Crash Address to Source
 
 Runtime addresses are randomized — rebase to the ELF before symbols mean anything.
@@ -355,6 +426,8 @@ All routed through `just` so the `aarch64-none-elf-*` prefix stays consistent:
 ## Reminders
 
 - Stub: **TCP 22225**, single client; requires `enable_standalone_gdbstub` + `enable_htc=0` + reboot.
+- A button can be injected rather than pressed — `arm-netloader.sh` removes the person from a
+  multi-suite run. The ELF must match the build on the console.
 - Attach to the **`hbloader` PID** — re-probe after every crash.
 - Always `-x cmds.gdb`; never multi-word inline `-ex`.
 - Attach **before** `just deploy`.
