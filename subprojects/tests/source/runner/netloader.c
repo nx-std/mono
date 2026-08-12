@@ -88,6 +88,28 @@ static bool set_nonblocking(int fd)
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0;
 }
 
+/**
+ * @brief Why the last read gave up.
+ *
+ * A read is reached through several callers and reports to none of them beyond having
+ * failed, yet the difference between a host that went away, one that stopped mid-message
+ * and one that sent something unusable is the whole of a diagnosis. Leaving the reason
+ * here lets whichever caller describes the failure say which of them it was.
+ *
+ * Written only on the failing path, and read only by the caller that is already giving
+ * up, so the one buffer cannot be overwritten between being set and being reported.
+ */
+static char g_read_failure[96];
+
+/** @brief Records why a read gave up, for the message the caller is about to build. */
+static void read_failed(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vsnprintf(g_read_failure, sizeof(g_read_failure), format, args);
+    va_end(args);
+}
+
 /** @brief Reads exactly `size` bytes, or gives up. */
 static bool recv_exact(int fd, void* buffer, size_t size)
 {
@@ -96,19 +118,31 @@ static bool recv_exact(int fd, void* buffer, size_t size)
 
     while (left > 0) {
         struct pollfd waiting = { .fd = fd, .events = POLLIN };
-        if (poll(&waiting, 1, NETLOADER_RECV_TIMEOUT_MS) <= 0) {
+        const int ready = poll(&waiting, 1, NETLOADER_RECV_TIMEOUT_MS);
+        if (ready == 0) {
+            read_failed("nothing arrived for %d ms, %zu of %zu bytes in",
+                        NETLOADER_RECV_TIMEOUT_MS, size - left, size);
+            return false;
+        }
+        if (ready < 0) {
+            read_failed("cannot wait on the connection: %s", strerror(errno));
             return false;
         }
 
         const ssize_t len = recv(fd, dst, left, 0);
         if (len == 0) {
-            // The host closed the connection with the transfer unfinished.
+            // The host closed the connection with the transfer unfinished. Told apart from
+            // a malformed message because the two point at opposite ends of the problem:
+            // this one says the host is not the one still talking to us.
+            read_failed("the host closed the connection, %zu of %zu bytes in", size - left,
+                        size);
             return false;
         }
         if (len < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 continue;
             }
+            read_failed("cannot read the connection: %s", strerror(errno));
             return false;
         }
 
@@ -172,11 +206,18 @@ static bool recv_file_name(int fd, char* name, size_t name_size)
         return false;
     }
     if (length == 0 || length >= name_size) {
+        read_failed("the name is %" PRIu32 " bytes, which is not between 1 and %zu", length,
+                    name_size - 1);
         return false;
     }
 
     char sent[NETLOADER_PATH_SIZE];
-    if (length >= sizeof(sent) || !recv_exact(fd, sent, length)) {
+    if (length >= sizeof(sent)) {
+        read_failed("the name is %" PRIu32 " bytes, which does not fit %zu", length,
+                    sizeof(sent) - 1);
+        return false;
+    }
+    if (!recv_exact(fd, sent, length)) {
         return false;
     }
     sent[length] = '\0';
@@ -184,6 +225,7 @@ static bool recv_file_name(int fd, char* name, size_t name_size)
     const char* separator = strrchr(sent, '/');
     const char* base = separator != NULL ? separator + 1 : sent;
     if (base[0] == '\0') {
+        read_failed("the name ends in a path separator, so it names no file");
         return false;
     }
 
@@ -393,13 +435,13 @@ static NetloaderStatus receive_program(int fd, struct in_addr host, NetloaderOut
 {
     char name[NETLOADER_PATH_SIZE];
     if (!recv_file_name(fd, name, sizeof(name))) {
-        fail(out, "the host did not send a usable file name");
+        fail(out, "no usable file name: %s", g_read_failure);
         return NETLOADER_FAILED;
     }
 
     uint32_t size = 0;
     if (!recv_u32(fd, &size)) {
-        fail(out, "%s: the host did not send the file length", name);
+        fail(out, "%s: no file length: %s", name, g_read_failure);
         return NETLOADER_FAILED;
     }
 
@@ -429,7 +471,7 @@ static NetloaderStatus receive_program(int fd, struct in_addr host, NetloaderOut
         // A part-written program would be launchable and wrong, which is worse
         // than not having it at all.
         unlink(out->path);
-        fail(out, "%s: the transfer did not complete", name);
+        fail(out, "%s: transfer incomplete: %s", name, g_read_failure);
         return NETLOADER_FAILED;
     }
 
@@ -439,7 +481,7 @@ static NetloaderStatus receive_program(int fd, struct in_addr host, NetloaderOut
     }
 
     if (!build_cmdline(fd, out->path, extra_arg, host, out->cmdline, sizeof(out->cmdline))) {
-        fail(out, "%s: the host did not send a command line", name);
+        fail(out, "%s: no command line: %s", name, g_read_failure);
         return NETLOADER_FAILED;
     }
 
@@ -509,7 +551,13 @@ void netloader_close(NetloaderServer* server)
     }
 }
 
-void netloader_answer_discovery(const NetloaderServer* server)
+bool netloader_reopen(NetloaderServer* server)
+{
+    netloader_close(server);
+    return netloader_open(server);
+}
+
+bool netloader_answer_discovery(const NetloaderServer* server)
 {
     char ping[16];
     struct sockaddr_in host;
@@ -517,11 +565,19 @@ void netloader_answer_discovery(const NetloaderServer* server)
 
     const ssize_t len =
         recvfrom(server->discovery_fd, ping, sizeof(ping), 0, (struct sockaddr*)&host, &host_size);
+
+    // Nothing waiting is the ordinary case on a socket nobody is pinging; anything else is
+    // the socket itself having gone, which no amount of asking again will mend.
+    if (len < 0) {
+        return errno == EAGAIN || errno == EWOULDBLOCK;
+    }
+
+    // A datagram that is not the ping is somebody else's; the socket is still good.
     if (len < (ssize_t)strlen(NETLOADER_PING)) {
-        return;
+        return true;
     }
     if (memcmp(ping, NETLOADER_PING, strlen(NETLOADER_PING)) != 0) {
-        return;
+        return true;
     }
 
     // The host listens for the answer on a port of its own, not on the one it
@@ -530,6 +586,8 @@ void netloader_answer_discovery(const NetloaderServer* server)
     host.sin_port = htons(NETLOADER_CLIENT_PORT);
     sendto(server->discovery_fd, NETLOADER_PONG, strlen(NETLOADER_PONG), 0,
            (struct sockaddr*)&host, sizeof(host));
+
+    return true;
 }
 
 NetloaderStatus netloader_receive(const NetloaderServer* server, NetloaderOutcome* out,
@@ -546,8 +604,11 @@ NetloaderStatus netloader_receive(const NetloaderServer* server, NetloaderOutcom
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return NETLOADER_IDLE;
         }
-        fail(out, "cannot accept a connection: %s", strerror(errno));
-        return NETLOADER_FAILED;
+        // Nobody waiting is the ordinary case; anything else means the socket itself is
+        // gone rather than this one attempt having failed, and nothing will arrive on it
+        // again.
+        fail(out, "the network went away: %s", strerror(errno));
+        return NETLOADER_SERVER_LOST;
     }
 
     // Whether an accepted socket inherits the listening socket's non-blocking

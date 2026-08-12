@@ -386,6 +386,8 @@ int main(void)
 
     RunnerProgress progress = { .percent = -1 };
     bool launching = false;
+    // Set the moment either socket stops working, and cleared once they have been rebuilt.
+    bool server_lost = false;
 
     while (appletMainLoop()) {
         padUpdate(&pad);
@@ -398,12 +400,39 @@ int main(void)
             clear_results();
         }
 
-        netloader_answer_discovery(&server);
+        // A console that has slept took its network down and brought a new one up, leaving
+        // both sockets bound to something that no longer exists. Neither half of the
+        // protocol can report that on its own — the discovery socket simply stops hearing
+        // pings, and the listening socket stops being connected to — so a failure on
+        // either is what says the pair has to be rebuilt.
+        if (!netloader_answer_discovery(&server)) {
+            server_lost = true;
+        }
+
+        if (server_lost) {
+            if (netloader_reopen(&server)) {
+                server_lost = false;
+                screen_show("Waiting for a program", "  (listening again)");
+            } else {
+                // Binding fails for as long as the network is still down, so this is
+                // retried on the next pass rather than given up on.
+                screen_show(CONSOLE_RED "the network went away" CONSOLE_RESET,
+                            "  Waiting for it to come back.");
+            }
+            svcSleepThread(RUNNER_POLL_INTERVAL_NS);
+            continue;
+        }
 
         NetloaderOutcome outcome;
         switch (netloader_receive(&server, &outcome, has_handback ? handback : NULL, on_progress,
                                   &progress)) {
         case NETLOADER_IDLE:
+            break;
+
+        case NETLOADER_SERVER_LOST:
+            snprintf(detail, sizeof(detail), CONSOLE_RED "  %s" CONSOLE_RESET, outcome.error);
+            screen_show("Waiting for a program", detail);
+            server_lost = true;
             break;
 
         case NETLOADER_RECEIVED: {
