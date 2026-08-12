@@ -212,6 +212,16 @@ list-options-configured: _ensure-configured
 deploy NRO_FILE *EXTRA_FLAGS:
     cargo nx link {{NRO_FILE}} {{EXTRA_FLAGS}}
 
+# Arm hbmenu's netloader on the console via the debug stub (needs the console's IP)
+[group: 'deploy']
+arm-netloader IP:
+    .agents/skills/code-debug/arm-netloader.sh {{IP}}
+
+# Arm hbmenu's netloader and deploy to it, for a console sitting at the menu
+[group: 'deploy']
+deploy-armed IP NRO_FILE *EXTRA_FLAGS: (arm-netloader IP)
+    cargo nx link {{NRO_FILE}} {{EXTRA_FLAGS}}
+
 
 ## devkitPro toolchain (aarch64-none-elf-*)
 ##
