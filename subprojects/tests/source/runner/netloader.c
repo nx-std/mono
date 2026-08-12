@@ -30,6 +30,7 @@
 #include <strings.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <zlib.h>
 
@@ -110,25 +111,38 @@ static void read_failed(const char* format, ...)
     va_end(args);
 }
 
-/** @brief Reads exactly `size` bytes, or gives up. */
+/** @brief Milliseconds on the monotonic clock, for measuring how long a read has waited. */
+static uint64_t monotonic_ms(void)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * 1000u + (uint64_t)(now.tv_nsec / 1000000);
+}
+
+/**
+ * @brief Reads exactly `size` bytes, or gives up.
+ *
+ * Asks the socket directly and retries while it has nothing, rather than waiting on
+ * `poll` first. On this console the two are not equivalent: a transfer that `poll` reports
+ * nothing for is one `recv` returns bytes for, and a run of them ends with the whole
+ * transfer abandoned over a name the host did send. The homebrew menu's own netloader
+ * reads this way and receives what this did not, which is the strongest evidence available
+ * that the wait is what breaks rather than the reading.
+ *
+ * The cost is a poll-free loop that has to bound its own patience, so it watches the clock
+ * and sleeps between attempts rather than spinning on a socket that will have something
+ * shortly.
+ */
 static bool recv_exact(int fd, void* buffer, size_t size)
 {
+    /** How long to sleep between attempts that found nothing. */
+    static const useconds_t RETRY_PAUSE_US = 1000;
+
     uint8_t* dst = buffer;
     size_t left = size;
+    const uint64_t deadline = monotonic_ms() + NETLOADER_RECV_TIMEOUT_MS;
 
     while (left > 0) {
-        struct pollfd waiting = { .fd = fd, .events = POLLIN };
-        const int ready = poll(&waiting, 1, NETLOADER_RECV_TIMEOUT_MS);
-        if (ready == 0) {
-            read_failed("nothing arrived for %d ms, %zu of %zu bytes in",
-                        NETLOADER_RECV_TIMEOUT_MS, size - left, size);
-            return false;
-        }
-        if (ready < 0) {
-            read_failed("cannot wait on the connection: %s", strerror(errno));
-            return false;
-        }
-
         const ssize_t len = recv(fd, dst, left, 0);
         if (len == 0) {
             // The host closed the connection with the transfer unfinished. Told apart from
@@ -139,11 +153,19 @@ static bool recv_exact(int fd, void* buffer, size_t size)
             return false;
         }
         if (len < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                continue;
+            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                read_failed("cannot read the connection: %s", strerror(errno));
+                return false;
             }
-            read_failed("cannot read the connection: %s", strerror(errno));
-            return false;
+
+            if (monotonic_ms() >= deadline) {
+                read_failed("nothing arrived for %d ms, %zu of %zu bytes in",
+                            NETLOADER_RECV_TIMEOUT_MS, size - left, size);
+                return false;
+            }
+
+            usleep(RETRY_PAUSE_US);
+            continue;
         }
 
         dst += len;
@@ -240,11 +262,11 @@ static bool is_program_name(const char* name)
 }
 
 /**
- * @brief Reserves the file the program will be written to.
+ * @brief Builds the path a program of this name will end up at.
  *
  * @return `NETLOADER_RESPONSE_OK`, or the status word that says what stopped it.
  */
-static int32_t reserve_file(const char* name, uint32_t size, char* path, size_t path_size)
+static int32_t build_drop_path(const char* name, char* path, size_t path_size)
 {
     if (!is_program_name(name)) {
         return NETLOADER_RESPONSE_NOT_A_PROGRAM;
@@ -259,6 +281,30 @@ static int32_t reserve_file(const char* name, uint32_t size, char* path, size_t 
         return NETLOADER_RESPONSE_CANNOT_CREATE_FILE;
     }
 
+    return NETLOADER_RESPONSE_OK;
+}
+
+/**
+ * @brief Names the file a program is written to while it is still arriving.
+ *
+ * A program is built up under this name and only takes its own once every byte of it is
+ * there, so nothing that stops part-way — a host that goes away, a console that loses
+ * power — can leave something launchable behind. Whatever is found under this name is
+ * wreckage from a transfer that did not finish.
+ */
+static bool build_partial_path(const char* path, char* partial, size_t partial_size)
+{
+    const int written = snprintf(partial, partial_size, "%s.part", path);
+    return written > 0 && (size_t)written < partial_size;
+}
+
+/**
+ * @brief Takes the room the program will need, at `path`.
+ *
+ * @return `NETLOADER_RESPONSE_OK`, or the status word that says what stopped it.
+ */
+static int32_t reserve_space(const char* path, uint32_t size)
+{
     const int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0777);
     if (fd < 0) {
         return NETLOADER_RESPONSE_CANNOT_CREATE_FILE;
@@ -276,6 +322,33 @@ static int32_t reserve_file(const char* name, uint32_t size, char* path, size_t 
     }
 
     return NETLOADER_RESPONSE_OK;
+}
+
+/**
+ * @brief Whether the file at `path` begins the way a program does.
+ *
+ * The name having ended in `.nro` said only what the host called it. This looks at what
+ * arrived: the loader will refuse anything without this marker, and refusing it here costs
+ * a read of sixteen bytes rather than a launch that fails on the console with nothing to
+ * say why.
+ */
+static bool looks_like_program(const char* path)
+{
+    /** Where the marker sits, past the branch and the header the loader reads first. */
+    static const long MAGIC_OFFSET = 0x10;
+    static const char MAGIC[4] = { 'N', 'R', 'O', '0' };
+
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        return false;
+    }
+
+    char magic[sizeof(MAGIC)];
+    const bool read = fseek(file, MAGIC_OFFSET, SEEK_SET) == 0
+        && fread(magic, 1, sizeof(magic), file) == sizeof(magic);
+    fclose(file);
+
+    return read && memcmp(magic, MAGIC, sizeof(MAGIC)) == 0;
 }
 
 /** @brief Inflates the chunk stream into `file` until the host ends it. */
@@ -332,6 +405,16 @@ static bool inflate_to_file(int fd, FILE* file, const char* name, size_t total,
     } while (ret != Z_STREAM_END);
 
     inflateEnd(&stream);
+
+    // A deflate stream can end cleanly having carried fewer bytes than the host said it
+    // would, and every check above would still have passed: the chunks were well formed
+    // and the stream ended properly, it was simply short. Only the length the host
+    // announced says how much there should have been.
+    if (written != total) {
+        read_failed("the program is %zu bytes of the %zu the host announced", written, total);
+        return false;
+    }
+
     return true;
 }
 
@@ -445,7 +528,19 @@ static NetloaderStatus receive_program(int fd, struct in_addr host, NetloaderOut
         return NETLOADER_FAILED;
     }
 
-    const int32_t response = reserve_file(name, size, out->path, sizeof(out->path));
+    int32_t response = build_drop_path(name, out->path, sizeof(out->path));
+
+    // Everything up to the rename at the end happens under a name of its own, so that a
+    // transfer which stops part-way leaves its wreckage somewhere the runner will never
+    // launch from.
+    char partial[NETLOADER_PATH_SIZE + sizeof(".part")];
+    if (response == NETLOADER_RESPONSE_OK
+        && !build_partial_path(out->path, partial, sizeof(partial))) {
+        response = NETLOADER_RESPONSE_CANNOT_CREATE_FILE;
+    }
+    if (response == NETLOADER_RESPONSE_OK) {
+        response = reserve_space(partial, size);
+    }
 
     // The host waits for this word before sending anything else, so it goes out
     // whether the file could be reserved or not.
@@ -458,20 +553,40 @@ static NetloaderStatus receive_program(int fd, struct in_addr host, NetloaderOut
         return NETLOADER_FAILED;
     }
 
-    FILE* file = fopen(out->path, "wb");
+    FILE* file = fopen(partial, "wb");
     if (file == NULL) {
         fail(out, "%s: cannot open it for writing", name);
         return NETLOADER_FAILED;
     }
 
-    const bool transferred = inflate_to_file(fd, file, name, size, on_progress, progress_ctx);
-    fclose(file);
+    bool transferred = inflate_to_file(fd, file, name, size, on_progress, progress_ctx);
+
+    // What the writes above produced is not on the card until the close says so: the last
+    // of it is still held in the library's buffer, and a close that cannot place it is how
+    // a card that filled up part-way through reports itself.
+    if (fclose(file) != 0 && transferred) {
+        read_failed("the card would not take the last of it");
+        transferred = false;
+    }
+
+    if (transferred && !looks_like_program(partial)) {
+        read_failed("what arrived does not begin like a program");
+        transferred = false;
+    }
 
     if (!transferred) {
         // A part-written program would be launchable and wrong, which is worse
         // than not having it at all.
-        unlink(out->path);
+        unlink(partial);
         fail(out, "%s: transfer incomplete: %s", name, g_read_failure);
+        return NETLOADER_FAILED;
+    }
+
+    // Everything that had to be true of it is true, so it takes its own name. Until this
+    // point nothing existed that the runner would hand to the loader.
+    if (rename(partial, out->path) != 0) {
+        unlink(partial);
+        fail(out, "%s: cannot put it in place: %s", name, strerror(errno));
         return NETLOADER_FAILED;
     }
 
