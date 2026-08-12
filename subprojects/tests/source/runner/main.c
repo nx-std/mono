@@ -386,6 +386,20 @@ int main(void)
 
     RunnerProgress progress = { .percent = -1 };
     bool launching = false;
+    // Set the moment either socket stops working, and cleared once they have been rebuilt.
+    bool server_lost = false;
+
+    // Waiting for a host is exactly what the console's idle timer counts as nobody being
+    // there, and sleeping takes the network down with it: the sockets stop answering while
+    // this program keeps running, so a run breaks off with the host reporting it found no
+    // console rather than anything about the tests.
+    //
+    // Nothing here can undo that once it has happened, because the code that would ask to
+    // be woken is not running while the console sleeps. Not starting is the only remedy.
+    // Asked for rather than insisted on: a console that refuses simply keeps its timer, and
+    // a run watched by a person works either way. Held only for as long as this program
+    // waits, and given back below.
+    appletSetAutoSleepDisabled(true);
 
     while (appletMainLoop()) {
         padUpdate(&pad);
@@ -398,12 +412,39 @@ int main(void)
             clear_results();
         }
 
-        netloader_answer_discovery(&server);
+        // A console that has slept took its network down and brought a new one up, leaving
+        // both sockets bound to something that no longer exists. Neither half of the
+        // protocol can report that on its own — the discovery socket simply stops hearing
+        // pings, and the listening socket stops being connected to — so a failure on
+        // either is what says the pair has to be rebuilt.
+        if (!netloader_answer_discovery(&server)) {
+            server_lost = true;
+        }
+
+        if (server_lost) {
+            if (netloader_reopen(&server)) {
+                server_lost = false;
+                screen_show("Waiting for a program", "  (listening again)");
+            } else {
+                // Binding fails for as long as the network is still down, so this is
+                // retried on the next pass rather than given up on.
+                screen_show(CONSOLE_RED "the network went away" CONSOLE_RESET,
+                            "  Waiting for it to come back.");
+            }
+            svcSleepThread(RUNNER_POLL_INTERVAL_NS);
+            continue;
+        }
 
         NetloaderOutcome outcome;
         switch (netloader_receive(&server, &outcome, has_handback ? handback : NULL, on_progress,
                                   &progress)) {
         case NETLOADER_IDLE:
+            break;
+
+        case NETLOADER_SERVER_LOST:
+            snprintf(detail, sizeof(detail), CONSOLE_RED "  %s" CONSOLE_RESET, outcome.error);
+            screen_show("Waiting for a program", detail);
+            server_lost = true;
             break;
 
         case NETLOADER_RECEIVED: {
@@ -434,7 +475,10 @@ int main(void)
 
     // Everything this program holds has to be let go before the next one starts:
     // it runs in this same process, and a session left open here is one it
-    // cannot open for itself.
+    // cannot open for itself. The idle timer is one of those things: a console
+    // left unable to sleep by a runner that has finished would stay awake until
+    // somebody noticed.
+    appletSetAutoSleepDisabled(false);
     netloader_close(&server);
     socketExit();
     consoleExit(NULL);

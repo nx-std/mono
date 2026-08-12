@@ -60,6 +60,17 @@ typedef enum {
     NETLOADER_RECEIVED,
     /** A host connected but the transfer did not complete. */
     NETLOADER_FAILED,
+    /**
+     * The sockets can no longer be listened on, and nothing will arrive until they are
+     * rebuilt.
+     *
+     * The console taking its network down, which it does whenever it sleeps, invalidates
+     * both sockets while leaving the runner running and apparently well. Reported apart
+     * from a failed transfer because the two ask opposite things of the caller: a failed
+     * transfer is over and the next one may still arrive, whereas this one means no
+     * transfer can arrive again until `netloader_reopen` succeeds.
+     */
+    NETLOADER_SERVER_LOST,
 } NetloaderStatus;
 
 /**
@@ -100,13 +111,28 @@ bool netloader_open(NetloaderServer* server);
 void netloader_close(NetloaderServer* server);
 
 /**
+ * @brief Closes both sockets and binds them again.
+ *
+ * What a console that has slept needs: its network went away and came back, and the
+ * sockets bound to the old one answer nothing. Binding is what fails while the network is
+ * still down, so a caller retries rather than treating one failure as final.
+ *
+ * @return `false` when the sockets could not be bound, in which case nothing is left open
+ *         and the call can simply be made again later.
+ */
+bool netloader_reopen(NetloaderServer* server);
+
+/**
  * @brief Answers a pending discovery ping, if one has arrived.
  *
  * A host that was not told an address finds the console by broadcasting a ping
  * and waiting for this reply, so this has to be called regularly for as long as
  * the runner is willing to be found.
+ *
+ * @return `false` when the socket has failed in a way waiting will not mend, which means
+ *         the server needs rebuilding before any host can find this console again.
  */
-void netloader_answer_discovery(const NetloaderServer* server);
+bool netloader_answer_discovery(const NetloaderServer* server);
 
 /**
  * @brief Receives one program, if a host is connecting.

@@ -1,11 +1,15 @@
 #include "tap.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <switch.h>
@@ -229,6 +233,92 @@ static FILE* tap_open_file(const char* suite)
     return fopen(path, "w");
 }
 
+/** @brief How long to keep trying to reach the host before reporting to the card alone. */
+#define TAP_CONNECT_TIMEOUT_MS 3000
+
+/** @brief Milliseconds on the monotonic clock, for bounding the wait below. */
+static uint64_t tap_monotonic_ms(void)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * 1000u + (uint64_t)(now.tv_nsec / 1000000);
+}
+
+/**
+ * @brief Connects to the host that pushed this program.
+ *
+ * Written here rather than taken from the C library, whose version waits on `poll` for the
+ * connection to finish. On this console `poll` reports nothing for a socket that is ready,
+ * so that wait ends in a timeout however well the connection went, and every report a run
+ * produced went to the card and nowhere else. The runner's own reads had to stop using
+ * `poll` for the same reason.
+ *
+ * So the socket is asked about itself instead: a connection that has finished is one that
+ * has a peer, and one that was refused says so through its pending error. Both are
+ * questions the socket answers without anything having to report it ready.
+ *
+ * @return The connected socket, or -1 when the host cannot be reached, which is not a
+ *         failure of the run: the report still reaches the card.
+ */
+static int tap_connect_to_host(void)
+{
+    const int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        return -1;
+    }
+
+    const int flags = fcntl(sock, F_GETFL);
+    if (flags == -1 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) != 0) {
+        close(sock);
+        return -1;
+    }
+
+    const struct sockaddr_in host = {
+        .sin_family = AF_INET,
+        .sin_port = htons(NXLINK_CLIENT_PORT),
+        .sin_addr = __nxlink_host,
+    };
+
+    if (connect(sock, (const struct sockaddr*)&host, sizeof(host)) != 0
+        && errno != EINPROGRESS) {
+        close(sock);
+        return -1;
+    }
+
+    const uint64_t deadline = tap_monotonic_ms() + TAP_CONNECT_TIMEOUT_MS;
+    for (;;) {
+        struct sockaddr_in peer;
+        socklen_t peer_size = sizeof(peer);
+        if (getpeername(sock, (struct sockaddr*)&peer, &peer_size) == 0) {
+            break;
+        }
+
+        int pending = 0;
+        socklen_t pending_size = sizeof(pending);
+        if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &pending, &pending_size) == 0
+            && pending != 0) {
+            close(sock);
+            return -1;
+        }
+
+        if (tap_monotonic_ms() >= deadline) {
+            close(sock);
+            return -1;
+        }
+
+        usleep(1000);
+    }
+
+    // The writes that follow are easier to reason about on a blocking socket, and there is
+    // nothing left to wait for once the connection is up.
+    if (fcntl(sock, F_SETFL, flags) != 0) {
+        close(sock);
+        return -1;
+    }
+
+    return sock;
+}
+
 void tap_report(const char* suite, bool network_already_up)
 {
     FILE* file = tap_open_file(suite);
@@ -240,7 +330,7 @@ void tap_report(const char* suite, bool network_already_up)
     if (__nxlink_host.s_addr != 0) {
         if (network_already_up || R_SUCCEEDED(socketInitializeDefault())) {
             network_is_ours = !network_already_up;
-            host_fd = nxlinkConnectToHost(false, false);
+            host_fd = tap_connect_to_host();
         }
     }
 
