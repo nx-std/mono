@@ -361,6 +361,7 @@ static bool inflate_to_file(int fd, FILE* file, const char* name, size_t total,
         .opaque = Z_NULL,
     };
     if (inflateInit(&stream) != Z_OK) {
+        read_failed("cannot start decompressing");
         return false;
     }
 
@@ -369,7 +370,13 @@ static bool inflate_to_file(int fd, FILE* file, const char* name, size_t total,
 
     do {
         uint32_t chunk_size = 0;
-        if (!recv_u32(fd, &chunk_size) || chunk_size > sizeof(g_compressed)) {
+        if (!recv_u32(fd, &chunk_size)) {
+            inflateEnd(&stream);
+            return false;
+        }
+        if (chunk_size > sizeof(g_compressed)) {
+            read_failed("the host announced a %" PRIu32 " byte chunk, over the %zu allowed",
+                        chunk_size, sizeof(g_compressed));
             inflateEnd(&stream);
             return false;
         }
@@ -386,13 +393,30 @@ static bool inflate_to_file(int fd, FILE* file, const char* name, size_t total,
             stream.next_out = g_plain;
 
             ret = inflate(&stream, Z_NO_FLUSH);
+
+            // No progress rather than damage: the decompressor has taken everything this
+            // chunk carried and has nothing pending, which is what it reports when a
+            // chunk's output happened to land exactly on the end of the buffer. The next
+            // chunk is what it is waiting for, so this ends the pass over this one instead
+            // of ending the transfer. Whether the host has more to send is settled by the
+            // read at the top of the outer loop, which gives up if nothing comes.
+            if (ret == Z_BUF_ERROR) {
+                break;
+            }
+
             if (ret != Z_OK && ret != Z_STREAM_END) {
+                read_failed("the compressed stream is damaged: %s",
+                            stream.msg != NULL ? stream.msg : "no reason given");
                 inflateEnd(&stream);
                 return false;
             }
 
             const size_t have = sizeof(g_plain) - stream.avail_out;
             if (fwrite(g_plain, 1, have, file) != have) {
+                // The usual reason is a card with no room left, which surfaces here rather
+                // than at the reservation when the card was nearly full to begin with.
+                read_failed("the card would not take it at %zu of %zu bytes: %s", written,
+                            total, strerror(errno));
                 inflateEnd(&stream);
                 return false;
             }
@@ -584,6 +608,13 @@ static NetloaderStatus receive_program(int fd, struct in_addr host, NetloaderOut
 
     // Everything that had to be true of it is true, so it takes its own name. Until this
     // point nothing existed that the runner would hand to the loader.
+    //
+    // The card is asked to let go of the previous one first: a rename here does not
+    // replace what it lands on, it refuses, and the same suite arriving twice is the
+    // ordinary case rather than the exception. Between the two calls the name is absent,
+    // which is the safe direction to fail in — there is nothing to launch either way.
+    unlink(out->path);
+
     if (rename(partial, out->path) != 0) {
         unlink(partial);
         fail(out, "%s: cannot put it in place: %s", name, strerror(errno));
