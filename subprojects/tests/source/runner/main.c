@@ -389,6 +389,18 @@ int main(void)
     // Set the moment either socket stops working, and cleared once they have been rebuilt.
     bool server_lost = false;
 
+    // Waiting for a host is exactly what the console's idle timer counts as nobody being
+    // there, and sleeping takes the network down with it: the sockets stop answering while
+    // this program keeps running, so a run breaks off with the host reporting it found no
+    // console rather than anything about the tests.
+    //
+    // Nothing here can undo that once it has happened, because the code that would ask to
+    // be woken is not running while the console sleeps. Not starting is the only remedy.
+    // Asked for rather than insisted on: a console that refuses simply keeps its timer, and
+    // a run watched by a person works either way. Held only for as long as this program
+    // waits, and given back below.
+    appletSetAutoSleepDisabled(true);
+
     while (appletMainLoop()) {
         padUpdate(&pad);
 
@@ -463,7 +475,10 @@ int main(void)
 
     // Everything this program holds has to be let go before the next one starts:
     // it runs in this same process, and a session left open here is one it
-    // cannot open for itself.
+    // cannot open for itself. The idle timer is one of those things: a console
+    // left unable to sleep by a runner that has finished would stay awake until
+    // somebody noticed.
+    appletSetAutoSleepDisabled(false);
     netloader_close(&server);
     socketExit();
     consoleExit(NULL);
