@@ -164,14 +164,23 @@
 //! of their fields are narrower than their names suggest. Getting one wrong would corrupt a
 //! caller's stack rather than fail a test.
 //!
-//! ## What this crate does not do
+//! ## Descriptor duplication
 //!
-//! Descriptor duplication is not implemented. The symbols exist because the translation unit
-//! defines them and the link would otherwise fail, but they report failure. The machinery it needs
-//! is now mostly in place, since an open file is already held behind a reference-counted handle
-//! that several slots could share and that is already dropped outside the table lock. What is
-//! missing is the C side: two descriptors sharing one file would have to agree on the header the C
-//! callers hold, and on which of them the `refcount` field describes.
+//! `dup` and `dup2` give a second descriptor the binding the first has, and what the two of them
+//! share depends on how the first was opened. A stream descriptor shares only the device number, so
+//! duplicating one copies a number and owns nothing new. A descriptor opened by path shares the
+//! open object, and a descriptor on a device registered from C shares that device's per-descriptor
+//! state. Both of those are released once the last descriptor naming them is closed, and each is
+//! counted where it lives: the open file in the descriptor table, the C state at this boundary.
+//!
+//! Counting the descriptors is a separate question from keeping the object alive, which is why the
+//! open file has a count of its own rather than leaning on its reference count. An operation in
+//! flight holds the file alive without naming it, and closing the descriptor it started from must
+//! still tell the device.
+//!
+//! The header handed to C carries a `refcount` field, and it stays 1 whatever the real count is.
+//! The C descriptor table was its only reader, and this crate replaces that table whole; the
+//! remaining C entry points read the device and the state pointer beside it and nothing else.
 #![no_std]
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]

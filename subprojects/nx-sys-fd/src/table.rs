@@ -1,9 +1,14 @@
 //! The descriptor table.
 //!
 //! One slot per descriptor number, in static storage. A descriptor always names a device, and may
-//! additionally own the [`File`] that device produced for it. What the two cases mean, and why an
+//! additionally hold the [`File`] that device produced for it. What the two cases mean, and why an
 //! open file is held behind a lock of its own rather than under the table lock, is explained in
 //! [`entry`](self::entry).
+//!
+//! A file is held rather than owned outright because [`duplicate`] lets a second descriptor name
+//! the same one. Which of them is the last to let go is the only thing that decides when the device
+//! is told to close, and [`entry`](self::entry) explains why that question is counted separately
+//! from the handles keeping the file alive.
 //!
 //! Every operation here follows the same shape: take the table lock, resolve the descriptor to what
 //! backs it, release the table lock, and only then call the device or the file. Nothing that can
@@ -189,8 +194,9 @@ pub fn close(fd: Fd) -> Result<(), CloseError> {
     };
 
     match file {
-        None => Ok(()),
-        Some(file) => file.lock().file().close().map_err(CloseError::File),
+        // A file another descriptor still names stays open, so only the last of them closes it.
+        Some(file) if file.remove_link() => file.lock().file().close().map_err(CloseError::File),
+        _ => Ok(()),
     }
 }
 
@@ -210,6 +216,154 @@ pub enum CloseError {
     #[error("File failed to close")]
     File(#[source] DeviceError),
 }
+
+/// Binds the lowest free descriptor number to what `fd` holds, and returns it.
+///
+/// The two descriptors name the same device and share the same open file, so they move one
+/// position between them and the device is told to close only once the last of them is closed.
+///
+/// # Errors
+///
+/// Returns [`DuplicateError::BadDescriptor`] when `fd` is not open, and
+/// [`DuplicateError::NoDescriptors`] when every slot is in use. No slot is disturbed either way.
+pub fn duplicate(fd: Fd) -> Result<Fd, DuplicateError> {
+    let number = fd.number();
+    if number >= MAX_FD {
+        return Err(DuplicateError::BadDescriptor);
+    }
+
+    let mut table = TABLE.lock();
+    let Some(device) = table.devices()[number] else {
+        return Err(DuplicateError::BadDescriptor);
+    };
+
+    let Some(target) = table.devices().iter().position(Option::is_none) else {
+        return Err(DuplicateError::NoDescriptors);
+    };
+
+    let file = table.files()[number].clone();
+    if let Some(file) = file.as_ref() {
+        file.add_link();
+    }
+
+    table.devices()[target] = Some(device);
+    table.files()[target] = file;
+
+    // SAFETY: `target` indexes `devices`, so it is below `MAX_FD` by construction.
+    Ok(Fd::from_number_unchecked(target))
+}
+
+/// Errors returned by [`duplicate`].
+#[derive(Debug, thiserror::Error)]
+pub enum DuplicateError {
+    /// The descriptor is not open
+    ///
+    /// There is nothing to duplicate, so no descriptor was taken.
+    #[error("Descriptor is not open")]
+    BadDescriptor,
+
+    /// Every descriptor is in use
+    ///
+    /// Occurs once the table is full. The descriptor duplicated from is untouched, so the call is
+    /// safe to retry after a descriptor is closed.
+    #[error("No free descriptors remain")]
+    NoDescriptors,
+}
+
+/// Binds `target` to what `fd` holds, and returns what `target` held.
+///
+/// The binding is exchanged under one lock, so `target` never passes through a state where it is
+/// closed: a caller redirecting `stdout` onto a socket cannot lose output to a thread that writes
+/// in between. What the exchange displaced travels back out to be released with the table already
+/// unlocked, which is what keeps a device's close off the lock.
+///
+/// Duplicating a descriptor onto itself changes nothing and displaces nothing.
+///
+/// # Errors
+///
+/// Returns [`DuplicateToError`] when `fd` is not open or `target` is outside the table. Neither
+/// slot is disturbed.
+pub fn duplicate_to(fd: Fd, target: Fd) -> Result<Displaced, DuplicateToError> {
+    let number = fd.number();
+    let target_number = target.number();
+    if number >= MAX_FD || target_number >= MAX_FD {
+        return Err(DuplicateToError);
+    }
+
+    let mut table = TABLE.lock();
+    let Some(device) = table.devices()[number] else {
+        return Err(DuplicateToError);
+    };
+
+    if number == target_number {
+        return Ok(Displaced {
+            device: None,
+            file: None,
+        });
+    }
+
+    let file = table.files()[number].clone();
+    if let Some(file) = file.as_ref() {
+        file.add_link();
+    }
+
+    let displaced_device = table.devices()[target_number].replace(device);
+    let displaced_file = core::mem::replace(&mut table.files()[target_number], file);
+
+    Ok(Displaced {
+        device: displaced_device,
+        file: displaced_file,
+    })
+}
+
+/// Errors returned by [`duplicate_to`].
+///
+/// The descriptor is not open, or the target is outside the table. Nothing was rebound and nothing
+/// was displaced.
+#[derive(Debug, thiserror::Error)]
+#[error("Descriptor is not open, or the target is outside the table")]
+pub struct DuplicateToError;
+
+/// What a descriptor held before [`duplicate_to`] rebound it.
+///
+/// Released by [`Displaced::close`], which is where the device is told. Dropping one instead
+/// abandons that: the file is released without its device ever hearing about it.
+#[must_use = "the displaced descriptor's file is closed by `close`, not by dropping this"]
+pub struct Displaced {
+    device: Option<DeviceId>,
+    file: Option<Arc<OpenFile>>,
+}
+
+impl Displaced {
+    /// Returns the device the descriptor named, or `None` when it was not open.
+    pub fn device(&self) -> Option<DeviceId> {
+        self.device
+    }
+
+    /// Closes what the descriptor held, if it was the last descriptor holding it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CloseDisplacedError`] with whatever the file reported. The descriptor was rebound
+    /// regardless, so this says what the file could not finish rather than that the rebinding
+    /// failed.
+    pub fn close(self) -> Result<(), CloseDisplacedError> {
+        match self.file {
+            // As in `close`: a file another descriptor still names stays open.
+            Some(file) if file.remove_link() => {
+                file.lock().file().close().map_err(CloseDisplacedError)
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+/// Errors returned by [`Displaced::close`].
+///
+/// The file could not release what it held. The descriptor that named it was rebound regardless.
+#[derive(Debug, thiserror::Error)]
+#[error("File failed to close")]
+pub struct CloseDisplacedError(#[source] DeviceError);
 
 /// Writes `buf` to whatever backs `fd`, returning how many bytes it consumed.
 ///
@@ -479,10 +633,18 @@ pub fn device_of(fd: Fd) -> Option<DeviceId> {
 
 /// Frees `fd`, returning the device it named.
 ///
-/// Whatever the descriptor owned is dropped here, with the table already unlocked.
+/// Whatever the descriptor owned is dropped here, with the table already unlocked. The device is
+/// not told, so a file no other descriptor names is released without ever being closed; that is
+/// what the C caller asks for when it releases a descriptor whose open did not finish.
 #[cfg(feature = "ffi")]
 pub(crate) fn take(fd: Fd) -> Option<DeviceId> {
-    take_entry(fd).map(|(device, _)| device)
+    let (device, file) = take_entry(fd)?;
+
+    if let Some(file) = file {
+        file.remove_link();
+    }
+
+    Some(device)
 }
 
 /// What an operation on a descriptor should call into.
