@@ -163,6 +163,7 @@ dependencies = [
  "miniz_oxide",
  "nx-alloc",
  "nx-cpu",
+ "nx-object",
  "nx-panic-handler",
  "nx-std",
  "nx-std-path",
@@ -179,6 +180,17 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-nv",
  "nx-svc",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
+name = "nx-object"
+version = "0.1.0"
+source = "git+https://github.com/nx-std/nx-object.git?rev=6d33e1bf2bed3fd30daf44a2c1097e66be9c174b#6d33e1bf2bed3fd30daf44a2c1097e66be9c174b"
+dependencies = [
+ "bitflags",
+ "static_assertions",
  "thiserror",
  "zerocopy",
 ]
@@ -220,6 +232,7 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-fsdev",
+ "nx-object",
  "nx-panic-handler",
  "nx-service-fs",
  "nx-sf",
@@ -274,6 +287,7 @@ dependencies = [
  "nx-alloc",
  "nx-fsdev",
  "nx-nv",
+ "nx-object",
  "nx-panic-handler",
  "nx-romfs",
  "nx-rt-core",

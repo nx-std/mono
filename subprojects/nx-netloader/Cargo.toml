@@ -15,12 +15,13 @@ bench = false
 ffi = []
 
 [dependencies]
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
+nx-object = { workspace = true }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-std = { version = "0.1.0", path = "../nx-std", default-features = false, features = ["fs", "extern-state"] }
 nx-std-path = { version = "0.1.0", path = "../nx-std-path" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
-nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
-nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-sys-net = { version = "0.1.0", path = "../nx-sys-net", features = ["extern-state"] }
 thiserror = { version = "2.0.12", default-features = false }
-miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }

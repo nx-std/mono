@@ -25,6 +25,13 @@
 
 use alloc::boxed::Box;
 
+use nx_object::raw::nro::{
+    ASSET_MAGIC,
+    NRO_MAGIC,
+    NroAssetHeader,
+    NroHeader,
+    NroStart,
+};
 use nx_std_path::{
     OsStr,
     Path,
@@ -40,112 +47,6 @@ use nx_sys_fd::{
     registry,
 };
 use zerocopy::FromBytes as _;
-
-/// What every `NRO` begins with: a branch, then the offset of its module header.
-///
-/// Nothing here is read. It exists so that the header after it can be found by size rather than by
-/// a magic number that could match earlier in the file.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    zerocopy::FromBytes,
-    zerocopy::Immutable,
-    zerocopy::KnownLayout,
-    zerocopy::Unaligned,
-)]
-#[repr(C)]
-struct Start {
-    /// Reserved by the format.
-    unused: zerocopy::little_endian::U32,
-    /// Where the module header sits.
-    mod_offset: zerocopy::little_endian::U32,
-    /// Reserved by the format.
-    padding: [u8; 8],
-}
-
-/// The `NRO` header, which follows [`Start`].
-///
-/// Only two fields are read: the magic, which says this really is an `NRO`, and the size, which is
-/// where the code ends and the appended assets begin.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    zerocopy::FromBytes,
-    zerocopy::Immutable,
-    zerocopy::KnownLayout,
-    zerocopy::Unaligned,
-)]
-#[repr(C)]
-struct NroHeader {
-    /// `NRO0`, identifying the format.
-    magic: zerocopy::little_endian::U32,
-    /// Reserved by the format.
-    unk1: zerocopy::little_endian::U32,
-    /// How many bytes of `NRO` there are, and so where the assets start.
-    size: zerocopy::little_endian::U32,
-    /// Reserved by the format.
-    unk2: zerocopy::little_endian::U32,
-    /// The three loadable segments, which this crate does not map.
-    segments: [u8; 24],
-    /// How many bytes of zero-initialized data the program wants.
-    bss_size: zerocopy::little_endian::U32,
-    /// Reserved by the format.
-    unk3: zerocopy::little_endian::U32,
-    /// The build's identity.
-    build_id: [u8; 0x20],
-    /// Reserved by the format.
-    padding: [u8; 0x20],
-}
-
-/// Where one appended asset sits, measured from the start of the asset header.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    zerocopy::FromBytes,
-    zerocopy::Immutable,
-    zerocopy::KnownLayout,
-    zerocopy::Unaligned,
-)]
-#[repr(C)]
-struct AssetSection {
-    /// Where this asset starts.
-    offset: zerocopy::little_endian::U64,
-    /// How many bytes of it there are.
-    size: zerocopy::little_endian::U64,
-}
-
-/// The header describing what is appended to an `NRO`, sitting at the end of its code.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    zerocopy::FromBytes,
-    zerocopy::Immutable,
-    zerocopy::KnownLayout,
-    zerocopy::Unaligned,
-)]
-#[repr(C)]
-struct AssetHeader {
-    /// `ASET`, identifying the appended block.
-    magic: zerocopy::little_endian::U32,
-    /// Which revision of the block this is.
-    version: zerocopy::little_endian::U32,
-    /// The icon shown in the homebrew menu.
-    icon: AssetSection,
-    /// The control data naming the program.
-    nacp: AssetSection,
-    /// The romfs image.
-    romfs: AssetSection,
-}
-
-/// `NRO0`, little-endian, as the magic is read.
-const NRO_MAGIC: u32 = u32::from_le_bytes(*b"NRO0");
-
-/// `ASET`, read the same way.
-const ASSET_MAGIC: u32 = u32::from_le_bytes(*b"ASET");
 
 /// The newest revision of the asset header this crate knows how to read.
 const ASSET_VERSION: u32 = 0;
@@ -270,7 +171,7 @@ const READ_ONLY: OpenFlags = OpenFlags {
 /// where the image sits inside the appended block.
 fn romfs_offset(file: &mut dyn File) -> Result<u64, MountSelfError> {
     let mut header_bytes = [0u8; size_of::<NroHeader>()];
-    read_exact_at(file, size_of::<Start>() as u64, &mut header_bytes)
+    read_exact_at(file, size_of::<NroStart>() as u64, &mut header_bytes)
         .map_err(|_| MountSelfError::NotAnNro)?;
     // The buffer is exactly the header's size and the header is all byte-order fields, so the only
     // way this fails is a length mismatch that cannot happen here.
@@ -284,9 +185,9 @@ fn romfs_offset(file: &mut dyn File) -> Result<u64, MountSelfError> {
     // Everything past this point is the ordinary shape of a program built without an image, so a
     // file that simply ends here is not a failure to report differently.
     let assets_at = u64::from(header.size.get());
-    let mut assets_bytes = [0u8; size_of::<AssetHeader>()];
+    let mut assets_bytes = [0u8; size_of::<NroAssetHeader>()];
     read_exact_at(file, assets_at, &mut assets_bytes).map_err(|_| MountSelfError::NoAssets)?;
-    let Ok(assets) = AssetHeader::read_from_bytes(&assets_bytes) else {
+    let Ok(assets) = NroAssetHeader::read_from_bytes(&assets_bytes) else {
         return Err(MountSelfError::NoAssets);
     };
     if assets.magic.get() != ASSET_MAGIC || assets.version.get() > ASSET_VERSION {

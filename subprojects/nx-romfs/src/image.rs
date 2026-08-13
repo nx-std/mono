@@ -11,26 +11,31 @@
 //! places a raw offset turns into a record, and both refuse an offset whose record, or whose
 //! record's name, would run past the end of the table holding it.
 //!
-//! Chain walks are bounded for the same reason. A `next_hash` or `sibling` field pointing back up
-//! its own chain is a loop, and an image can be written that way; each walk therefore gives up
-//! after more steps than the table could hold records.
-
-mod record;
+//! Chain walks are bounded for the same reason. A `hash_sibling_offset` or `sibling_offset` field
+//! pointing back up its own chain is a loop, and an image can be written that way; each walk
+//! therefore gives up after more steps than the table could hold records.
+//!
+//! ## The layouts are not declared here
+//!
+//! [`nx_object`] declares them, and the image writer this workspace builds with reads them out of
+//! the same place. The hash in particular has to agree byte for byte with whatever laid the buckets
+//! out, so it is one definition rather than one per side.
 
 use alloc::{
     vec,
     vec::Vec,
 };
 
+use nx_object::raw::romfs::{
+    NO_ENTRY,
+    RomFsDirEntry,
+    RomFsFileEntry,
+    RomFsHeader,
+    path_hash,
+};
 use nx_sys_fd::device::DeviceError;
 use zerocopy::FromBytes as _;
 
-use self::record::{
-    DirRecord,
-    FileRecord,
-    Header,
-    NONE,
-};
 use crate::source::Source;
 
 /// Offset of the root directory, which is always the first record in the directory table.
@@ -74,35 +79,35 @@ impl Image {
     /// hash table has no buckets to hash into, and [`LoadError::NoRoot`] when the directory table
     /// is too small to hold the root.
     pub(crate) fn load(source: Source) -> Result<Self, LoadError> {
-        let mut header_bytes = [0u8; size_of::<Header>()];
+        let mut header_bytes = [0u8; size_of::<RomFsHeader>()];
         source
             .read_exact_at(0, &mut header_bytes)
             .map_err(|_| LoadError::Io)?;
         // The buffer is exactly the header's size and the header is all byte-order fields, so the
         // only way this fails is a length mismatch that cannot happen here.
-        let Ok(header) = Header::read_from_bytes(&header_bytes) else {
+        let Ok(header) = RomFsHeader::read_from_bytes(&header_bytes) else {
             return Err(LoadError::Io);
         };
 
         let dir_hash = read_table(
             &source,
-            header.dir_hash_table_off.get(),
+            header.dir_hash_table_offset.get(),
             header.dir_hash_table_size.get(),
         )?;
         let dir_table = read_table(
             &source,
-            header.dir_table_off.get(),
-            header.dir_table_size.get(),
+            header.dir_meta_table_offset.get(),
+            header.dir_meta_table_size.get(),
         )?;
         let file_hash = read_table(
             &source,
-            header.file_hash_table_off.get(),
+            header.file_hash_table_offset.get(),
             header.file_hash_table_size.get(),
         )?;
         let file_table = read_table(
             &source,
-            header.file_table_off.get(),
-            header.file_table_size.get(),
+            header.file_meta_table_offset.get(),
+            header.file_meta_table_size.get(),
         )?;
 
         // A bucket count of zero would divide by zero on the first lookup, and a directory table
@@ -110,7 +115,7 @@ impl Image {
         if dir_hash.len() < 4 || file_hash.len() < 4 {
             return Err(LoadError::NoBuckets);
         }
-        if dir_table.len() < size_of::<DirRecord>() {
+        if dir_table.len() < size_of::<RomFsDirEntry>() {
             return Err(LoadError::NoRoot);
         }
 
@@ -120,7 +125,7 @@ impl Image {
             dir_table,
             file_hash,
             file_table,
-            file_data_off: header.file_data_off.get(),
+            file_data_off: header.file_data_offset.get(),
         })
     }
 
@@ -135,7 +140,7 @@ impl Image {
     pub(crate) fn contents_of(&self, off: u32) -> Result<(u64, u64), DeviceError> {
         let (file, _) = self.file_at(off).ok_or(DeviceError::Io)?;
         Ok((
-            self.file_data_off + file.data_off.get(),
+            self.file_data_off + file.data_offset.get(),
             file.data_size.get(),
         ))
     }
@@ -166,7 +171,7 @@ impl Image {
     /// Returns [`DeviceError::Io`] when `off` names no directory.
     pub(crate) fn dir_entry_at(&self, off: u32) -> Result<(&[u8], Option<u32>), DeviceError> {
         let (dir, name) = self.dir_at(off).ok_or(DeviceError::Io)?;
-        Ok((name, chained(dir.sibling.get())))
+        Ok((name, chained(dir.sibling_offset.get())))
     }
 
     /// Returns the name and size of the file at `off`, and where its siblings continue.
@@ -176,7 +181,11 @@ impl Image {
     /// Returns [`DeviceError::Io`] when `off` names no file.
     pub(crate) fn file_entry_at(&self, off: u32) -> Result<(&[u8], u64, Option<u32>), DeviceError> {
         let (file, name) = self.file_at(off).ok_or(DeviceError::Io)?;
-        Ok((name, file.data_size.get(), chained(file.sibling.get())))
+        Ok((
+            name,
+            file.data_size.get(),
+            chained(file.sibling_offset.get()),
+        ))
     }
 
     /// Returns where the first child directory and the first child file of `off` are.
@@ -186,7 +195,10 @@ impl Image {
     /// Returns [`DeviceError::Io`] when `off` names no directory.
     pub(crate) fn children_of(&self, off: u32) -> Result<(Option<u32>, Option<u32>), DeviceError> {
         let (dir, _) = self.dir_at(off).ok_or(DeviceError::Io)?;
-        Ok((chained(dir.child_dir.get()), chained(dir.child_file.get())))
+        Ok((
+            chained(dir.child_offset.get()),
+            chained(dir.file_offset.get()),
+        ))
     }
 
     /// Resolves `path` to the directory holding what it names, and whatever component is left over.
@@ -258,19 +270,19 @@ impl Image {
     /// Returns [`DeviceError::Io`] when the chain leads somewhere the table does not reach.
     pub(crate) fn find_dir(&self, parent: u32, name: &[u8]) -> Result<Option<u32>, DeviceError> {
         let buckets = (self.dir_hash.len() / 4) as u32;
-        let bucket = record::bucket_of(parent, name, buckets);
+        let bucket = bucket_of(parent, name, buckets);
         let mut off = self.bucket(&self.dir_hash, bucket)?;
 
         for _ in 0..self.max_dir_records() {
-            if off == NONE {
+            if off == NO_ENTRY {
                 return Ok(None);
             }
 
             let (dir, entry_name) = self.dir_at(off).ok_or(DeviceError::Io)?;
-            if dir.parent.get() == parent && entry_name == name {
+            if dir.parent_offset.get() == parent && entry_name == name {
                 return Ok(Some(off));
             }
-            off = dir.next_hash.get();
+            off = dir.hash_sibling_offset.get();
         }
 
         // More steps than the table has records means the chain leads back into itself.
@@ -284,19 +296,19 @@ impl Image {
     /// Returns [`DeviceError::Io`] when the chain leads somewhere the table does not reach.
     pub(crate) fn find_file(&self, parent: u32, name: &[u8]) -> Result<Option<u32>, DeviceError> {
         let buckets = (self.file_hash.len() / 4) as u32;
-        let bucket = record::bucket_of(parent, name, buckets);
+        let bucket = bucket_of(parent, name, buckets);
         let mut off = self.bucket(&self.file_hash, bucket)?;
 
         for _ in 0..self.max_file_records() {
-            if off == NONE {
+            if off == NO_ENTRY {
                 return Ok(None);
             }
 
             let (file, entry_name) = self.file_at(off).ok_or(DeviceError::Io)?;
-            if file.parent.get() == parent && entry_name == name {
+            if file.parent_offset.get() == parent && entry_name == name {
                 return Ok(Some(off));
             }
-            off = file.next_hash.get();
+            off = file.hash_sibling_offset.get();
         }
 
         Err(DeviceError::Io)
@@ -312,7 +324,7 @@ impl Image {
     /// Returns [`DeviceError::Io`] when `off`, or the parent it names, is not in the table.
     fn parent_of(&self, off: u32) -> Result<u32, DeviceError> {
         let (dir, _) = self.dir_at(off).ok_or(DeviceError::Io)?;
-        let parent = dir.parent.get();
+        let parent = dir.parent_offset.get();
 
         if self.dir_at(parent).is_none() {
             return Err(DeviceError::Io);
@@ -324,17 +336,17 @@ impl Image {
     ///
     /// `None` means the offset names nothing: either the record itself or the name after it would
     /// run past the end of the table.
-    fn dir_at(&self, off: u32) -> Option<(&DirRecord, &[u8])> {
+    fn dir_at(&self, off: u32) -> Option<(&RomFsDirEntry, &[u8])> {
         let bytes = self.dir_table.get(off as usize..)?;
-        let (dir, after) = DirRecord::ref_from_prefix(bytes).ok()?;
+        let (dir, after) = RomFsDirEntry::ref_from_prefix(bytes).ok()?;
         let name = after.get(..dir.name_len.get() as usize)?;
         Some((dir, name))
     }
 
     /// Returns the file record at `off` and the name that follows it. See [`Image::dir_at`].
-    fn file_at(&self, off: u32) -> Option<(&FileRecord, &[u8])> {
+    fn file_at(&self, off: u32) -> Option<(&RomFsFileEntry, &[u8])> {
         let bytes = self.file_table.get(off as usize..)?;
-        let (file, after) = FileRecord::ref_from_prefix(bytes).ok()?;
+        let (file, after) = RomFsFileEntry::ref_from_prefix(bytes).ok()?;
         let name = after.get(..file.name_len.get() as usize)?;
         Some((file, name))
     }
@@ -356,12 +368,12 @@ impl Image {
 
     /// Returns more steps than any chain through the directory table can take.
     fn max_dir_records(&self) -> usize {
-        self.dir_table.len() / size_of::<DirRecord>() + 1
+        self.dir_table.len() / size_of::<RomFsDirEntry>() + 1
     }
 
     /// Returns more steps than any chain through the file table can take.
     fn max_file_records(&self) -> usize {
-        self.file_table.len() / size_of::<FileRecord>() + 1
+        self.file_table.len() / size_of::<RomFsFileEntry>() + 1
     }
 }
 
@@ -405,7 +417,42 @@ pub enum LoadError {
 /// keeps that sentinel from travelling: a caller walking siblings matches on an `Option` and cannot
 /// mistake the end of the chain for an entry.
 fn chained(off: u32) -> Option<u32> {
-    (off != NONE).then_some(off)
+    (off != NO_ENTRY).then_some(off)
+}
+
+/// Returns which of `buckets` hash buckets holds the entry called `name` inside `parent`.
+///
+/// The hash itself belongs to the format and is shared with whatever wrote the image. Reducing it
+/// to a bucket is this crate's part, because the count comes from a table only this module holds.
+fn bucket_of(parent: u32, name: &[u8], buckets: u32) -> u32 {
+    // `buckets` is a quarter of a hash table's length, and [`Image::load`] refuses an image whose
+    // hash table is shorter than one bucket, so the divisor is never zero by the time a lookup runs.
+    path_hash(parent, name) % buckets
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ROOT,
+        bucket_of,
+    };
+
+    #[test]
+    fn bucket_of_a_name_longer_than_the_table_stays_inside_it() {
+        //* Given
+        // Fewer buckets than the name has bytes, so an unreduced hash lands far outside them.
+        let buckets = 7;
+        let name = b"a rather longer name";
+
+        //* When
+        let bucket = bucket_of(ROOT, name, buckets);
+
+        //* Then
+        assert!(
+            bucket < buckets,
+            "a bucket outside the table would index past the end of it"
+        );
+    }
 }
 
 /// Reads `len` bytes from `off` into a table of its own.
