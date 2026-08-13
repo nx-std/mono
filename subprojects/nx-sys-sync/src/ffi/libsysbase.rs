@@ -172,12 +172,15 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait(
     lock: *mut Mutex,
     timeout_ns: u64,
 ) -> c_int {
-    // SAFETY: the caller guarantees both `cond` and `lock` point to live, initialized objects
-    // that outlive the call, and that this thread holds `lock`.
-    let result = unsafe { &*cond }.wait_timeout(
-        unsafe { &*lock },
-        nx_svc::sync::timeout_from_raw(timeout_ns),
-    );
+    // SAFETY: the caller guarantees `cond` points to a live, initialized condition variable that
+    // outlives the call.
+    let cond = unsafe { &*cond };
+    // SAFETY: the caller guarantees `lock` points to a live, initialized mutex that outlives the
+    // call.
+    let lock = unsafe { &*lock };
+    // SAFETY: the caller guarantees this thread holds `lock`, which is the ownership the wait
+    // requires.
+    let result = unsafe { cond.wait_timeout(lock, nx_svc::sync::timeout_from_raw(timeout_ns)) };
     errno_from_result(result)
 }
 

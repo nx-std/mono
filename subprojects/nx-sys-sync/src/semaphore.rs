@@ -81,7 +81,9 @@ impl Semaphore {
         let count = unsafe { &mut *self.count.get() };
         #[allow(clippy::while_immutable_condition)]
         while *count == 0 {
-            self.condvar.wait(&self.mutex);
+            // SAFETY: this thread took `self.mutex` at the top of the call and has not released
+            // it, so it holds the lock the wait releases and reacquires.
+            unsafe { self.condvar.wait(&self.mutex) };
         }
         *count = count.checked_sub(1).expect("semaphore count underflow");
 

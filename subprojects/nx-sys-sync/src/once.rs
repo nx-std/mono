@@ -149,7 +149,10 @@ impl Once {
         self.mutex.lock();
         while load_state(&self.state, Relaxed) != OnceState::Complete {
             // Ignore potential error codes; we only care about waking up.
-            let _ = self.cvar.wait(&self.mutex);
+            //
+            // SAFETY: this thread took `self.mutex` above and has not released it, so it holds
+            // the lock the wait releases and reacquires.
+            let _ = unsafe { self.cvar.wait(&self.mutex) };
         }
         self.mutex.unlock();
     }
@@ -238,7 +241,12 @@ impl Once {
                 OnceState::Running => {
                     // Somebody else is running – wait until they finish.
                     while load_state(&self.state, Relaxed) == OnceState::Running {
-                        let _ = self.cvar.wait(&self.mutex);
+                        // Ignore potential error codes; we only care about waking up.
+                        //
+                        // SAFETY: this thread took `self.mutex` at the top of this iteration and
+                        // this arm does not release it before the wait, so it holds the lock the
+                        // wait releases and reacquires.
+                        let _ = unsafe { self.cvar.wait(&self.mutex) };
                     }
 
                     // Re-check the state: if it is Complete we are done,

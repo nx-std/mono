@@ -59,7 +59,10 @@ impl Condvar {
     /// [`Mutex`]: super::Mutex
     pub fn wait<'a, T>(&self, guard: MutexGuard<'a, T>) -> MutexGuard<'a, T> {
         let lock = mutex::guard_lock(&guard);
-        self.inner.wait(lock);
+        // SAFETY: `guard` is this thread's proof that it locked `lock` and has not released it,
+        // which is the ownership the wait requires. It is held across the wait, so nothing else
+        // unlocks in the meantime.
+        unsafe { self.inner.wait(lock) };
         guard
     }
 

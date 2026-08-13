@@ -71,18 +71,21 @@ impl Condvar {
     ///
     /// When the function returns, the mutex is guaranteed to be re-acquired.
     ///
-    /// The calling thread must hold `mutex`. A wait issued without it has no lock state to
-    /// release and restore, and the kernel is entitled to fault rather than report an error.
-    ///
     /// Returns `0` on a successful wait and wake, or the result code of the wait otherwise; a
     /// timeout is reported as an error rather than as a distinct success.
-    pub fn wait_timeout(&self, mutex: &Mutex, timeout: Option<Duration>) -> ResultCode {
+    ///
+    /// # Safety
+    ///
+    /// The calling thread must hold `mutex`. A wait issued without it has no lock state to
+    /// release and restore, and the kernel is entitled to fault rather than report an error.
+    pub unsafe fn wait_timeout(&self, mutex: &Mutex, timeout: Option<Duration>) -> ResultCode {
         let curr_thread_tag = ThreadTag::current();
 
         // SAFETY: `self` and `mutex` are borrowed for this call, so both pointers address live,
         // aligned, writable process memory that stays mapped for the whole wait, including the
-        // part of it that outlasts this call while the thread is blocked. The remaining
-        // obligation, that this thread owns `mutex`, is the precondition stated above.
+        // part of it that outlasts this call while the thread is blocked. That the calling thread
+        // owns `mutex` is this function's own precondition, forwarded to its caller rather than
+        // discharged here.
         let result = unsafe {
             wait_process_wide_key_atomic(
                 self.as_ptr(),
@@ -108,9 +111,16 @@ impl Condvar {
     /// returns, the mutex is guaranteed to be re-acquired.
     ///
     /// Returns `0` on a successful wait and wake, or the result code of the wait otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The calling thread must hold `mutex`. A wait issued without it has no lock state to
+    /// release and restore, and the kernel is entitled to fault rather than report an error.
     #[inline]
-    pub fn wait(&self, mutex: &Mutex) -> ResultCode {
-        self.wait_timeout(mutex, None)
+    pub unsafe fn wait(&self, mutex: &Mutex) -> ResultCode {
+        // SAFETY: the wait needs the calling thread to hold `mutex`, which is this function's own
+        // precondition, and `mutex` is borrowed for the call, so it stays live throughout.
+        unsafe { self.wait_timeout(mutex, None) }
     }
 
     /// Wakes threads waiting on the condition variable.
