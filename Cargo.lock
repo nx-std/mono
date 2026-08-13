@@ -142,6 +142,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-hbabi"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-sf",
+ "nx-svc",
+]
+
+[[package]]
 name = "nx-net"
 version = "0.1.0"
 dependencies = [
@@ -285,6 +294,7 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-fsdev",
+ "nx-hbabi",
  "nx-nv",
  "nx-object",
  "nx-panic-handler",

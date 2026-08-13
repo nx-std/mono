@@ -22,6 +22,10 @@ ld_overrides = [
 nx_alloc_proj = subproject('nx-alloc')
 deps += nx_alloc_proj.get_variable('nx_alloc_dep')
 
+# nx-hbabi (always required — the loader handover this crate is handed)
+nx_hbabi_proj = subproject('nx-hbabi')
+deps += nx_hbabi_proj.get_variable('nx_hbabi_dep')
+
 # nx-panic-handler (always required)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 deps += nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
