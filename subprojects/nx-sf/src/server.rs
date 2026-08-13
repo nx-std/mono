@@ -39,11 +39,21 @@
 //! wrote, and the message that leaves is a value this process assembles.
 //! Hosting one end of a session means each direction is only ever handled one
 //! way, so a type that did both would carry a dead half.
+//!
+//! # Running one
+//!
+//! [`Service`] is the trait an interface implements, and [`Server`] is the loop
+//! that feeds it: it owns the port, accepts the sessions arriving on it, and
+//! drives the kernel call that both sends the previous reply and waits for the
+//! next request. Together they are the `hyper` half of the picture; the router
+//! and extractors that would sit above them are not written yet.
 
 mod command;
 mod protocol;
 mod request;
 mod response;
+mod serve;
+mod service;
 
 pub use self::{
     command::CommandId,
@@ -63,4 +73,9 @@ pub use self::{
         Reply,
         Response,
     },
+    serve::{
+        ServeError,
+        Server,
+    },
+    service::Service,
 };
