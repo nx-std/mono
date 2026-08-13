@@ -16,7 +16,7 @@ ffi = []
 
 [dependencies]
 nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
-nx-std-fs = { version = "0.1.0", path = "../nx-std-fs", features = ["extern-state"] }
+nx-std = { version = "0.1.0", path = "../nx-std", default-features = false, features = ["fs", "extern-state"] }
 nx-std-path = { version = "0.1.0", path = "../nx-std-path" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }

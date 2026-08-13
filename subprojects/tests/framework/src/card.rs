@@ -7,7 +7,7 @@
 use alloc::string::String;
 use core::fmt::Write as _;
 
-use nx_std_fs::File;
+use nx_std::fs::File;
 use nx_std_path::Path;
 
 /// Writes `text` as the report for `suite`, under `report_dir`.
@@ -19,7 +19,7 @@ use nx_std_path::Path;
 pub fn write(report_dir: &str, suite: &str, text: &str) -> Result<(), WriteError> {
     // The directory is created on the way: a card that has never run a test has no such directory,
     // and it already existing is the ordinary case rather than a failure.
-    let _ = nx_std_fs::create_dir(Path::new(report_dir));
+    let _ = nx_std::fs::create_dir(Path::new(report_dir));
 
     let mut path = String::new();
     write!(&mut path, "{report_dir}/{suite}.tap").map_err(|_| WriteError::Path)?;
@@ -42,13 +42,13 @@ pub enum WriteError {
 
     /// The file could not be created
     #[error("the report file could not be created")]
-    Create(#[source] nx_std_fs::Error),
+    Create(#[source] nx_std::fs::Error),
 
     /// The document could not be written
     #[error("the report could not be written")]
-    Write(#[source] nx_std_fs::Error),
+    Write(#[source] nx_std::fs::Error),
 
     /// The file could not be closed, so what was written may not be on the card
     #[error("the report file could not be closed")]
-    Close(#[source] nx_std_fs::Error),
+    Close(#[source] nx_std::fs::Error),
 }

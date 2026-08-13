@@ -50,7 +50,7 @@
 //! ## One archive per binary
 //!
 //! This crate holds process-wide state -- the open document -- and takes [`nx_sys_net`] and
-//! [`nx_std_fs`], which hold their own. A `static` is only process-wide while the crate holding it
+//! [`nx_std::fs`], which hold their own. A `static` is only process-wide while the crate holding it
 //! is linked once, so a test binary links **exactly one** Rust static library and everything else
 //! reaches it as an rlib inside that one.
 //!

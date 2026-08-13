@@ -37,7 +37,7 @@ use miniz_oxide::{
         inflate,
     },
 };
-use nx_std_fs::File;
+use nx_std::fs::File;
 use nx_std_path::Path;
 use nx_sys_net::Socket;
 
@@ -127,7 +127,7 @@ fn run(
             // A part-written program would be launchable and wrong, which is worse than not having
             // it at all. The removal is best-effort: the transfer has already failed, and a drop
             // directory that will not give the file up is not something this can act on.
-            let _ = nx_std_fs::remove_file(Path::new(&partial));
+            let _ = nx_std::fs::remove_file(Path::new(&partial));
             return Ok(Outcome::Failed {
                 reason: err.to_string(),
             });
@@ -186,8 +186,8 @@ fn receive_body(
     //
     // The removal is expected to fail the first time a given program arrives, since there is nothing
     // to remove; only the rename's success is worth reporting.
-    let _ = nx_std_fs::remove_file(Path::new(path));
-    nx_std_fs::rename(Path::new(partial), Path::new(path)).map_err(TransferError::PutInPlace)
+    let _ = nx_std::fs::remove_file(Path::new(path));
+    nx_std::fs::rename(Path::new(partial), Path::new(path)).map_err(TransferError::PutInPlace)
 }
 
 /// Inflates the chunk stream into `file` until the host's stream ends.
@@ -287,7 +287,7 @@ fn looks_like_program(path: &str) -> Result<bool, TransferError> {
     const MAGIC: &[u8; 4] = b"NRO0";
 
     let mut file = File::open(Path::new(path)).map_err(TransferError::Reopen)?;
-    file.seek(nx_std_fs::SeekFrom::Start(MAGIC_OFFSET))
+    file.seek(nx_std::fs::SeekFrom::Start(MAGIC_OFFSET))
         .map_err(TransferError::Reopen)?;
 
     let mut magic = [0u8; MAGIC.len()];
@@ -336,7 +336,7 @@ fn drop_path(name: &str, drop_dir: &str) -> Result<String, TransferError> {
 
     // The directory is created on the way: a card that has never run a test has no such directory,
     // and it already existing is the ordinary case rather than a failure.
-    let _ = nx_std_fs::create_dir(Path::new(drop_dir));
+    let _ = nx_std::fs::create_dir(Path::new(drop_dir));
 
     let mut path = String::new();
     write!(&mut path, "{drop_dir}/{name}").map_err(|_| TransferError::PathTooLong)?;
@@ -369,7 +369,7 @@ fn reserve(partial: &str, size: u32) -> Result<(), TransferError> {
         Ok(()) => Ok(()),
         Err(err) => {
             // The reservation is what failed, so the file it left behind is of no use to anything.
-            let _ = nx_std_fs::remove_file(Path::new(partial));
+            let _ = nx_std::fs::remove_file(Path::new(partial));
             Err(TransferError::NotEnoughSpace(err))
         }
     }
@@ -604,11 +604,11 @@ pub enum TransferError {
 
     /// The drop directory would not take the file
     #[error("the file could not be created")]
-    CreateFile(#[source] nx_std_fs::Error),
+    CreateFile(#[source] nx_std::fs::Error),
 
     /// The card had no room for the program
     #[error("the card has no room for it")]
-    NotEnoughSpace(#[source] nx_std_fs::Error),
+    NotEnoughSpace(#[source] nx_std::fs::Error),
 
     /// A chunk larger than the ceiling was announced
     #[error("the host announced a {announced} byte chunk, over the {limit} allowed")]
@@ -634,19 +634,19 @@ pub enum TransferError {
 
     /// The card would not take what was written
     #[error("the card would not take it")]
-    Write(#[source] nx_std_fs::Error),
+    Write(#[source] nx_std::fs::Error),
 
     /// The card would not take the last of what was written
     #[error("the card would not take the last of it")]
-    CloseFile(#[source] nx_std_fs::Error),
+    CloseFile(#[source] nx_std::fs::Error),
 
     /// What arrived could not be read back to be checked
     #[error("what arrived could not be read back")]
-    Reopen(#[source] nx_std_fs::Error),
+    Reopen(#[source] nx_std::fs::Error),
 
     /// The program could not be put under its own name
     #[error("it could not be put in place")]
-    PutInPlace(#[source] nx_std_fs::Error),
+    PutInPlace(#[source] nx_std::fs::Error),
 
     /// The command line the host sent is longer than the ceiling
     #[error("the command line is {length} bytes, over the {limit} allowed")]
