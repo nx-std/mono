@@ -8,6 +8,14 @@
 
 #include <switch.h>
 
+// For the directory the report is filed in, which is the rig's and the same for
+// every binary in it.
+#include "nx_tests_rig.h"
+
+#ifndef VERSION
+#error "the rig's build defines VERSION; a binary that reports has to be built with it"
+#endif
+
 /**
  * @brief Reporting in the Test Anything Protocol, version 14.
  *
@@ -109,22 +117,22 @@ int32_t __nx_tests_framework__report(uint32_t host);
 /**
  * @brief Opens the document, with what the runtime says about this run.
  *
+ * The build and the directory are not parameters: every binary in the rig
+ * answers both the same way, and asking each of them to say so is how two of
+ * them come to disagree.
+ *
  * @param suite The name this suite reports under, which is also the name its
  *        file is written to and the name the runner records it as.
- * @param version The build this was compiled from.
- * @param report_dir The directory the report is filed in. The rig's policy
- *        rather than the protocol's, so it is passed in rather than known here.
  * @param unattended Whether the runner launched it rather than a person.
  */
-static inline void tap_begin(const char* suite, const char* version, const char* report_dir,
-                             bool unattended)
+static inline void tap_begin(const char* suite, bool unattended)
 {
     const u32 hos = hosversionGet();
 
     const NxTestsFrameworkRun run = {
         .suite = suite,
-        .build = version,
-        .report_dir = report_dir,
+        .build = VERSION,
+        .report_dir = RIG_DIR,
         .hos_major = (uint8_t)HOSVER_MAJOR(hos),
         .hos_minor = (uint8_t)HOSVER_MINOR(hos),
         .hos_micro = (uint8_t)HOSVER_MICRO(hos),

@@ -15,7 +15,6 @@
 
 #include <switch.h>
 
-#include "../../rig.h"
 #include "../handback.h"
 #include "../harness.h"
 #include "cwd/suite.h"
@@ -46,7 +45,7 @@ int main()
     // reason to wait for one back.
     const bool unattended = suite_is_unattended();
 
-    tap_begin("rt", VERSION, RIG_DIR, unattended);
+    tap_begin("rt", unattended);
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
     uint64_t curr_test_suite = 0;

@@ -35,7 +35,6 @@
 
 #include <switch.h>
 
-#include "../../rig.h"
 #include "../handback.h"
 #include "../harness.h"
 #include "resolve/suite.h"
@@ -68,7 +67,7 @@ int main()
     // reason to wait for one back.
     const bool unattended = suite_is_unattended();
 
-    tap_begin("net", VERSION, RIG_DIR, unattended);
+    tap_begin("net", unattended);
 
     // The driver is brought up once for the whole binary rather than per test.
     // It is process-wide state, so a test that initialized it would be setting

@@ -1,18 +1,19 @@
-// Random number generation tests.
+// Thread tests.
 //
 // Split out of `nx-tests` when that binary became the test runner: what used to be
 // one unattended suite is now one binary per area, each of which the runner can
 // be handed on its own.
 //
-// The same binary links either way: with `use_nx_rand` off the calls resolve to
-// the C implementation, which is the baseline to compare ours against.
+// The same binary links either way: with `use_nx_sys_thread` off the calls
+// resolve to libnx's own thread layer, which is the baseline to compare ours
+// against — except that libnx leaves `thrd_detach` unimplemented, so the detach
+// cases fail there by construction rather than by regression.
 
 #include <inttypes.h>
 #include <stdio.h>
 
 #include <switch.h>
 
-#include "../../rig.h"
 #include "../handback.h"
 #include "../harness.h"
 #include "suite.h"
@@ -24,8 +25,8 @@ TEST_RESULTS_STORAGE
  * Test suites
  */
 static TestSuiteFn test_suites[] = {
-    // random
-    rand_suite,
+    // thread
+    thread_suite,
 };
 
 int main()
@@ -43,7 +44,7 @@ int main()
     // reason to wait for one back.
     const bool unattended = suite_is_unattended();
 
-    tap_begin("rand", VERSION, RIG_DIR, unattended);
+    tap_begin("thread", unattended);
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
     uint64_t curr_test_suite = 0;
@@ -78,7 +79,7 @@ int main()
 
     // Back to the runner that launched this suite, if one did: a run is
     // several suites, and it ends here otherwise.
-    handback_to_runner("rand");
+    handback_to_runner("thread");
 
     consoleExit(NULL);
     return 0;
