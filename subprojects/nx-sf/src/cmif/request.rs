@@ -1,7 +1,9 @@
-//! CMIF request building.
+//! CMIF request messages: building one as a client, parsing one as a server.
 //!
-//! This module contains request values and fluent builders for CMIF
-//! requests. Serialization and response parsing live in sibling modules.
+//! The build path ([`CmifRequestBuilder`] and its siblings) produces request
+//! values a client serializes and sends; [`parse_request`] reads one a client
+//! sent to a service this process hosts. Reply building lives in the sibling
+//! `response` module.
 //!
 //! # In-band payload model
 //!
@@ -17,10 +19,7 @@
 //! Session-close has no in-band data and reuses the default `()` payload.
 
 use core::{
-    mem::{
-        size_of,
-        size_of_val,
-    },
+    mem::size_of,
     ptr,
 };
 
@@ -35,11 +34,13 @@ use super::{
         CommandType,
         DomainInHeader,
         DomainRequestType,
+        IN_HEADER_MAGIC,
         InHeader,
     },
 };
 use crate::{
     array_vec::ArrayVec,
+    cursor::Cursor,
     hipc::{
         self,
         BufferDescriptor,
@@ -56,6 +57,7 @@ use crate::{
         OutputBuffer,
         RecvListEntry,
         StaticDescriptor,
+        write_section,
     },
     service::handle::BorrowedSessionHandle,
 };
@@ -900,6 +902,119 @@ impl HipcPayload for CmifCloseBody {
     }
 }
 
+/// Interprets an already-parsed HIPC request as a CMIF one.
+///
+/// Takes the [`hipc::Request`] rather than the raw buffer because a server
+/// needs both halves: the HIPC value owns the buffer descriptors and handles
+/// the command's arguments live in, and this function only adds the CMIF
+/// reading of its message type and data words. Parsing the envelope once and
+/// layering on top of it also keeps CMIF from reaching past HIPC into bytes it
+/// does not own.
+///
+/// # Errors
+///
+/// Returns [`RequestParseError`] when the message type is not one this crate
+/// serves, or when the data-words region does not hold a well-formed `SFCI`
+/// header.
+pub fn parse_request<'a>(request: &hipc::Request<'a>) -> Result<Request<'a>, RequestParseError> {
+    let raw_type = request.message_type.to_raw();
+    match raw_type {
+        t if t == CommandType::Close as u16 => Ok(Request::Close),
+        t if t == CommandType::Request as u16 || t == CommandType::RequestWithContext as u16 => {
+            parse_command(request.data_words).map(Request::Command)
+        }
+        t if t == CommandType::Control as u16 || t == CommandType::ControlWithContext as u16 => {
+            parse_command(request.data_words).map(Request::Control)
+        }
+        // `Invalid` (0), and the pre-5.0.0 `LegacyRequest` (1) /
+        // `LegacyControl` (3) types this crate does not serve.
+        other => Err(RequestParseError::UnsupportedCommandType(other)),
+    }
+}
+
+/// Error returned by [`parse_request`].
+#[derive(Debug, thiserror::Error)]
+pub enum RequestParseError {
+    /// The HIPC message type is not a CMIF command type this crate serves.
+    ///
+    /// Covers `Invalid` and the pre-5.0.0 legacy request and control types, as
+    /// well as any value outside the enum.
+    #[error("unsupported CMIF command type: {0:#x}")]
+    UnsupportedCommandType(u16),
+    /// Data-words region too small to contain a CMIF [`InHeader`].
+    #[error("CMIF request too small for InHeader")]
+    TruncatedInHeader,
+    /// The header did not carry the `SFCI` magic, so the data words are not a
+    /// CMIF request body.
+    #[error("invalid CMIF magic header")]
+    InvalidMagic,
+}
+
+#[cfg(feature = "ffi")]
+impl crate::error::ToResultCode for RequestParseError {
+    fn to_rc(self) -> crate::error::ResultCode {
+        // A request rejected before any handler saw it, so no service assigned
+        // it a code to forward.
+        crate::error::GENERIC_ERROR
+    }
+}
+
+/// Parsed inbound CMIF request.
+///
+/// Returned by [`parse_request`]. The message type decides which of these a
+/// request is, so a caller cannot read a command id off a session close or
+/// route a control request to the command handler.
+#[derive(Debug)]
+pub enum Request<'a> {
+    /// A command invocation on the session's interface.
+    Command(Command<'a>),
+    /// A control request: domain conversion, cloning, or a pointer-buffer-size
+    /// query. Answered by the framework rather than by the hosted interface.
+    Control(Command<'a>),
+    /// A session close. Carries no in-band data, and is not replied to.
+    Close,
+}
+
+/// Command id, versioning, and raw arguments decoded from a CMIF request.
+#[derive(Debug)]
+pub struct Command<'a> {
+    /// Method id to invoke on the target interface.
+    pub command_id: u32,
+    /// Protocol version: `0` for a plain request, `1` when a context token
+    /// rides along.
+    pub version: u32,
+    /// Context token, echoed back in the reply.
+    pub token: u32,
+    /// The data-words region after the `InHeader`.
+    ///
+    /// This is the raw remainder, not a sized argument tuple: it still holds
+    /// the word padding HIPC added and, for a command declaring out-pointers,
+    /// the out-pointer-size table at its tail. How much of it is arguments is a
+    /// property of the command's own signature, which a wire-format parser does
+    /// not know.
+    pub payload: &'a [u8],
+}
+
+/// Reads the `InHeader` and the argument region shared by command and control
+/// requests.
+fn parse_command(data_words: &[u8]) -> Result<Command<'_>, RequestParseError> {
+    let cursor = Cursor::new(data_words).align_to(CMIF_HEADER_ALIGN);
+    let (in_hdr, cursor) = cursor
+        .read::<InHeader>()
+        .ok_or(RequestParseError::TruncatedInHeader)?;
+
+    if in_hdr.magic != IN_HEADER_MAGIC {
+        return Err(RequestParseError::InvalidMagic);
+    }
+
+    Ok(Command {
+        command_id: in_hdr.command_id,
+        version: in_hdr.version,
+        token: in_hdr.token,
+        payload: cursor.remaining(),
+    })
+}
+
 /// Writes a CMIF [`InHeader`] into `buf` and returns the remaining tail.
 ///
 /// Centralizes the magic constant so each body only supplies the fields it
@@ -939,22 +1054,4 @@ fn write_cmif_domain_in_header(
         token,
     };
     write_section(buf, &header)
-}
-
-/// Writes `value`'s bytes into the prefix of `buf` and returns the tail.
-///
-/// Mirrors the helper used by [`hipc::request`] so CMIF bodies thread the
-/// destination buffer through a chain of typed sections instead of repeated
-/// `mut_from_prefix` / `copy_from_slice` calls. [`CmifBody::encoded_len`]
-/// guarantees the prefix fits, so the inner `write_to` call is infallible.
-#[inline]
-fn write_section<'a, T>(buf: &'a mut [u8], value: &T) -> &'a mut [u8]
-where
-    T: zerocopy::IntoBytes + zerocopy::Immutable + ?Sized,
-{
-    let (buf, tail) = buf.split_at_mut(size_of_val(value));
-    value
-        .write_to(buf)
-        .expect("internal: encoded_len guarantees fit");
-    tail
 }
