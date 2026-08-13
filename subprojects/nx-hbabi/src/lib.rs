@@ -25,16 +25,23 @@
 //! So the key table is stated once, in [`Entry`], and the two directions are the
 //! two conversions on it:
 //!
-//! - `Entry::from(config_entry)` - what a **program** does with what it was
-//!   handed. Every key this crate knows becomes a variant naming the fields;
-//!   every key it does not becomes [`Entry::Unknown`], which keeps enough to
-//!   apply the mandatory rule below.
+//! - [`Entry::decode`] - what a **program** does with what it was handed. Every
+//!   key this crate knows becomes a variant naming the fields; every key it does
+//!   not becomes [`Entry::Unknown`], which keeps enough to apply the mandatory
+//!   rule below.
 //! - `ConfigEntry::from(entry)` - what a **loader** does to say the same thing.
 //!   It is the exact inverse, which is what makes a round trip through the wire
 //!   format a no-op and what keeps the two sides from drifting.
 //!
 //! Neither side reaches for a key constant to do its job; both reach for the
 //! variant, and the packing is written down once.
+//!
+//! The variants hold what the key already implies rather than the untyped words
+//! it travels as: a thread handle where the key names the main thread, a slice
+//! where the entry carries an address and a length. That makes a loader's side
+//! ordinary safe Rust and leaves the program's side one `unsafe` - the promise
+//! that the addresses it was handed are good - taken once at
+//! [`decode`](Entry::decode) rather than at every use.
 //!
 //! # Reading a list, writing a list
 //!
@@ -78,6 +85,7 @@ pub use self::{
         Entry,
         EntryFlags,
         Key,
+        USER_ID_LEN,
     },
     list::{
         ConfigEntries,

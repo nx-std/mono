@@ -3,59 +3,89 @@
 
 use core::{
     ffi::{
+        CStr,
         c_char,
-        c_void,
     },
     ptr::NonNull,
 };
 
 use nx_sf::ServiceName;
-use nx_svc::raw::Handle as RawHandle;
+use nx_svc::{
+    ipc::Handle as SessionHandle,
+    process::Handle as ProcessHandle,
+    thread::Handle as ThreadHandle,
+};
 
 /// A single fact the loader is telling the program, with the fields its key
 /// gives the payload words.
 ///
 /// This is the typed view of a [`ConfigEntry`], and the one place the key table
-/// is written down. Reading is `Entry::from(config_entry)` and writing is
-/// `ConfigEntry::from(entry)`. Encoding an entry and decoding it back yields
-/// the entry again, for every variant including [`Unknown`](Self::Unknown),
-/// which is what keeps the two sides of the handover from drifting apart.
+/// is written down. Writing is `ConfigEntry::from(entry)` and reading is
+/// [`decode`](Self::decode). Encoding an entry and decoding it back yields the
+/// entry again, for every variant including [`Unknown`](Self::Unknown), which
+/// is what keeps the two sides of the handover from drifting apart.
 ///
-/// Every pointer arrives as an address the loader chose and is `Option` because
-/// a null one is how the loader says it has nothing to point at. Handles arrive
-/// as the bare number: naming a handle closes nothing, and deciding who owns it
-/// is the consumer's call, not the format's.
+/// # What the key already settles
+///
+/// A payload word is an untyped 64 bits on the wire, but the key it travels
+/// under says what it is, and that is exactly what this enum records. A handle
+/// under [`Key::MAIN_THREAD_HANDLE`] is a thread handle, so the variant holds
+/// one; the bytes a loader names itself with have an address and a length, so
+/// the variant holds a slice. Nothing here hands back a number for a consumer
+/// to re-derive a type from that the key had already fixed.
+///
+/// The handles are the naming form, which is `Copy` and closes nothing: a
+/// handover tells a program which handles it has, and none of them is this
+/// crate's to close.
+///
+/// # Why the lifetime, and why decoding is unsafe
+///
+/// Several entries name memory the loader owns, and this enum borrows it rather
+/// than repeating an address and a length. That makes the loader's side of the
+/// handover ordinary safe Rust: a loader has the slices already and hands them
+/// over as they are.
+///
+/// The program's side cannot be safe in the same way. It receives addresses,
+/// and nothing it can check says how long they are good for, so producing a
+/// borrow from one is a promise only the loader's behaviour backs. That promise
+/// is made once, at [`decode`](Self::decode), rather than by every consumer that
+/// dereferences a pointer this enum handed it.
 #[derive(Debug, Clone, Copy)]
-pub enum Entry {
+pub enum Entry<'a> {
     /// Free-form text naming the loader, and the list terminator.
     ///
     /// The two jobs are one entry because the format has no separate end
     /// marker: reaching this key is what tells a program the list is over,
     /// whether or not the loader put any text in it.
-    LoaderInfo {
-        /// The text, which is not NUL-terminated - `len` is the length.
-        text: Option<NonNull<c_char>>,
-        len: u64,
-    },
+    ///
+    /// The text is not NUL-terminated, which is why it is bytes and not a
+    /// [`CStr`]: the length travels in the entry.
+    LoaderInfo(Option<&'a [u8]>),
     /// The handle naming the process's main thread.
-    MainThreadHandle(RawHandle),
+    MainThreadHandle(ThreadHandle),
     /// The handle naming the process itself.
-    ProcessHandle(RawHandle),
+    ProcessHandle(ProcessHandle),
     /// The loader's buffers for naming the program to run next.
     ///
-    /// Both are buffers the loader owns and the program writes into, which is
+    /// Both are buffers the loader owns and the program *writes into*, which is
     /// how a program asks to be replaced rather than exited. Their presence is
     /// what makes the request possible at all: a loader that offers no buffers
     /// is one that will not chain-load.
+    ///
+    /// These stay bare addresses where the other entries carry slices, because
+    /// the format gives them no length. How much a program may write is fixed
+    /// by convention between the two sides, not stated in the handover, so a
+    /// slice here would be a length this crate invented.
     NextLoadPath {
-        path: Option<NonNull<c_char>>,
-        argv: Option<NonNull<c_char>>,
+        path: NonNull<c_char>,
+        argv: NonNull<c_char>,
     },
     /// The heap the program must use, in place of asking the kernel for one.
-    OverrideHeap {
-        addr: Option<NonNull<c_void>>,
-        size: usize,
-    },
+    ///
+    /// A pointer to a region of known length rather than a slice: the memory is
+    /// uninitialised and the program is about to hand it to an allocator, so
+    /// nothing may read it as bytes or assume it is unaliased.
+    OverrideHeap(NonNull<[u8]>),
     /// A service session the loader has already opened on the program's behalf.
     ///
     /// A program that looks this name up must be handed this session rather
@@ -63,11 +93,11 @@ pub enum Entry {
     /// The key may appear many times, once per name.
     OverrideService {
         name: ServiceName,
-        handle: RawHandle,
+        handle: SessionHandle,
     },
     /// The command line, as one NUL-terminated string to be split by the
     /// program.
-    Argv(Option<NonNull<c_char>>),
+    Argv(&'a CStr),
     /// Which of supervisor calls `0x00..=0x7F` the program may make.
     ///
     /// A bit per call, lowest call in the lowest bit. A loader clears the bits
@@ -87,8 +117,11 @@ pub enum Entry {
     /// Storage the loader keeps for the preselected user id, which persists
     /// across a chain load.
     ///
-    /// The address holds a 16-byte account user id.
-    UserIdStorage(Option<NonNull<u8>>),
+    /// A pointer rather than a reference, because both sides use it: the
+    /// program writes the id it settled on so the next one starts with it, and
+    /// the loader keeps the storage between the two. The length is the id's,
+    /// which the format fixes.
+    UserIdStorage(NonNull<[u8; USER_ID_LEN]>),
     /// How the previously chain-loaded program ended.
     LastLoadResult(u32),
     /// Entropy for seeding the program's pseudo-random number generator.
@@ -110,37 +143,108 @@ pub enum Entry {
         flags: EntryFlags,
         value: [u64; 2],
     },
+    /// A key this crate knows, carrying a payload it cannot use.
+    ///
+    /// In practice this is one thing: an entry that must name memory and gives
+    /// a null address instead. A loader with nothing to say omits the entry, so
+    /// reaching here means the loader said something malformed rather than
+    /// saying nothing.
+    ///
+    /// It is separate from [`Unknown`](Self::Unknown) because the two call for
+    /// different answers. An unknown key may be from a newer loader and is
+    /// skippable unless mandatory; a known key with an unusable payload is a
+    /// loader that is not working, and a consumer that treats it as absent runs
+    /// on a default the loader was trying to replace.
+    ///
+    /// The flags come along for the same reason they do on `Unknown`: a
+    /// malformed entry the loader marked mandatory is still mandatory.
+    Malformed {
+        key: Key,
+        flags: EntryFlags,
+        value: [u64; 2],
+    },
 }
 
-impl From<ConfigEntry> for Entry {
-    fn from(entry: ConfigEntry) -> Self {
+impl<'a> Entry<'a> {
+    /// Reads an entry, borrowing whatever memory it names for `'a`.
+    ///
+    /// # Safety
+    ///
+    /// Every address `entry` carries must name memory this process may read for
+    /// the whole of `'a`, with the length the key gives it: the loader-info
+    /// bytes for the length in the entry, the command line up to its
+    /// terminating NUL. A loader keeps these alive for as long as the program
+    /// it started runs, which is what makes a `'static` choice of `'a` the
+    /// usual one, but nothing checkable here says so.
+    ///
+    /// The handles are not part of that promise. Naming one closes nothing and
+    /// a handle the kernel never issued is answered with `InvalidHandle` by the
+    /// call that reaches it, so a wrong one is an error rather than undefined
+    /// behaviour.
+    pub unsafe fn decode(entry: ConfigEntry) -> Self {
         // Every payload field narrower than the 64-bit word carrying it sits in
         // the low half, so these narrowing casts drop bits the format leaves
         // zero.
         match entry.key {
-            Key::LOADER_INFO => Self::LoaderInfo {
-                text: NonNull::new(entry.value[0] as *mut c_char),
-                len: entry.value[1],
-            },
-            Key::MAIN_THREAD_HANDLE => Self::MainThreadHandle(entry.value[0] as RawHandle),
-            Key::PROCESS_HANDLE => Self::ProcessHandle(entry.value[0] as RawHandle),
-            Key::NEXT_LOAD_PATH => Self::NextLoadPath {
-                path: NonNull::new(entry.value[0] as *mut c_char),
-                argv: NonNull::new(entry.value[1] as *mut c_char),
-            },
-            Key::OVERRIDE_HEAP => Self::OverrideHeap {
-                addr: NonNull::new(entry.value[0] as *mut c_void),
-                size: entry.value[1] as usize,
+            Key::LOADER_INFO => {
+                let text = NonNull::new(entry.value[0] as *mut u8).map(|text| {
+                    // SAFETY: the caller vouched for the entry's address naming
+                    // readable memory for the length beside it, which is what
+                    // this slice spans.
+                    unsafe { core::slice::from_raw_parts(text.as_ptr(), entry.value[1] as usize) }
+                });
+                Self::LoaderInfo(text)
+            }
+            // SAFETY: the handle is one the loader is passing on rather than
+            // one this crate is adopting, so nothing here closes it, and a
+            // number the kernel did not issue is refused by the call that uses
+            // it rather than faulting.
+            Key::MAIN_THREAD_HANDLE => {
+                Self::MainThreadHandle(ThreadHandle::from_raw_unchecked(entry.value[0] as u32))
+            }
+            // SAFETY: the handle is one the loader is passing on rather than
+            // one this crate is adopting, so nothing here closes it, and a
+            // number the kernel did not issue is refused by the call that uses
+            // it rather than faulting.
+            Key::PROCESS_HANDLE => {
+                Self::ProcessHandle(ProcessHandle::from_raw_unchecked(entry.value[0] as u32))
+            }
+            Key::NEXT_LOAD_PATH => {
+                // Both buffers or neither: naming a program to run without a
+                // command line to run it with, or the reverse, is not a request
+                // any loader can act on.
+                match (
+                    NonNull::new(entry.value[0] as *mut c_char),
+                    NonNull::new(entry.value[1] as *mut c_char),
+                ) {
+                    (Some(path), Some(argv)) => Self::NextLoadPath { path, argv },
+                    _ => Self::malformed(entry),
+                }
+            }
+            Key::OVERRIDE_HEAP => match NonNull::new(entry.value[0] as *mut u8) {
+                Some(addr) => {
+                    Self::OverrideHeap(NonNull::slice_from_raw_parts(addr, entry.value[1] as usize))
+                }
+                None => Self::malformed(entry),
             },
             Key::OVERRIDE_SERVICE => Self::OverrideService {
                 // SAFETY: the format packs a NUL-padded ASCII name into this
                 // word, so it is already the byte pattern the checked
                 // constructor would accept.
                 name: ServiceName::from_u64_unchecked(entry.value[0]),
-                handle: entry.value[1] as RawHandle,
+                // SAFETY: the session is one the loader opened and is passing
+                // on rather than one this crate is adopting, so nothing here
+                // closes it, and a number the kernel did not issue is refused
+                // by the call that uses it rather than faulting.
+                handle: SessionHandle::from_raw_unchecked(entry.value[1] as u32),
             },
             // The command line travels in the second word, not the first.
-            Key::ARGV => Self::Argv(NonNull::new(entry.value[1] as *mut c_char)),
+            Key::ARGV => match NonNull::new(entry.value[1] as *mut c_char) {
+                // SAFETY: the caller vouched for the entry's address naming
+                // memory readable up to a NUL, which is the run this scans.
+                Some(argv) => Self::Argv(unsafe { CStr::from_ptr(argv.as_ptr()) }),
+                None => Self::malformed(entry),
+            },
             Key::SYSCALL_HINT => Self::SyscallHint {
                 hint_0_3f: entry.value[0],
                 hint_40_7f: entry.value[1],
@@ -153,7 +257,10 @@ impl From<ConfigEntry> for Entry {
                 flags: entry.value[1],
             },
             Key::APPLET_WORKAROUND => Self::AppletWorkaround,
-            Key::USER_ID_STORAGE => Self::UserIdStorage(NonNull::new(entry.value[0] as *mut u8)),
+            Key::USER_ID_STORAGE => match NonNull::new(entry.value[0] as *mut [u8; USER_ID_LEN]) {
+                Some(storage) => Self::UserIdStorage(storage),
+                None => Self::malformed(entry),
+            },
             Key::LAST_LOAD_RESULT => Self::LastLoadResult(entry.value[0] as u32),
             Key::RANDOM_SEED => Self::RandomSeed(entry.value),
             Key::HOS_VERSION => Self::HosVersion {
@@ -167,29 +274,52 @@ impl From<ConfigEntry> for Entry {
             },
         }
     }
+
+    /// Reports `entry` as a known key whose payload cannot be used.
+    ///
+    /// Keeps the words as they arrived so the entry encodes back to itself and
+    /// a consumer that can make sense of them still may.
+    const fn malformed(entry: ConfigEntry) -> Self {
+        Self::Malformed {
+            key: entry.key,
+            flags: entry.flags,
+            value: entry.value,
+        }
+    }
 }
 
-impl From<Entry> for ConfigEntry {
-    fn from(entry: Entry) -> Self {
-        // Flags are not the entry's to decide: only `Unknown` carries any, by
-        // having preserved what it was handed. A loader marking an entry
-        // mandatory does so when it appends it to the list.
+impl From<Entry<'_>> for ConfigEntry {
+    fn from(entry: Entry<'_>) -> Self {
+        // Flags are not the entry's to decide: only the two catch-all variants
+        // carry any, by having preserved what they were handed. A loader
+        // marking an entry mandatory does so when it appends it to the list.
         match entry {
-            Entry::LoaderInfo { text, len } => Self::new(Key::LOADER_INFO, [address_of(text), len]),
+            Entry::LoaderInfo(text) => Self::new(
+                Key::LOADER_INFO,
+                [
+                    text.map_or(0, |text| text.as_ptr() as u64),
+                    text.map_or(0, |text| text.len() as u64),
+                ],
+            ),
             Entry::MainThreadHandle(handle) => {
-                Self::new(Key::MAIN_THREAD_HANDLE, [u64::from(handle), 0])
+                Self::new(Key::MAIN_THREAD_HANDLE, [u64::from(handle.to_raw()), 0])
             }
-            Entry::ProcessHandle(handle) => Self::new(Key::PROCESS_HANDLE, [u64::from(handle), 0]),
-            Entry::NextLoadPath { path, argv } => {
-                Self::new(Key::NEXT_LOAD_PATH, [address_of(path), address_of(argv)])
+            Entry::ProcessHandle(handle) => {
+                Self::new(Key::PROCESS_HANDLE, [u64::from(handle.to_raw()), 0])
             }
-            Entry::OverrideHeap { addr, size } => {
-                Self::new(Key::OVERRIDE_HEAP, [address_of(addr), size as u64])
-            }
-            Entry::OverrideService { name, handle } => {
-                Self::new(Key::OVERRIDE_SERVICE, [name.to_u64(), u64::from(handle)])
-            }
-            Entry::Argv(argv) => Self::new(Key::ARGV, [0, address_of(argv)]),
+            Entry::NextLoadPath { path, argv } => Self::new(
+                Key::NEXT_LOAD_PATH,
+                [path.as_ptr() as u64, argv.as_ptr() as u64],
+            ),
+            Entry::OverrideHeap(heap) => Self::new(
+                Key::OVERRIDE_HEAP,
+                [heap.cast::<u8>().as_ptr() as u64, heap.len() as u64],
+            ),
+            Entry::OverrideService { name, handle } => Self::new(
+                Key::OVERRIDE_SERVICE,
+                [name.to_u64(), u64::from(handle.to_raw())],
+            ),
+            Entry::Argv(argv) => Self::new(Key::ARGV, [0, argv.as_ptr() as u64]),
             Entry::SyscallHint {
                 hint_0_3f,
                 hint_40_7f,
@@ -200,7 +330,7 @@ impl From<Entry> for ConfigEntry {
             }
             Entry::AppletWorkaround => Self::new(Key::APPLET_WORKAROUND, [0, 0]),
             Entry::UserIdStorage(storage) => {
-                Self::new(Key::USER_ID_STORAGE, [address_of(storage), 0])
+                Self::new(Key::USER_ID_STORAGE, [storage.as_ptr() as u64, 0])
             }
             Entry::LastLoadResult(result) => {
                 Self::new(Key::LAST_LOAD_RESULT, [u64::from(result), 0])
@@ -216,22 +346,20 @@ impl From<Entry> for ConfigEntry {
                     if is_atmosphere { ATMOSPHERE_MAGIC } else { 0 },
                 ],
             ),
-            Entry::Unknown { key, flags, value } => Self { key, flags, value },
+            Entry::Unknown { key, flags, value } | Entry::Malformed { key, flags, value } => {
+                Self { key, flags, value }
+            }
         }
     }
-}
-
-/// Returns the address a pointer names, with a null one for absent.
-///
-/// Null is the format's own way of saying nothing is there, so this is the
-/// inverse of the `NonNull::new` every decode arm applies.
-fn address_of<T>(ptr: Option<NonNull<T>>) -> u64 {
-    ptr.map_or(0, |ptr| ptr.as_ptr() as u64)
 }
 
 /// Marks the second word of a [`Key::HOS_VERSION`] entry as reporting a custom
 /// firmware: `ATMOSPHR` read as little-endian ASCII.
 const ATMOSPHERE_MAGIC: u64 = 0x41544d4f53504852;
+
+/// How many bytes an account user id occupies, which is the size of the storage
+/// a [`Key::USER_ID_STORAGE`] entry points at.
+pub const USER_ID_LEN: usize = 16;
 
 /// Which fact an entry is stating.
 ///

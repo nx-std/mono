@@ -1,7 +1,10 @@
 //! The entry list, from both ends: walking one a loader handed over, and
 //! assembling one to hand over.
 
-use core::ptr::NonNull;
+use core::{
+    marker::PhantomData,
+    ptr::NonNull,
+};
 
 use super::entry::{
     ConfigEntry,
@@ -34,13 +37,17 @@ pub const MAX_APPENDED: usize = MAX_ENTRIES - 1;
 /// than as a slice up front, because how many there are is not known until the
 /// terminator is reached and a slice covering the maximum would read past a
 /// short list.
-pub struct ConfigEntries {
+/// `'a` is how long the memory the entries name stays readable, which the
+/// caller of [`from_ptr`](Self::from_ptr) chooses and vouches for once on
+/// behalf of every entry the walk yields.
+pub struct ConfigEntries<'a> {
     next: NonNull<ConfigEntry>,
     read: usize,
     done: bool,
+    list: PhantomData<&'a [ConfigEntry]>,
 }
 
-impl ConfigEntries {
+impl<'a> ConfigEntries<'a> {
     /// Starts walking the list beginning at `ptr`.
     ///
     /// # Safety
@@ -48,17 +55,21 @@ impl ConfigEntries {
     /// `ptr` must be the start of an entry list this process may read, either
     /// terminated by a [`Key::LOADER_INFO`] entry or at least [`MAX_ENTRIES`]
     /// entries long.
+    ///
+    /// Every address the entries carry must additionally satisfy
+    /// [`Entry::decode`] for `'a`, since that is what each one is read through.
     pub const unsafe fn from_ptr(ptr: NonNull<ConfigEntry>) -> Self {
         Self {
             next: ptr,
             read: 0,
             done: false,
+            list: PhantomData,
         }
     }
 }
 
-impl Iterator for ConfigEntries {
-    type Item = Entry;
+impl<'a> Iterator for ConfigEntries<'a> {
+    type Item = Entry<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done || self.read >= MAX_ENTRIES {
@@ -70,14 +81,18 @@ impl Iterator for ConfigEntries {
         // so this entry is within it.
         let raw = unsafe { self.next.read() };
 
+        // SAFETY: the caller of `from_ptr` vouched for every address in the
+        // list naming memory readable for `'a`, which is what decoding this
+        // entry into borrows of that lifetime requires.
+        let entry = unsafe { Entry::decode(raw) };
+
         // SAFETY: the entry just read is within the list, so the list has
         // either another entry after it or ends here, and ending here is what
         // the terminator check below detects before the pointer is read again.
         self.next = unsafe { self.next.add(1) };
         self.read += 1;
 
-        let entry = Entry::from(raw);
-        if matches!(entry, Entry::LoaderInfo { .. }) {
+        if matches!(entry, Entry::LoaderInfo(_)) {
             self.done = true;
         }
 
@@ -90,18 +105,28 @@ impl Iterator for ConfigEntries {
 /// Held by value rather than written into caller memory because the loader has
 /// to keep it alive across the jump to the program: the program reads the list
 /// during its own startup, long after the call that passed the pointer.
+///
+/// `'a` is how long the memory the appended entries named stays alive. The
+/// encoded list holds those as bare addresses, so the lifetime is what keeps a
+/// list from outliving the buffers it points into.
 #[derive(Debug, Clone)]
-pub struct ConfigList {
+pub struct ConfigList<'a> {
     entries: [ConfigEntry; MAX_ENTRIES],
     len: usize,
+    // Encoding turned the entries' borrows into plain addresses, so no field
+    // above still ties this list to the buffers it points into. This is what
+    // puts that back: without it a list could outlive its own loader-info text
+    // and `as_ptr` would hand a program a dangling address.
+    named: PhantomData<&'a [u8]>,
 }
 
-impl ConfigList {
+impl<'a> ConfigList<'a> {
     /// Starts assembling a list.
-    pub fn builder() -> ConfigListBuilder {
+    pub fn builder() -> ConfigListBuilder<'a> {
         ConfigListBuilder {
             entries: [PLACEHOLDER; MAX_ENTRIES],
             len: 0,
+            named: PhantomData,
         }
     }
 
@@ -124,18 +149,21 @@ impl ConfigList {
 /// Entries are appended in order and the terminator is written by
 /// [`build`](Self::build), so a list cannot be handed over unterminated.
 #[derive(Debug, Clone)]
-pub struct ConfigListBuilder {
+pub struct ConfigListBuilder<'a> {
     entries: [ConfigEntry; MAX_ENTRIES],
     len: usize,
+    // Entries are encoded as they are appended, so the builder erases their
+    // borrows exactly as the finished list does and needs the same stand-in.
+    named: PhantomData<&'a [u8]>,
 }
 
-impl ConfigListBuilder {
+impl<'a> ConfigListBuilder<'a> {
     /// Appends an entry the program may skip if it does not know the key.
     ///
     /// # Panics
     ///
     /// Panics in debug builds once [`MAX_APPENDED`] entries are appended.
-    pub fn push(self, entry: Entry) -> Self {
+    pub fn push(self, entry: Entry<'a>) -> Self {
         self.push_encoded(ConfigEntry::from(entry))
     }
 
@@ -148,7 +176,7 @@ impl ConfigListBuilder {
     /// # Panics
     ///
     /// Panics in debug builds once [`MAX_APPENDED`] entries are appended.
-    pub fn push_mandatory(self, entry: Entry) -> Self {
+    pub fn push_mandatory(self, entry: Entry<'a>) -> Self {
         self.push_encoded(ConfigEntry::from(entry).with_flags(EntryFlags::MANDATORY))
     }
 
@@ -160,24 +188,18 @@ impl ConfigListBuilder {
     ///
     /// Terminating cannot fail for want of room: [`MAX_APPENDED`] holds the
     /// last slot back for exactly this entry.
-    pub fn build(self, info: &'static [u8]) -> ConfigList {
+    pub fn build(self, info: &'a [u8]) -> ConfigList<'a> {
         // An empty slice still has a non-null address, so absence is decided on
-        // the length rather than on what `as_ptr` hands back. Otherwise a
-        // loader that named nothing would point a program at a dangling
-        // address and tell it the text was zero bytes long.
-        let text = if info.is_empty() {
-            None
-        } else {
-            NonNull::new(info.as_ptr().cast_mut()).map(NonNull::cast)
-        };
-        let terminated = self.append(ConfigEntry::from(Entry::LoaderInfo {
-            text,
-            len: info.len() as u64,
-        }));
+        // the length rather than on what the slice's pointer happens to be.
+        // Otherwise a loader that named nothing would point a program at a
+        // dangling address and tell it the text was zero bytes long.
+        let text = (!info.is_empty()).then_some(info);
+        let terminated = self.append(ConfigEntry::from(Entry::LoaderInfo(text)));
 
         ConfigList {
             entries: terminated.entries,
             len: terminated.len,
+            named: PhantomData,
         }
     }
 

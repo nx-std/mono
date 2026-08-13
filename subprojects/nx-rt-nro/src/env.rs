@@ -57,11 +57,7 @@ use nx_rt_core::{
     env::init_once,
     services::sm,
 };
-use nx_svc::{
-    ipc::Handle as ServiceHandle,
-    process::Handle as ProcessHandle,
-    thread::Handle as ThreadHandle,
-};
+use nx_svc::thread::Handle as ThreadHandle;
 
 /// Atmosphere flag bit, OR-ed into the HOS version when Atmosphere is detected.
 const HOS_VERSION_ATMOSPHERE_BIT: u32 = 1 << 31;
@@ -117,19 +113,20 @@ pub unsafe fn setup(
                     }
                     hos_version::set(v);
                 }
-                Entry::MainThreadHandle(raw) => {
-                    // SAFETY: The handle is provided by the loader and guaranteed valid.
-                    state.main_thread_handle = Some(ThreadHandle::from_raw_unchecked(raw));
+                Entry::MainThreadHandle(handle) => {
+                    state.main_thread_handle = Some(handle);
                 }
-                Entry::ProcessHandle(raw) => {
-                    // SAFETY: The handle is provided by the loader and guaranteed valid.
-                    state.process_handle = Some(ProcessHandle::from_raw_unchecked(raw));
+                Entry::ProcessHandle(handle) => {
+                    state.process_handle = Some(handle);
                 }
-                Entry::OverrideHeap { addr, size } => {
-                    state.heap_override = addr.map(|a| (a, size));
+                Entry::OverrideHeap(heap) => {
+                    state.heap_override = Some((heap.cast(), heap.len()));
                 }
-                Entry::Argv(ptr) => {
-                    state.argv = ptr;
+                Entry::Argv(argv) => {
+                    // The C-facing accessors below hand out the bare pointer,
+                    // so the borrow is unwrapped back to one here rather than
+                    // held.
+                    state.argv = Some(NonNull::from(argv).cast());
                 }
                 Entry::RandomSeed(seed) => {
                     state.random_seed = Some(seed);
@@ -144,29 +141,25 @@ pub unsafe fn setup(
                 Entry::SyscallHint2 { hint_80_bf } => {
                     state.syscall_hints.set_hints_80_bf(hint_80_bf);
                 }
-                Entry::UserIdStorage(ptr) => {
-                    // The handover names the storage by address only: a user id
-                    // is 16 bytes there and an `AccountUid` here, and this is
-                    // the one place the two are known to be the same thing.
-                    state.user_id_storage = ptr.map(NonNull::cast);
+                Entry::UserIdStorage(storage) => {
+                    // The handover sizes the storage in bytes and this layer
+                    // names it an `AccountUid`; this is the one place the two
+                    // are known to be the same thing.
+                    state.user_id_storage = Some(storage.cast());
                 }
                 Entry::LastLoadResult(result) => {
                     state.last_load_result = result;
                 }
                 Entry::NextLoadPath { path, argv } => {
-                    // Both buffers or neither: naming a program without a
-                    // command line to run it with, or the reverse, is not a
-                    // request any loader can act on.
-                    state.next_load = path.zip(argv).map(|(path, argv)| {
-                        // SAFETY: The pointers come straight from the loader's
-                        // configuration, which is where `from_loader` expects
-                        // them from.
-                        unsafe { NextLoad::from_loader(path, argv) }
-                    });
+                    // SAFETY: The pointers come straight from the loader's
+                    // configuration, which is where `from_loader` expects them
+                    // from.
+                    state.next_load = Some(unsafe { NextLoad::from_loader(path, argv) });
                 }
-                Entry::OverrideService { name, handle } => {
-                    // SAFETY: The handle is provided by the loader and guaranteed valid.
-                    let service_handle = ServiceHandle::from_raw_unchecked(handle);
+                Entry::OverrideService {
+                    name,
+                    handle: service_handle,
+                } => {
                     if state.service_override_count < MAX_SERVICE_OVERRIDES {
                         state.service_overrides[state.service_override_count] =
                             Some(ServiceOverride::new(name, service_handle));
@@ -185,10 +178,11 @@ pub unsafe fn setup(
                 Entry::AppletWorkaround => {
                     state.applet_workaround = true;
                 }
-                Entry::LoaderInfo { text, len } => {
-                    if len > 0 {
-                        state.loader_info = text.map(|text| (text, len));
-                    }
+                Entry::LoaderInfo(text) => {
+                    // Kept as a pointer and a length because the C-facing
+                    // accessors hand the two out separately.
+                    state.loader_info =
+                        text.map(|text| (NonNull::from(text).cast(), text.len() as u64));
                 }
                 // TODO: return to the loader when `flags.is_mandatory()`, which
                 //  the handover requires and startup does not yet do. Skipping
@@ -197,6 +191,16 @@ pub unsafe fn setup(
                 Entry::Unknown { .. } => {
                     // A key from a newer loader. Skipping it is what the
                     // handover asks for, so long as it is not mandatory.
+                }
+                // TODO: return to the loader when `flags.is_mandatory()`, on
+                //  the same terms as an unknown key above. A loader that named
+                //  the heap and gave a null address is one that is not working,
+                //  and continuing runs the program on the default heap the
+                //  loader was replacing.
+                Entry::Malformed { .. } => {
+                    // A key this runtime knows, carrying nothing it can act on.
+                    // Startup continues on the defaults, which is what it would
+                    // have done had the loader not sent the entry at all.
                 }
             }
         }
