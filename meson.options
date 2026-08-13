@@ -49,6 +49,13 @@ option(
 )
 
 option(
+    'use_nx_romfs',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx romfs functions with nx-romfs functions',
+    yield : true
+)
+
+option(
     'use_nx_std_env',
     type : 'feature', value : 'auto',
     description : 'Enable nx_std::env (the process environment in `std::env` shape)',

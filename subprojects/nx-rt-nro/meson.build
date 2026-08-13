@@ -145,6 +145,21 @@ if get_option('use_nx_service_fs').enabled()
     ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_fs.ld'
 endif
 
+# nx-romfs — the `romfsMountSelf` arm for a homebrew NRO.
+#
+# The image is appended to the NRO's own file, so finding it means reading the file the loader
+# launched, through the device it sits on: `use_nx_service_fs` is what puts that device there.
+if get_option('use_nx_romfs').enabled()
+    if not get_option('use_nx_service_fs').enabled()
+        error('use_nx_romfs requires -Duse_nx_service_fs=enabled')
+    endif
+
+    nx_romfs_proj = subproject('nx-romfs')
+    deps += nx_romfs_proj.get_variable('nx_romfs_dep')
+    cargo_features += 'romfs'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_romfs.ld'
+endif
+
 # nx-service-hid (depends on applet at the Rust level)
 if get_option('use_nx_service_hid').enabled()
     nx_service_hid_proj = subproject('nx-service-hid')

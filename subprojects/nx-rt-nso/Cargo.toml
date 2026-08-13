@@ -16,7 +16,16 @@ bench = false
 # Pulls `nx-sys-args/ffi`: that crate gates the C-style `(argc, argv)` view on
 # the feature, and the only reader of it is the `__system_argc` / `__system_argv`
 # pair below this switch.
-ffi = ["nx-rt-core/ffi", "nx-sys-args/ffi"]
+# Pulls `nx-romfs?/ffi`: `romfsMountSelf` is defined below this switch and the
+# rest of the `romfs*` surface in that crate, and a link carrying one override
+# without the others has calls landing back in the C it replaced.
+# Pulls `nx-sf/ffi`: the romfs mount forwards the server's own code for a failed
+# open, and that crate gates its result-code mapping on the feature.
+ffi = ["nx-rt-core/ffi", "nx-romfs?/ffi", "nx-sf?/ffi", "nx-sys-args/ffi"]
+# A program's own romfs image — gates `ffi::libnx::romfs`, which holds the
+# `romfsMountSelf` an NSO needs: a packaged program's data is a partition the
+# filesystem service hands out, so mounting it names no file at all.
+romfs = ["dep:nx-romfs", "dep:nx-sf"]
 # Per-kind `pm`-launch `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the NSO process-launch startup ABI). Leave it off on
 # the GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
@@ -32,8 +41,10 @@ sys-virtmem = ["nx-rt-core/sys-virtmem"]
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-romfs = { version = "0.1.0", path = "../nx-romfs", optional = true }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", features = ["service-applet"] }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
+nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-args = { version = "0.1.0", path = "../nx-sys-args" }
 

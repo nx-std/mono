@@ -11,6 +11,7 @@ members = [
     "subprojects/nx-panic-handler",
     "subprojects/nx-pm",
     "subprojects/nx-rand",
+    "subprojects/nx-romfs",
     "subprojects/nx-rt-core",
     "subprojects/nx-rt-kip",
     "subprojects/nx-rt-module",

@@ -95,6 +95,19 @@ ld_overrides = [
     meson.current_source_dir() / 'overrides' / 'rt_nso_libnx_service_applet.ld',
 ]
 
+# nx-romfs — the `romfsMountSelf` arm for an NSO.
+#
+# A packaged program's data is a partition the filesystem service hands out, so this needs no file
+# and no path, only the `fsp-srv` session. Nothing is asserted about that session here: this crate
+# has no filesystem bring-up step of its own yet, so an NSO reaches the mount once something
+# installs one.
+if get_option('use_nx_romfs').enabled()
+    nx_romfs_proj = subproject('nx-romfs')
+    deps += nx_romfs_proj.get_variable('nx_romfs_dep')
+    cargo_features += 'romfs'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nso_libnx_romfs.ld'
+endif
+
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------

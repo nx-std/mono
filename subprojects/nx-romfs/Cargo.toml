@@ -1,0 +1,29 @@
+[package]
+name = "nx-romfs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_romfs"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_romfs FFI
+# Pulls `nx-sf/ffi`: the C surface takes an open file or storage as the `Service` libnx passes by
+# value, and turns a failed open into the server's own result code.
+ffi = ["nx-sf/ffi"]
+
+[dependencies]
+nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
+nx-fsdev = { version = "0.1.0", path = "../nx-fsdev" }
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-fs = { version = "0.1.0", path = "../nx-service-fs" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-path = { version = "0.1.0", path = "../nx-std-path" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd" }
+thiserror = { version = "2.0.12", default-features = false }
+zerocopy = { workspace = true }

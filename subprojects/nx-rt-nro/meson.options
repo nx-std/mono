@@ -83,6 +83,13 @@ option(
 )
 
 option(
+    'use_nx_romfs',
+    type : 'feature', value : 'auto',
+    description : 'Enable the nx-rt-nro `romfs` feature (the NRO arm of romfsMountSelf)',
+    yield : true
+)
+
+option(
     'use_nx_service_hid',
     type : 'feature', value : 'auto',
     description : 'Enable the nx-rt-nro `service-hid` feature',

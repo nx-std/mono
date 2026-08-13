@@ -16,6 +16,10 @@ pub use nx_net::ffi as net;
 pub use nx_pm::ffi as pm;
 #[cfg(feature = "rand")]
 pub use nx_rand::ffi as rand;
+// `romfsMountSelf` is not here: it is the one `romfs*` entry point that depends
+// on the output kind, so it comes from whichever entry crate is in the link.
+#[cfg(feature = "romfs")]
+pub use nx_romfs::ffi as romfs;
 #[cfg(feature = "rt")]
 pub use nx_rt_core::ffi as rt_core;
 // The entry-crate surfaces are alternatives, one per output kind: a link takes

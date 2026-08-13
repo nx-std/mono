@@ -106,4 +106,6 @@ pub mod argv;
 pub mod cwd;
 pub mod env;
 pub mod init;
+#[cfg(feature = "romfs")]
+pub mod romfs;
 pub mod services;
