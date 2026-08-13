@@ -111,7 +111,7 @@ them. If code diverges from a rule, either fix the code or update the rule (with
 ```
 nx-std (umbrella crate)
 ├── nx-alloc     - Global allocator using SVC memory management
-├── nx-rand      - Random number generation
+├── nx-rand      - The platform entropy source, behind the `getrandom` backend seam
 ├── nx-std-sync  - High-level sync primitives (Mutex, RwLock, etc.)
 ├── nx-time      - Time utilities
 └── sys/
@@ -127,7 +127,8 @@ nx-std (umbrella crate)
 `nx-svc` is the foundation — it provides raw SVC bindings. Higher-level crates build on it:
 
 - `nx-alloc` depends on `nx-svc`, `nx-sys-sync`
-- `nx-sys-virtmem` depends on `nx-svc`, `nx-rand`, `nx-sys-sync` — the heap-free page substrate; `nx-alloc` is deliberately absent from its graph so heap-freedom is compiler-enforced
+- `nx-sys-virtmem` depends on `nx-svc`, `nx-sys-sync`, `rand` — the heap-free page substrate; `nx-alloc` is deliberately absent from its graph so heap-freedom is compiler-enforced
+- `nx-rand` is reached by nobody: it defines `__getrandom_v03_custom`, the symbol `getrandom` resolves entropy through, so a crate that needs random bytes depends on `rand` and gets Horizon's source without naming the crate that supplies it. The `getrandom_backend="custom"` cfg in `.cargo/config.toml` is what selects that seam, and anything overriding `RUSTFLAGS` must repeat it
 - `nx-sys-mem` depends on `nx-alloc`, `nx-svc`, `nx-sys-virtmem`
 - `nx-std` optionally depends on `nx-sys-virtmem` (folded into its `sys-mem` feature) to re-export the `virtmem` FFI directly
 

@@ -28,7 +28,7 @@ A crate's C-FFI surface and the linker scripts that redirect upstream archive sy
 
 | Aspect                     | Rule                                                                                      |
 |----------------------------|-------------------------------------------------------------------------------------------|
-| Declaration                | `ffi = []` in `[features]`, plus any `<dep>?/ffi` whose gated item only this crate's C boundary calls ([§2](#2-declaration)). |
+| Declaration                | `ffi = []` in `[features]`, plus any `<dep>?/<feature>` gating an item only this crate's C boundary calls, or a `#[no_mangle]` definition the C link must own ([§2](#2-declaration)). |
 | Source gating              | `#[cfg(feature = "ffi")] pub mod ffi;` in `src/lib.rs`.                                   |
 | Symbol naming              | `__nx_<aspect>__<symbol>` with `#[unsafe(no_mangle)] pub extern "C"`.                     |
 | Direct producer build      | The producer's own `meson.build` does NOT pass `--features ffi` to `cargo build`.         |
@@ -45,10 +45,10 @@ ffi = []
 ```
 
 - The feature value is empty (`[]`) — it gates a compile-time `#[cfg(...)]` branch in the producer crate and contributes nothing else.
-- No transitive feature activation belongs in this list. The `ffi` feature MUST NOT pull in additional crates or enable other features.
-- The `# Enable the __nx_<aspect> FFI` comment is the canonical descriptor and must accompany the feature declaration ([rust-crates](rust-crates.md)).
+- No transitive feature activation belongs in this list. The `ffi` feature MUST NOT pull in additional crates or enable other features. In particular it takes no `dep:` entry: a crate the C surface needs is a dependency of the crate, not of the feature.
+- The comment above the declaration opens `# Enable the __nx_<aspect> FFI`, with `<aspect>` the crate's slug ([§4](#4-symbol-naming)), so the line reads the same in every crate that exports a surface of its own. Further lines may follow where the crate has something specific to say, as the exceptions below do. A crate whose `ffi` feature gates something *other* than its own `__nx_*` surface — a result-code mapping, C-shaped backing for another crate's exports ([§7](#7-an-ffi-module-may-export-nothing-of-its-own)) — says what it actually gates instead, because the canonical line would name symbols that do not exist. [rust-crates](rust-crates.md) requires *a* comment on every feature; this document fixes what this one says.
 
-### The one exception: a dependency that gates its own mapping on `ffi`
+### First exception: a dependency that gates its own mapping on `ffi`
 
 A crate may list `<dep>?/ffi` when that dependency compiles something **only this crate's C boundary calls**,
 and gates it on its own `ffi` feature. The result-code mapping is the case in practice: `nx-sf` and the
@@ -72,6 +72,33 @@ Each such entry carries a comment saying which item the dependency gates and why
 needs it. An entry without that comment is the violation this section otherwise describes. The exception does
 not extend to pulling in a `dep:` or enabling a sibling feature of the producer's own — those still belong to
 whichever feature owns them.
+
+### Second exception: a dependency whose feature gates a `#[no_mangle]` definition
+
+A crate may list `<dep>?/<feature>` when that feature defines a **`#[no_mangle]` symbol**. Such a symbol is
+defined once per program or the link fails, and `ffi` is already the switch that says which archive carries
+the program's unmangled definitions ([§5](#5-producer-build-vs-consumer-activation)). Putting the two under
+one switch is what makes "exactly one" hold by construction; under separate switches a build can enable one
+and not the other, and the failure surfaces as an undefined or duplicate symbol far from the manifest that
+caused it.
+
+`nx-rand` is the case in practice. Its `getrandom-backend` feature defines `__getrandom_v03_custom`, the
+symbol `getrandom` resolves this target's entropy through, and the umbrella activates it beside the C surface:
+
+```toml
+[features]
+# Enable the __nx_std FFI
+# `nx-rand?/getrandom-backend` arrives here rather than under `rand`: it defines
+# `__getrandom_v03_custom`, and one archive per program defines that.
+ffi = ["nx-rand?/ffi", "nx-rand?/getrandom-backend"]
+```
+
+The gated symbol is **not** a C-FFI export, and the rest of this document does not reach it: it is
+`extern "Rust"`, no linker script redirects it, and its name belongs to the crate that resolves it rather
+than to this workspace, so [§3](#3-source-gating) does not place it in `src/ffi.rs` and
+[§4](#4-symbol-naming) does not rename it. What this exception governs is the manifest entry alone. A
+producer declaring such a feature names it for what it defines, never `ffi`, since a crate has at most one C
+surface and this is not it.
 
 ---
 
@@ -196,9 +223,13 @@ Such a crate declares `ffi = []` and gates `src/ffi.rs` exactly as an exporting 
 
 Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
 
-- [ ] `[features]` contains `ffi = []` with the `# Enable the __nx_<aspect> FFI` comment.
-- [ ] The `ffi` feature value is `[]`, except for `<dep>?/ffi` entries that each carry the comment saying
-      which item the dependency gates and why this crate is the caller
+- [ ] `[features]` contains `ffi = []`, commented `# Enable the __nx_<aspect> FFI` when the crate exports a
+      surface of its own, or with what the feature actually gates when it does not.
+- [ ] The `ffi` feature value is `[]`, except for `<dep>?/<feature>` entries that each carry the comment
+      saying which item the dependency gates and why this crate is the one that needs it — either an item
+      only this crate's C boundary calls, or a `#[no_mangle]` definition one archive per program must own
+- [ ] A feature gating a `#[no_mangle]` definition that is not a C-FFI export is named for what it defines,
+      not `ffi`, and is activated from the consumer's `ffi` rather than beside the dependency it belongs to
 - [ ] `src/lib.rs` gates the FFI module with `#[cfg(feature = "ffi")] pub mod ffi;`.
 - [ ] All `extern "C"` exports live inside `src/ffi.rs` (or submodules under `src/ffi/`), not scattered across other modules.
 - [ ] Every exported symbol uses the `__nx_<aspect>__<symbol>` naming with `#[unsafe(no_mangle)] pub extern "C"`.
@@ -211,6 +242,10 @@ Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
 ## References
 
 - [crates-rt](crates-rt.md) - Related: Owns which crate defines a runtime symbol, when the backing for it lives in another
+- [rust-process-wide-state](rust-process-wide-state.md) - Related: Owns the one-definition-per-program
+  discipline the second exception in §2 rides on, and why a build carrying `extern-state` never enables `ffi`
 - [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts that consume the symbols defined here
 - [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
-- [rust-crates](rust-crates.md) - Related: `Cargo.toml` feature naming and ordering rules
+- [rust-crates](rust-crates.md) - Related: `Cargo.toml` feature naming and ordering rules. It owns the general
+  requirements every feature meets; this document owns the `ffi` feature's value and comment, and governs
+  where the two appear to differ

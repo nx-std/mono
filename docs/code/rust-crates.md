@@ -81,13 +81,17 @@ When a `[features]` section exists:
   `tracking`, `result-decoding` over `results`, `virtmem-stats` over `stats`, `tipc-dispatch` over `tipc`.
 - Every feature MUST have a `#` comment above it explaining its purpose.
 
+`ffi` is the one standing exception to the descriptiveness rule above: a crate exposing a C surface spells
+the feature exactly that, so a consumer can write `nx-<aspect>?/ffi` without looking it up. Its declaration is
+owned by [rust-ffi](rust-ffi.md), which is why no example on this page shows one.
+
 ```toml
 # ❌ Bad — unordered, undocumented, and named so that no reader can tell what turning one
 # on actually pulls in; `dbg` was assumed to gate only assertions and silently shipped the
 # debug SVC wrappers into a retail build.
 [features]
 handle-tracking = []
-FFI = []
+Virtmem-Stats = []
 default = ["result-decoding"]
 result_decoding = ["dep:thiserror"]
 # stuff
@@ -100,15 +104,14 @@ dbg = []
 [features]
 # Default features, enabled unless default-features = false
 default = ["result-decoding"]
-# C-FFI surface: compiles the `__nx_*` symbols the libnx override linker scripts redirect to.
-# `ffi` is the workspace-canonical name for this feature and is spelled the same in every crate.
-ffi = ["dep:nx-sf"]
 # Tracks every live kernel handle so leaks are reported instead of exhausting the handle table
 handle-tracking = []
 # Kernel debug SVC wrappers (process memory inspection); excluded from retail builds
 kernel-debug-svcs = []
 # Typed Result decoding: kernel error codes surface as values instead of raw u32 words
 result-decoding = ["dep:thiserror"]
+# Counts reservations and peak usage, read back through the virtmem stats API
+virtmem-stats = []
 ```
 
 ## Checklist
@@ -122,6 +125,7 @@ Before committing Cargo.toml changes, verify:
 - [ ] `default` feature is listed first (if present)
 - [ ] All remaining features are alphabetically ordered
 - [ ] Every feature has a descriptive `#` comment above it
+- [ ] An `ffi` feature was checked against [rust-ffi](rust-ffi.md), not against this document
 - [ ] No `[features]` section added unnecessarily
 
 ## References

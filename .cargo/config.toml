@@ -36,7 +36,18 @@ target-dir = "buildDir/cargo-target"
 # unknown value with a `compile_error!`, so a bare `cargo` invocation needs a
 # value to build at all. Meson builds set `RUSTFLAGS` from the `nso_applet_type`
 # option, which replaces this default; nothing else reads the cfg.
-rustflags = ["--cfg", 'nso_applet_type="application"']
+#
+# `getrandom_backend` tells `getrandom` that this target's entropy comes from a
+# symbol the platform defines rather than from one of its built-in backends.
+# `nx-rand` defines it. Horizon is not a target `getrandom` knows, so dropping
+# this cfg does not silently fall back: the crate fails to build, which is the
+# outcome to want. It must be repeated by anything that sets `RUSTFLAGS` itself,
+# since the environment variable replaces this list wholesale rather than adding
+# to it - `subprojects/nx-rt-nso/meson.build` is the one place that does.
+rustflags = [
+    "--cfg", 'nso_applet_type="application"',
+    "--cfg", 'getrandom_backend="custom"',
+]
 
 [unstable]
 # This section enables unstable Cargo features.

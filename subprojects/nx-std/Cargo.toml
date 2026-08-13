@@ -24,6 +24,9 @@ ffi = [
     "nx-fsdev?/ffi",
     "nx-pm?/ffi",
     "nx-rand?/ffi",
+    # The `getrandom` backend symbol is `#[no_mangle]` like the C surface, so the archive that
+    # carries one carries the other: one definition per program, a link error if that slips.
+    "nx-rand?/getrandom-backend",
     "nx-romfs?/ffi",
     "nx-rt-core?/ffi",
     "nx-rt-nro?/ffi",
@@ -116,10 +119,14 @@ sys-fd = ["dep:nx-sys-fd", "alloc"]
 # Forwards `sys-virtmem` to whichever runtime crate is in the build: its startup
 # sequence calls `virtmem`'s Rust API directly when the crate is present, and
 # falls back to libnx's `virtmemSetup` by name when it is not.
+# Pulls `rand` because `virtmem` draws its ASLR offsets from `rand::rngs::SysRng`, whose entropy
+# resolves to the symbol `nx-rand` defines; without the crate in the graph that symbol is undefined
+# at link time.
 sys-mem = [
     "dep:nx-sys-mem",
     "dep:nx-sys-virtmem",
     "alloc",
+    "rand",
     "nx-rt-nro?/sys-virtmem",
     "nx-rt-nso?/sys-virtmem",
 ]
