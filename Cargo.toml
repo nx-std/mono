@@ -8,6 +8,7 @@ members = [
     "subprojects/nx-netloader",
     "subprojects/nx-nv",
     "subprojects/nx-fsdev",
+    "subprojects/nx-hbabi",
     "subprojects/nx-panic-handler",
     "subprojects/nx-pm",
     "subprojects/nx-rand",

@@ -7,8 +7,12 @@
 //! The homebrew loader hands an NRO a `ConfigEntry` array describing the heap
 //! override, command-line arguments, service overrides, applet type, HOS
 //! version, and the rest of the startup environment. [`setup`] walks that
-//! array exactly once and fills `nx-rt-core`'s environment container; the
-//! loader-config parser itself lives in the private [`config`] submodule.
+//! array exactly once and fills `nx-rt-core`'s environment container.
+//!
+//! The array's format is [`nx_hbabi`]'s, not this module's: this is one of the
+//! two sides of a handover, and the side that writes it is a loader. What is
+//! left here is the mapping from a decoded [`Entry`] to the piece of runtime
+//! state it sets.
 //!
 //! The read accessors and the HOS-version / main-thread submodules are
 //! re-exported from [`nx_rt_core::env`] so callers continue to reach them
@@ -16,6 +20,11 @@
 
 use core::ptr::NonNull;
 
+pub use nx_hbabi::{
+    ConfigEntries,
+    ConfigEntry,
+    Entry,
+};
 pub use nx_rt_core::env::{
     AccountUid,
     AppletType,
@@ -52,14 +61,6 @@ use nx_svc::{
     ipc::Handle as ServiceHandle,
     process::Handle as ProcessHandle,
     thread::Handle as ThreadHandle,
-};
-
-mod config;
-
-pub use self::config::{
-    ConfigEntries,
-    ConfigEntry,
-    Entry,
 };
 
 /// Atmosphere flag bit, OR-ed into the HOS version when Atmosphere is detected.
@@ -144,7 +145,10 @@ pub unsafe fn setup(
                     state.syscall_hints.set_hints_80_bf(hint_80_bf);
                 }
                 Entry::UserIdStorage(ptr) => {
-                    state.user_id_storage = ptr;
+                    // The handover names the storage by address only: a user id
+                    // is 16 bytes there and an `AccountUid` here, and this is
+                    // the one place the two are known to be the same thing.
+                    state.user_id_storage = ptr.map(NonNull::cast);
                 }
                 Entry::LastLoadResult(result) => {
                     state.last_load_result = result;
@@ -181,13 +185,18 @@ pub unsafe fn setup(
                 Entry::AppletWorkaround => {
                     state.applet_workaround = true;
                 }
-                Entry::LoaderInfo { ptr, len } => {
+                Entry::LoaderInfo { text, len } => {
                     if len > 0 {
-                        state.loader_info = ptr.map(|p| (p, len));
+                        state.loader_info = text.map(|text| (text, len));
                     }
                 }
+                // TODO: return to the loader when `flags.is_mandatory()`, which
+                //  the handover requires and startup does not yet do. Skipping
+                //  one leaves the program running against an environment the
+                //  loader said it must adopt.
                 Entry::Unknown { .. } => {
-                    // Ignore unknown entry types.
+                    // A key from a newer loader. Skipping it is what the
+                    // handover asks for, so long as it is not mandatory.
                 }
             }
         }

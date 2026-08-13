@@ -1,0 +1,16 @@
+[package]
+name = "nx-hbabi"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_hbabi"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
