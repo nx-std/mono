@@ -22,11 +22,44 @@ use nx_sys_sync::Once;
 /// manager, neither of which composes a command line anywhere near this long.
 pub const MAX_ARGS: usize = 32;
 
-/// Guards the one write to [`INSTALLED`], and answers whether it has happened.
-static ARGV_INIT: Once = Once::new();
+/// The process's command line, and the guard that orders the one write to it.
+///
+/// The guard and what it guards are one static rather than two, because a program that links this
+/// crate twice must share both or neither: a borrowed command line behind a private guard is a slot
+/// two libraries would install into without ordering. Keeping them together makes that
+/// unrepresentable.
+///
+/// The symbol is spelled out, and `extern-state` swaps this definition for a declaration. See
+/// [rust-process-wide-state](../../../docs/code/rust-process-wide-state.md).
+#[cfg(not(feature = "extern-state"))]
+#[unsafe(no_mangle)]
+static COMMAND_LINE: InstalledCommandLine = InstalledCommandLine {
+    init: Once::new(),
+    slot: UnsafeCell::new(CommandLine::EMPTY),
+};
 
-/// The installed command line, empty until [`setup_from`] replaces it.
-static INSTALLED: InstalledCommandLine = InstalledCommandLine(UnsafeCell::new(CommandLine::EMPTY));
+#[cfg(feature = "extern-state")]
+unsafe extern "Rust" {
+    /// The command line and its guard, owned by another static library.
+    static COMMAND_LINE: InstalledCommandLine;
+}
+
+/// The one command-line slot, however this build reaches it.
+fn command_line() -> &'static InstalledCommandLine {
+    #[cfg(not(feature = "extern-state"))]
+    {
+        &COMMAND_LINE
+    }
+
+    #[cfg(feature = "extern-state")]
+    // SAFETY: the symbol is defined by the one static library built without `extern-state`, as an
+    // `InstalledCommandLine` from this same source at this same version, so the reference has the
+    // type and layout it claims. It is a `static`, so the `'static` lifetime is honest. The `Once`
+    // inside orders the write to the slot; a shared reference to the pair races with nothing.
+    unsafe {
+        &COMMAND_LINE
+    }
+}
 
 /// Returns an iterator over the command-line arguments, as `std::env::args_os`
 /// does.
@@ -59,14 +92,16 @@ pub fn args() -> Args {
 /// unsynchronized reads in [`Args`] sound. Arguments past [`MAX_ARGS`] are
 /// dropped.
 pub fn setup_from(source: &'static mut [u8]) {
-    ARGV_INIT.call_once(|| {
+    let command_line = command_line();
+
+    command_line.init.call_once(|| {
         let scanned = CommandLine::scan(source);
 
         // SAFETY: `Once` runs this at most once and blocks every other caller
         // until it returns, so this is the only writer, and no reader can be
         // running: `installed` reads only after `is_completed` observes this
         // call finished.
-        unsafe { *INSTALLED.0.get() = scanned };
+        unsafe { *command_line.slot.get() = scanned };
     });
 }
 
@@ -101,14 +136,16 @@ impl ExactSizeIterator for Args {}
 
 /// Borrows the installed command line, or `None` before one is installed.
 fn installed() -> Option<&'static CommandLine> {
-    if !ARGV_INIT.is_completed() {
+    let command_line = command_line();
+
+    if !command_line.init.is_completed() {
         return None;
     }
 
     // SAFETY: `is_completed` is true, so the one write in `setup_from` has
-    // finished and nothing writes again. `INSTALLED` is a `static`, so the
+    // finished and nothing writes again. The slot lives in a `static`, so the
     // borrow is good for the rest of the program.
-    Some(unsafe { &*INSTALLED.0.get() })
+    Some(unsafe { &*command_line.slot.get() })
 }
 
 /// A scanned command line: the loader's buffer, and where each argument sits
@@ -234,10 +271,15 @@ struct Span {
     len: usize,
 }
 
-/// `Sync` wrapper for the write-once command-line store.
-struct InstalledCommandLine(UnsafeCell<CommandLine>);
+/// The write-once command-line store: the slot, and the guard that orders it.
+struct InstalledCommandLine {
+    /// Ensures the slot is written once, and answers whether it has been.
+    init: Once,
+    /// The command line, empty until [`setup_from`] installs one.
+    slot: UnsafeCell<CommandLine>,
+}
 
-// SAFETY: the cell is written once inside `ARGV_INIT`, which blocks every other
+// SAFETY: the slot is written once inside `init`, which blocks every other
 // caller until that write returns, and read only once `is_completed` observes
 // it. No reader can see it mid-write, and nothing writes it twice.
 unsafe impl Sync for InstalledCommandLine {}

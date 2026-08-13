@@ -11,6 +11,10 @@ doctest = false
 bench = false
 
 [features]
+# Borrow the process-wide command line from another static library instead of defining it. Exactly
+# one static library in a program leaves this off. Must not be combined with `ffi`.
+# See docs/code/rust-process-wide-state.md.
+extern-state = []
 # C-FFI surface: the C-style `(argc, argv)` view of the parsed command line —
 # the nul-terminated copies and the pointer array an entry crate publishes into
 # its `__nx_<aspect>__system_argc` / `__system_argv` globals. This crate exports
