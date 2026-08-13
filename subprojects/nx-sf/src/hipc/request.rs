@@ -705,7 +705,7 @@ pub struct Request<'a> {
 /// server may do with them, so each is its own variant: a caller that matches
 /// on this cannot read entries a mode did not reserve, nor treat "write into
 /// the message buffer" as if it named a destination.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RecvList<'a> {
     /// Wire mode `0`: no receive list. The server may not return pointer data.
     None,

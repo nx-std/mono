@@ -232,33 +232,42 @@ impl ToResultCode for ParseError {
 ///
 /// Alias for a [`HipcReply`] carrying a [`CmifReplyBody`] payload. Serialize it
 /// into the thread's IPC buffer with [`HipcReply::write_to`]; the server then
-/// hands that buffer to `ReplyAndReceive`.
-pub type CmifReply<'a> = HipcReply<CmifReplyBody<'a>>;
+/// hands that buffer to the reply-and-receive syscall.
+pub type CmifReply<P> = HipcReply<CmifReplyBody<P>>;
 
 /// Fluent builder for a [`CmifReply`].
 ///
 /// The result code is taken at construction rather than defaulted, because a
 /// reply that forgot to report a failure is indistinguishable on the wire from
 /// one that succeeded.
-pub struct CmifReplyBuilder<'a> {
+///
+/// The payload is a [`HipcPayload`] rather than a byte slice so a reply can be
+/// built from a value the caller owns. A handler computing a reply has nowhere
+/// to put bytes it would then lend out, and `()` and `&[u8]` both implement the
+/// trait, so the byte-slice case is unaffected.
+pub struct CmifReplyBuilder<P: HipcPayload = ()> {
     hipc: HipcReplyBuilder,
     result: ResultCode,
     token: u32,
-    payload: &'a [u8],
+    payload: P,
 }
 
-impl<'a> CmifReplyBuilder<'a> {
-    /// Starts a builder for a reply reporting `result`.
+impl CmifReplyBuilder {
+    /// Starts a builder for a reply reporting `result`, with no payload.
+    ///
+    /// Attach one via [`with_payload`](Self::with_payload).
     #[inline]
     pub fn new(result: ResultCode) -> Self {
         Self {
             hipc: HipcReplyBuilder::new(),
             result,
             token: 0,
-            payload: &[],
+            payload: (),
         }
     }
+}
 
+impl<P: HipcPayload> CmifReplyBuilder<P> {
     /// Echoes the request's context token back to the client.
     ///
     /// The header's version field follows from it - `1` for a versioned
@@ -270,16 +279,28 @@ impl<'a> CmifReplyBuilder<'a> {
         self
     }
 
-    /// Sets the reply payload bytes to copy into the CMIF data area.
+    /// Attaches the reply payload, type-changing the builder to carry `Q`.
+    ///
+    /// All previously-accumulated envelope state is preserved.
     #[inline]
-    pub fn with_data(mut self, data: &'a [u8]) -> Self {
-        self.payload = data;
-        self
+    pub fn with_payload<Q: HipcPayload>(self, payload: Q) -> CmifReplyBuilder<Q> {
+        CmifReplyBuilder {
+            hipc: self.hipc,
+            result: self.result,
+            token: self.token,
+            payload,
+        }
+    }
+
+    /// Sets the reply payload to bytes copied into the CMIF data area.
+    #[inline]
+    pub fn with_data(self, data: &[u8]) -> CmifReplyBuilder<&[u8]> {
+        self.with_payload(data)
     }
 
     /// Sets the reply payload from a typed value via its zero-copy byte view.
     #[inline]
-    pub fn with_data_value<T>(self, value: &'a T) -> Self
+    pub fn with_data_value<T>(self, value: &T) -> CmifReplyBuilder<&[u8]>
     where
         T: zerocopy::IntoBytes + zerocopy::Immutable,
     {
@@ -329,7 +350,7 @@ impl<'a> CmifReplyBuilder<'a> {
     }
 
     /// Finalizes the reply value.
-    pub fn build(self) -> CmifReply<'a> {
+    pub fn build(self) -> CmifReply<P> {
         let body = CmifReplyBody {
             result: self.result,
             token: self.token,
@@ -342,16 +363,17 @@ impl<'a> CmifReplyBuilder<'a> {
 /// In-band body for a CMIF reply.
 ///
 /// Encodes the alignment pad, the `OutHeader` carrying the `SFCO` magic and the
-/// result code, and the raw reply payload. It has the same shape as the control
-/// request body on the request side: no domain framing, no object-id tail.
+/// result code, and the reply payload after it. It has the same shape as the
+/// control request body on the request side: no domain framing, no object-id
+/// tail.
 #[derive(Debug, Clone)]
-pub struct CmifReplyBody<'a> {
+pub struct CmifReplyBody<P: HipcPayload> {
     result: ResultCode,
     token: u32,
-    payload: &'a [u8],
+    payload: P,
 }
 
-impl CmifReplyBody<'_> {
+impl<P: HipcPayload> CmifReplyBody<P> {
     /// Protocol version implied by the echoed token, matching how the request
     /// side derives it.
     fn cmif_version(&self) -> u32 {
@@ -359,15 +381,15 @@ impl CmifReplyBody<'_> {
     }
 }
 
-impl HipcPayload for CmifReplyBody<'_> {
+impl<P: HipcPayload> HipcPayload for CmifReplyBody<P> {
     /// Alignment slack for the leading pad ([`CMIF_HEADER_ALIGN`]), plus the
     /// `OutHeader` and the reply payload.
     fn encoded_len(&self) -> usize {
-        CMIF_HEADER_ALIGN + size_of::<OutHeader>() + self.payload.len()
+        CMIF_HEADER_ALIGN + size_of::<OutHeader>() + self.payload.encoded_len()
     }
 
     /// Writes the CMIF reply body: skip the [`CMIF_HEADER_ALIGN`] alignment
-    /// pad, then the `OutHeader` followed by the raw reply payload.
+    /// pad, then the `OutHeader` followed by the reply payload.
     fn write_to(&self, dst: &mut [u8]) {
         let region = &mut dst[..self.encoded_len()];
 
@@ -383,6 +405,6 @@ impl HipcPayload for CmifReplyBody<'_> {
         };
         let buf = write_section(buf, &header);
 
-        write_section(buf, self.payload);
+        self.payload.write_to(buf);
     }
 }

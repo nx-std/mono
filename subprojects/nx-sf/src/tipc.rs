@@ -4,8 +4,9 @@
 //! CMIF, it has no domain support and stores the command ID directly in the
 //! HIPC message type field.
 //!
-//! See the [`request`], [`response`], and [`wire`] submodules for the split
-//! between builders, response parsing, and wire-format types.
+//! Each submodule owns one message kind in both directions: `request` builds a
+//! request as a client and parses one as a server, `response` parses a reply as
+//! a client and builds one as a server. `wire` holds the layouts they share.
 //!
 //! # Protocol Stack
 //!
@@ -57,6 +58,13 @@
 //! TIPC supports (mapped buffers + copy handles). Build a [`TipcRequest`] with
 //! [`TipcRequestBuilder::build`] and serialize it with [`TipcRequest::write_to`].
 //!
+//! # Server-side coverage
+//!
+//! [`parse_request`] classifies an inbound message as a command or a session
+//! close, and [`TipcReplyBuilder`] answers it. There is nothing further to
+//! cover: TIPC has no domains and no control requests, so the server path is
+//! complete where CMIF's is not.
+//!
 //! # References
 //!
 //! - [Switchbrew IPC Marshalling](https://switchbrew.org/wiki/IPC_Marshalling)
@@ -68,15 +76,22 @@ mod wire;
 
 pub use self::{
     request::{
+        Command,
+        Request,
         RequestLayoutError,
+        RequestParseError,
         SendError,
         TipcCloseRequest,
         TipcRequest,
         TipcRequestBuilder,
+        parse_request,
     },
     response::{
         ParseResponseError,
         Response,
+        TipcReply,
+        TipcReplyBody,
+        TipcReplyBuilder,
         parse_response,
     },
     wire::CommandType,
