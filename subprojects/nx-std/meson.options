@@ -62,6 +62,13 @@ option(
 )
 
 option(
+    'use_nx_sys_env',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `sys-env` feature',
+    yield : true
+)
+
+option(
     'use_nx_sys_fd',
     type : 'feature', value : 'auto',
     description : 'Enable the `sys-fd` feature',

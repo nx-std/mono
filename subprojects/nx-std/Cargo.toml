@@ -31,6 +31,7 @@ ffi = [
     "nx-sf?/ffi",
     "nx-std-sync?/ffi",
     "nx-svc?/ffi",
+    "nx-sys-env?/ffi",
     "nx-sys-fd?/ffi",
     "nx-sys-mem?/ffi",
     "nx-sys-net?/ffi",
@@ -90,6 +91,8 @@ sf = ["dep:nx-sf"]
 svc = ["dep:nx-svc"]
 sync = ["dep:nx-std-sync", "alloc"]
 # Virtual file descriptor table and device registry, replacing libsysbase's
+# The process environment, replacing newlib's.
+sys-env = ["dep:nx-sys-env", "alloc"]
 sys-fd = ["dep:nx-sys-fd", "alloc"]
 # Forwards `sys-virtmem` to whichever runtime crate is in the build: its startup
 # sequence calls `virtmem`'s Rust API directly when the crate is present, and
@@ -138,6 +141,7 @@ nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
 nx-std-env = { version = "0.1.0", path = "../nx-std-env", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
+nx-sys-env = { version = "0.1.0", path = "../nx-sys-env", optional = true }
 nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd", optional = true }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem", optional = true }
 nx-sys-net = { version = "0.1.0", path = "../nx-sys-net", optional = true }

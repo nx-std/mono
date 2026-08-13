@@ -47,6 +47,8 @@ nx_sys_env_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Dependency declaration
 #---------------------------------------------------------------------------------
+nx_sys_env_ld_override = meson.current_source_dir() / 'env_override.ld'
+
 nx_sys_env_dep = declare_dependency(
     sources : nx_sys_env_tgt,
     dependencies : deps,

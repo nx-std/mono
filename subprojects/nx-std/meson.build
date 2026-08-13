@@ -90,6 +90,17 @@ if get_option('use_nx_svc').enabled()
     deps_cargo_features += ['svc']
 endif
 
+# nx-sys-env
+if get_option('use_nx_sys_env').enabled()
+    nx_sys_env_proj = subproject('nx-sys-env')
+
+    deps += nx_sys_env_proj.get_variable('nx_sys_env_dep')
+    deps_override_link_args += ['-T', nx_sys_env_proj.get_variable('nx_sys_env_ld_override')]
+
+    debug('sys-env feature: enabled')
+    deps_cargo_features += ['sys-env']
+endif
+
 # nx-sys-fd
 if get_option('use_nx_sys_fd').enabled()
     nx_sys_fd_proj = subproject('nx-sys-fd')
