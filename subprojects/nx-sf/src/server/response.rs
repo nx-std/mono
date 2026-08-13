@@ -148,9 +148,9 @@ impl<B: HipcPayload> Response<B> {
     ///
     /// # Errors
     ///
-    /// Returns [`PointerDataOverTipcError`] when the reply carries pointer data
-    /// and the session speaks TIPC, which has no descriptor to put it in.
-    pub fn into_reply(self, protocol: Protocol) -> Result<Reply<B>, PointerDataOverTipcError> {
+    /// Returns [`IncompatibleProtocolError`] when the reply and the protocol it
+    /// must be encoded for cannot be reconciled.
+    pub fn into_reply(self, protocol: Protocol) -> Result<Reply<B>, IncompatibleProtocolError> {
         match protocol {
             Protocol::Cmif(version) => {
                 let mut builder = CmifReplyBuilder::new(self.result).with_payload(self.body);
@@ -170,7 +170,7 @@ impl<B: HipcPayload> Response<B> {
             }
             Protocol::Tipc => {
                 if !self.send_statics.is_empty() {
-                    return Err(PointerDataOverTipcError);
+                    return Err(IncompatibleProtocolError);
                 }
                 let mut builder = TipcReplyBuilder::new(self.result).with_payload(self.body);
                 for &handle in self.copy_handles.as_slice() {
@@ -187,17 +187,23 @@ impl<B: HipcPayload> Response<B> {
 
 /// Error returned by [`Response::into_reply`].
 ///
-/// Occurs when the reply carries send statics and the session speaks TIPC,
-/// which has no pointer descriptors at all. Reachable only from a handler that
-/// returns out-pointer data on an interface a TIPC client reached, so it
-/// reports a mismatch between the interface's declared signature and the
-/// protocol serving it, not something a client can provoke. Nothing was
-/// encoded, so the caller still owes the client a reply.
+/// Occurs when a reply and the protocol it must be encoded for cannot be
+/// reconciled: the reply carries pointer data, which only CMIF has a descriptor
+/// for, and the session speaks TIPC.
+///
+/// It is an incompatibility rather than a fault on either side. The reply is
+/// well-formed and the protocol is behaving as specified; what does not hold is
+/// the pairing, because the reply reached outside the surface the two protocols
+/// share (see the module docs). That makes it a disagreement between an
+/// interface's own signature and the protocol serving it, never something a
+/// client can provoke.
+///
+/// Nothing was encoded, so the caller still owes the client a reply.
 #[derive(Debug, thiserror::Error)]
-#[error("the reply carries pointer data, and TIPC has no descriptor to carry it")]
-pub struct PointerDataOverTipcError;
+#[error("the reply carries pointer data, which the session's protocol cannot encode")]
+pub struct IncompatibleProtocolError;
 
-impl ToResultCode for PointerDataOverTipcError {
+impl ToResultCode for IncompatibleProtocolError {
     fn to_rc(self) -> ResultCode {
         // A reply this crate refused to encode. No service assigned it a code,
         // and the client is owed some answer rather than a dropped session.

@@ -370,7 +370,7 @@ pub enum ServeError {
     /// reply being unencodable is not this: that is reported to its sender as a
     /// result code and the loop continues.
     #[error("Failed to encode even a bare failure reply")]
-    EncodeFailureReply(#[source] super::response::PointerDataOverTipcError),
+    EncodeFailureReply(#[source] super::response::IncompatibleProtocolError),
     /// A reply carrying nothing but a result code did not fit the IPC buffer.
     ///
     /// Occurs on the same path and means the same thing as

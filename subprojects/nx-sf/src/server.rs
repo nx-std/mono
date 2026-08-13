@@ -14,6 +14,33 @@
 //! encoded the way the client will read it, not so the handler can branch on
 //! it.
 //!
+//! # What a handler may rely on: the portable surface is TIPC's
+//!
+//! The two protocols are not peers with a shared middle. CMIF is a strict
+//! superset: everything TIPC does - invoke a command by id, carry argument
+//! bytes and mapped buffers, pass copy and move handles, return a result code,
+//! hand back a sub-object as a move handle - CMIF also does. What TIPC drops is
+//! the machinery around that, not any of it: no magic to validate, no in-band
+//! header, no domains, no control requests, no pointer descriptors, no context
+//! token. It exists to be cheaper, not to be different.
+//!
+//! So the set of things a handler can do and still serve either client is
+//! exactly TIPC's, and that makes the contract statable rather than a matter of
+//! comparing two protocol modules: **write to TIPC's capabilities and one
+//! handler serves both**. Everything CMIF adds is an opt-out, not a feature to
+//! reach for and hope.
+//!
+//! Two consequences worth knowing, because they are the ones that surprise:
+//!
+//! - **Returning an object is portable.** A domain hands back an object id and
+//!   is CMIF-only, but a *non-domain* CMIF session returns a sub-object as a
+//!   move handle, exactly as TIPC does. Since [`Server`] refuses domain
+//!   conversion, every session it hosts is non-domain, so this needs no branch
+//!   at all.
+//! - **Returning pointer data is not.** Send statics are the one CMIF-only
+//!   facility a [`Response`] can currently express, and encoding such a reply
+//!   for a TIPC session fails with [`IncompatibleProtocolError`].
+//!
 //! # Head and body
 //!
 //! A [`Request`] is [`Parts`] plus a body, the split `http` uses. What lands on
@@ -45,8 +72,11 @@
 //! [`Service`] is the trait an interface implements, and [`Server`] is the loop
 //! that feeds it: it owns the port, accepts the sessions arriving on it, and
 //! drives the kernel call that both sends the previous reply and waits for the
-//! next request. Together they are the `hyper` half of the picture; the router
-//! and extractors that would sit above them are not written yet.
+//! next request. Together they are the `hyper` half of the picture.
+//!
+//! [`Router`] is the `axum` half above them: one handler per [`CommandId`],
+//! each an ordinary function whose parameters are extracted from the request.
+//! A `Router` is itself a `Service`, so hosting one is hosting an interface.
 
 mod body;
 mod command;
@@ -87,7 +117,7 @@ pub use self::{
         parse_request,
     },
     response::{
-        PointerDataOverTipcError,
+        IncompatibleProtocolError,
         Reply,
         Response,
     },
