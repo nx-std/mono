@@ -1,8 +1,6 @@
-//! # nx-std-env
-//!
 //! The process's environment, in the shape `std` gives it.
 //!
-//! This crate is the workspace's stand-in for `std::env`.
+//! This module is the workspace's stand-in for `std::env`.
 //!
 //! ## What it is for
 //!
@@ -11,7 +9,7 @@
 //! `nx-sys-env` reaches the C library's environment in bytes under the lock
 //! that orders those calls. Both are right for the layer that owns the
 //! resource and wrong for a caller, who wants the vocabulary `std` uses.
-//! Turning the one into the other is this crate's whole job, and it is the
+//! Turning the one into the other is this module's whole job, and it is the
 //! division `std` makes: `std::sys` holds, `std::env` presents.
 //!
 //! ## Nothing here initializes anything
@@ -42,16 +40,6 @@
 //!   nothing here sets.
 //!
 //! Each belongs here the moment its answer does.
-#![no_std]
-
-extern crate nx_panic_handler as _; // provides #[panic_handler]
-
-extern crate alloc;
-
-// Proves a global allocator exists for the owned types below; the umbrella still owns the
-// singular `#[global_allocator]` registration at link time.
-extern crate nx_alloc as _;
-
 mod args;
 pub mod consts;
 mod vars;

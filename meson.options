@@ -51,7 +51,7 @@ option(
 option(
     'use_nx_std_env',
     type : 'feature', value : 'auto',
-    description : 'Enable nx-std-env (the process environment in `std::env` shape)',
+    description : 'Enable nx_std::env (the process environment in `std::env` shape)',
     yield : true
 )
 
