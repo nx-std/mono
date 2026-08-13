@@ -51,7 +51,10 @@
 
 extern crate nx_panic_handler as _; // Provides `#[panic_handler]`.
 
-use core::cell::Cell;
+use core::{
+    cell::Cell,
+    time::Duration,
+};
 
 use nx_service_sm::SmService;
 use nx_sf::service::{
@@ -61,6 +64,7 @@ use nx_sf::service::{
     DomainObjectRef,
     Session,
 };
+use nx_svc::sync::wait_synchronization;
 
 mod cmif;
 mod dispatch;
@@ -517,12 +521,10 @@ impl NifmRequest<'_> {
     /// - Otherwise refresh the cached state + result via cmds 0 and 1, and
     ///   return the refreshed state.
     pub fn get_request_state(&self) -> Result<NifmRequestState, DispatchError> {
-        use nx_svc::sync::wait_synchronization_single;
-        // SAFETY: `event_request_state` is a live kernel readable-event handle.
-        let signaled = unsafe { wait_synchronization_single(&self.event_request_state, 0) };
+        let signaled = wait_synchronization(&self.event_request_state, Some(Duration::ZERO));
         if signaled.is_err() {
-            // Either timeout or another error — either way, libnx returns the
-            // cached state without surfacing the wait error.
+            // Either timeout or another error: either way, the cached state is
+            // returned without surfacing the wait error.
             return Ok(self.cached_state.get());
         }
         self.refresh_state();
@@ -533,9 +535,7 @@ impl NifmRequest<'_> {
     /// has not signaled, otherwise refreshes the cache and returns the new
     /// result.
     pub fn get_result(&self) -> Result<(), DispatchError> {
-        use nx_svc::sync::wait_synchronization_single;
-        // SAFETY: `event_request_state` is a live kernel readable-event handle.
-        let signaled = unsafe { wait_synchronization_single(&self.event_request_state, 0) };
+        let signaled = wait_synchronization(&self.event_request_state, Some(Duration::ZERO));
         if signaled.is_ok() {
             self.refresh_state();
         }
@@ -568,11 +568,11 @@ impl NifmRequest<'_> {
         Ok(())
     }
 
-    /// Mirrors libnx's `nifmRequestSubmitAndWait`: submits and then polls the
-    /// state, waiting on `event_request_state` (10s timeout per iteration)
-    /// until the state is not `OnHold`.
+    /// Submits the request and then polls the state until it is no longer
+    /// `OnHold`, waiting on `event_request_state` between polls.
     pub fn submit_and_wait(&self) -> Result<(), DispatchError> {
-        use nx_svc::sync::wait_synchronization_single;
+        /// How long one poll iteration waits on the request-state event.
+        const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
         self.submit_libnx()?;
         loop {
@@ -580,10 +580,7 @@ impl NifmRequest<'_> {
             if state != NifmRequestState::OnHold {
                 return Ok(());
             }
-            // 10s timeout, matching libnx's `10000000000ULL` nanoseconds.
-            // SAFETY: `event_request_state` is a live kernel readable-event handle.
-            let waited =
-                unsafe { wait_synchronization_single(&self.event_request_state, 10_000_000_000) };
+            let waited = wait_synchronization(&self.event_request_state, Some(POLL_INTERVAL));
             if waited.is_ok() {
                 self.refresh_state();
                 return Ok(());

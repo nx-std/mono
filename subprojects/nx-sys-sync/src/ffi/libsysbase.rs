@@ -20,7 +20,6 @@ use crate::{
     condvar::Condvar,
     mutex::Mutex,
     remutex::ReentrantMutex,
-    wait::Timeout,
 };
 
 /// POSIX error: Bad file descriptor (used when recursive lock counter != 1).
@@ -175,7 +174,10 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait(
 ) -> c_int {
     // SAFETY: the caller guarantees both `cond` and `lock` point to live, initialized objects
     // that outlive the call, and that this thread holds `lock`.
-    let result = unsafe { &*cond }.wait_timeout(unsafe { &*lock }, Timeout::from(timeout_ns));
+    let result = unsafe { &*cond }.wait_timeout(
+        unsafe { &*lock },
+        nx_svc::sync::timeout_from_raw(timeout_ns),
+    );
     errno_from_result(result)
 }
 
@@ -191,7 +193,10 @@ pub unsafe extern "C" fn __nx_sys_sync__libsysbase_syscall_cond_wait_recursive(
 ) -> c_int {
     // SAFETY: the caller guarantees both `lock` and `cond` point to live, initialized objects that
     // outlive the call, and that this thread holds `lock`.
-    match unsafe { &*lock }.cond_wait(unsafe { &*cond }, Timeout::from(timeout_ns)) {
+    match unsafe { &*lock }.cond_wait(
+        unsafe { &*cond },
+        nx_svc::sync::timeout_from_raw(timeout_ns),
+    ) {
         Ok(result) => errno_from_result(result),
         // The caller does not hold the mutex exactly once, so there is no lock state this
         // wait could correctly release and restore.

@@ -384,9 +384,7 @@ fn wait_in_focus(common_state_getter: CommonStateGetter<'_>) -> Result<(), WaitI
         .map_err(WaitInFocusError::GetFocusState)?;
 
     while focus_state != AppletFocusState::InFocus {
-        // SAFETY: `event` owns the handle for the whole of this loop, so it
-        // names a live kernel event.
-        unsafe { nx_svc::sync::wait_synchronization_single(event.as_handle(), u64::MAX) }
+        nx_svc::sync::wait_synchronization(event.as_handle(), None)
             .map_err(WaitInFocusError::WaitSynchronization)?;
 
         // The event does not clear itself, so the signal is cleared here;

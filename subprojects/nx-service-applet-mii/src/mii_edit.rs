@@ -355,10 +355,7 @@ fn run(
         .get_library_applet_launchable_event()
         .map_err(RunError::LaunchableEvent)?;
 
-    // SAFETY: The handle names the event the server just issued, and the wait
-    // borrows it for the call.
-    unsafe { nx_svc::sync::wait_synchronization_single(&launchable, u64::MAX) }
-        .map_err(RunError::WaitLaunchable)?;
+    nx_svc::sync::wait_synchronization(&launchable, None).map_err(RunError::WaitLaunchable)?;
 
     let accessor = creator
         .create_library_applet(

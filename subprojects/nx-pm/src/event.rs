@@ -5,6 +5,8 @@
 //! closed when the wrapper is dropped, and both expose a blocking
 //! [`wait`](ProcessEvent::wait) via `svcWaitSynchronization`.
 
+use core::time::Duration;
+
 use nx_svc::{
     raw::Handle,
     sync::EventHandle,
@@ -35,14 +37,9 @@ impl ProcessEvent {
         }
     }
 
-    /// Blocks until the event is signalled or `timeout_ns` elapses.
-    ///
-    /// Pass `u64::MAX` for an infinite wait.
-    pub fn wait(&self, timeout_ns: u64) -> Result<(), WaitError> {
-        // SAFETY: `self.handle` is a valid kernel handle owned by this process
-        // for as long as `self` lives, and it is not one of the pseudo-handles.
-        unsafe { nx_svc::sync::wait_synchronization_single(&self.handle, timeout_ns) }
-            .map_err(WaitError)
+    /// Blocks until the event is signalled, or until `timeout` elapses.
+    pub fn wait(&self, timeout: Option<Duration>) -> Result<(), WaitError> {
+        nx_svc::sync::wait_synchronization(&self.handle, timeout).map_err(WaitError)
     }
 
     /// Returns the underlying [`EventHandle`] for interop with other
@@ -87,13 +84,9 @@ impl ProcessHook {
         }
     }
 
-    /// Blocks until the hook fires or `timeout_ns` elapses.
-    ///
-    /// Pass `u64::MAX` for an infinite wait.
-    pub fn wait(&self, timeout_ns: u64) -> Result<(), WaitError> {
-        // SAFETY: see [`ProcessEvent::wait`].
-        unsafe { nx_svc::sync::wait_synchronization_single(&self.handle, timeout_ns) }
-            .map_err(WaitError)
+    /// Blocks until the hook fires, or until `timeout` elapses.
+    pub fn wait(&self, timeout: Option<Duration>) -> Result<(), WaitError> {
+        nx_svc::sync::wait_synchronization(&self.handle, timeout).map_err(WaitError)
     }
 
     /// Returns the underlying [`EventHandle`].

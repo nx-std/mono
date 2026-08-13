@@ -1,5 +1,7 @@
 //! Synchronization primitives
 
+use core::time::Duration;
+
 use crate::{
     error::{
         _sealed,
@@ -34,7 +36,7 @@ define_reset_handle_type! {
     ///
     /// This represents a waitable event handle obtained from services via copy handles.
     /// Events are signaled by the system when specific conditions occur, and can be
-    /// waited on using `wait_synchronization_single` or `wait_synchronization_multiple`.
+    /// waited on using `wait_synchronization` or `wait_synchronization_multiple`.
     ///
     /// # Distinction from SessionHandle
     ///
@@ -217,7 +219,7 @@ impl _sealed::Sealed for ArbitrateUnlockError {}
 /// | IN | _condvar_ | Pointer to the condition variable in userspace memory. |
 /// | IN | _mutex_ | Pointer to the mutex raw tag value in userspace memory. |
 /// | IN | _tag_ | The thread handle value associated with the mutex. |
-/// | IN | _timeout_ns_ | Timeout in nanoseconds. Use 0 for no timeout, -1 for infinite wait. |
+/// | IN | _timeout_ | How long the wait may last; `None` waits until signalled. |
 ///
 /// # Behavior
 /// This function calls the [`__nx_svc__svc_wait_process_wide_key_atomic`] syscall with the provided arguments.
@@ -237,8 +239,8 @@ impl _sealed::Sealed for ArbitrateUnlockError {}
 /// - This is a blocking operation that will pause the current thread
 /// - The mutex must be held by the current thread before calling this function
 /// - The operation is atomic - no other thread can acquire the mutex between release and wait
-/// - If timeout is 0, returns immediately after releasing mutex
-/// - If timeout is -1, waits indefinitely
+/// - A zero timeout returns immediately after releasing the mutex
+/// - A `None` timeout waits indefinitely
 ///
 /// # Safety
 /// The caller must guarantee:
@@ -255,9 +257,14 @@ pub unsafe fn wait_process_wide_key_atomic(
     condvar: *mut u32,
     mutex: *mut u32,
     tag: u32,
-    timeout_ns: u64,
+    timeout: Option<Duration>,
 ) -> Result<(), WaitProcessWideKeyError> {
-    let res = unsafe { raw::wait_process_wide_key_atomic(mutex, condvar, tag, timeout_ns) };
+    // SAFETY: this function's own `# Safety` contract requires of `condvar` and `mutex` exactly
+    // what the syscall does: each addressing an aligned, writable `u32` in this process that stays
+    // mapped for the whole wait, with the calling thread owning the mutex. The obligation is
+    // forwarded to this call site, not discharged here.
+    let res =
+        unsafe { raw::wait_process_wide_key_atomic(mutex, condvar, tag, timeout_to_raw(timeout)) };
     RawResult::from_raw(res).map((), |rc| match rc.description() {
         desc if KError::InvalidAddress == desc => WaitProcessWideKeyError::InvalidMemState,
         desc if KError::TerminationRequested == desc => WaitProcessWideKeyError::ThreadTerminating,
@@ -337,89 +344,77 @@ pub unsafe fn signal_process_wide_key(condvar: *mut u32, count: i32) {
     unsafe { raw::signal_process_wide_key(condvar, count) };
 }
 
-/// Upper bound on how many synchronization objects the high-level public wrappers
-/// ([`wait_synchronization_multiple`] and [`wait_synchronization_single`]) will forward to the
-/// kernel.
+/// Upper bound on how many synchronization objects one wait may cover.
 ///
-/// If the caller supplies a longer slice, only the first `MAX_WAIT_HANDLES` elements are forwarded
-/// and the remainder is **silently ignored**.  This mirrors the Horizon kernel limit (64) while
-/// avoiding a panic or allocation inside the wrapper.
+/// This is the Horizon kernel's own limit. A wait covering more objects than this is rejected
+/// with [`WaitSyncError::OutOfRange`] rather than silently narrowed: a caller who believes it is
+/// waiting on an object the wait never covered blocks until one of the *other* objects fires,
+/// which reads as a hang with no failing call to trace it to.
 pub const MAX_WAIT_HANDLES: usize = 64;
 
 /// Blocks the current thread until `handle` is signalled, a timeout expires or the wait is
 /// cancelled.
 ///
-/// This is a convenience wrapper around [`wait_synchronization_multiple`] that forwards exactly
-/// one handle.  On success it discards the signalled‐index information and simply returns `Ok(())`.
+/// The one-object case of [`wait_synchronization_multiple`]: there is only one object the wait can
+/// return for, so the signalled index carries nothing and this returns `Ok(())`.
 ///
-/// # Arguments
-/// * `handle`     – Object implementing [`Waitable`].  Its underlying kernel handle is extracted
-///   via [`Waitable::raw_handle`].
-/// * `timeout`    – Timeout in nanoseconds (use `u64::MAX` for an infinite wait, `0` for an
-///   immediate check).
+/// A `None` timeout waits until the object is signalled, however long that takes.
+/// `Some(Duration::ZERO)` polls instead: the call returns immediately, with
+/// [`WaitSyncError::TimedOut`] standing for "not signalled".
 ///
-/// Returns an [`Ok(())`] on success or a [`WaitSyncError`] if the wait fails.
+/// # Errors
 ///
-/// # Safety
-/// See [`wait_synchronization_multiple`].  In addition, the caller must uphold those invariants
-/// for the single `handle` passed here.
-pub unsafe fn wait_synchronization_single<W>(handle: &W, timeout: u64) -> Result<(), WaitSyncError>
+/// Returns [`WaitSyncError::TimedOut`] if the timeout expires first, and
+/// [`WaitSyncError::InvalidHandle`] if `handle` names no live kernel object this process owns or
+/// is one of the pseudo-handles [`raw::CUR_THREAD_HANDLE`] / [`raw::CUR_PROCESS_HANDLE`]. See
+/// [`WaitSyncError`] for the rest.
+pub fn wait_synchronization<W>(handle: &W, timeout: Option<Duration>) -> Result<(), WaitSyncError>
 where
     W: Waitable,
 {
-    // SAFETY: We forward a single raw handle; the slice we create lives on the stack for the full
-    // duration of the syscall and thus fulfils the memory invariants documented below.
-    unsafe { wait_synchronization(&[handle.raw_handle()], timeout).map(|_| ()) }
+    wait_synchronization_raw(&[handle.raw_handle()], timeout).map(|_| ())
 }
 
-/// Waits on *up to* [`MAX_WAIT_HANDLES`] objects, returning the index of the first one that becomes
+/// Waits on every object in `handles`, returning the index of the first one that becomes
 /// signalled.
 ///
 /// Compared to the low-level [`raw::wait_synchronization`] syscall this helper accepts any type
-/// implementing [`Waitable`], automatically truncates slices longer than the kernel's maximum and
-/// hides the `unsafe` call site from the user.
+/// implementing [`Waitable`] and copies the raw handles into a stack buffer for the call, so no
+/// caller has to keep an array of raw handle words of its own.
 ///
-/// # Arguments
-/// * `handles`    – Any iterator yielding [`Waitable`] objects. If it produces more than
-///   [`MAX_WAIT_HANDLES`] elements, only the first `MAX_WAIT_HANDLES` values are
-///   considered; additional items are **silently ignored**.
-/// * `timeout`    – Timeout in nanoseconds (`u64::MAX` ≅ infinite).
+/// The returned index is an index into `handles`. A `None` timeout waits until one of the objects
+/// is signalled, however long that takes.
 ///
-/// Returns an [`Ok(usize)`] indicating the index of the signalled handle on success or a
-/// [`WaitSyncError`] if the wait fails.
+/// # Errors
 ///
-/// # Safety
-/// The caller must guarantee that **each handle yielded by the iterator and actually forwarded to
-/// the kernel (i.e. the first *n* items with `n ≤ MAX_WAIT_HANDLES`)**:
-/// 1. Yields a *valid* kernel handle owned by the current process.
-/// 2. Is *not* one of the special pseudo-handles [`raw::CUR_THREAD_HANDLE`] or
-///    [`raw::CUR_PROCESS_HANDLE`].
+/// Returns [`WaitSyncError::OutOfRange`] if `handles` is empty or holds more than
+/// [`MAX_WAIT_HANDLES`] entries; the wait is not issued in either case. An empty wait is rejected
+/// here rather than forwarded because the kernel reads it as "sleep for the timeout" and reports
+/// an index the caller has no entry for.
 ///
-/// The underlying kernel handles must remain valid for the entire duration of the wait.  No
-/// additional memory-safety requirements apply because the values are copied into a stack buffer
-/// before the syscall is issued.
-pub unsafe fn wait_synchronization_multiple<'a, W, I>(
-    handles: I,
-    timeout: u64,
+/// Otherwise returns [`WaitSyncError::TimedOut`] if the timeout expires first, and
+/// [`WaitSyncError::InvalidHandle`] if any entry names no live kernel object this process owns or
+/// is one of the pseudo-handles [`raw::CUR_THREAD_HANDLE`] / [`raw::CUR_PROCESS_HANDLE`]. See
+/// [`WaitSyncError`] for the rest.
+pub fn wait_synchronization_multiple<W>(
+    handles: &[W],
+    timeout: Option<Duration>,
 ) -> Result<usize, WaitSyncError>
 where
-    W: Waitable + 'a,
-    I: IntoIterator<Item = &'a W>,
+    W: Waitable,
 {
-    // Limit the number of handles to the kernel limit
-    let handles_iter = handles.into_iter().take(MAX_WAIT_HANDLES);
-
-    // Build a stack-allocated array and copy up to `MAX_WAIT_HANDLES` raw handles into it.
-    let mut raw_handles: [Handle; MAX_WAIT_HANDLES] = [raw::INVALID_HANDLE; MAX_WAIT_HANDLES];
-    let mut raw_handles_count = 0usize;
-    for (slot, h) in raw_handles.iter_mut().zip(handles_iter) {
-        *slot = h.raw_handle();
-        raw_handles_count += 1;
+    if handles.is_empty() || handles.len() > MAX_WAIT_HANDLES {
+        return Err(WaitSyncError::OutOfRange);
     }
 
-    // SAFETY: We forward at most `MAX_WAIT_HANDLES` handles, each obtained from a `Waitable`
-    // supplied by the caller. The slice lives on the stack for the entire syscall.
-    unsafe { wait_synchronization(&raw_handles[..raw_handles_count], timeout) }
+    // Copy the raw handle words into a stack buffer: the kernel reads the array while this thread
+    // is blocked, and `handles` itself holds `Waitable` values whose layout it knows nothing of.
+    let mut raw_handles: [Handle; MAX_WAIT_HANDLES] = [raw::INVALID_HANDLE; MAX_WAIT_HANDLES];
+    for (slot, handle) in raw_handles.iter_mut().zip(handles) {
+        *slot = handle.raw_handle();
+    }
+
+    wait_synchronization_raw(&raw_handles[..handles.len()], timeout)
 }
 
 /// Waits on one or more synchronization objects
@@ -427,53 +422,44 @@ where
 /// Suspends the current thread until one of the given synchronization handles is signalled,
 /// a timeout occurs or the wait gets cancelled.
 ///
-/// # Arguments
-/// | Arg | Name | Description |
-/// | --- | --- | --- |
-/// | IN | _handles_ | Slice of raw kernel handles. If the slice is longer than [`MAX_WAIT_HANDLES`], only the first [`MAX_WAIT_HANDLES`] elements are considered. |
-/// | IN | _timeout_ | Timeout in nanoseconds. Use `u64::MAX` for an infinite wait, `0` for an immediate check. |
-///
-/// Returns an [`Ok(usize)`] indicating the index of the signalled handle on success or a
-/// [`WaitSyncError`] if the wait fails.
-///
 /// # Behavior
 /// This function calls the [`__nx_svc__svc_wait_synchronization`] syscall under the hood.
 /// The kernel will:
 /// 1. Validate all provided handles and memory access.
 /// 2. If any of the objects are already signalled, return immediately with its index.
 /// 3. Otherwise, block the current thread until either:
-///    - One of the objects becomes signalled → success, returning its index.
-///    - The timeout expires              → [`WaitSyncError::TimedOut`].
-///    - The wait gets cancelled via [`__nx_svc__svc_cancel_synchronization`] → [`WaitSyncError::Cancelled`].
+///    - One of the objects becomes signalled, returning its index.
+///    - The timeout expires, giving [`WaitSyncError::TimedOut`].
+///    - The wait gets cancelled via [`__nx_svc__svc_cancel_synchronization`], giving
+///      [`WaitSyncError::Cancelled`].
 ///
-/// # Notes
-/// - Passing an empty slice results in a sleep until `timeout_ns` elapses (or indefinitely when
-///   `timeout_ns == u64::MAX`). In that case the returned index value is implementation-defined and
-///   should not be relied upon.
-/// - The special pseudo-handles [`raw::CUR_THREAD_HANDLE`] and [`raw::CUR_PROCESS_HANDLE`] **must not**
-///   appear among the first [`MAX_WAIT_HANDLES`] entries – doing so triggers
-///   [`WaitSyncError::InvalidHandle`].
-/// - The error variant [`WaitSyncError::OutOfRange`] is unlikely to be returned by this
-///   wrapper because the argument list is clamped to [`MAX_WAIT_HANDLES`] before the syscall is issued;
-///   it is kept for forward-compatibility.
+/// # Errors
 ///
-/// # Safety
-/// The caller must uphold the following invariants:
-/// 1. Only the first `handles.len().min(MAX_WAIT_HANDLES)` entries are forwarded. Each of those
-///    handles **must** be valid, owned by the current process and **must not** be one of the
-///    pseudo-handles [`raw::CUR_THREAD_HANDLE`] or [`raw::CUR_PROCESS_HANDLE`].
-/// 2. The memory backing the `handles` slice must remain valid and immutable for the entire
-///    duration of the syscall (it is read by the kernel while the thread is in user-space).
-///
-/// Violating any of these requirements results in **undefined behaviour**.
-unsafe fn wait_synchronization(handles: &[Handle], timeout: u64) -> Result<usize, WaitSyncError> {
+/// A handle that names no live kernel object, and either of the pseudo-handles
+/// [`raw::CUR_THREAD_HANDLE`] / [`raw::CUR_PROCESS_HANDLE`], are answered with
+/// [`WaitSyncError::InvalidHandle`]. A `handles` length outside `0..=MAX_WAIT_HANDLES` is
+/// answered with [`WaitSyncError::OutOfRange`]. Neither faults, which is why this is a safe
+/// function: the kernel validates the array it is handed and reports what it rejected.
+fn wait_synchronization_raw(
+    handles: &[Handle],
+    timeout: Option<Duration>,
+) -> Result<usize, WaitSyncError> {
     let mut idx: i32 = -1;
+
+    // The length cast cannot lose a bit: both callers build `handles` from a stack array of
+    // `MAX_WAIT_HANDLES` (64) entries, so the length is far inside `i32`.
+    let handle_count = handles.len() as i32;
 
     // SAFETY: The pointer passed to the kernel is valid for `handles.len()` * size_of::<Handle>()
     // bytes because the slice lives on the stack (borrowed from `handles`) for the entire syscall
     // duration and is immutable.
     let rc = unsafe {
-        raw::wait_synchronization(&mut idx, handles.as_ptr(), handles.len() as i32, timeout)
+        raw::wait_synchronization(
+            &mut idx,
+            handles.as_ptr(),
+            handle_count,
+            timeout_to_raw(timeout),
+        )
     };
 
     RawResult::from_raw(rc).map(idx as usize, |rc| match rc.description() {
@@ -635,3 +621,51 @@ impl ToResultCode for CloseHandleError {
 }
 
 impl _sealed::Sealed for CloseHandleError {}
+
+/// The raw value the blocking SVCs read as "no deadline".
+const TIMEOUT_INFINITE_RAW: u64 = u64::MAX;
+
+/// The longest deadline that is still a deadline.
+///
+/// One nanosecond short of [`TIMEOUT_INFINITE_RAW`], so that clamping a duration too large to
+/// express cannot land on the sentinel and turn a bounded wait into an unbounded one. The
+/// difference is 1ns in a wait of roughly 584 years; the difference between bounded and unbounded
+/// is a hang.
+const TIMEOUT_LONGEST_RAW: u64 = u64::MAX - 1;
+
+/// Encodes a wait deadline in the form the blocking SVCs take.
+///
+/// Private because no caller outside this module needs it: every blocking wrapper here takes the
+/// deadline already typed, so the sentinel is encoded once, at the SVC.
+///
+/// A deadline is an `Option<Duration>`: `Some(d)` bounds the wait, `None` lets it run until it is
+/// woken. That is the shape `std` gives the same idea, and it keeps "no deadline" a value no
+/// arithmetic can land on by accident. The SVCs underneath take a plain `u64` of nanoseconds in
+/// which `u64::MAX` carries that meaning, and this function is the one place that knows it.
+///
+/// A `Duration` counts nanoseconds in a `u128`, so it reaches further than that `u64`. One that
+/// does not fit is clamped to [`TIMEOUT_LONGEST_RAW`] rather than to the sentinel: a caller asking
+/// for a wait longer than the ABI can name still gets a wait that ends.
+#[inline]
+fn timeout_to_raw(timeout: Option<Duration>) -> u64 {
+    let Some(duration) = timeout else {
+        return TIMEOUT_INFINITE_RAW;
+    };
+
+    match u64::try_from(duration.as_nanos()) {
+        Ok(nanos) if nanos < TIMEOUT_INFINITE_RAW => nanos,
+        _ => TIMEOUT_LONGEST_RAW,
+    }
+}
+
+/// Decodes the wait deadline a C caller passed across the FFI boundary.
+///
+/// The decoding half of the sentinel this module owns. Every `u64` denotes a deadline, so this
+/// cannot fail: the sentinel is one specific value and everything else is a nanosecond count.
+#[inline]
+pub fn timeout_from_raw(raw: u64) -> Option<Duration> {
+    match raw {
+        TIMEOUT_INFINITE_RAW => None,
+        nanos => Some(Duration::from_nanos(nanos)),
+    }
+}

@@ -22,7 +22,6 @@ use alloc::{
     },
     boxed::Box,
     sync::Arc,
-    vec::Vec,
 };
 use core::{
     cell::UnsafeCell,
@@ -60,10 +59,8 @@ use nx_svc::{
     raw::ThreadContext,
     result::Error,
     sync::{
-        MAX_WAIT_HANDLES,
         WaitSyncError,
-        wait_synchronization_multiple,
-        wait_synchronization_single,
+        wait_synchronization,
     },
     thread::{
         CloseHandleError,
@@ -1008,6 +1005,40 @@ impl<T: Send + 'static> JoinHandle<T> {
         // discharges `reclaim_after_exit_spawn`'s exit precondition.
         unsafe { reclaim_after_exit_spawn(inner) }
     }
+
+    /// Returns `true` once the spawned thread has finished.
+    ///
+    /// Polls the thread's kernel handle without blocking, so it is the
+    /// non-blocking counterpart to [`join`](Self::join). A `true` answer means
+    /// `join` will not block; it does not reclaim anything, so `join` is still
+    /// what recovers the closure's return value.
+    ///
+    /// A handle the kernel refuses to report on reads as "not finished", which
+    /// keeps this infallible like its `std` counterpart. The condition is not
+    /// silently swallowed: it is the same handle `join` waits on, so `join`
+    /// surfaces it as a [`JoinError::Wait`].
+    pub fn is_finished(&self) -> bool {
+        let Some(inner) = self.inner.as_ref() else {
+            // `join` and the `Drop` detach both consume the handle by value, so
+            // an inert handle cannot be observed through `&self` from outside.
+            // Reachable only from this crate, and "finished" is the honest
+            // answer for a thread whose state has already been handed off.
+            return true;
+        };
+
+        // Read the creation-fixed kernel handle through a raw pointer; forming a
+        // `&ThreadControl` would race the running thread's self-mutation of its
+        // own `state`, `prev` and `next` fields.
+        // SAFETY: `inner` is a live `Arc<SpawnInner<T>>`, so `Arc::as_ptr` yields
+        // a pointer valid for this read, and `handle` is fixed at creation and
+        // never written again.
+        let handle = unsafe { (*Arc::as_ptr(inner)).thread.handle };
+
+        // A zero timeout turns the wait into a poll: the kernel signals a thread
+        // handle when the thread terminates, so `Ok` means exited and `TimedOut`
+        // means still running.
+        matches!(wait_synchronization(&handle, Some(Duration::ZERO)), Ok(()))
+    }
 }
 
 impl<T: Send + 'static> Drop for JoinHandle<T> {
@@ -1092,8 +1123,8 @@ impl<T: Send + 'static> Detachable for SpawnInner<T> {
 /// - `inner` must be the un-cloned [`spawn`] join-handle `Arc` whose thread-side
 ///   count has not yet been reclaimed.
 /// - The thread must have *already exited*, its termination observed through
-///   [`wait_for_exit`]/[`wait_for_any_exit`], so its trampoline write of
-///   `result` happened-before this call, and it never touches the state again.
+///   [`wait_for_exit`], so its trampoline write of `result` happened-before this
+///   call, and it never touches the state again.
 unsafe fn reclaim_after_exit_spawn<T: Send + 'static>(
     inner: Arc<SpawnInner<T>>,
 ) -> Result<T, JoinError<T>> {
@@ -1700,10 +1731,15 @@ impl _sealed::Sealed for StartError {}
 ///
 /// Waits on the thread's kernel handle, which the kernel signals when the
 /// thread terminates; the wait is unbounded. Once it returns `Ok`, the thread
-/// has run its exit path and [`close`] can safely reclaim its resources — the
+/// has run its exit path and [`close`] can safely reclaim its resources: the
 /// two together form a join.
 ///
-/// `thread` is a raw [`NonNull`] supplied by the caller — the live-thread
+/// This is the crate's raw join half, kept internal so that
+/// [`JoinHandle::join`] is the only way a consumer waits on a thread. The
+/// pointer discipline below is why: a caller that gets this wrong has a
+/// use-after-free, whereas `JoinHandle` owns the state it waits on and cannot.
+///
+/// `thread` is a raw [`NonNull`] supplied by the caller: the live-thread
 /// registry and [`current`] hand out raw pointers, and [`start`] pins the
 /// joined thread to one. `wait_for_exit` reads only the creation-fixed
 /// `handle`, so it forms no `&ThreadControl`.
@@ -1711,69 +1747,18 @@ impl _sealed::Sealed for StartError {}
 /// # Safety
 ///
 /// `thread` must point to a [`ThreadControl`] that stays valid for the whole
-/// wait — in practice the joined thread's pinned core state, which its joiner
+/// wait, in practice the joined thread's pinned core state, which its joiner
 /// keeps alive until this call returns.
-pub unsafe fn wait_for_exit(thread: NonNull<ThreadControl>) -> Result<(), WaitError> {
+pub(crate) unsafe fn wait_for_exit(thread: NonNull<ThreadControl>) -> Result<(), WaitError> {
     // Read the creation-fixed kernel handle through the raw pointer; forming a
     // `&ThreadControl` would race the target thread's self-mutation.
     // SAFETY: by the `# Safety` contract `thread` points to a valid
     // `ThreadControl`; `handle` is fixed at creation and never written again.
     let handle = unsafe { (*thread.as_ptr()).handle };
-    // SAFETY: `handle` is the thread's kernel handle from `create` — a valid,
-    // process-owned thread handle, never a pseudo-handle — and the slice
-    // borrowing it stays live for the whole syscall.
-    unsafe { wait_synchronization_single(&handle, u64::MAX) }.map_err(WaitError::from)
+    wait_synchronization(&handle, None).map_err(WaitError::from)
 }
 
-/// Blocks until any one of `threads` has exited, returning its index.
-///
-/// The multi-handle counterpart of [`wait_for_exit`]: it waits on every
-/// thread's kernel handle at once and returns the index — into `threads` — of
-/// the first to terminate. At most [`MAX_WAIT_HANDLES`] threads are waited on;
-/// if `threads` is longer, only its leading prefix is waited and the returned
-/// index still falls within that prefix, so the caller revisits the remainder.
-///
-/// Like [`wait_for_exit`], it reads only each thread's creation-fixed `handle`
-/// through a raw pointer, forming no `&ThreadControl`.
-///
-/// # Panics
-///
-/// Panics if `threads` is empty — a zero-handle wait is a caller bug, and the
-/// kernel rejects it regardless.
-///
-/// # Safety
-///
-/// Every pointer in `threads` must address a [`ThreadControl`] that stays valid
-/// for the whole wait — in practice each thread's pinned core state, kept alive
-/// by its reclaiming owner until this call returns.
-pub unsafe fn wait_for_any_exit(threads: &[NonNull<ThreadControl>]) -> Result<usize, WaitError> {
-    assert!(
-        !threads.is_empty(),
-        "wait_for_any_exit: the wait set must not be empty"
-    );
-
-    // Read each thread's creation-fixed kernel handle through its raw pointer;
-    // forming a `&ThreadControl` would race the target thread's self-mutation.
-    // The kernel caps a wait at `MAX_WAIT_HANDLES` handles, so collect
-    // at most that many — the returned index then stays within the prefix.
-    let handles: Vec<Handle> = threads
-        .iter()
-        .take(MAX_WAIT_HANDLES)
-        .map(|thread| {
-            // SAFETY: by the `# Safety` contract each pointer addresses a valid
-            // `ThreadControl`; `handle` is fixed at creation, never rewritten.
-            unsafe { (*thread.as_ptr()).handle }
-        })
-        .collect();
-
-    // SAFETY: every handle is a thread's kernel handle from `create` — a valid,
-    // process-owned thread handle, never a pseudo-handle — and the `Vec`
-    // borrowing them stays live for the whole syscall.
-    unsafe { wait_synchronization_multiple(handles.iter(), u64::MAX) }.map_err(WaitError::from)
-}
-
-/// Errors returned when waiting for a thread to exit via [`wait_for_exit`] or
-/// [`wait_for_any_exit`].
+/// Errors returned when waiting for a thread to exit via [`wait_for_exit`].
 #[derive(Debug, thiserror::Error)]
 pub enum WaitError {
     /// Thread termination was requested while waiting.
