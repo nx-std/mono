@@ -5,7 +5,7 @@
 //!
 //! Reporting is the part of it that lives here so far. The rest -- declaring a case and running it,
 //! the run's one record, and the argument protocol a suite hands back to the runner over -- is
-//! still C under `subprojects/tests/source/suites`, and joins this crate as it moves.
+//! still C under `subprojects/tests/suites`, and joins this crate as it moves.
 //!
 //! ## The Test Anything Protocol
 //!

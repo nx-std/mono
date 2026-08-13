@@ -194,19 +194,20 @@ This gdb build has no Python, so the address arithmetic is done in the shell.
 ## Test Architecture
 
 Tests live in `subprojects/tests/`:
-- `source/runner/` — the `nx-tests` runner: serves the netloader protocol, launches what it receives,
+- `runner/` — the `nx-tests` runner: serves the netloader protocol, launches what it receives,
   and keeps the run's results (`ledger.c`) across its own restarts
-- `source/runner/handback.h` — the two arguments the runner and a suite say things to each other with
-- `source/suites/handback.h` — the suite side of them: am I unattended, and reporting on the way out
-- `source/suites/tap.h`, `tap.c` — TAP 14 reporting: the console as cases finish, the SD card and the
-  host once they are all over. The only place that knows what the protocol looks like
-- `source/suites/harness.h` — test framework macros, which report through `tap.h`
-- `source/suites/rand/` — RNG tests
-- `source/suites/rt/` — runtime tests (working directory derived from the command line)
-- `source/suites/thread/` — thread tests
-- `source/suites/sync/` — synchronization primitive tests
-- `source/suites/fs/` — SD card and savedata tests (own binary; needs a card)
-- `source/suites/net/` — socket driver and resolver tests (own binary; brings up a network stack)
+- `runner/handback.h` — the two arguments the runner and a suite say things to each other with
+- `suites/handback.h` — the suite side of them: am I unattended, and reporting on the way out
+- `framework/` — the rig's framework, in Rust: TAP 14 reporting to the console as cases finish, and
+  to the SD card and the host once they are all over. The only place that knows what the protocol
+  looks like. Its C surface is `framework/include/nx_tests_framework.h`
+- `suites/harness.h` — test framework macros, which report through the framework
+- `suites/rand/` — RNG tests
+- `suites/rt/` — runtime tests (working directory derived from the command line)
+- `suites/thread/` — thread tests
+- `suites/sync/` — synchronization primitive tests
+- `suites/fs/` — SD card and savedata tests (own binary; needs a card)
+- `suites/net/` — socket driver and resolver tests (own binary; brings up a network stack)
 
 Each area is its own binary, with its `main.c` beside its cases.
 
