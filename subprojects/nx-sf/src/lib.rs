@@ -46,8 +46,15 @@
 //! | `http` - one `Request`/`Response` pair every protocol version decodes into | `server::Request` / `server::Response` |
 //! | `http`'s `Method`, `StatusCode`, `Version` | `server::CommandId`, [`error::ResultCode`], `server::Protocol` |
 //! | `hyper`'s per-version codecs (`h1`, `h2`) | [`cmif`] and [`tipc`], both framing over [`hipc`] |
-//! | `hyper`'s connection runtime and `Service` trait | not yet written |
+//! | `hyper`'s connection runtime and `Service` trait | `server::Server`, `server::Service` |
 //! | `axum`'s `Router`, handlers and extractors | not yet written |
+//!
+//! The runtime is where the analogy stops being a translation and starts being
+//! an adaptation. `hyper` gives each connection a task and blocks it on that
+//! socket; Horizon's reply-and-receive waits on a port and every session at
+//! once and reports which of them woke, so there is no per-session call to
+//! build a task around. One `server::Server` is one thread serving every
+//! client, and the wait set is the whole state of the exchange.
 //!
 //! The payoff is the same one the web stack gets from it. A handler is written
 //! against one request type and one reply type, and stays correct whether the
@@ -57,8 +64,8 @@
 //! module adds is the single shape above them a handler can be written
 //! against.
 //!
-//! The `server` module holds the message half of that picture today, behind
-//! the `server` feature. The runtime and the router are later work.
+//! The `server` module holds the message and runtime halves of that picture
+//! today, behind the `server` feature. The router is later work.
 
 #![no_std]
 
