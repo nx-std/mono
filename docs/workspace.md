@@ -1,12 +1,12 @@
 # Workspace
 
-This document describes the workspace-level organization of this repository: the hybrid Cargo + Meson root, the crate category hierarchy, dependency direction rules, and ordering requirements for the root manifests.
+This document describes the workspace-level organization of this repository: the hybrid Cargo + Meson root, the crate families, the dependency rules that hold between them, and ordering requirements for the root manifests.
 
 ## Table of Contents
 
 1. [Hybrid Cargo + Meson Workspace](#1-hybrid-cargo--meson-workspace)
-2. [Crate Category Hierarchy](#2-crate-category-hierarchy)
-3. [Dependency Rules per Category](#3-dependency-rules-per-category)
+2. [Crate Families](#2-crate-families)
+3. [Dependency Rules](#3-dependency-rules)
 4. [Root `Cargo.toml`](#4-root-cargotoml)
 5. [Root `meson.build`](#5-root-mesonbuild)
 6. [Ordering Requirements](#6-ordering-requirements)
@@ -25,7 +25,7 @@ The repository is **simultaneously a Cargo workspace and a Meson project**. Both
 | **Cargo** | `Cargo.toml`       | Every Rust crate under `subprojects/<crate>/` listed in `[workspace].members`             |
 | **Meson** | `meson.build`      | Every Meson subproject under `subprojects/<name>/` (Rust crates + C libraries + binaries) |
 
-The two views overlap on the Rust crates (each Cargo member also has a `meson.build`) but diverge on the C side: `subprojects/libnx/`, `subprojects/libnx-dkp/`, `subprojects/libdeko3d-dkp/`, `subprojects/sysroot/`, `subprojects/sysroot-dkp/`, `subprojects/tests/`, `subprojects/examples/`, `subprojects/nx-hbmenu/`, and `subprojects/vendor/` are visible only to Meson.
+The two views overlap on the Rust crates (each Cargo member also has a `meson.build`) but diverge on the C side: `subprojects/libnx/`, `subprojects/libnx-dkp/`, `subprojects/libdeko3d-dkp/`, `subprojects/sysroot-dkp/`, `subprojects/tests/`, `subprojects/examples/`, and `subprojects/nx-hbmenu/` are visible only to Meson.
 
 ```
 mono/
@@ -57,83 +57,75 @@ The two graphs deliberately stay in lockstep but serve different needs: Cargo dr
 
 ---
 
-## 2. Crate Category Hierarchy
+## 2. Crate Families
 
-Cargo workspace members live under `subprojects/<crate>/` and are split into the following architectural layers, from foundation to leaf:
+Every Cargo workspace member sits directly at `subprojects/<crate>/`. The directory tree is **flat**: there is no `sys/` subdirectory, and a crate's family is read off its name.
 
-### `sys/*` — Foundation Layer
+### The Prefix Names Provenance, Not Layer
 
-**Purpose**: Direct interface to Horizon OS primitives. Foundation for everything else.
+A prefix says **which part of `std` a crate is destined to become**, not where it sits in the dependency graph. The two are different questions, and reading one off the other is wrong in both directions.
 
-**What belongs here:**
+| Prefix | Mirrors | Example |
+|---|---|---|
+| `nx-svc`, `nx-cpu` | no `std` counterpart — the Horizon substrate | `nx-svc` is the SVC surface everything reaches through |
+| `nx-sys-*` | a module of `std::sys` | `nx-sys-args` ↔ `std::sys::args` |
+| `nx-std-*` | a top-level module of `std` | `nx-std-env` ↔ `std::env` |
+| `nx-sf`, `nx-service-*` | no `std` counterpart — Horizon IPC clients | `nx-service-sm` speaks to the service manager |
+| device crates (`nx-net`, `nx-fsdev`, `nx-nv`, `nx-display`, `nx-pm`, `nx-wlaninf`, `nx-netloader`) | no `std` counterpart — a device or driver above IPC | `nx-fsdev` serves the SD card as a device |
+| `nx-rt-*` | the process entry runtime: `std::rt`, plus what `crt0` and the C runtime do beneath it | one entry crate per output kind ([code/crates-rt](code/crates-rt.md)) |
+| `nx-std` | the umbrella `staticlib`, not a member of the `nx-std-*` family | the single linkable artifact |
 
-- **`nx-svc`**: Raw Supervisor Call (SVC) bindings — the layer everything else depends on.
-- **`nx-cpu`**: CPU-level utilities (cache, registers).
-- **`nx-sys-mem`**: Low-level memory management on top of `nx-svc`.
-- **`nx-sys-sync`**: Low-level synchronization primitives on top of `nx-svc`.
-- **`nx-sys-thread-tls`**: Thread-local storage region access.
+Two consequences worth stating outright, because both have been misread:
 
-### Higher-level Crates — Standard-library-style abstractions
+- **`nx-std` is not the parent of `nx-std-*`.** It is the sink every crate flows into, and it depends on some `nx-std-*` crates and not others. The shared prefix is a collision, not a hierarchy.
+- **A `nx-std-*` crate is not automatically above a `nx-sys-*` one.** `nx-std-path` is a vocabulary crate near the bottom that several `nx-sys-*` crates depend on; `nx-std-fs` is genuinely a top tier. `std` has the same shape and hides it, because there the whole thing is one crate and the edges are invisible.
 
-**Purpose**: `std`-flavoured abstractions built on the `sys/*` layer.
+### The Actual Order
 
-**What belongs here:**
+What the graph really looks like, foundation first. Only the load-bearing edges are drawn; `nx-panic-handler` is omitted because every crate takes it.
 
-- **`nx-alloc`**: Global allocator (uses `nx-svc` + `nx-sys-sync`).
-- **`nx-rand`**: Random number generation.
-- **`nx-time`**: Time utilities.
-- **`nx-std-sync`**: High-level sync primitives (`Mutex`, `RwLock`, …).
-- **`nx-rt`**: Runtime support.
-- **`nx-panic-handler`**: Panic handler.
-
-### Service Crates (`nx-service-*`) — Horizon OS Services
-
-**Purpose**: Bindings to specific Horizon OS services exposed via IPC.
-
-**What belongs here:**
-
-- **`nx-sf`**: Service framework primitives.
-- **`nx-service-sm`**, **`nx-service-time`**, **`nx-service-applet`**, **`nx-service-hid`**, **`nx-service-vi`**, **`nx-service-set`**, **`nx-service-apm`**, **`nx-service-nv`**: Per-service IPC clients.
-
-### `nx-std` — Umbrella Staticlib
-
-**Purpose**: Single `staticlib` crate that re-exports the FFI symbols (`__nx_*`) consumed by linker overrides. Each enabled higher-level / `sys/*` / service crate exposes its FFI surface via a public `ffi` module behind an `ffi` Cargo feature; `nx-std` re-exports them based on enabled features.
-
-This is the only Rust crate that produces a linkable artifact for the C side.
+```
+nx-panic-handler, nx-cpu                      no dependencies
+└── nx-svc                                    the SVC surface
+    ├── nx-sys-thread-tls, nx-sys-sync, nx-rand
+    │   └── nx-alloc                          the global allocator
+    │       ├── nx-std-path                   OsStr / Path vocabulary
+    │       ├── nx-sys-args, nx-sys-env       process-wide platform state
+    │       ├── nx-sys-virtmem → nx-sys-mem → nx-sys-thread
+    │       ├── nx-sys-fd                     descriptor table and devices
+    │       └── nx-std-sync                   Mutex, RwLock, …
+    │           └── nx-sf → nx-service-*      the IPC layer
+    │               ├── nx-sys-net, and the device crates
+    │               │   └── nx-std-fs, nx-std-env   the std-facing API
+    │               │       └── nx-rt-core → nx-rt-{nro,nso,kip,module}
+    │               │           └── nx-std    the umbrella
+```
 
 ### Meson-only Subprojects
 
-These ship `meson.build` files but no `Cargo.toml` and are NOT Cargo workspace members:
+These ship `meson.build` files but no `Cargo.toml`, and are NOT Cargo workspace members:
 
-- **`libnx`** / **`libnx-dkp`**: The C homebrew library, either built from source or sourced as a devkitPro prebuilt (toggled by `use_libnx_dkp`).
-- **`sysroot`** / **`sysroot-dkp`**: System root manifest mapping devkitPro and toolchain headers/libs for Meson.
+- **`libnx`** / **`libnx-dkp`**: the C homebrew library, built from source or taken as a devkitPro prebuilt (`use_libnx_dkp`).
+- **`sysroot-dkp`**: system root manifest mapping devkitPro and toolchain headers and libraries for Meson.
 - **`libdeko3d-dkp`**: devkitPro graphics library prebuilt.
-- **`vendor`**: Vendored third-party C sources.
-- **`tests`**: Switch-hardware NRO test suite (C code linking against the Rust crates to verify FFI correctness).
-- **`examples`**: Example NROs.
-- **`nx-hbmenu`**: The homebrew menu binary.
+- **`tests`**: the Switch-hardware NRO suites and the runner that drives them.
+- **`examples`**: example NROs.
+- **`nx-hbmenu`**: the homebrew menu binary.
 
 ---
 
-## 3. Dependency Rules per Category
+## 3. Dependency Rules
 
-| From \ To              | `sys/*` | higher-level | service | `nx-std` |
-|------------------------|:-------:|:------------:|:-------:|:--------:|
-| **`sys/*`**            | ✅       | ❌            | ❌       | ❌        |
-| **higher-level**       | ✅       | ✅            | ❌       | ❌        |
-| **service**            | ✅       | ✅            | ✅       | ❌        |
-| **`nx-std`** umbrella  | ✅       | ✅            | ✅       | ❌        |
+There is no per-family permission matrix, because the families are not layers ([Section 2](#2-crate-families)). What holds instead:
 
-**Key rules:**
+- **No cycles**, at any level. Cargo enforces this, and a cycle usually means two crates were split along the wrong seam.
+- **`nx-std` is the sink.** Every crate may flow into it; nothing depends on it.
+- **Nothing below the runtime depends on an `nx-rt-*` crate**, in a manifest or through an `extern "C"` declaration. The runtime is the last crate before the sink, so anything owned there is out of reach of everything else ([code/crates-rt](code/crates-rt.md)).
+- **A new `nx-sys-*` crate takes no `nx-std-*` dependency.** It deals in bytes, and the crate above applies the `OsStr` / `Path` vocabulary. `nx-sys-fd` and `nx-sys-net` predate this and carry the edge; the rule is about not adding more.
+- **A `nx-sys-*` crate implements its resource in Rust** rather than calling the C library this workspace replaces. Wrapping newlib adopts a second copy of state the crate exists to provide, and the two then disagree.
+- **The `ffi` feature gates a crate's `src/ffi.rs`**, and `nx-std` enables exactly those `ffi` features matching the enabled `use_nx*` Meson options ([code/rust-ffi](code/rust-ffi.md)).
 
-- **`sys/*` crates** depend only on other `sys/*` crates and `nx-svc`. They NEVER depend on higher-level, service, or umbrella crates.
-- **Higher-level crates** depend on `sys/*` and other higher-level crates. They MUST NOT depend on service or umbrella crates.
-- **Service crates** depend on `sys/*`, higher-level, and other service crates as needed (e.g., service-applet depends on service-sm). They MUST NOT depend on the `nx-std` umbrella.
-- **`nx-std`** is the sink: every other crate may flow into it; nothing depends on `nx-std`.
-- **No circular dependencies** at any layer.
-- The `ffi` feature on each crate gates its FFI module; `nx-std` enables exactly those `ffi` features that match the Meson `use_nx*` setup-time options.
-
-Meson-only subprojects (libnx, tests, examples, …) sit outside this matrix — they consume the Rust side but are not consumed by it.
+Meson-only subprojects sit outside all of this: they consume the Rust side and are not consumed by it.
 
 ---
 
@@ -216,7 +208,7 @@ All `Cargo.toml` dependency sections (`[dependencies]`, `[dev-dependencies]`, `[
 
 ### Meson Subproject Calls
 
-Top-level `subproject(...)` calls in the root `meson.build` are grouped by purpose (`Libraries` first, `Executables` second), then ordered to match the build dependency direction within each group (sysroot before libnx; libnx before binaries). Strict alphabetical ordering is NOT required at the root because dependency direction must drive the order.
+Top-level `subproject(...)` calls in the root `meson.build` are grouped by purpose (`Libraries` first, `Executables` second), then ordered to match the build dependency direction within each group (`sysroot-dkp` before libnx; libnx before binaries). Strict alphabetical ordering is NOT required at the root because dependency direction must drive the order.
 
 ---
 
@@ -234,9 +226,10 @@ Before committing workspace-level changes, verify:
 
 ### Crate placement and direction
 
-- [ ] New crates are placed in the correct architectural layer (`sys/*` foundation, higher-level, service, or umbrella).
-- [ ] Dependency direction follows the rules (no upward edges, no cycles).
-- [ ] `sys/*` crates have no dependencies on higher-level, service, or `nx-std` crates.
+- [ ] A new crate's prefix names the part of `std` it is destined to become, not where it sits in the graph.
+- [ ] The crate sits directly at `subprojects/<crate>/`; no family has a directory of its own.
+- [ ] There are no cycles, and nothing below the runtime depends on an `nx-rt-*` crate.
+- [ ] A new `nx-sys-*` crate takes no `nx-std-*` dependency and implements its resource in Rust rather than calling the C library.
 - [ ] Meson-only subprojects (libnx, tests, examples, …) are NOT Cargo workspace members.
 
 ### Root manifests
