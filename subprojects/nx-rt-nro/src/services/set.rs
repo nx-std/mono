@@ -45,9 +45,9 @@ pub fn init() -> Result<(), ConnectError> {
 
     // Connect to set:sys service (TIPC on HOS 12.0.0+/Atmosphere, CMIF otherwise)
     let service = if sm::should_use_tipc() {
-        nx_service_set::connect_tipc(&sm).map_err(ConnectError::Tipc)?
+        nx_service_set::connect_sys_tipc(&sm).map_err(ConnectError::Tipc)?
     } else {
-        nx_service_set::connect_cmif(&sm).map_err(ConnectError::Cmif)?
+        nx_service_set::connect_sys_cmif(&sm).map_err(ConnectError::Cmif)?
     };
 
     let mut guard = state().write();
@@ -197,10 +197,10 @@ pub enum ConnectError {
     SmNotInitialized(#[source] nx_rt_core::services::sm::NotInitializedError),
     /// Failed to connect using CMIF protocol.
     #[error("failed to connect to set:sys (CMIF)")]
-    Cmif(#[source] nx_service_set::ConnectCmifError),
+    Cmif(#[source] nx_service_set::ConnectSysCmifError),
     /// Failed to connect using TIPC protocol.
     #[error("failed to connect to set:sys (TIPC)")]
-    Tipc(#[source] nx_service_set::ConnectTipcError),
+    Tipc(#[source] nx_service_set::ConnectSysTipcError),
 }
 
 #[cfg(feature = "ffi")]

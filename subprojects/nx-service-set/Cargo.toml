@@ -10,6 +10,12 @@ test = false
 doctest = false
 bench = false
 
+[features]
+# Enable the `ToResultCode` mapping the `nx-rt-*` FFI adapters consume. No FFI
+# surface lives here; the feature exists so a pure-Rust consumer does not compile
+# a mapping only a C boundary needs.
+ffi = []
+
 [dependencies]
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }

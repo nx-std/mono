@@ -19,6 +19,8 @@ bench = false
 # Pulls `nx-sys-args/ffi`: that crate gates the C-style `(argc, argv)` view on
 # the feature, and the only reader of it is the `__system_argc` / `__system_argv`
 # pair below this switch.
+# Pulls `nx-service-set?/ffi`: that crate gates its result-code mapping on the
+# feature, and the `setsys*` adapters below this switch are what map with it.
 # Pulls `nx-romfs?/ffi`: `romfsMountSelf` is defined below this switch and the
 # rest of the `romfs*` surface in that crate, and a link carrying one override
 # without the others has calls landing back in the C it replaced.
@@ -36,6 +38,7 @@ ffi = [
     "nx-service-applet-nfp?/ffi",
     "nx-service-applet-pctlauth?/ffi",
     "nx-service-applet-psel?/ffi",
+    "nx-service-set?/ffi",
 ]
 # Memory objects on the NV driver — gates `ffi::nvmap`. Pulls `service-nv`: the
 # device is opened on the driver session that feature establishes.
