@@ -66,41 +66,11 @@ endif
 nx_netloader_proj = subproject('nx-netloader')
 nx_netloader_dep = nx_netloader_proj.get_variable('nx_netloader_dep')
 
-# nx-tests-tap
-# The suites report through this crate rather than through C. It is the one Rust
-# static library a suite binary links: the crates it holds keep process-wide
-# state, and a second archive carrying its own copy of that state would report
-# over a socket driver the program never brought up. Its dependencies therefore
-# take `extern-state`, and `ffi` is enabled here because the cases calling it are
-# still C. See `docs/code/rust-process-wide-state.md`.
-#
-# The crate lives inside this subproject rather than beside the `nx-*` crates: it
-# serves the test rig alone and nothing outside it has any use for the protocol.
-cargo = find_program('cargo', required : true)
-
-nx_tests_tap_tgt = custom_target(
-    'nx-tests-tap',
-    command : [
-        cargo, 'build',
-        '--package', 'nx-tests-tap',
-        '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
-        '--target-dir', meson.global_build_root() / 'cargo-target',
-        '--artifact-dir', '@OUTDIR@',
-        '--features', 'ffi',
-    ],
-    output : ['libnx_tests_tap.a', 'libnx_tests_tap.rlib'],
-    console : true,
-    build_by_default : true,
-    build_always_stale : true,
-)
-
-nx_tests_tap_inc = include_directories('source/suites/tap/include')
-
-nx_tests_tap_dep = declare_dependency(
-    include_directories : nx_tests_tap_inc,
-    sources : nx_tests_tap_tgt,
-    link_with : nx_tests_tap_tgt[0],
-)
+# nx-tests-framework
+# The rig's own framework, in a directory of its own beside the sources that use
+# it: it serves the suites and the runner and nothing outside this subproject, so
+# it is built as part of this one rather than reached as a project of its own.
+subdir('framework')
 
 #---------------------------------------------------------------------------------
 # Build options
@@ -195,7 +165,7 @@ src = files(
     'source/suites/rand/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -223,7 +193,7 @@ src = files(
     'source/suites/rt/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -250,7 +220,7 @@ src = files(
     'source/suites/thread/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -318,7 +288,7 @@ src = files(
     'source/suites/sync/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -377,7 +347,7 @@ src = files(
     'source/suites/fs/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -426,7 +396,7 @@ src = files(
     'source/suites/net/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)

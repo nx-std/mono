@@ -1,6 +1,13 @@
-//! # nx-tests-tap
+//! # nx-tests-framework
 //!
-//! Reporting in the Test Anything Protocol, version 14, for the suites under `subprojects/tests`.
+//! The test rig's framework: what the suites under `subprojects/tests` are declared, run and
+//! reported through.
+//!
+//! Reporting is the part of it that lives here so far. The rest -- declaring a case and running it,
+//! the run's one record, and the argument protocol a suite hands back to the runner over -- is
+//! still C under `subprojects/tests/source/suites`, and joins this crate as it moves.
+//!
+//! ## The Test Anything Protocol
 //!
 //! A run that nobody watches has to be readable by something that is not a person. TAP is the
 //! format that something already reads: it is line-oriented, it survives being streamed, and every

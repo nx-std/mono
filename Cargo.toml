@@ -130,7 +130,7 @@ members = [
     "subprojects/nx-sys-virtmem",
     "subprojects/nx-time",
     "subprojects/nx-wlaninf",
-    "subprojects/tests/source/suites/tap",
+    "subprojects/tests/framework",
 ]
 
 [workspace.dependencies]

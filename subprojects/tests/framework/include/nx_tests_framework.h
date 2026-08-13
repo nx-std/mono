@@ -22,11 +22,11 @@
  * The host is sent it, because the host is what a run is driven from and the
  * only reader that can act on it.
  *
- * The protocol itself is the `nx-tests-tap` crate beside this file, which
+ * The protocol itself is the `nx-tests-framework` crate beside this file, which
  * accumulates the document and writes it to all three. This header is its C
  * surface, in two halves:
  *
- * - The `__nx_tests_tap__*` entry points, which are what the crate exports.
+ * - The `__nx_tests_framework__*` entry points, which are what the crate exports.
  * - A handful of `tap_*` wrappers over them, which gather the facts about a run
  *   that only the C runtime holds and the crate is deliberately not allowed to
  *   reach for: the system version, the host's address, and the socket driver,
@@ -59,7 +59,7 @@ typedef struct {
     bool atmosphere;
     /** Whether the runner launched this rather than a person. */
     bool unattended;
-} NxTestsTapRun;
+} NxTestsFrameworkRun;
 
 /**
  * @brief Opens the document. Called once, before any case runs.
@@ -68,13 +68,13 @@ typedef struct {
  * document that silently began itself would be one whose preamble said nothing
  * about the run.
  */
-void __nx_tests_tap__begin(const NxTestsTapRun* run);
+void __nx_tests_framework__begin(const NxTestsFrameworkRun* run);
 
 /** @brief Writes a line the protocol ignores, for whatever a reader may want. */
-void __nx_tests_tap__comment(const char* text);
+void __nx_tests_framework__comment(const char* text);
 
 /** @brief Reports one case, numbering it after the last one reported. */
-void __nx_tests_tap__case(const char* title, int32_t rc);
+void __nx_tests_framework__case(const char* title, int32_t rc);
 
 /**
  * @brief Reports a case the harness itself could not run.
@@ -83,7 +83,7 @@ void __nx_tests_tap__case(const char* title, int32_t rc);
  * the test rather than the thing under test. It is still counted and numbered,
  * because a case that did not run is not a case that passed.
  */
-void __nx_tests_tap__harness_error(const char* title, const char* reason);
+void __nx_tests_framework__harness_error(const char* title, const char* reason);
 
 /**
  * @brief Closes the document by stating how many cases there were.
@@ -91,7 +91,7 @@ void __nx_tests_tap__harness_error(const char* title, const char* reason);
  * The count is only known once they have all run, which is why this is the end
  * of the document rather than the start; the protocol allows either.
  */
-void __nx_tests_tap__plan(void);
+void __nx_tests_framework__plan(void);
 
 /**
  * @brief Writes the document to the SD card and sends it to the host.
@@ -104,7 +104,7 @@ void __nx_tests_tap__plan(void);
  * @return 0 when both the card and the host took the document, -1 when either
  *         did not. Neither is a failure of the run.
  */
-int32_t __nx_tests_tap__report(uint32_t host);
+int32_t __nx_tests_framework__report(uint32_t host);
 
 /**
  * @brief Opens the document, with what the runtime says about this run.
@@ -121,7 +121,7 @@ static inline void tap_begin(const char* suite, const char* version, const char*
 {
     const u32 hos = hosversionGet();
 
-    const NxTestsTapRun run = {
+    const NxTestsFrameworkRun run = {
         .suite = suite,
         .build = version,
         .report_dir = report_dir,
@@ -131,31 +131,31 @@ static inline void tap_begin(const char* suite, const char* version, const char*
         .atmosphere = hosversionIsAtmosphere(),
         .unattended = unattended,
     };
-    __nx_tests_tap__begin(&run);
+    __nx_tests_framework__begin(&run);
 }
 
 /** @brief Writes a line the protocol ignores, for whatever a reader may want. */
 static inline void tap_comment(const char* text)
 {
-    __nx_tests_tap__comment(text);
+    __nx_tests_framework__comment(text);
 }
 
 /** @brief Reports one case, numbering it after the last one reported. */
 static inline void tap_case(const char* title, int32_t rc)
 {
-    __nx_tests_tap__case(title, rc);
+    __nx_tests_framework__case(title, rc);
 }
 
 /** @brief Reports a case the harness itself could not run. */
 static inline void tap_harness_error(const char* title, const char* reason)
 {
-    __nx_tests_tap__harness_error(title, reason);
+    __nx_tests_framework__harness_error(title, reason);
 }
 
 /** @brief Closes the document by stating how many cases there were. */
 static inline void tap_plan(void)
 {
-    __nx_tests_tap__plan();
+    __nx_tests_framework__plan();
 }
 
 /**
@@ -188,7 +188,7 @@ static inline void tap_report(bool network_already_up)
     // at all: the card still gets the document, which is the whole report for a
     // run nobody is listening to.
     const bool reachable = host != 0 && (network_already_up || network_is_ours);
-    __nx_tests_tap__report(reachable ? host : 0);
+    __nx_tests_framework__report(reachable ? host : 0);
 
     if (network_is_ours) {
         socketExit();
