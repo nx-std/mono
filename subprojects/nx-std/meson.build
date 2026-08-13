@@ -59,6 +59,16 @@ if get_option('use_nx_rand').enabled()
     deps_cargo_features += ['rand']
 endif
 
+# nx-std-env
+if get_option('use_nx_std_env').enabled()
+    nx_std_env_proj = subproject('nx-std-env')
+
+    deps += nx_std_env_proj.get_variable('nx_std_env_dep')
+
+    debug('env feature: enabled')
+    deps_cargo_features += ['env']
+endif
+
 # nx-std-sync
 if get_option('use_nx_std_sync').enabled()
     nx_std_sync_proj = subproject('nx-std-sync')

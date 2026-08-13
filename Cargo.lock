@@ -1579,6 +1579,7 @@ dependencies = [
  "nx-service-time",
  "nx-service-vi",
  "nx-sf",
+ "nx-std-env",
  "nx-std-sync",
  "nx-svc",
  "nx-sys-fd",
@@ -1590,6 +1591,18 @@ dependencies = [
  "nx-sys-virtmem",
  "nx-time",
  "nx-wlaninf",
+]
+
+[[package]]
+name = "nx-std-env"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-std-path",
+ "nx-sys-args",
+ "nx-sys-env",
+ "thiserror",
 ]
 
 [[package]]
@@ -1636,6 +1649,16 @@ version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
  "nx-sys-sync",
+]
+
+[[package]]
+name = "nx-sys-env"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-sys-sync",
+ "thiserror",
 ]
 
 [[package]]

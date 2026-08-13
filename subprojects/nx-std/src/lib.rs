@@ -18,6 +18,10 @@ pub mod ffi;
 pub mod rand {
     pub use nx_rand::*;
 }
+#[cfg(feature = "env")]
+pub mod env {
+    pub use nx_std_env::*;
+}
 #[cfg(feature = "sync")]
 pub mod sync {
     pub use nx_std_sync::*;

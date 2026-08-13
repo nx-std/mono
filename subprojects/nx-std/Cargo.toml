@@ -48,6 +48,8 @@ services = ["service-apm", "service-applet", "service-fs", "service-hid", "servi
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 display = ["dep:nx-display", "service-vi"]
+# The process environment in `std::env` shape, over the command-line store.
+env = ["dep:nx-std-env", "alloc"]
 # Forwards to `nx-rt-core`, which owns the five resolver symbols that reach
 # `sfdnsres` over the service-manager session it holds.
 net = ["dep:nx-net", "nx-rt-core?/net"]
@@ -133,6 +135,7 @@ nx-service-sm = { version = "0.1.0", path = "../nx-service-sm", optional = true 
 nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = true }
 nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true }
 nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
+nx-std-env = { version = "0.1.0", path = "../nx-std-env", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
 nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd", optional = true }
