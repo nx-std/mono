@@ -1,6 +1,15 @@
-//! CMIF response parsing.
+//! CMIF response messages: parsing one as a client, building one as a server.
+//!
+//! [`parse_response`] and its variants read a reply a service sent;
+//! [`CmifReplyBuilder`] produces one for a service this process hosts. Request
+//! parsing and building live in the sibling `request` module.
 
-use nx_svc::error::ResultCode;
+use core::mem::size_of;
+
+use nx_svc::{
+    error::ResultCode,
+    raw::Handle as RawHandle,
+};
 use nx_sys_thread_tls::IPC_BUFFER_SIZE;
 
 use super::wire::{
@@ -20,7 +29,14 @@ use crate::{
         ToResultCode,
         libnx_error,
     },
-    hipc,
+    hipc::{
+        self,
+        HipcPayload,
+        HipcReply,
+        HipcReplyBuilder,
+        StaticDescriptor,
+        write_section,
+    },
 };
 
 /// Parses a CMIF non-domain response.
@@ -209,5 +225,164 @@ impl ToResultCode for ParseError {
             | ParseError::TruncatedPayload
             | ParseError::TruncatedDomainObjects => GENERIC_ERROR,
         }
+    }
+}
+
+/// CMIF reply value.
+///
+/// Alias for a [`HipcReply`] carrying a [`CmifReplyBody`] payload. Serialize it
+/// into the thread's IPC buffer with [`HipcReply::write_to`]; the server then
+/// hands that buffer to `ReplyAndReceive`.
+pub type CmifReply<'a> = HipcReply<CmifReplyBody<'a>>;
+
+/// Fluent builder for a [`CmifReply`].
+///
+/// The result code is taken at construction rather than defaulted, because a
+/// reply that forgot to report a failure is indistinguishable on the wire from
+/// one that succeeded.
+pub struct CmifReplyBuilder<'a> {
+    hipc: HipcReplyBuilder,
+    result: ResultCode,
+    token: u32,
+    payload: &'a [u8],
+}
+
+impl<'a> CmifReplyBuilder<'a> {
+    /// Starts a builder for a reply reporting `result`.
+    #[inline]
+    pub fn new(result: ResultCode) -> Self {
+        Self {
+            hipc: HipcReplyBuilder::new(),
+            result,
+            token: 0,
+            payload: &[],
+        }
+    }
+
+    /// Echoes the request's context token back to the client.
+    ///
+    /// The header's version field follows from it - `1` for a versioned
+    /// request, `0` otherwise - so echoing the token a request carried is
+    /// enough to answer it in the protocol version it used.
+    #[inline]
+    pub fn with_token(mut self, token: u32) -> Self {
+        self.token = token;
+        self
+    }
+
+    /// Sets the reply payload bytes to copy into the CMIF data area.
+    #[inline]
+    pub fn with_data(mut self, data: &'a [u8]) -> Self {
+        self.payload = data;
+        self
+    }
+
+    /// Sets the reply payload from a typed value via its zero-copy byte view.
+    #[inline]
+    pub fn with_data_value<T>(self, value: &'a T) -> Self
+    where
+        T: zerocopy::IntoBytes + zerocopy::Immutable,
+    {
+        self.with_data(value.as_bytes())
+    }
+
+    /// Adds a send-static (Type X) descriptor carrying returned pointer data.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds once more than [`HIPC_MAX_DESCRIPTORS`] entries
+    /// are added; the wire-format cap is hardware-fixed.
+    ///
+    /// [`HIPC_MAX_DESCRIPTORS`]: crate::hipc::HIPC_MAX_DESCRIPTORS
+    #[inline]
+    pub fn add_send_static(mut self, desc: StaticDescriptor) -> Self {
+        self.hipc = self.hipc.with_send_static(desc);
+        self
+    }
+
+    /// Adds a copy handle, which the kernel duplicates into the client.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds once more than [`HIPC_MAX_DESCRIPTORS`] entries
+    /// are added; the wire-format cap is hardware-fixed.
+    ///
+    /// [`HIPC_MAX_DESCRIPTORS`]: crate::hipc::HIPC_MAX_DESCRIPTORS
+    #[inline]
+    pub fn add_copy_handle(mut self, handle: RawHandle) -> Self {
+        self.hipc = self.hipc.with_copy_handle(handle);
+        self
+    }
+
+    /// Adds a move handle, transferring ownership to the client.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds once more than [`HIPC_MAX_DESCRIPTORS`] entries
+    /// are added; the wire-format cap is hardware-fixed.
+    ///
+    /// [`HIPC_MAX_DESCRIPTORS`]: crate::hipc::HIPC_MAX_DESCRIPTORS
+    #[inline]
+    pub fn add_move_handle(mut self, handle: RawHandle) -> Self {
+        self.hipc = self.hipc.with_move_handle(handle);
+        self
+    }
+
+    /// Finalizes the reply value.
+    pub fn build(self) -> CmifReply<'a> {
+        let body = CmifReplyBody {
+            result: self.result,
+            token: self.token,
+            payload: self.payload,
+        };
+        self.hipc.with_payload(body).build()
+    }
+}
+
+/// In-band body for a CMIF reply.
+///
+/// Encodes the alignment pad, the `OutHeader` carrying the `SFCO` magic and the
+/// result code, and the raw reply payload. It has the same shape as the control
+/// request body on the request side: no domain framing, no object-id tail.
+#[derive(Debug, Clone)]
+pub struct CmifReplyBody<'a> {
+    result: ResultCode,
+    token: u32,
+    payload: &'a [u8],
+}
+
+impl CmifReplyBody<'_> {
+    /// Protocol version implied by the echoed token, matching how the request
+    /// side derives it.
+    fn cmif_version(&self) -> u32 {
+        if self.token != 0 { 1 } else { 0 }
+    }
+}
+
+impl HipcPayload for CmifReplyBody<'_> {
+    /// Alignment slack for the leading pad ([`CMIF_HEADER_ALIGN`]), plus the
+    /// `OutHeader` and the reply payload.
+    fn encoded_len(&self) -> usize {
+        CMIF_HEADER_ALIGN + size_of::<OutHeader>() + self.payload.len()
+    }
+
+    /// Writes the CMIF reply body: skip the [`CMIF_HEADER_ALIGN`] alignment
+    /// pad, then the `OutHeader` followed by the raw reply payload.
+    fn write_to(&self, dst: &mut [u8]) {
+        let region = &mut dst[..self.encoded_len()];
+
+        // Skip alignment padding before the CMIF in-band header.
+        let pad = region.as_ptr().align_offset(CMIF_HEADER_ALIGN);
+        let (_padding, buf) = region.split_at_mut(pad);
+
+        let header = OutHeader {
+            magic: OUT_HEADER_MAGIC,
+            version: self.cmif_version(),
+            result: self.result,
+            token: self.token,
+        };
+        let buf = write_section(buf, &header);
+
+        write_section(buf, self.payload);
     }
 }

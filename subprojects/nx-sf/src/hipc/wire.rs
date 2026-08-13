@@ -1,16 +1,26 @@
-//! Wire-format types and prefix decoding for HIPC.
+//! Wire-format types, prefix decoding, and section writing for HIPC.
 //!
 //! The bitfield structs in this module describe the on-the-wire byte layouts
-//! the kernel reads and writes. Higher-level views (`Response`, request
-//! building) live in the sibling `request`/`response` modules and consume
-//! these types.
+//! the kernel reads and writes. Higher-level views (`Request`, `Response`,
+//! request and reply building) live in the sibling `request`/`response`
+//! modules and consume these types.
+//!
+//! The two directions meet here. A request and a reply share the same prefix
+//! shape, so [`parse_prefix`] decodes it once for both the inbound parser and
+//! the response parser, and [`write_section`] emits a fixed-layout section for
+//! both the request builder and the reply builder.
 
 #![expect(clippy::identity_op)]
 
-use core::mem::size_of;
+use core::mem::{
+    size_of,
+    size_of_val,
+};
 
 use modular_bitfield::prelude::*;
 use static_assertions::const_assert_eq;
+
+use crate::cursor::Cursor;
 
 /// Minimum buffer size required to decode the worst-case HIPC wire prefix:
 /// [`Header`] (8) + [`SpecialHeader`] (4) + sender PID (`u64`, 8) = 20 bytes.
@@ -30,9 +40,11 @@ pub const MIN_PREFIX_BUF_SIZE: usize =
 /// - `2 + n` for `n ∈ 1..=13` - per-pointer recv-list of `n` entries; entry
 ///   `i` destinations the `i`-th out-pointer descriptor.
 pub const RECV_LIST_WIRE_NONE: u8 = 0;
-/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `1` ("to message buffer") sits
-/// between these two values; it is a server-side receive pattern with no
-/// client-side constant.
+/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `1`: returned pointer data goes into
+/// the client's TLS message buffer, so no wire slot is reserved.
+pub const RECV_LIST_WIRE_TO_MESSAGE_BUFFER: u8 = 1;
+/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `2` reserves one slot; `2 + n`
+/// reserves `n`.
 pub const RECV_LIST_WIRE_SINGLE_BUFFER: u8 = 2;
 
 /// HIPC message header (8 bytes).
@@ -408,4 +420,160 @@ impl MessageType {
     pub const fn to_raw(self) -> u16 {
         self.0
     }
+}
+
+/// Decodes the wire-level prefix (header + optional special header + optional PID)
+/// from a fixed-size IPC buffer slice, returning the parsed [`Prefix`] and the
+/// remainder of the buffer after the prefix bytes.
+///
+/// # Wire layout
+///
+/// Three valid prefix shapes, selected by two bits in the wire bytes:
+///
+/// ```text
+/// offset:   0                  8              12             20
+///           ┌──────────────────┬──────────────┬──────────────┐
+/// shape A:  │      Header      │ ⋯ payload ⋯
+///           │     (8 bytes)    │
+///           └──────────────────┘
+///           has_special_header = 0
+///
+///           ┌──────────────────┬──────────────┬──────────────┐
+/// shape B:  │      Header      │ SpecialHdr   │ ⋯ payload ⋯
+///           │     (8 bytes)    │  (4 bytes)   │
+///           └──────────────────┴──────────────┘
+///           has_special_header = 1, send_pid = 0
+///
+///           ┌──────────────────┬──────────────┬──────────────┐
+/// shape C:  │      Header      │ SpecialHdr   │  ProcessId   │ ⋯ payload ⋯
+///           │     (8 bytes)    │  (4 bytes)   │  (8 bytes)   │
+///           └──────────────────┴──────────────┴──────────────┘
+///           has_special_header = 1, send_pid = 1
+/// ```
+///
+/// Infallible: the caller supplies a buffer at least [`MIN_PREFIX_BUF_SIZE`]
+/// bytes long (the worst-case prefix), enforced at monomorphization via a
+/// `const` assertion on `N`.
+pub(crate) fn parse_prefix<const N: usize>(buf: &[u8; N]) -> (Prefix, &[u8]) {
+    // Compile-time check: the buffer must fit the worst-case prefix
+    const {
+        assert!(
+            N >= MIN_PREFIX_BUF_SIZE,
+            "parse_prefix buffer must be at least MIN_PREFIX_BUF_SIZE bytes",
+        );
+    }
+
+    // The const assertion above ensures `N >= MIN_PREFIX_BUF_SIZE`, so the
+    // cursor reads below cannot fail.
+    let cursor = Cursor::new(buf);
+    let (header, cursor) = cursor
+        .read::<Header>()
+        .expect("internal: TLR buffer fits HIPC header");
+    if !header.has_special_header() {
+        return (
+            Prefix {
+                header: *header,
+                extras: None,
+            },
+            cursor.remaining(),
+        );
+    }
+
+    let (special_hdr, cursor) = cursor
+        .read::<SpecialHeader>()
+        .expect("internal: TLR buffer fits special header");
+
+    let (pid, cursor) = if special_hdr.send_pid() {
+        let (pid_ref, cursor) = cursor
+            .read::<ProcessId>()
+            .expect("internal: TLR buffer fits PID");
+        (Some(*pid_ref), cursor)
+    } else {
+        (None, cursor)
+    };
+
+    let prefix = Prefix {
+        header: *header,
+        extras: Some(Extras {
+            num_copy_handles: special_hdr.num_copy_handles(),
+            num_move_handles: special_hdr.num_move_handles(),
+            pid,
+        }),
+    };
+
+    (prefix, cursor.remaining())
+}
+
+/// Parsed wire-level prefix shared by requests and responses.
+///
+/// The three valid prefix shapes on the wire — header only / header + special
+/// header / header + special header + PID — collapse into a single value with
+/// nested `Option`s, so a consumer cannot read the discriminant bits
+/// independently from the bytes they describe.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Prefix {
+    /// Wire-level message header (always present).
+    pub header: Header,
+    /// Optional special header + PID payload. `None` ⇔ the header's
+    /// `has_special_header` bit is clear.
+    pub extras: Option<Extras>,
+}
+
+/// Decoded contents of the special header section.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Extras {
+    /// Number of copy handles (≤ 15, bound by the `B4` bitfield width).
+    pub num_copy_handles: u8,
+    /// Number of move handles (≤ 15, bound by the `B4` bitfield width).
+    pub num_move_handles: u8,
+    /// Sender's process ID, if the `send_pid` bit was set on the wire.
+    pub pid: Option<ProcessId>,
+}
+
+/// Sender's process ID as decoded from the HIPC special header payload.
+///
+/// The HIPC wire layout stores the PID as a native-endian `u64` immediately
+/// after the special header, so the type derives the zerocopy byte-conversion
+/// traits and is decoded in place rather than copied out.
+///
+/// The kernel fills this slot itself on transmission, so a server that reads it
+/// off an inbound request learns which process sent it without trusting the
+/// sender to say.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(transparent)]
+pub struct ProcessId(u64);
+
+impl ProcessId {
+    /// Returns the raw process ID.
+    #[inline]
+    pub const fn to_raw(self) -> u64 {
+        self.0
+    }
+}
+
+/// Writes `value`'s bytes into the prefix of `buf` and returns the tail.
+///
+/// Both builders size their layout before emitting it, which is what makes the
+/// inner `write_to` call infallible: the prefix is guaranteed to fit.
+#[inline]
+pub(crate) fn write_section<'a, T>(buf: &'a mut [u8], value: &T) -> &'a mut [u8]
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable + ?Sized,
+{
+    let (buf, tail) = buf.split_at_mut(size_of_val(value));
+    value
+        .write_to(buf)
+        .expect("internal: edge check guarantees buffer fits");
+    tail
 }

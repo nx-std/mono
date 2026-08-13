@@ -1,8 +1,22 @@
-//! HIPC request building (client side).
+//! HIPC request messages: building one as a client, parsing one as a server.
 //!
-//! Only the build path is implemented in this crate - see the parent module's
-//! "Server-side request parsing" section for why a `parse_request` counterpart
-//! is intentionally absent.
+//! The build path ([`HipcRequestBuilder`] → [`HipcRequest`]) puts a request on
+//! the wire; the parse path ([`parse_request`] → [`Request`]) reads one the
+//! kernel delivered. They are not inverses of each other and do not share code
+//! beyond the wire-format types: the builder emits descriptors it derives from
+//! loans it holds, whereas the parser hands back borrows into a buffer whose
+//! bytes an untrusted client chose.
+//!
+//! # Trust boundary
+//!
+//! Every field in an inbound request is attacker-controlled, including the
+//! descriptor counts that say how long the message is. [`parse_request`]
+//! therefore validates the declared layout against the buffer before reading a
+//! single section, and returns a typed error for every shape it rejects; it has
+//! no panicking path on untrusted input. What it does **not** do is vouch for
+//! the descriptor *targets*: a buffer descriptor's address and size are numbers
+//! the sender picked, and only the kernel's mapping makes them real. See
+//! [`Request`] for what that means for a caller.
 //!
 //! # DTO model
 //!
@@ -33,10 +47,7 @@
 //! DTO uses inline `[T; HIPC_MAX_DESCRIPTORS]` storage - no heap, no dynamic
 //! allocation.
 
-use core::mem::{
-    size_of,
-    size_of_val,
-};
+use core::mem::size_of;
 
 use nx_svc::{
     error::{
@@ -52,14 +63,19 @@ use super::wire::{
     BufferDescriptor,
     Header,
     MessageType,
+    ProcessId,
     RECV_LIST_WIRE_NONE,
     RECV_LIST_WIRE_SINGLE_BUFFER,
+    RECV_LIST_WIRE_TO_MESSAGE_BUFFER,
     RecvListEntry,
     SpecialHeader,
     StaticDescriptor,
+    parse_prefix,
+    write_section,
 };
 use crate::{
     array_vec::ArrayVec,
+    cursor::Cursor,
     error::{
         GENERIC_ERROR,
         ToResultCode,
@@ -509,6 +525,231 @@ impl RecvListMode {
     }
 }
 
+/// Parses an inbound HIPC request message.
+///
+/// This is the server-side entry point: `buf` holds the message the kernel
+/// delivered into the thread's IPC buffer, and every byte of it was chosen by
+/// the sending client. The returned [`Request`] borrows `buf` in place — no
+/// copies, no allocation.
+///
+/// Generic over the buffer size `N`, which must be at least large enough for
+/// the worst-case wire prefix; the prefix decoder enforces that at
+/// monomorphization, so a too-small buffer is a compile error rather than a
+/// runtime one.
+///
+/// # Errors
+///
+/// Returns [`RequestParseError`] for any malformed wire shape. It never panics
+/// on untrusted input: the declared layout is bound-checked against the buffer
+/// before any section is read.
+pub fn parse_request<const N: usize>(buf: &[u8; N]) -> Result<Request<'_>, RequestParseError> {
+    let (prefix, rest) = parse_prefix(buf);
+    let header = &prefix.header;
+
+    let (num_copy_handles, num_move_handles, process_id) = match prefix.extras {
+        Some(extras) => (
+            extras.num_copy_handles as usize,
+            extras.num_move_handles as usize,
+            extras.pid,
+        ),
+        None => (0, 0, None),
+    };
+
+    let num_send_statics = header.num_send_statics() as usize;
+    let num_send_buffers = header.num_send_buffers() as usize;
+    let num_recv_buffers = header.num_recv_buffers() as usize;
+    let num_exch_buffers = header.num_exch_buffers() as usize;
+    let num_data_words = header.num_data_words() as usize;
+    let recv_static_mode = header.recv_static_mode();
+    let num_recv_list = recv_list_slot_count(recv_static_mode);
+
+    // Bound-check the whole declared layout against the buffer once, so the
+    // section reads below cannot run past the end whatever the sender declared.
+    let declared = (num_copy_handles + num_move_handles) * size_of::<RawHandle>()
+        + num_send_statics * size_of::<StaticDescriptor>()
+        + (num_send_buffers + num_recv_buffers + num_exch_buffers) * size_of::<BufferDescriptor>()
+        + num_data_words * size_of::<u32>()
+        + num_recv_list * size_of::<RecvListEntry>();
+    if declared > rest.len() {
+        return Err(RequestParseError::DeclaredSizeExceedsBuffer {
+            declared,
+            capacity: rest.len(),
+        });
+    }
+
+    // The size check above leaves alignment as the only way a read can fail,
+    // and that is a property of the buffer the caller supplied rather than of
+    // anything the sender wrote.
+    let cursor = Cursor::new(rest);
+    let (copy_handles, cursor) = cursor
+        .read_slice::<RawHandle>(num_copy_handles)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (move_handles, cursor) = cursor
+        .read_slice::<RawHandle>(num_move_handles)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (send_statics, cursor) = cursor
+        .read_slice::<StaticDescriptor>(num_send_statics)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (send_buffers, cursor) = cursor
+        .read_slice::<BufferDescriptor>(num_send_buffers)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (recv_buffers, cursor) = cursor
+        .read_slice::<BufferDescriptor>(num_recv_buffers)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (exch_buffers, cursor) = cursor
+        .read_slice::<BufferDescriptor>(num_exch_buffers)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (data_words, cursor) = cursor
+        .read_bytes(num_data_words * size_of::<u32>())
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+    let (recv_list_entries, _) = cursor
+        .read_slice::<RecvListEntry>(num_recv_list)
+        .ok_or(RequestParseError::UnalignedBuffer)?;
+
+    Ok(Request {
+        message_type: MessageType::from_raw(header.message_type()),
+        process_id,
+        copy_handles,
+        move_handles,
+        send_statics,
+        send_buffers,
+        recv_buffers,
+        exch_buffers,
+        data_words,
+        recv_list: classify_recv_list(recv_static_mode, recv_list_entries),
+    })
+}
+
+/// Error returned by [`parse_request`].
+#[derive(Debug, thiserror::Error)]
+pub enum RequestParseError {
+    /// The header's declared descriptor counts imply a message longer than the
+    /// supplied buffer, so the request cannot be decoded without reading past
+    /// its end.
+    ///
+    /// The counts come from the sender, so this is the expected shape of a
+    /// malformed or hostile request rather than an internal inconsistency.
+    #[error("HIPC request declares {declared} bytes but only {capacity} remain in buffer")]
+    DeclaredSizeExceedsBuffer {
+        /// Total descriptor-region bytes implied by the header's counts.
+        declared: usize,
+        /// Bytes available after the decoded prefix.
+        capacity: usize,
+    },
+    /// The supplied buffer's base address is not 4-byte aligned, so the
+    /// fixed-layout sections cannot be borrowed in place.
+    ///
+    /// A property of the caller's buffer, not of the message: the thread's IPC
+    /// buffer satisfies this, and nothing a sender writes can cause it.
+    #[error("HIPC request buffer is not 4-byte aligned")]
+    UnalignedBuffer,
+}
+
+#[cfg(feature = "ffi")]
+impl crate::error::ToResultCode for RequestParseError {
+    fn to_rc(self) -> crate::error::ResultCode {
+        // A request this crate rejected before any handler saw it. No service
+        // assigned it a code, so there is nothing to forward.
+        crate::error::GENERIC_ERROR
+    }
+}
+
+/// Parsed inbound HIPC request.
+///
+/// Returned by [`parse_request`]. Every field borrows the caller's buffer, so
+/// the value lives exactly as long as the message it describes — which is what
+/// keeps a reply, written into the same buffer, from being built from bytes it
+/// has already overwritten.
+///
+/// # Descriptor targets are not validated
+///
+/// The descriptor slices report what the sender *declared*. A
+/// [`BufferDescriptor`]'s address and size are numbers from the client, made
+/// real only by the mapping the kernel established for the duration of the
+/// request; a [`StaticDescriptor`]'s bytes were copied by the kernel into the
+/// server's pointer buffer. Reading through either one means constructing a
+/// slice from a raw address, which is why this type hands back the descriptors
+/// themselves rather than slices: the step that vouches for a target belongs to
+/// the layer that knows which mapping is live, not to a parser.
+#[derive(Debug)]
+pub struct Request<'a> {
+    /// Message type field, carrying the protocol's command type.
+    pub message_type: MessageType,
+    /// Sender's process ID, present when the client set the `send_pid` bit.
+    ///
+    /// The kernel writes this slot itself, so it identifies the sender rather
+    /// than repeating a claim the sender made.
+    pub process_id: Option<ProcessId>,
+    /// Handles the kernel duplicated into this process.
+    pub copy_handles: &'a [RawHandle],
+    /// Handles whose ownership transferred to this process.
+    pub move_handles: &'a [RawHandle],
+    /// Type-X send statics: pointer data the kernel copied in.
+    pub send_statics: &'a [StaticDescriptor],
+    /// Type-A send buffers: client memory mapped read-only.
+    pub send_buffers: &'a [BufferDescriptor],
+    /// Type-B receive buffers: client memory mapped read-write, for output.
+    pub recv_buffers: &'a [BufferDescriptor],
+    /// Type-W exchange buffers: client memory mapped read-write, bidirectional.
+    pub exch_buffers: &'a [BufferDescriptor],
+    /// Raw data-words region, as bytes. The protocol layer (CMIF, TIPC) parses
+    /// its own headers out of this.
+    pub data_words: &'a [u8],
+    /// Type-C receive list: where returned pointer data is to be written.
+    pub recv_list: RecvList<'a>,
+}
+
+/// Type-C receive list declared by an inbound request.
+///
+/// The four wire modes differ in how many slots they reserve and what the
+/// server may do with them, so each is its own variant: a caller that matches
+/// on this cannot read entries a mode did not reserve, nor treat "write into
+/// the message buffer" as if it named a destination.
+#[derive(Debug)]
+pub enum RecvList<'a> {
+    /// Wire mode `0`: no receive list. The server may not return pointer data.
+    None,
+    /// Wire mode `1`: returned pointer data goes into the client's TLS message
+    /// buffer, so the client reserved no slot to name a destination.
+    ToMessageBuffer,
+    /// Wire mode `2`: a single destination the server may subdivide across all
+    /// the pointer data it returns.
+    SingleBuffer(&'a RecvListEntry),
+    /// Wire mode `2 + n`: one destination per returned pointer, entry `i`
+    /// taking the `i`-th out-pointer.
+    Entries(&'a [RecvListEntry]),
+}
+
+/// Number of receive-list slots a `recv_static_mode` wire value reserves.
+///
+/// See [`RECV_LIST_WIRE_NONE`] for the encoding table.
+#[inline]
+fn recv_list_slot_count(mode: u8) -> usize {
+    match mode {
+        RECV_LIST_WIRE_NONE | RECV_LIST_WIRE_TO_MESSAGE_BUFFER => 0,
+        RECV_LIST_WIRE_SINGLE_BUFFER => 1,
+        // The arms above take every value below `RECV_LIST_WIRE_SINGLE_BUFFER`,
+        // so the subtraction cannot wrap; the field is 4 bits wide, capping the
+        // result at 13.
+        n => usize::from(n - RECV_LIST_WIRE_SINGLE_BUFFER),
+    }
+}
+
+/// Pairs a `recv_static_mode` wire value with the entries it reserved.
+///
+/// Total by construction: [`recv_list_slot_count`] sized `entries`, so the
+/// single-buffer arm's one-element pattern is the only shape that mode can
+/// produce.
+#[inline]
+fn classify_recv_list(mode: u8, entries: &[RecvListEntry]) -> RecvList<'_> {
+    match (mode, entries) {
+        (RECV_LIST_WIRE_NONE, _) => RecvList::None,
+        (RECV_LIST_WIRE_TO_MESSAGE_BUFFER, _) => RecvList::ToMessageBuffer,
+        (RECV_LIST_WIRE_SINGLE_BUFFER, [entry]) => RecvList::SingleBuffer(entry),
+        _ => RecvList::Entries(entries),
+    }
+}
+
 /// Writes the HIPC header into `buf` and returns the remaining tail.
 fn write_header<'a, P: HipcPayload>(
     buf: &'a mut [u8],
@@ -573,20 +814,4 @@ fn write_recv_list<'a>(buf: &'a mut [u8], mode: &RecvListMode) -> &'a mut [u8] {
         RecvListMode::Entries(v) => write_section(buf, v.as_slice()),
         RecvListMode::None => buf,
     }
-}
-
-/// Writes `value`'s bytes into the prefix of `buf` and returns the tail.
-///
-/// The total-size check in [`HipcRequest::write_to`] guarantees the prefix
-/// fits, so the `write_to` call is infallible.
-#[inline]
-fn write_section<'a, T>(buf: &'a mut [u8], value: &T) -> &'a mut [u8]
-where
-    T: zerocopy::IntoBytes + zerocopy::Immutable + ?Sized,
-{
-    let (buf, tail) = buf.split_at_mut(size_of_val(value));
-    value
-        .write_to(buf)
-        .expect("internal: edge check guarantees buffer fits");
-    tail
 }
