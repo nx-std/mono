@@ -28,6 +28,8 @@
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
+use core::time::Duration;
+
 use nx_sf::service::{
     DispatchError,
     Session,
@@ -64,14 +66,10 @@ impl AsyncValue {
         Self { service, event }
     }
 
-    /// Waits for the async operation to complete or until `timeout_ns` elapses.
-    ///
-    /// Pass `u64::MAX` for no timeout.
+    /// Waits for the async operation to complete, or until `timeout` elapses.
     #[inline]
-    pub fn wait(&self, timeout_ns: u64) -> Result<(), WaitSyncError> {
-        // SAFETY: `self.event` is a valid waitable handle obtained from the
-        // parent service. The kernel serializes waits on the same handle.
-        unsafe { sync::wait_synchronization_single(&self.event, timeout_ns) }
+    pub fn wait(&self, timeout: Option<Duration>) -> Result<(), WaitSyncError> {
+        sync::wait_synchronization(&self.event, timeout)
     }
 
     /// Queries the value size (IAsyncValue cmd 0).
@@ -108,7 +106,7 @@ impl AsyncValue {
     /// closed when `self` is dropped at the end of this method.
     pub fn close(self) {
         let _ = self.cancel();
-        let _ = self.wait(u64::MAX);
+        let _ = self.wait(None);
         // SAFETY: `self.event` is a valid handle obtained from the parent service.
         let _ = unsafe { nx_svc::raw::close_handle(self.event.to_raw()) };
     }
@@ -131,14 +129,10 @@ impl AsyncResult {
         Self { service, event }
     }
 
-    /// Waits for the async operation to complete or until `timeout_ns` elapses.
-    ///
-    /// Pass `u64::MAX` for no timeout.
+    /// Waits for the async operation to complete, or until `timeout` elapses.
     #[inline]
-    pub fn wait(&self, timeout_ns: u64) -> Result<(), WaitSyncError> {
-        // SAFETY: `self.event` is a valid waitable handle obtained from the
-        // parent service. The kernel serializes waits on the same handle.
-        unsafe { sync::wait_synchronization_single(&self.event, timeout_ns) }
+    pub fn wait(&self, timeout: Option<Duration>) -> Result<(), WaitSyncError> {
+        sync::wait_synchronization(&self.event, timeout)
     }
 
     /// Retrieves the result code (IAsyncResult cmd 0).
@@ -172,7 +166,7 @@ impl AsyncResult {
     /// closed when `self` is dropped at the end of this method.
     pub fn close(self) {
         let _ = self.cancel();
-        let _ = self.wait(u64::MAX);
+        let _ = self.wait(None);
         // SAFETY: `self.event` is a valid handle obtained from the parent service.
         let _ = unsafe { nx_svc::raw::close_handle(self.event.to_raw()) };
     }

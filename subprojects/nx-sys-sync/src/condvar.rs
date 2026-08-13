@@ -8,6 +8,7 @@
 use core::{
     num::NonZeroU32,
     sync::atomic::AtomicU32,
+    time::Duration,
 };
 
 use nx_svc::{
@@ -24,10 +25,7 @@ use static_assertions::const_assert_eq;
 use super::Mutex;
 use crate::{
     tag::ThreadTag,
-    wait::{
-        Timeout,
-        WakeCount,
-    },
+    wait::WakeCount,
 };
 
 /// A condition variable primitive for thread synchronization.
@@ -73,17 +71,24 @@ impl Condvar {
     ///
     /// When the function returns, the mutex is guaranteed to be re-acquired.
     ///
+    /// The calling thread must hold `mutex`. A wait issued without it has no lock state to
+    /// release and restore, and the kernel is entitled to fault rather than report an error.
+    ///
     /// Returns `0` on a successful wait and wake, or the result code of the wait otherwise; a
     /// timeout is reported as an error rather than as a distinct success.
-    pub fn wait_timeout(&self, mutex: &Mutex, timeout: Timeout) -> ResultCode {
+    pub fn wait_timeout(&self, mutex: &Mutex, timeout: Option<Duration>) -> ResultCode {
         let curr_thread_tag = ThreadTag::current();
 
+        // SAFETY: `self` and `mutex` are borrowed for this call, so both pointers address live,
+        // aligned, writable process memory that stays mapped for the whole wait, including the
+        // part of it that outlasts this call while the thread is blocked. The remaining
+        // obligation, that this thread owns `mutex`, is the precondition stated above.
         let result = unsafe {
             wait_process_wide_key_atomic(
                 self.as_ptr(),
                 mutex.as_ptr(),
                 curr_thread_tag.to_raw(),
-                timeout.to_raw(),
+                timeout,
             )
         };
 
@@ -105,7 +110,7 @@ impl Condvar {
     /// Returns `0` on a successful wait and wake, or the result code of the wait otherwise.
     #[inline]
     pub fn wait(&self, mutex: &Mutex) -> ResultCode {
-        self.wait_timeout(mutex, Timeout::Infinite)
+        self.wait_timeout(mutex, None)
     }
 
     /// Wakes threads waiting on the condition variable.

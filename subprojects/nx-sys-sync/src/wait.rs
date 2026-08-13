@@ -1,52 +1,16 @@
-//! How long a wait lasts, and how many waiters a wake releases.
+//! How many waiting threads a wake releases.
 //!
-//! Both quantities reach the kernel as plain integers carrying a sentinel: a timeout of
-//! `u64::MAX` means "no deadline", and a wake count of zero or less means "every waiter". A
-//! sentinel is only a convention, so nothing stops a computed duration from landing on
-//! `u64::MAX` and turning a bounded wait into an unbounded one, or a subtraction from reaching
-//! zero and waking every thread when the caller meant to wake none.
+//! The count reaches the kernel as a plain integer carrying a sentinel: zero or less means "every
+//! waiter". A sentinel is only a convention, so nothing stops a subtraction from reaching zero and
+//! waking every thread when the caller meant to wake none.
 //!
-//! [`Timeout`] and [`WakeCount`] name the two cases instead, and convert to the sentinel form at
-//! the point the SVC is issued.
+//! [`WakeCount`] names the two cases instead, and converts to the sentinel form at the point the
+//! SVC is issued.
+//!
+//! A wait's deadline is the other quantity of this shape, and it is an `Option<Duration>` rather
+//! than a type of its own; [`nx_svc::timeout`] holds the sentinel it encodes to.
 
 use core::num::NonZeroU32;
-
-/// How long a blocking wait may last.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Timeout {
-    /// Wait until woken, however long that takes.
-    Infinite,
-    /// Wait until woken, or until this many nanoseconds have elapsed.
-    Nanos(u64),
-}
-
-impl Timeout {
-    /// The value the wait SVCs read as "no deadline".
-    const INFINITE_RAW: u64 = u64::MAX;
-
-    /// Returns the timeout in the form the wait SVCs take.
-    #[inline]
-    pub const fn to_raw(self) -> u64 {
-        match self {
-            Self::Infinite => Self::INFINITE_RAW,
-            Self::Nanos(nanos) => nanos,
-        }
-    }
-}
-
-impl From<u64> for Timeout {
-    /// Decodes the timeout a C caller passed across the FFI boundary.
-    ///
-    /// Every `u64` denotes a timeout, so this cannot fail: the sentinel is one specific value
-    /// and everything else is a nanosecond count.
-    #[inline]
-    fn from(raw: u64) -> Self {
-        match raw {
-            Self::INFINITE_RAW => Self::Infinite,
-            nanos => Self::Nanos(nanos),
-        }
-    }
-}
 
 /// How many waiting threads a wake releases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -163,7 +163,7 @@ impl ReentrantMutex {
     pub(crate) fn cond_wait(
         &self,
         condvar: &super::Condvar,
-        timeout: crate::wait::Timeout,
+        timeout: Option<core::time::Duration>,
     ) -> Result<nx_svc::result::ResultCode, NotHeldOnceError> {
         // SAFETY: the caller holds the lock, or the count read here says it does not and nothing
         // is touched.

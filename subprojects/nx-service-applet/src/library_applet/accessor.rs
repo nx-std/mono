@@ -101,10 +101,7 @@ impl<'d> LibraryAppletAccessor<'d> {
     /// Blocks until the user dismisses the applet, so this must not be called
     /// from a context that cannot block indefinitely.
     pub fn join(&self, event: &EventHandle) -> Result<LibraryAppletExitReason, JoinError> {
-        // SAFETY: `event` is a live handle this accessor obtained from the
-        // server, and the wait borrows it for the call's duration.
-        unsafe { nx_svc::sync::wait_synchronization_single(event, u64::MAX) }
-            .map_err(JoinError::Wait)?;
+        nx_svc::sync::wait_synchronization(event, None).map_err(JoinError::Wait)?;
 
         self.get_result().map_err(JoinError::GetResult)
     }

@@ -585,9 +585,8 @@ unsafe fn reclaim(thread: Arc<PthreadControl>) -> Result<*mut c_void, PthreadJoi
 /// - `thread` must be a join handle returned by [`pthread_create`] that has not
 ///   been cloned and whose thread-side `Arc` count has not yet been reclaimed.
 /// - The thread must have *already exited*, its termination observed through
-///   [`thread::wait_for_exit`] or [`thread::wait_for_any_exit`], so its
-///   `pthread_exit` write of `return_value` happened-before this call, and it
-///   will never touch the object again.
+///   [`thread::wait_for_exit`], so its `pthread_exit` write of `return_value`
+///   happened-before this call, and it will never touch the object again.
 unsafe fn reclaim_after_exit(thread: Arc<PthreadControl>) -> Result<*mut c_void, PthreadJoinError> {
     // Reclaim the spawned thread's `Arc` strong count. `pthread_create` leaked
     // one `Arc::into_raw` clone for the running thread; the thread can never
