@@ -42,6 +42,10 @@ deps += nx_svc_proj.get_variable('nx_svc_dep')
 nx_std_sync_proj = subproject('nx-std-sync')
 deps += nx_std_sync_proj.get_variable('nx_std_sync_dep')
 
+# nx-sys-args (always required)
+nx_sys_args_proj = subproject('nx-sys-args')
+deps += nx_sys_args_proj.get_variable('nx_sys_args_dep')
+
 # nx-sys-mem (always required)
 nx_sys_mem_proj = subproject('nx-sys-mem')
 deps += nx_sys_mem_proj.get_variable('nx_sys_mem_dep')

@@ -13,7 +13,10 @@ bench = false
 [features]
 # Enable the C-FFI surface — the `__nx_rt_nso__*` libnx-override symbols.
 # Pulls `nx-rt-core/ffi`: the NSO applet FFI re-uses `nx_rt_core::ffi::common`.
-ffi = ["nx-rt-core/ffi"]
+# Pulls `nx-sys-args/ffi`: that crate gates the C-style `(argc, argv)` view on
+# the feature, and the only reader of it is the `__system_argc` / `__system_argv`
+# pair below this switch.
+ffi = ["nx-rt-core/ffi", "nx-sys-args/ffi"]
 # Per-kind `pm`-launch `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the NSO process-launch startup ABI). Leave it off on
 # the GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
@@ -32,6 +35,7 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", features = ["service-applet"] }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-args = { version = "0.1.0", path = "../nx-sys-args" }
 
 # The build-time Application Manager identity arrives as the `nso_applet_type`
 # cfg value, set by the Meson option of the same name. Denying the lint turns a

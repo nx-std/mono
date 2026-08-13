@@ -17,7 +17,8 @@ scope: "global"
 4. [Symbol Naming](#4-symbol-naming)
 5. [Producer Build vs Consumer Activation](#5-producer-build-vs-consumer-activation)
 6. [Crates Without an FFI Surface](#6-crates-without-an-ffi-surface)
-7. [Checklist](#checklist)
+7. [An `ffi` Module May Export Nothing of Its Own](#7-an-ffi-module-may-export-nothing-of-its-own)
+8. [Checklist](#checklist)
 
 A crate's C-FFI surface and the linker scripts that redirect upstream archive symbols (`libnx`, `newlib`, etc.) to it are deliberately separated. This doc covers only the Rust-side feature contract. The linker-side override scripts that consume the symbols defined here live in [meson-linker-script](meson-linker-script.md).
 
@@ -31,7 +32,7 @@ A crate's C-FFI surface and the linker scripts that redirect upstream archive sy
 | Source gating              | `#[cfg(feature = "ffi")] pub mod ffi;` in `src/lib.rs`.                                   |
 | Symbol naming              | `__nx_<aspect>__<symbol>` with `#[unsafe(no_mangle)] pub extern "C"`.                     |
 | Direct producer build      | The producer's own `meson.build` does NOT pass `--features ffi` to `cargo build`.         |
-| Crates without overrides   | Service crates (`nx-service-*`) and pure Rust utilities OMIT the `ffi` feature entirely.  |
+| Crates without an `ffi` module | Service crates (`nx-service-*`) and pure Rust utilities OMIT the `ffi` feature entirely ([§6](#6-crates-without-an-ffi-surface)). |
 
 ---
 
@@ -170,12 +171,24 @@ The `?` makes the activation conditional on the consumer having also enabled `nx
 
 ## 6. Crates Without an FFI Surface
 
-A crate that has no `__nx_<aspect>__*` symbols MUST OMIT the `ffi` feature entirely. Typical examples:
+**The `ffi` feature exists to gate `src/ffi.rs`.** A crate with no such module MUST OMIT the feature entirely. Typical examples:
 
 - `nx-service-*` IPC clients — expose a pure Rust API; the upstream services they replace are wrapped by callers in their own bindings.
 - Pure Rust utilities such as `nx-cpu` and `nx-panic-handler`.
 
 Do NOT add `ffi = []` "for symmetry" — its presence is a strong signal that an `ffi` module exists, and downstream `nx-<aspect>?/ffi` references will fail to resolve if the feature is declared without a corresponding `src/ffi.rs`.
+
+Having no symbols of its own is not the same as having no module ([§7](#7-an-ffi-module-may-export-nothing-of-its-own)).
+
+## 7. An `ffi` Module May Export Nothing of Its Own
+
+Defining `__nx_*` symbols is the usual reason to have an `ffi` module, not the only one. A crate may hold the C-shaped data that **another** crate's exports address, and that data belongs behind the same feature: it is built for a C boundary, and a pure-Rust link should not pay for it.
+
+The alternative is worse in both directions. Compiling the backing unconditionally bills every Rust-only consumer for a shape only C reads; moving it up to the exporting crate splits ownership of one data structure across a crate boundary, so the store and the view of it drift.
+
+The split follows ownership. `nx-sys-args` stores the process command line, so the nul-terminated copies and the pointer array behind an entry crate's `__nx_rt_<kind>__libnx_system_argv` sit there too: they are a second shape for data that crate already holds. The symbols stay with the entry crates, because the output kind is what defines them ([crates-rt](crates-rt.md)).
+
+Such a crate declares `ffi = []` and gates `src/ffi.rs` exactly as an exporting crate does. What it must not do is invent `__nx_<aspect>__*` names for items no linker script redirects — [§4](#4-symbol-naming) governs symbols, and this crate has none to name. Consumers activate it through their own `ffi` feature, unchanged ([§5](#5-producer-build-vs-consumer-activation)).
 
 ---
 
@@ -191,10 +204,13 @@ Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
 - [ ] Every exported symbol uses the `__nx_<aspect>__<symbol>` naming with `#[unsafe(no_mangle)] pub extern "C"`.
 - [ ] Symbol signatures match the upstream archive's prototype exactly (integer widths, signedness, pointer mutability).
 - [ ] The producer's `meson.build` does NOT pass `--features ffi` to `cargo build`.
-- [ ] Crates without a C-FFI surface do NOT declare an `ffi` feature.
+- [ ] A crate with no `src/ffi.rs` does NOT declare an `ffi` feature.
+- [ ] An `ffi` module holding only C-shaped backing for another crate's exports defines no `__nx_*` symbols of
+      its own.
 
 ## References
 
+- [crates-rt](crates-rt.md) - Related: Owns which crate defines a runtime symbol, when the backing for it lives in another
 - [meson-linker-script](meson-linker-script.md) - Related: `*_override.ld` linker scripts that consume the symbols defined here
 - [meson-subproject-crate](meson-subproject-crate.md) - Related: Rust-crate subproject layout and `meson.build` Cargo wiring
 - [rust-crates](rust-crates.md) - Related: `Cargo.toml` feature naming and ordering rules

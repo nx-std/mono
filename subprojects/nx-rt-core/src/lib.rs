@@ -6,8 +6,12 @@
 //! shares, regardless of how it is launched or linked: the parsed
 //! environment-state container and its read accessors, heap initialization,
 //! Horizon OS version detection, syscall hints, main-thread TLS setup, the
-//! command-line argument scanner, the panic glue, and the Service Manager
-//! (`sm`) bootstrap.
+//! panic glue, and the Service Manager (`sm`) bootstrap.
+//!
+//! The command line is deliberately absent. Each entry crate reads it from its
+//! own kind-specific source and installs it in `nx-sys-args`, which holds it
+//! the way `std::sys::args` does: below every caller, rather than in the last
+//! crate of the graph where nothing else could reach it.
 //!
 //! It deliberately contains **no** process entry point, no
 //! loader-configuration parser, and no Application Manager (applet) logic.
@@ -61,7 +65,6 @@
 extern crate alloc;
 extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-pub mod argv;
 pub mod caps;
 pub mod env;
 #[cfg(feature = "ffi")]

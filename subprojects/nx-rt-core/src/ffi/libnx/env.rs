@@ -194,7 +194,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_env_has_argv() -> bool {
 /// the runtime environment state is sound to read at any time.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_core__libnx_env_get_argv() -> *const c_char {
-    env::argv().unwrap_or_default()
+    env::argv().map_or(core::ptr::null(), |argv| argv.as_ptr() as *const c_char)
 }
 
 /// Returns true if the given syscall is hinted as available.

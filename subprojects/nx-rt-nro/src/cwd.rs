@@ -22,8 +22,6 @@ use core::ffi::{
     c_int,
 };
 
-use crate::argv;
-
 /// Changes into the directory the program was loaded from.
 ///
 /// Does nothing when the loader passed no command line, or when `argv[0]`
@@ -35,14 +33,14 @@ pub fn init() {
         fn chdir(path: *const c_char) -> c_int;
     }
 
-    let Some(program) = argv::args().next() else {
+    let Some(program) = nx_sys_args::args().next() else {
         return;
     };
 
     // Everything before the last separator is the directory the program sits
     // in: `sdmc:/switch/app.nro` changes into `sdmc:/switch`. A path with no
     // separator names no directory, so there is nothing to change into.
-    let Some(separator) = program.rfind('/') else {
+    let Some(separator) = program.iter().rposition(|&byte| byte == b'/') else {
         return;
     };
     let Ok(directory) = CString::new(&program[..separator]) else {

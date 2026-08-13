@@ -14,11 +14,11 @@ pub static mut __nx_rt_nso__libnx_system_argc: i32 = 0;
 
 /// FFI-exported argv (for C consumers).
 ///
-/// Initialized to the shared empty-argv backing from `nx-rt-core`; [`argv::setup`]
-/// repoints it at the parsed command line.
+/// Initialized to the shared empty-argv backing from `nx-sys-args`;
+/// [`argv::setup`] repoints it at the parsed command line.
 #[unsafe(no_mangle)]
 pub static mut __nx_rt_nso__libnx_system_argv: *mut *mut c_char =
-    nx_rt_core::argv::EMPTY_ARGV.as_ptr();
+    nx_sys_args::ffi::EMPTY_ARGV.as_ptr();
 
 /// Sets up argv parsing.
 ///
@@ -29,9 +29,7 @@ pub static mut __nx_rt_nso__libnx_system_argv: *mut *mut c_char =
 /// Must be called after the global allocator is initialized.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_rt_nso__libnx_argv_setup() {
-    // SAFETY: the caller guarantees the allocator is up, which is what the
-    // argument scanner allocates from.
-    unsafe { argv::setup() };
+    argv::setup();
     // SAFETY: the arguments were just parsed, which is what leaves something
     // to publish.
     unsafe { publish() };
@@ -48,12 +46,12 @@ pub unsafe extern "C" fn __nx_rt_nso__libnx_argv_setup() {
 /// The arguments must already be parsed, which is what leaves something to
 /// publish; calling it beforehand leaves the globals as they were.
 pub(crate) unsafe fn publish() {
-    let Some((argc, argv)) = nx_rt_core::argv::system_argv() else {
+    let Some((argc, argv)) = nx_sys_args::ffi::system_argv() else {
         return;
     };
 
     // SAFETY: argc/argv describe the leaked argument allocation owned by
-    // `nx_rt_core::argv`, which lives for the rest of the program, and the
+    // `nx_sys_args`, which lives for the rest of the program, and the
     // startup thread is the only one running.
     unsafe {
         __nx_rt_nso__libnx_system_argc = argc;

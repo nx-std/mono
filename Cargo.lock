@@ -234,6 +234,7 @@ dependencies = [
  "nx-sf",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-args",
  "nx-sys-mem",
  "nx-sys-thread-tls",
  "nx-time",
@@ -250,6 +251,7 @@ dependencies = [
  "nx-rt-core",
  "nx-service-applet",
  "nx-svc",
+ "nx-sys-args",
 ]
 
 [[package]]
@@ -1626,6 +1628,14 @@ dependencies = [
  "bitflags",
  "nx-panic-handler",
  "thiserror",
+]
+
+[[package]]
+name = "nx-sys-args"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-sys-sync",
 ]
 
 [[package]]

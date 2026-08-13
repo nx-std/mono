@@ -1,0 +1,23 @@
+[package]
+name = "nx-sys-args"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_sys_args"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# C-FFI surface: the C-style `(argc, argv)` view of the parsed command line —
+# the nul-terminated copies and the pointer array an entry crate publishes into
+# its `__nx_<aspect>__system_argc` / `__system_argv` globals. This crate exports
+# no `__nx_*` symbol itself; it builds the array those symbols address, so the
+# feature is named for the boundary it serves. A pure-Rust link compiles none of it.
+ffi = []
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
