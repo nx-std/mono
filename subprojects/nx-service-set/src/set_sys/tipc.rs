@@ -17,9 +17,8 @@ use nx_sf::{
 };
 use zerocopy::IntoBytes as _;
 
-use crate::proto::{
-    CMD_GET_FIRMWARE_VERSION,
-    CMD_GET_FIRMWARE_VERSION_2,
+use crate::set_sys::proto::{
+    self,
     FirmwareVersion,
 };
 
@@ -28,10 +27,10 @@ use crate::proto::{
 /// Uses command ID 4 (GetFirmwareVersion2).
 /// Requires HOS 12.0.0+ or Atmosphere.
 #[inline]
-pub fn get_firmware_version(
+pub(crate) fn get_firmware_version(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
-    get_firmware_version_inner(session, CMD_GET_FIRMWARE_VERSION_2)
+    get_firmware_version_inner(session, proto::GET_FIRMWARE_VERSION_2)
 }
 
 /// Gets the system firmware version using TIPC protocol (legacy command).
@@ -39,10 +38,10 @@ pub fn get_firmware_version(
 /// Uses command ID 3 (GetFirmwareVersion).
 /// This command zeros the revision field in the output.
 #[inline]
-pub fn get_firmware_version_legacy(
+pub(crate) fn get_firmware_version_legacy(
     session: BorrowedSessionHandle<'_>,
 ) -> Result<FirmwareVersion, GetFirmwareVersionError> {
-    get_firmware_version_inner(session, CMD_GET_FIRMWARE_VERSION)
+    get_firmware_version_inner(session, proto::GET_FIRMWARE_VERSION)
 }
 
 /// Inner implementation that takes a command ID.

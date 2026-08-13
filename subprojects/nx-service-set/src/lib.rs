@@ -1,157 +1,72 @@
-//! System Settings Service (set:sys) Implementation.
+//! Settings services implementation.
 //!
-//! This crate provides access to the Nintendo Switch's system settings service,
-//! which allows querying firmware version and other system configuration.
+//! What a console was configured with, and what it was configured by: the language and region it
+//! was set up in, the firmware it runs, and the settings items the system reads its own knobs
+//! out of.
 //!
-//! ## Protocol Support
+//! ## Interfaces
 //!
-//! The service supports two protocols:
-//! - **CMIF**: Available on all HOS versions
-//! - **TIPC**: Available on HOS 12.0.0+ and Atmosphere
+//! The settings live behind two interfaces, and a session to one answers nothing about the
+//! other:
 //!
-//! Protocol selection is the caller's responsibility. Use the `_cmif` or `_tipc`
-//! method variants as appropriate for your system version.
+//! - **`set`** - the settings a console is set up with: language, region, nickname. Connected
+//!   via [`connect_cmif`].
+//! - **`set:sys`** - the system's own settings: firmware version, theme, settings items.
+//!   Connected via [`connect_sys_cmif`].
+//!
+//! A third interface, `set:cal`, holds the calibration a console was manufactured with. Nothing
+//! here reaches it yet.
+//!
+//! ## Protocol
+//!
+//! Every command is CMIF, except the firmware version, which is also reachable over TIPC.
+//! The `_tipc` connect functions choose how the *Service Manager* is asked for the interface,
+//! which `[12.0.0]` and Atmosphère changed; they do not change what the session's own commands
+//! are sent as.
 
 #![no_std]
 
-extern crate nx_panic_handler; // Provide #![panic_handler]
+extern crate nx_panic_handler as _; // provides #[panic_handler]
 
-use nx_service_sm::SmService;
-use nx_sf::{
-    error::{
-        ResultCode,
-        ToResultCode,
-    },
-    service::{
-        BorrowedSessionHandle,
-        Session,
-    },
-};
-
-mod cmif;
-mod proto;
-mod tipc;
+mod dispatch;
+mod set;
+mod set_sys;
 
 pub use self::{
-    cmif::GetFirmwareVersionError as GetFirmwareVersionCmifError,
-    proto::{
-        FirmwareVersion,
-        SERVICE_NAME,
+    set::{
+        AvailableLanguageCodes,
+        ConnectCmifError,
+        ConnectTipcError,
+        DeviceNickname,
+        GetAvailableLanguageCodesError,
+        GetLanguageCodeError,
+        GetRegionCodeError,
+        InvalidLanguageCode,
+        Language,
+        LanguageCode,
+        LanguageCodeParseError,
+        RegionCode,
+        SetService,
+        UnknownLanguage,
+        UnknownRegionCode,
+        connect_cmif,
+        connect_tipc,
     },
-    tipc::GetFirmwareVersionError as GetFirmwareVersionTipcError,
+    set_sys::{
+        ColorSetId,
+        ConnectSysCmifError,
+        ConnectSysTipcError,
+        FirmwareVersion,
+        GetColorSetIdError,
+        GetFirmwareVersionCmifError,
+        GetFirmwareVersionTipcError,
+        GetSettingsItemValueU64Error,
+        InvalidSettingsText,
+        SetSysService,
+        SettingsItemKey,
+        SettingsName,
+        UnknownColorSetId,
+        connect_sys_cmif,
+        connect_sys_tipc,
+    },
 };
-
-/// System Settings Service (set:sys) session wrapper.
-///
-/// Provides type safety to distinguish set:sys sessions from other services.
-#[repr(transparent)]
-pub struct SetSysService(Session);
-
-impl SetSysService {
-    /// Returns the underlying session handle.
-    #[inline]
-    pub fn session(&self) -> BorrowedSessionHandle<'_> {
-        self.0.handle()
-    }
-}
-
-/// CMIF protocol methods.
-impl SetSysService {
-    /// Gets the system firmware version using CMIF protocol.
-    ///
-    /// Uses command ID 4 (GetFirmwareVersion2) which is available on HOS 3.0.0+.
-    #[inline]
-    pub fn get_firmware_version_cmif(
-        &self,
-    ) -> Result<FirmwareVersion, GetFirmwareVersionCmifError> {
-        cmif::get_firmware_version(self.0.handle())
-    }
-
-    /// Gets the system firmware version using CMIF protocol (legacy command).
-    ///
-    /// Uses command ID 3 (GetFirmwareVersion) for pre-3.0.0 systems.
-    /// This command zeros the revision field in the output.
-    #[inline]
-    pub fn get_firmware_version_legacy_cmif(
-        &self,
-    ) -> Result<FirmwareVersion, GetFirmwareVersionCmifError> {
-        cmif::get_firmware_version_legacy(self.0.handle())
-    }
-}
-
-/// TIPC protocol methods.
-///
-/// Requires HOS 12.0.0+ or Atmosphere.
-impl SetSysService {
-    /// Gets the system firmware version using TIPC protocol.
-    ///
-    /// Uses command ID 4 (GetFirmwareVersion2).
-    /// Requires HOS 12.0.0+ or Atmosphere.
-    #[inline]
-    pub fn get_firmware_version_tipc(
-        &self,
-    ) -> Result<FirmwareVersion, GetFirmwareVersionTipcError> {
-        tipc::get_firmware_version(self.0.handle())
-    }
-
-    /// Gets the system firmware version using TIPC protocol (legacy command).
-    ///
-    /// Uses command ID 3 (GetFirmwareVersion).
-    /// This command zeros the revision field in the output.
-    #[inline]
-    pub fn get_firmware_version_legacy_tipc(
-        &self,
-    ) -> Result<FirmwareVersion, GetFirmwareVersionTipcError> {
-        tipc::get_firmware_version_legacy(self.0.handle())
-    }
-}
-
-/// Connects to the set:sys (System Settings) service using CMIF.
-///
-/// Obtains a service handle from the Service Manager using CMIF protocol.
-/// For TIPC-based systems (HOS 12.0.0+), use [`connect_tipc`].
-pub fn connect_cmif(sm: &SmService) -> Result<SetSysService, ConnectCmifError> {
-    let handle = sm
-        .get_service_handle_cmif(SERVICE_NAME)
-        .map_err(ConnectCmifError)?;
-
-    let service = Session::new(handle, 0);
-
-    Ok(SetSysService(service))
-}
-
-/// Error returned by [`connect_cmif`].
-#[derive(Debug, thiserror::Error)]
-#[error("failed to get set:sys service")]
-pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
-
-impl ToResultCode for ConnectCmifError {
-    fn to_rc(self) -> ResultCode {
-        self.0.to_rc()
-    }
-}
-
-/// Connects to the set:sys (System Settings) service using TIPC.
-///
-/// Obtains a service handle from the Service Manager using TIPC protocol.
-/// Requires HOS 12.0.0+ or Atmosphere.
-pub fn connect_tipc(sm: &SmService) -> Result<SetSysService, ConnectTipcError> {
-    let handle = sm
-        .get_service_handle_tipc(SERVICE_NAME)
-        .map_err(ConnectTipcError)?;
-
-    let service = Session::new(handle, 0);
-
-    Ok(SetSysService(service))
-}
-
-/// Error returned by [`connect_tipc`].
-#[derive(Debug, thiserror::Error)]
-#[error("failed to get set:sys service")]
-pub struct ConnectTipcError(#[source] pub nx_service_sm::GetServiceTipcError);
-
-impl ToResultCode for ConnectTipcError {
-    fn to_rc(self) -> ResultCode {
-        self.0.to_rc()
-    }
-}
