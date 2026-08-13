@@ -83,6 +83,18 @@ if get_option('use_nx_std_sync').enabled()
     deps_cargo_features += ['sync']
 endif
 
+# nx-std::thread — a module of this crate, over the platform crates below it
+if get_option('use_nx_std_thread').enabled()
+    nx_svc_thread_proj = subproject('nx-svc')
+    nx_sys_thread_proj = subproject('nx-sys-thread')
+
+    deps += nx_svc_thread_proj.get_variable('nx_svc_dep')
+    deps += nx_sys_thread_proj.get_variable('nx_sys_thread_dep')
+
+    debug('thread feature: enabled')
+    deps_cargo_features += ['thread']
+endif
+
 # nx-svc
 if get_option('use_nx_svc').enabled()
     nx_svc_proj = subproject('nx-svc')

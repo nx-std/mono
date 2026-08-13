@@ -148,7 +148,7 @@ impl DetachState {
 /// A join-handle object that owns a detachable thread.
 ///
 /// Implemented by the `Arc`-shared payloads behind the two Level-1 join
-/// handles — `PthreadControl` and `SpawnInner<T>` — so [`exit_self_or_detached`]
+/// handles — `PthreadControl` and `SpawnInner` — so [`exit_self_or_detached`]
 /// and [`unmap_self`] drive both through one path. Each object embeds a core
 /// [`ThreadControl`] and a [`DetachState`] atomic.
 pub(crate) trait Detachable: Sized {
@@ -245,9 +245,9 @@ pub(crate) unsafe fn exit_self_or_detached<O: Detachable>(obj: NonNull<O>) -> ! 
 ///   here through [`Detachable::reclaim_exited`].
 ///
 /// Consumes `arc`, the join handle's sole strong count. The move-only join
-/// handles (`JoinHandle` / `PthreadJoinHandle`) guarantee it is un-cloned with
+/// handles (`Thread` / `PthreadJoinHandle`) guarantee it is un-cloned with
 /// its thread-side count still outstanding, so this is a safe `fn` — like
-/// [`JoinHandle::join`](crate::thread::JoinHandle::join).
+/// [`Thread::join`](crate::thread::Thread::join).
 pub(crate) fn detach<O: Detachable>(arc: Arc<O>) {
     // SAFETY: `Arc::as_ptr` never returns null.
     let obj = unsafe { NonNull::new_unchecked(Arc::as_ptr(&arc).cast_mut()) };

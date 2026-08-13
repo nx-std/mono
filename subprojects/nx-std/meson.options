@@ -55,6 +55,13 @@ option(
 )
 
 option(
+    'use_nx_std_thread',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `thread` feature',
+    yield : true
+)
+
+option(
     'use_nx_svc',
     type : 'feature', value : 'auto',
     description : 'Enable the `svc` feature',

@@ -24,7 +24,6 @@ use alloc::{
     sync::Arc,
 };
 use core::{
-    cell::UnsafeCell,
     ffi::c_void,
     mem::{
         MaybeUninit,
@@ -781,63 +780,74 @@ impl Default for Builder {
     }
 }
 
-/// Spawns a new Horizon thread that runs the closure `f` and returns a
-/// [`JoinHandle`].
+/// The type-erased body a [`spawn`]ed thread runs.
 ///
-/// `spawn` is the idiomatic, closure-accepting Level 1 entry point layered on
-/// top of [`create`] + [`start`]: a Rust caller passes a normal `FnOnce`
-/// closure instead of hand-writing an `extern "C"` shim and erasing its
-/// captures through `*mut c_void`. Unlike the two-step [`create`] + [`start`]
-/// core flow, `spawn` brings the thread all the way to *running* — matching
-/// `std::thread::spawn` — and hands back a move-only [`JoinHandle<T>`] whose
-/// [`join`](JoinHandle::join) yields the value the closure produced.
+/// The platform layer never sees the closure's own type or its return value:
+/// a caller that wants either boxes the closure and captures whatever slot it
+/// needs inside it, which is what keeps this layer non-generic and its
+/// trampoline a single function rather than one per instantiation.
+pub type ThreadBody = Box<dyn FnOnce() + Send + 'static>;
+
+/// Spawns a new Horizon thread that runs `f` and returns the owning [`Thread`].
+///
+/// `spawn` is the platform-layer entry point layered on top of [`create`] +
+/// [`start`]: a caller passes a boxed thread body instead of hand-writing an
+/// `extern "C"` shim and erasing its captures through `*mut c_void`. Unlike the
+/// two-step [`create`] + [`start`] core flow, `spawn` brings the thread all the
+/// way to *running* and hands back a move-only [`Thread`].
+///
+/// The body is type-erased ([`ThreadBody`]) and returns nothing. Carrying a
+/// closure's return value to a joiner is the job of the layer above, which
+/// captures its own result slot inside the boxed body; keeping it out of here
+/// is what lets one `closure_trampoline` serve every spawned thread.
 ///
 /// # Ownership
 ///
 /// The spawned thread's state lives inside an [`Arc`], shared by two strong
-/// counts. The returned [`JoinHandle`] holds one; the spawned thread "holds"
-/// the other — it reaches its state only through `ThreadVars.thread_info_ptr`
+/// counts. The returned [`Thread`] holds one; the spawned thread "holds" the
+/// other — it reaches its state only through `ThreadVars.thread_info_ptr`
 /// (container-of), a raw pointer that owns no count, so `spawn` leaks one
 /// [`Arc::into_raw`] clone for it. The [`Arc`] payload never moves, so the
 /// embedded [`ThreadControl`] the thread locates by container-of stays pinned
-/// for free. [`JoinHandle::join`] reclaims the thread-side count once the
-/// thread is provably dead. Dropping the handle without joining *detaches* the
-/// thread (see [`JoinHandle`]): the thread reclaims itself once it exits, so an
-/// unjoined handle is not leaked.
+/// for free. [`Thread::join`] reclaims the thread-side count once the thread is
+/// provably dead. Dropping the handle without joining *detaches* the thread
+/// (see [`Thread`]): the thread reclaims itself once it exits, so an unjoined
+/// handle is not leaked.
 ///
-/// The closure is `Box`-allocated because the thread body runs *after* `spawn`
-/// returns — a stack-local closure would dangle. The raw `Box` pointer travels
-/// as the C `arg`; the trampoline reclaims it on the spawned thread once the
-/// closure returns. If [`create`] or [`start`] fails before the thread runs,
-/// the trampoline never executes, so `spawn` reconstructs and drops the `Box`
+/// The body is `Box`-allocated because it runs *after* `spawn` returns — a
+/// stack-local closure would dangle. The raw `Box` pointer travels as the C
+/// `arg`; the trampoline reclaims it on the spawned thread once the body
+/// returns. If [`create`] or [`start`] fails before the thread runs, the
+/// trampoline never executes, so `spawn` reconstructs and drops the `Box`
 /// itself — the captures are never leaked.
 ///
-/// `F` is bounded `FnOnce() -> T + Send + 'static` and `T` is `Send + 'static`:
-/// `FnOnce` because a thread body runs exactly once, `Send` because the closure
-/// and its return value cross to another thread, and `'static` because the
-/// closure must not borrow the caller's frame.
+/// # Errors
+///
+/// Returns [`SpawnError::Create`] if the thread could not be created — an
+/// invalid stack, an exhausted address space, or a kernel refusal — in which
+/// case no thread exists and the body has been dropped. Returns
+/// [`SpawnError::Start`] if the created thread could not be made runnable; the
+/// created thread is closed and the body dropped before returning, so nothing
+/// is left behind.
 ///
 /// # Safety
 ///
 /// When `config.stack` is [`StackSpec::Provided`], its `base` must point to a
 /// page-aligned buffer of `size` bytes that stays valid for the thread's
 /// lifetime — the same stack contract [`create`] imposes. The
-/// closure-to-[`ThreadFunc`] conversion itself adds no unsafety: the
-/// monomorphized trampoline is always a valid function pointer.
-pub unsafe fn spawn<F, T>(config: SpawnConfig, f: F) -> Result<JoinHandle<T>, SpawnError>
-where
-    F: FnOnce() -> T + Send + 'static,
-    T: Send + 'static,
-{
-    // Heap-allocate the closure: the thread body runs after `spawn` returns, so
-    // the closure must outlive this stack frame. The raw pointer is the *data
-    // half* paired with the `closure_trampoline::<F, T>` *code half*.
+/// body-to-[`ThreadFunc`] conversion itself adds no unsafety: the trampoline
+/// `spawn` pairs with the body is always a valid function pointer.
+pub unsafe fn spawn(config: SpawnConfig, f: ThreadBody) -> Result<Thread, SpawnError> {
+    // Heap-allocate the body: it runs after `spawn` returns, so it must outlive
+    // this stack frame. `ThreadBody` is itself a fat pointer, so the extra `Box`
+    // is what makes `raw` the thin pointer the C `arg` slot can carry — the
+    // *data half* paired with the `closure_trampoline` *code half*.
     let raw = Box::into_raw(Box::new(f));
 
-    // `closure_trampoline::<F, T>` monomorphizes to a plain `extern "C"`
-    // function — a valid `ThreadFunc` — and `raw` is its matched `arg`.
+    // `closure_trampoline` is a plain `extern "C"` function — a valid
+    // `ThreadFunc` — and `raw` is its matched `arg`.
     let create_config = ThreadCreateConfig {
-        entry: closure_trampoline::<F, T>,
+        entry: closure_trampoline,
         arg: raw.cast::<c_void>(),
         stack: config.stack,
         prio: config.prio,
@@ -865,7 +875,6 @@ where
     // and the `Arc` payload never moves, so that address stays pinned for free.
     let inner = Arc::new(SpawnInner {
         thread,
-        result: UnsafeCell::new(None),
         detach_state: AtomicU8::new(DetachState::Joinable as u8),
     });
 
@@ -887,7 +896,7 @@ where
     // freshly-created, still-suspended thread; the `Arc` keeps it pinned at
     // that address for the spawned thread's whole lifetime.
     match unsafe { start(thread_ptr) } {
-        Ok(()) => Ok(JoinHandle { inner: Some(inner) }),
+        Ok(()) => Ok(Thread { inner: Some(inner) }),
         Err(err) => {
             // `create` already spawned the kernel thread, but `start` failed
             // and rolled `state` back to `Created`, so the thread stays
@@ -918,88 +927,80 @@ where
     }
 }
 
-/// A move-only handle to a thread spawned by [`spawn`].
+/// A move-only, owning handle to a thread created by [`spawn`].
 ///
-/// `JoinHandle` owns one strong count of the spawned thread's `Arc`-shared
-/// state and is the only way to retrieve the value its closure produced. It is
-/// deliberately neither `Copy` nor `Clone`: [`join`](Self::join) consumes the
-/// handle by value, so a thread can be joined at most once and a double join is
-/// a compile error rather than a runtime use-after-free.
+/// `Thread` owns one strong count of the spawned thread's `Arc`-shared state.
+/// It is deliberately neither `Copy` nor `Clone`: [`join`](Self::join) consumes
+/// the handle by value, so a thread can be joined at most once and a double
+/// join is a compile error rather than a runtime use-after-free.
 ///
-/// Dropping a `JoinHandle` without joining *detaches* the thread (see
+/// Dropping a `Thread` without joining *detaches* it (see
 /// [`detach`](detach::detach)): the thread reclaims itself once it exits. An
-/// unjoined handle therefore detaches cleanly instead of leaking — the terminal
-/// state of a never-joined `std::thread::JoinHandle`.
-pub struct JoinHandle<T: Send + 'static> {
+/// unjoined handle therefore detaches cleanly instead of leaking, which is the
+/// terminal state the platform layer gives an abandoned thread.
+pub struct Thread {
     /// The spawned thread's `Arc`-shared state — its pinned core
-    /// [`ThreadControl`] and the closure's return-value slot.
+    /// [`ThreadControl`] and the detach-race atomic.
     ///
     /// `Some` until [`join`](Self::join) or the `Drop` detach consumes it,
     /// after which the handle is inert.
-    inner: Option<Arc<SpawnInner<T>>>,
+    inner: Option<Arc<SpawnInner>>,
 }
 
-impl<T: Send + 'static> JoinHandle<T> {
-    /// Waits for the spawned thread to finish and returns the value its closure
-    /// produced.
+impl Thread {
+    /// Waits for the thread to finish and reclaims it.
     ///
-    /// Blocks until the thread has run its exit path, reclaims its stack
-    /// mapping and kernel handle through [`close`], frees the `Arc`-shared
-    /// thread state, and returns the closure's return value. Consuming `self`
-    /// makes a second join on the same thread a compile error.
+    /// Blocks until the thread has run its exit path, then reclaims its stack
+    /// mapping and kernel handle through [`close`] and frees the `Arc`-shared
+    /// thread state. Consuming `self` makes a second join a compile error.
+    ///
+    /// No value comes back: a thread body is a [`ThreadBody`] returning `()`,
+    /// and carrying a result to the joiner belongs to the layer above.
     ///
     /// # Errors
     ///
     /// Returns [`JoinError::Wait`] if waiting for the thread to terminate
-    /// fails: the thread may still be running, so its return value cannot be
-    /// recovered and the `Arc`-shared thread state leaks — the thread-side
-    /// `Arc` count keeps it live — rather than reclaiming a still-running
-    /// thread's state. Returns [`JoinError::Close`] if [`close`] fails *after*
-    /// the thread exited; the closure's return value is still recovered and
-    /// rides out in that variant, since the recorded value is independent of
-    /// whether the stack mapping and kernel handle could be reclaimed.
+    /// fails: the thread may still be running, so the `Arc`-shared thread state
+    /// leaks — the thread-side `Arc` count keeps it live — rather than
+    /// reclaiming a still-running thread's state. Returns [`JoinError::Close`]
+    /// if [`close`] fails *after* the thread exited, which leaks the stack
+    /// mapping and the kernel handle but leaves the thread itself gone.
     ///
     /// # Panics
     ///
     /// Panics — which aborts the process under `panic = "abort"` — on a broken
     /// invariant rather than a recoverable condition: a handle whose state was
-    /// already taken, a joiner that is not the sole `Arc` owner after
-    /// reclaiming the thread-side count, or a thread that terminated without
-    /// recording a return value. None is reachable — a `JoinHandle` is
-    /// move-only so it cannot be cloned or joined twice, and a thread that
-    /// reached `svcExitThread` has always run the trampoline that records the
-    /// value.
-    pub fn join(mut self) -> Result<T, JoinError<T>> {
-        // Take the shared state out of the handle. A `JoinHandle` holds it
-        // until `join` (here) or `Drop` consumes it, and both take the handle
-        // by value, so the slot is always `Some` at this point.
+    /// already taken, or a joiner that is not the sole `Arc` owner after
+    /// reclaiming the thread-side count. Neither is reachable, since a `Thread`
+    /// is move-only and so cannot be cloned or joined twice.
+    pub fn join(mut self) -> Result<(), JoinError> {
+        // Take the shared state out of the handle. A `Thread` holds it until
+        // `join` (here) or `Drop` consumes it, and both take the handle by
+        // value, so the slot is always `Some` at this point.
         let inner = self
             .inner
             .take()
-            .expect("JoinHandle::join: a JoinHandle holds its state until joined");
+            .expect("Thread::join: a Thread holds its state until joined");
 
         // Project the embedded `thread` field to a raw `NonNull<ThreadControl>`
         // without forming a typed `&` over the concurrently-live thread:
         // the joined thread foreign-writes its own `state`/`prev`/
         // `next` right up until it exits.
-        // SAFETY: `inner` is a live `Arc<SpawnInner<T>>`, so `Arc::as_ptr`
-        // yields a pointer valid for this call; `&raw mut` projects its
-        // `thread` field to a non-null pointer without going through a
-        // reference.
+        // SAFETY: `inner` is a live `Arc<SpawnInner>`, so `Arc::as_ptr` yields a
+        // pointer valid for this call; `&raw mut` projects its `thread` field to
+        // a non-null pointer without going through a reference.
         let thread_ptr =
             unsafe { NonNull::new_unchecked(&raw mut (*Arc::as_ptr(&inner).cast_mut()).thread) };
 
-        // Wait for the thread to run its exit path *before* reading or freeing
-        // the shared state: the thread writes `result` right up until
-        // it exits, so an earlier read would race it and return a stale value.
+        // Wait for the thread to run its exit path *before* freeing the shared
+        // state: the thread mutates its own `ThreadControl` right up until it
+        // exits, so reclaiming earlier would free memory still in use.
         // SAFETY: `thread_ptr` points to the embedded `ThreadControl` of the
         // `Arc`-shared `SpawnInner`; `inner` keeps it alive across the wait.
         unsafe { wait_for_exit(thread_ptr) }.map_err(JoinError::Wait)?;
 
-        // `wait_for_exit` returned `Ok`: the kernel signaled termination only
-        // after `svcExitThread`, so the trampoline's write of `result`
-        // happened-before this point and the thread will never touch the state
-        // again.
+        // `wait_for_exit` returned `Ok`: the kernel signals termination only
+        // after `svcExitThread`, so the thread will never touch the state again.
         // SAFETY: `inner` is the un-cloned join-handle `Arc` whose thread-side
         // count `spawn` leaked is still live; the termination wait just above
         // discharges `reclaim_after_exit_spawn`'s exit precondition.
@@ -1010,8 +1011,8 @@ impl<T: Send + 'static> JoinHandle<T> {
     ///
     /// Polls the thread's kernel handle without blocking, so it is the
     /// non-blocking counterpart to [`join`](Self::join). A `true` answer means
-    /// `join` will not block; it does not reclaim anything, so `join` is still
-    /// what recovers the closure's return value.
+    /// `join` will not block; it reclaims nothing, so `join` is still what frees
+    /// the thread.
     ///
     /// A handle the kernel refuses to report on reads as "not finished", which
     /// keeps this infallible like its `std` counterpart. The condition is not
@@ -1029,8 +1030,8 @@ impl<T: Send + 'static> JoinHandle<T> {
         // Read the creation-fixed kernel handle through a raw pointer; forming a
         // `&ThreadControl` would race the running thread's self-mutation of its
         // own `state`, `prev` and `next` fields.
-        // SAFETY: `inner` is a live `Arc<SpawnInner<T>>`, so `Arc::as_ptr` yields
-        // a pointer valid for this read, and `handle` is fixed at creation and
+        // SAFETY: `inner` is a live `Arc<SpawnInner>`, so `Arc::as_ptr` yields a
+        // pointer valid for this read, and `handle` is fixed at creation and
         // never written again.
         let handle = unsafe { (*Arc::as_ptr(inner)).thread.handle };
 
@@ -1041,14 +1042,13 @@ impl<T: Send + 'static> JoinHandle<T> {
     }
 }
 
-impl<T: Send + 'static> Drop for JoinHandle<T> {
+impl Drop for Thread {
     /// Detaches the spawned thread if it was never joined.
     ///
-    /// A `JoinHandle` dropped without [`join`](Self::join) *detaches* its
-    /// thread: [`detach`](detach::detach) resolves the detach-vs-exit race so
-    /// the thread reclaims itself once it exits — or reclaims it here, if it
-    /// already exited. An unjoined handle therefore detaches cleanly instead of
-    /// leaking, the terminal state of a never-joined `std::thread::JoinHandle`.
+    /// A `Thread` dropped without [`join`](Self::join) *detaches* it:
+    /// [`detach`](detach::detach) resolves the detach-vs-exit race so the thread
+    /// reclaims itself once it exits — or reclaims it here, if it already
+    /// exited. An unjoined handle therefore detaches cleanly instead of leaking.
     /// Dropping a handle `join` already consumed is a no-op.
     fn drop(&mut self) {
         if let Some(inner) = self.inner.take() {
@@ -1059,26 +1059,26 @@ impl<T: Send + 'static> Drop for JoinHandle<T> {
 
 // `Detachable` lets a detached `spawn` thread self-reclaim its `Arc`-shared
 // `SpawnInner` through `detach`'s `exit_self_or_detached` / `unmap_self`, and
-// lets `JoinHandle`'s `Drop` route through `detach::detach`.
-impl<T: Send + 'static> Detachable for SpawnInner<T> {
+// lets `Thread`'s `Drop` route through `detach::detach`.
+impl Detachable for SpawnInner {
     fn thread_ptr(obj: NonNull<Self>) -> NonNull<ThreadControl> {
         // Project the embedded `thread` field without forming a typed `&` over
         // the concurrently-live thread.
-        // SAFETY: `obj` addresses a live `SpawnInner<T>`; `&raw mut` projects
-        // its `thread` field to a non-null pointer without going through a
+        // SAFETY: `obj` addresses a live `SpawnInner`; `&raw mut` projects its
+        // `thread` field to a non-null pointer without going through a
         // reference.
         unsafe { NonNull::new_unchecked(&raw mut (*obj.as_ptr()).thread) }
     }
 
     fn detach_state(obj: NonNull<Self>) -> NonNull<AtomicU8> {
-        // SAFETY: `obj` addresses a live `SpawnInner<T>`; `&raw mut` projects
-        // its `detach_state` field to a non-null pointer.
+        // SAFETY: `obj` addresses a live `SpawnInner`; `&raw mut` projects its
+        // `detach_state` field to a non-null pointer.
         unsafe { NonNull::new_unchecked(&raw mut (*obj.as_ptr()).detach_state) }
     }
 
     fn into_thread_control(self) -> ThreadControl {
-        // `result` (the recorded return value) and `detach_state` drop here — a
-        // detached thread has no joiner to receive its return value.
+        // `detach_state` drops here; the thread body's own captures were freed
+        // on the spawned thread when the trampoline dropped the boxed body.
         self.thread
     }
 
@@ -1095,39 +1095,34 @@ impl<T: Send + 'static> Detachable for SpawnInner<T> {
         }
         // SAFETY: `wait_for_exit` returned `Ok`, proving the thread exited;
         // `arc` is the un-cloned join handle whose thread-side count is still
-        // outstanding — exactly `reclaim_after_exit_spawn`'s contract. The
-        // recovered return value is dropped (a detached thread has no joiner).
+        // outstanding — exactly `reclaim_after_exit_spawn`'s contract. A
+        // `close` failure here can only leak, and the detach path has no error
+        // channel to report it on.
         let _ = unsafe { reclaim_after_exit_spawn(arc) };
     }
 }
 
 /// Reclaims a [`spawn`]ed thread whose termination has already been observed.
 ///
-/// The post-termination half of [`JoinHandle::join`], shared with the
+/// The post-termination half of [`Thread::join`], shared with the
 /// detach-after-exit path through [`SpawnInner`]'s [`Detachable`] impl: it
-/// reclaims the thread-side [`Arc`] strong count [`spawn`] leaked, frees the
-/// thread state through [`close`], and returns the value the closure recorded.
-/// Splitting it out lets the join path and the detach path funnel into one
-/// reclaim path (DRY).
+/// reclaims the thread-side [`Arc`] strong count [`spawn`] leaked and frees the
+/// thread state through [`close`]. Splitting it out lets the join path and the
+/// detach path funnel into one reclaim path (DRY).
 ///
 /// # Panics
 ///
 /// Panics — which aborts the process under `panic = "abort"` — if the caller is
-/// not the sole `Arc` owner after reclaiming the thread-side count, or if the
-/// thread exited without recording a return value. Both indicate a broken
-/// invariant: the join handle cannot be cloned, and a thread that reached
-/// `svcExitThread` has always run the trampoline that records the value.
+/// not the sole `Arc` owner after reclaiming the thread-side count. That
+/// indicates a broken invariant: the join handle cannot be cloned.
 ///
 /// # Safety
 ///
 /// - `inner` must be the un-cloned [`spawn`] join-handle `Arc` whose thread-side
 ///   count has not yet been reclaimed.
 /// - The thread must have *already exited*, its termination observed through
-///   [`wait_for_exit`], so its trampoline write of `result` happened-before this
-///   call, and it never touches the state again.
-unsafe fn reclaim_after_exit_spawn<T: Send + 'static>(
-    inner: Arc<SpawnInner<T>>,
-) -> Result<T, JoinError<T>> {
+///   [`wait_for_exit`], so it never touches the state again.
+unsafe fn reclaim_after_exit_spawn(inner: Arc<SpawnInner>) -> Result<(), JoinError> {
     // Reclaim the thread-side `Arc` count `spawn` leaked; the thread can never
     // drop it itself (that would free the `ThreadControl` its exit path runs
     // on), so it is reclaimed here, now that the thread is provably dead.
@@ -1144,53 +1139,29 @@ unsafe fn reclaim_after_exit_spawn<T: Send + 'static>(
     );
     let SpawnInner {
         thread,
-        result,
         detach_state: _,
     } = inner;
 
-    // Read the recorded return value *before* `close`. The trampoline runs on
-    // every thread that reaches `svcExitThread`, and the termination wait above
-    // proves it did, so `result` is `Some`. Reading it first means a `close`
-    // failure carries the value out in `JoinError::Close` instead of dropping
-    // the value the closure successfully computed — the recorded value is
-    // independent of whether reclaiming the stack mapping and handle succeeds.
-    let value = result
-        .into_inner()
-        .expect("reclaim_after_exit_spawn: an exited thread must have recorded its return value");
-
     // Reclaim the exited thread's stack mapping and kernel handle.
-    if let Err(source) = close(thread) {
-        return Err(JoinError::Close { value, source });
-    }
-
-    Ok(value)
+    close(thread).map_err(JoinError::Close)
 }
 
-/// Errors returned when joining a spawned thread via [`JoinHandle::join`].
+/// Errors returned when joining a spawned thread via [`Thread::join`].
 #[derive(Debug, thiserror::Error)]
-pub enum JoinError<T> {
+pub enum JoinError {
     /// [`wait_for_exit`] failed while waiting for the thread to exit.
     ///
-    /// The thread may still be running, so its return value cannot be
-    /// recovered and the `Arc`-shared thread state leaks — the thread-side
-    /// `Arc` count keeps it live — rather than reclaiming a still-running
-    /// thread's state.
+    /// The thread may still be running, so the `Arc`-shared thread state leaks
+    /// — the thread-side `Arc` count keeps it live — rather than reclaiming a
+    /// still-running thread's state.
     #[error("failed to wait for the spawned thread to exit")]
     Wait(#[source] WaitError),
     /// [`close`] failed while reclaiming the exited thread's resources.
     ///
-    /// The thread had already exited and recorded its return value before
-    /// [`close`] ran, so `value` carries that value out: a `close` failure
-    /// leaks the stack mapping and kernel handle but does not invalidate the
-    /// value the closure computed.
+    /// The thread had already exited before [`close`] ran, so it is gone; what
+    /// leaks is its stack mapping and kernel handle.
     #[error("failed to reclaim the joined thread")]
-    Close {
-        /// The value the joined thread's closure produced and recorded.
-        value: T,
-        /// The underlying [`close`] failure.
-        #[source]
-        source: CloseError,
-    },
+    Close(#[source] CloseError),
 }
 
 /// Error returned when [`spawn`] fails to bring the spawned thread up.
@@ -1217,18 +1188,18 @@ pub enum SpawnError {
 // error. libnx's separate `threadCreate`/`threadStart` entries map to `create`/
 // `start`, whose `CreateError`/`StartError` already carry `ToResultCode`.
 
-/// Monomorphized trampoline that re-joins a closure with its captures on the
-/// spawned thread and records its return value.
+/// Trampoline that runs a spawned thread's boxed body and tears the thread down.
 ///
-/// [`spawn`] splits a closure into a *code half* — this function — and a *data
-/// half* — a `Box<F>` that reaches the new thread through the C `arg` slot.
-/// Each `closure_trampoline::<F, T>` instantiation is monomorphized into a
-/// concrete `extern "C"` function, a valid [`ThreadFunc`]; [`entry_wrap`]'s
-/// existing `(args.entry)(args.arg)` call invokes it. It reconstructs the
-/// `Box<F>`, runs the closure exactly once, drops the box — freeing the
-/// captures on the spawned thread — and stores the closure's return value into
-/// the `Arc`-shared [`SpawnInner`] the running thread locates by container-of,
-/// so a later [`JoinHandle::join`] can retrieve it.
+/// [`spawn`] splits a thread body into a *code half* — this function — and a
+/// *data half* — a `Box<ThreadBody>` that reaches the new thread through the C
+/// `arg` slot. It is a plain `extern "C"` function, a valid [`ThreadFunc`], that
+/// [`entry_wrap`]'s existing `(args.entry)(args.arg)` call invokes. It
+/// reconstructs the box, runs the body exactly once, and drops the box, freeing
+/// the captures on the spawned thread.
+///
+/// Because the body is type-erased there is nothing to record: one trampoline
+/// serves every spawned thread rather than one per closure type, and a caller
+/// wanting a result captures its own slot inside the body.
 ///
 /// It then tears the thread down through [`detach::exit_self_or_detached`],
 /// which never returns — so, unlike a plain libnx entry point, control never
@@ -1237,25 +1208,19 @@ pub enum SpawnError {
 ///
 /// # Safety
 ///
-/// `arg` must be the `Box::into_raw(Box::new(f))` pointer that `spawn::<F, T>`
-/// paired with this exact `closure_trampoline::<F, T>` instantiation
-/// (type-welding). No API exposes this pointer separately, so the matched pair
-/// can only ever be formed inside one `spawn::<F, T>` monomorphization.
-unsafe extern "C" fn closure_trampoline<F, T>(arg: *mut c_void)
-where
-    F: FnOnce() -> T + Send + 'static,
-    T: Send + 'static,
-{
-    // SAFETY: `arg` is the `Box::into_raw(Box::new(f))` pointer that
-    // `spawn::<F, T>` paired with this exact `closure_trampoline::<F, T>`
-    // instantiation (type-welding).
-    let f = unsafe { Box::from_raw(arg.cast::<F>()) };
-    let value = f();
+/// `arg` must be the `Box::into_raw(Box::new(f))` pointer that [`spawn`] paired
+/// with this trampoline. No API exposes this pointer separately, so the matched
+/// pair can only ever be formed inside `spawn`.
+unsafe extern "C" fn closure_trampoline(arg: *mut c_void) {
+    // SAFETY: `arg` is the `Box::into_raw(Box::new(f))` pointer `spawn` paired
+    // with this trampoline, so it addresses a live, unconsumed `ThreadBody`.
+    let f = unsafe { Box::from_raw(arg.cast::<ThreadBody>()) };
+    f();
 
-    // Record the return value into the `Arc`-shared `SpawnInner`. The running
-    // thread reaches that object only through `ThreadVars.thread_info_ptr`,
-    // which addresses its embedded `ThreadControl` — walk back to the
-    // enclosing `SpawnInner` by container-of.
+    // Locate this thread's `Arc`-shared `SpawnInner` to hand to the exit path.
+    // The running thread reaches that object only through
+    // `ThreadVars.thread_info_ptr`, which addresses its embedded
+    // `ThreadControl` — walk back to the enclosing `SpawnInner` by container-of.
     let info = nx_sys_thread_tls::get_thread_info_ptr::<ThreadControl>();
     let Some(info) = NonNull::new(info) else {
         // No core state — unreachable for a `spawn`-created thread, whose
@@ -1265,16 +1230,9 @@ where
         unsafe { exit() }
     };
     // SAFETY: a thread spawned by `spawn` has its `thread_info_ptr` wired to
-    // the `thread` field of an `Arc`-shared `SpawnInner<T>`, so
+    // the `thread` field of an `Arc`-shared `SpawnInner`, so
     // `enclosing_spawn_inner` recovers the enclosing object.
-    let inner = unsafe { enclosing_spawn_inner::<T>(info) };
-    // SAFETY: `inner` points to this thread's live `SpawnInner`; `raw_get`
-    // yields the `result` slot without forming a reference, and
-    // `JoinHandle::join` reads it only after `wait_for_exit` observes the exit,
-    // so this write is ordered before any read of it.
-    unsafe {
-        *UnsafeCell::raw_get(&raw const (*inner.as_ptr()).result) = Some(value);
-    }
+    let inner = unsafe { enclosing_spawn_inner(info) };
 
     // Tear the thread down: run the exit prefix, then either `svcExitThread`
     // (still joinable) or self-reclaim (detached). Never returns.
@@ -1285,41 +1243,35 @@ where
 
 /// The `Arc`-shared state of a thread spawned by [`spawn`].
 ///
-/// Bundles the spawned thread's pinned core [`ThreadControl`] with the slot for
-/// its closure's return value. Shared through an [`Arc`] between the
-/// [`JoinHandle`] and the running thread; the latter reaches it only by
+/// Holds the spawned thread's pinned core [`ThreadControl`] and the atomic that
+/// resolves the detach-vs-exit race. Shared through an [`Arc`] between the
+/// [`Thread`] handle and the running thread; the latter reaches it only by
 /// container-of from `ThreadVars.thread_info_ptr` (see [`enclosing_spawn_inner`]),
 /// so the `Arc` payload must never move — which holding it in an `Arc`
 /// guarantees.
-struct SpawnInner<T> {
+///
+/// It carries no result slot: the body is type-erased, so this object is
+/// non-generic and one `closure_trampoline` and one `Detachable` impl cover
+/// every spawned thread.
+struct SpawnInner {
     /// Core thread state; the container-of anchor for the running thread.
     thread: ThreadControl,
-    /// The closure's return value, stored by the spawned thread through
-    /// [`closure_trampoline`] and read by [`JoinHandle::join`].
-    ///
-    /// An [`UnsafeCell`] so the exiting thread can write it through the shared,
-    /// `Arc`-backed object; the `join` read is ordered after that write by the
-    /// join synchronization edge, so the access is not a data race.
-    /// `None` until the trampoline records the value.
-    result: UnsafeCell<Option<T>>,
     /// Detach-vs-exit race state (see [`DetachState`]).
     ///
-    /// [`Joinable`](DetachState::Joinable) until [`JoinHandle`]'s `Drop` detaches
+    /// [`Joinable`](DetachState::Joinable) until [`Thread`]'s `Drop` detaches
     /// the thread or the thread's own exit CAS claims it.
     detach_state: AtomicU8,
 }
 
 // SAFETY: `SpawnInner` is shared across threads by design — the spawned thread
-// reaches it by container-of while the `JoinHandle`'s `Arc` is owned and
+// reaches it by container-of while the `Thread` handle's `Arc` is owned and
 // reclaimed on another thread. The embedded `ThreadControl` confines its
-// concurrent self-mutation to atomic fields, and `result` is an `UnsafeCell`
-// whose write (by the spawned thread) and read (by the joiner) are ordered by
-// the join edge, never a true data race. The `T: Send` bound covers the
-// return value itself crossing from the spawned thread to the joiner.
-unsafe impl<T: Send> Send for SpawnInner<T> {}
+// concurrent self-mutation to atomic fields, and `detach_state` is an atomic, so
+// no field admits a data race.
+unsafe impl Send for SpawnInner {}
 // SAFETY: see the `Send` impl above — the same contract makes a shared
 // `&SpawnInner` sound to access from more than one thread.
-unsafe impl<T: Send> Sync for SpawnInner<T> {}
+unsafe impl Sync for SpawnInner {}
 
 /// Recovers the enclosing [`SpawnInner`] from a pointer to its embedded
 /// [`ThreadControl`].
@@ -1333,16 +1285,16 @@ unsafe impl<T: Send> Sync for SpawnInner<T> {}
 /// # Safety
 ///
 /// `info` must address the embedded `thread` field of an `Arc`-shared
-/// `SpawnInner<T>` — i.e. it must be the `ThreadVars.thread_info_ptr` of a
-/// thread created by [`spawn`]. On a thread created by any other path the
-/// container-of arithmetic yields a bogus pointer.
-unsafe fn enclosing_spawn_inner<T>(info: NonNull<ThreadControl>) -> NonNull<SpawnInner<T>> {
+/// `SpawnInner` — i.e. it must be the `ThreadVars.thread_info_ptr` of a thread
+/// created by [`spawn`]. On a thread created by any other path the container-of
+/// arithmetic yields a bogus pointer.
+unsafe fn enclosing_spawn_inner(info: NonNull<ThreadControl>) -> NonNull<SpawnInner> {
     // SAFETY: by the contract `info` addresses the `thread` field of an
-    // `Arc`-shared `SpawnInner<T>`, so `byte_sub` by that field offset stays
+    // `Arc`-shared `SpawnInner`, so `byte_sub` by that field offset stays
     // within the same allocation and recovers the enclosing object.
     unsafe {
-        info.byte_sub(offset_of!(SpawnInner<T>, thread))
-            .cast::<SpawnInner<T>>()
+        info.byte_sub(offset_of!(SpawnInner, thread))
+            .cast::<SpawnInner>()
     }
 }
 
