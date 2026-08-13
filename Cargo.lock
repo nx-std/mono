@@ -1715,7 +1715,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nx-tests-tap"
+name = "nx-tests-framework"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",

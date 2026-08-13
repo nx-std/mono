@@ -1,4 +1,4 @@
-//! The C surface, as `include/nx_tests_tap.h` declares it.
+//! The C surface, as `include/nx_tests_framework.h` declares it.
 //!
 //! This adds a surface rather than replacing one: nothing upstream reports in this protocol, so
 //! there is no symbol to override and no linker script. A C caller reaches these by name.
@@ -47,7 +47,7 @@ const TEST_SETUP_FAILED: i32 = -503;
 
 /// What a reader needs in order to know which run it is looking at, as C declares it.
 #[repr(C)]
-pub struct NxTestsTapRun {
+pub struct NxTestsFrameworkRun {
     /// The name this suite reports under, which is also the name its file is written to.
     suite: *const c_char,
     /// The build this was compiled from.
@@ -56,9 +56,9 @@ pub struct NxTestsTapRun {
     report_dir: *const c_char,
     /// The system version, already taken apart by the caller that asked the runtime for it.
     hos_major: u8,
-    /// See [`NxTestsTapRun::hos_major`].
+    /// See [`NxTestsFrameworkRun::hos_major`].
     hos_minor: u8,
-    /// See [`NxTestsTapRun::hos_major`].
+    /// See [`NxTestsFrameworkRun::hos_major`].
     hos_micro: u8,
     /// Whether the run is happening under a custom firmware.
     atmosphere: bool,
@@ -72,11 +72,11 @@ pub struct NxTestsTapRun {
 ///
 /// # Safety
 ///
-/// `run` must be null or point to a live [`NxTestsTapRun`] whose three strings are live
+/// `run` must be null or point to a live [`NxTestsFrameworkRun`] whose three strings are live
 /// nul-terminated strings for the length of the call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_tests_tap__begin(run: *const NxTestsTapRun) {
-    // SAFETY: the caller guarantees `run` is null or points to a live `NxTestsTapRun`.
+pub unsafe extern "C" fn __nx_tests_framework__begin(run: *const NxTestsFrameworkRun) {
+    // SAFETY: the caller guarantees `run` is null or points to a live `NxTestsFrameworkRun`.
     let Some(run) = (unsafe { run.as_ref() }) else {
         return;
     };
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn __nx_tests_tap__begin(run: *const NxTestsTapRun) {
 ///
 /// `text` must be null or a live nul-terminated string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_tests_tap__comment(text: *const c_char) {
+pub unsafe extern "C" fn __nx_tests_framework__comment(text: *const c_char) {
     // SAFETY: the caller guarantees `text` is null or a live nul-terminated string.
     let owned = unsafe { text_from(text) };
     crate::comment(&owned);
@@ -116,7 +116,7 @@ pub unsafe extern "C" fn __nx_tests_tap__comment(text: *const c_char) {
 ///
 /// `title` must be null or a live nul-terminated string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_tests_tap__case(title: *const c_char, rc: i32) {
+pub unsafe extern "C" fn __nx_tests_framework__case(title: *const c_char, rc: i32) {
     // SAFETY: the caller guarantees `title` is null or a live nul-terminated string.
     let title = unsafe { text_from(title) };
     crate::case(&title, outcome_of(rc));
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn __nx_tests_tap__case(title: *const c_char, rc: i32) {
 ///
 /// `title` and `reason` must each be null or a live nul-terminated string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_tests_tap__harness_error(
+pub unsafe extern "C" fn __nx_tests_framework__harness_error(
     title: *const c_char,
     reason: *const c_char,
 ) {
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn __nx_tests_tap__harness_error(
 
 /// Closes the document by stating how many cases there were.
 #[unsafe(no_mangle)]
-pub extern "C" fn __nx_tests_tap__plan() {
+pub extern "C" fn __nx_tests_framework__plan() {
     crate::plan();
 }
 
@@ -159,7 +159,7 @@ pub extern "C" fn __nx_tests_tap__plan() {
 /// is nothing a caller can do about a failure past showing it, and the console has already shown
 /// every case the document holds.
 #[unsafe(no_mangle)]
-pub extern "C" fn __nx_tests_tap__report(host: u32) -> i32 {
+pub extern "C" fn __nx_tests_framework__report(host: u32) -> i32 {
     // The address is held by the C runtime the way it arrived off the wire, so its first octet is
     // the byte at the lowest address; read as a native word on this machine that is the low byte.
     let host = match host {
