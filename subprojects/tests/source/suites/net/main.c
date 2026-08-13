@@ -35,6 +35,7 @@
 
 #include <switch.h>
 
+#include "../../rig.h"
 #include "../handback.h"
 #include "../harness.h"
 #include "resolve/suite.h"
@@ -67,7 +68,7 @@ int main()
     // reason to wait for one back.
     const bool unattended = suite_is_unattended();
 
-    tap_begin("net", VERSION, unattended);
+    tap_begin("net", VERSION, RIG_DIR, unattended);
 
     // The driver is brought up once for the whole binary rather than per test.
     // It is process-wide state, so a test that initialized it would be setting
@@ -116,7 +117,7 @@ int main()
 
     // Reported before the driver goes down, and told that it is up: reaching
     // the host needs a socket, and this suite owns the one there is.
-    tap_report("net", R_SUCCEEDED(socket_rc));
+    tap_report(R_SUCCEEDED(socket_rc));
 
     if (R_SUCCEEDED(socket_rc)) {
         socketExit();

@@ -66,6 +66,42 @@ endif
 nx_netloader_proj = subproject('nx-netloader')
 nx_netloader_dep = nx_netloader_proj.get_variable('nx_netloader_dep')
 
+# nx-tests-tap
+# The suites report through this crate rather than through C. It is the one Rust
+# static library a suite binary links: the crates it holds keep process-wide
+# state, and a second archive carrying its own copy of that state would report
+# over a socket driver the program never brought up. Its dependencies therefore
+# take `extern-state`, and `ffi` is enabled here because the cases calling it are
+# still C. See `docs/code/rust-process-wide-state.md`.
+#
+# The crate lives inside this subproject rather than beside the `nx-*` crates: it
+# serves the test rig alone and nothing outside it has any use for the protocol.
+cargo = find_program('cargo', required : true)
+
+nx_tests_tap_tgt = custom_target(
+    'nx-tests-tap',
+    command : [
+        cargo, 'build',
+        '--package', 'nx-tests-tap',
+        '--profile', get_option('buildtype') == 'release' ? 'release' : 'dev',
+        '--target-dir', meson.global_build_root() / 'cargo-target',
+        '--artifact-dir', '@OUTDIR@',
+        '--features', 'ffi',
+    ],
+    output : ['libnx_tests_tap.a', 'libnx_tests_tap.rlib'],
+    console : true,
+    build_by_default : true,
+    build_always_stale : true,
+)
+
+nx_tests_tap_inc = include_directories('source/suites/tap/include')
+
+nx_tests_tap_dep = declare_dependency(
+    include_directories : nx_tests_tap_inc,
+    sources : nx_tests_tap_tgt,
+    link_with : nx_tests_tap_tgt[0],
+)
+
 #---------------------------------------------------------------------------------
 # Build options
 #---------------------------------------------------------------------------------
@@ -153,15 +189,13 @@ name = 'nx-tests-rand'
 src = files(
     'source/rig.h',
     'source/suites/handback.h',
-    'source/suites/tap.h',
-    'source/suites/tap.c',
     'source/suites/rand/suite.h',
     'source/suites/rand/test_0001_rand_get_fills_buffers_with_random_data.c',
     'source/suites/rand/test_0002_rand_get64_returns_different_values.c',
     'source/suites/rand/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -182,8 +216,6 @@ name = 'nx-tests-rt'
 src = files(
     'source/rig.h',
     'source/suites/handback.h',
-    'source/suites/tap.h',
-    'source/suites/tap.c',
     'source/suites/rt/cwd/program.h',
     'source/suites/rt/cwd/suite.h',
     'source/suites/rt/cwd/test_0001_startup_cwd_is_the_program_directory.c',
@@ -191,7 +223,7 @@ src = files(
     'source/suites/rt/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -211,8 +243,6 @@ name = 'nx-tests-thread'
 src = files(
     'source/rig.h',
     'source/suites/handback.h',
-    'source/suites/tap.h',
-    'source/suites/tap.c',
     'source/suites/thread/suite.h',
     'source/suites/thread/test_0001_detach_running_thread_self_reclaims.c',
     'source/suites/thread/test_0002_detach_after_exit_reclaims.c',
@@ -220,7 +250,7 @@ src = files(
     'source/suites/thread/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -245,8 +275,6 @@ name = 'nx-tests-sync'
 src = files(
     'source/rig.h',
     'source/suites/handback.h',
-    'source/suites/tap.h',
-    'source/suites/tap.c',
     'source/suites/sync/suite.h',
     'source/suites/sync/mutex/suite.h',
     'source/suites/sync/mutex/test_0001_mutex_lock_unlock_single_thread.c',
@@ -290,7 +318,7 @@ src = files(
     'source/suites/sync/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -314,8 +342,6 @@ name = 'nx-tests-fs'
 src = files(
     'source/rig.h',
     'source/suites/handback.h',
-    'source/suites/tap.h',
-    'source/suites/tap.c',
     'source/suites/fs/sdmc/fixture.h',
     'source/suites/fs/sdmc/suite.h',
     'source/suites/fs/sdmc/test_0001_write_then_read_returns_same_bytes.c',
@@ -351,7 +377,7 @@ src = files(
     'source/suites/fs/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -375,8 +401,6 @@ name = 'nx-tests-net'
 src = files(
     'source/rig.h',
     'source/suites/handback.h',
-    'source/suites/tap.h',
-    'source/suites/tap.c',
     'source/suites/net/resolve/fixture.h',
     'source/suites/net/resolve/suite.h',
     'source/suites/net/resolve/test_0001_getaddrinfo_with_a_numeric_host_returns_that_address.c',
@@ -402,7 +426,7 @@ src = files(
     'source/suites/net/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, nx_std_sync_dep],
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_tap_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
