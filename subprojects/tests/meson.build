@@ -126,7 +126,6 @@ bundle_base = [
 # keeps its own dependencies to what serving the protocol costs.
 name = 'nx-tests'
 src = files(
-    'rig.h',
     'runner/handback.h',
     'runner/ledger.h',
     'runner/ledger.c',
@@ -134,6 +133,10 @@ src = files(
 )
 elf = executable(name + '.elf', src,
                  dependencies : [nx_dep, nx_netloader_dep],
+                 # For the rig's directory alone. The framework's archive is the
+                 # suites' -- the runner reports nothing, and a second Rust static
+                 # library here is what the one-archive rule forbids.
+                 include_directories : nx_tests_framework_inc,
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -157,7 +160,6 @@ custom_target(name + '.nro',
 # to libnx, which is the baseline to compare our implementation against.
 name = 'nx-tests-rand'
 src = files(
-    'rig.h',
     'suites/handback.h',
     'suites/rand/suite.h',
     'suites/rand/test_0001_rand_get_fills_buffers_with_random_data.c',
@@ -184,7 +186,6 @@ custom_target(name + '.nro',
 # off the runtime is libnx's own, the baseline to compare against.
 name = 'nx-tests-rt'
 src = files(
-    'rig.h',
     'suites/handback.h',
     'suites/rt/cwd/program.h',
     'suites/rt/cwd/suite.h',
@@ -211,7 +212,6 @@ custom_target(name + '.nro',
 # so the detach cases fail there by construction rather than by regression.
 name = 'nx-tests-thread'
 src = files(
-    'rig.h',
     'suites/handback.h',
     'suites/thread/suite.h',
     'suites/thread/test_0001_detach_running_thread_self_reclaims.c',
@@ -243,7 +243,6 @@ custom_target(name + '.nro',
 # baseline to compare against.
 name = 'nx-tests-sync'
 src = files(
-    'rig.h',
     'suites/handback.h',
     'suites/sync/suite.h',
     'suites/sync/mutex/suite.h',
@@ -310,7 +309,6 @@ custom_target(name + '.nro',
 # implementation against.
 name = 'nx-tests-fs'
 src = files(
-    'rig.h',
     'suites/handback.h',
     'suites/fs/sdmc/fixture.h',
     'suites/fs/sdmc/suite.h',
@@ -369,7 +367,6 @@ custom_target(name + '.nro',
 # the baseline to compare against.
 name = 'nx-tests-net'
 src = files(
-    'rig.h',
     'suites/handback.h',
     'suites/net/resolve/fixture.h',
     'suites/net/resolve/suite.h',

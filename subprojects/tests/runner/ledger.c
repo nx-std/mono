@@ -7,7 +7,7 @@
 
 // For the directory the runner keeps its files in: the programs it receives and
 // this run's results live in the same place.
-#include "../rig.h"
+#include "nx_tests_rig.h"
 
 /** @brief The file the run is kept in between the runner's own lifetimes. */
 #define LEDGER_PATH RIG_DIR "/results.log"

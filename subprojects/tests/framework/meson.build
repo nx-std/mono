@@ -41,7 +41,7 @@ deps = [
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------
-inc = include_directories('include')
+nx_tests_framework_inc = include_directories('include')
 
 # Target
 #
@@ -70,7 +70,7 @@ nx_tests_framework_tgt = custom_target(
 # Dependency declaration
 #---------------------------------------------------------------------------------
 nx_tests_framework_dep = declare_dependency(
-    include_directories : inc,
+    include_directories : nx_tests_framework_inc,
     sources : nx_tests_framework_tgt,
     link_with : nx_tests_framework_tgt[0],
     dependencies : deps,
