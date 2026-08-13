@@ -1715,6 +1715,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-tests-tap"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-panic-handler",
+ "nx-std-fs",
+ "nx-std-path",
+ "nx-std-sync",
+ "nx-sys-net",
+ "thiserror",
+]
+
+[[package]]
 name = "nx-time"
 version = "0.1.0"
 dependencies = [

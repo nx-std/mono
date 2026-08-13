@@ -6,7 +6,7 @@
 #include <inttypes.h>
 
 #include "nx_sync_oneshot.h"
-#include "tap.h"
+#include "nx_tests_tap.h"
 
 /**
  * @brief The result code for a test case.

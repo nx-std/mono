@@ -14,6 +14,7 @@
 
 #include <switch.h>
 
+#include "../../rig.h"
 #include "../handback.h"
 #include "../harness.h"
 #include "suite.h"
@@ -44,7 +45,7 @@ int main()
     // reason to wait for one back.
     const bool unattended = suite_is_unattended();
 
-    tap_begin("thread", VERSION, unattended);
+    tap_begin("thread", VERSION, RIG_DIR, unattended);
 
     const uint64_t test_suites_count = sizeof(test_suites) / sizeof(TestSuiteFn);
     uint64_t curr_test_suite = 0;
@@ -75,7 +76,7 @@ int main()
     }
 
     tap_plan();
-    tap_report("thread", false);
+    tap_report(false);
 
     // Back to the runner that launched this suite, if one did: a run is
     // several suites, and it ends here otherwise.
