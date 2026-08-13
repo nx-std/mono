@@ -187,9 +187,8 @@ dependencies = [
 [[package]]
 name = "nx-object"
 version = "0.1.0"
-source = "git+https://github.com/nx-std/nx-object.git?rev=6d33e1bf2bed3fd30daf44a2c1097e66be9c174b#6d33e1bf2bed3fd30daf44a2c1097e66be9c174b"
+source = "git+https://github.com/nx-std/nx-object.git?rev=d9b2c686b5dc133fdfb6d497b93c7269749c5f09#d9b2c686b5dc133fdfb6d497b93c7269749c5f09"
 dependencies = [
- "bitflags",
  "static_assertions",
  "thiserror",
  "zerocopy",

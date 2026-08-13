@@ -19,7 +19,7 @@ ffi = ["nx-sf/ffi"]
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-fsdev = { version = "0.1.0", path = "../nx-fsdev" }
-nx-object = { workspace = true }
+nx-object = { workspace = true, features = ["romfs"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-fs = { version = "0.1.0", path = "../nx-service-fs" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
