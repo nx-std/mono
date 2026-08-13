@@ -48,6 +48,31 @@ if get_option('use_nx_fsdev').enabled()
     deps_cargo_features += ['fsdev']
 endif
 
+# nx-romfs
+# The read-only device sits on the descriptor table and reads its bytes through the fsp-srv client,
+# so both must be on for its overrides to have anything to dispatch through. `romfsMountSelf` is not
+# in this crate's override surface: it is claimed per output kind by whichever `nx-rt-*` entry crate
+# is in the link.
+if get_option('use_nx_romfs').enabled()
+    if not get_option('use_nx_sys_fd').enabled()
+        error('use_nx_romfs requires -Duse_nx_sys_fd=enabled')
+    endif
+    if not get_option('use_nx_service_fs').enabled()
+        error('use_nx_romfs requires -Duse_nx_service_fs=enabled')
+    endif
+    if not get_option('use_nx_fsdev').enabled()
+        error('use_nx_romfs requires -Duse_nx_fsdev=enabled')
+    endif
+
+    nx_romfs_proj = subproject('nx-romfs')
+
+    deps += nx_romfs_proj.get_variable('nx_romfs_dep')
+    deps_override_link_args += ['-T', nx_romfs_proj.get_variable('nx_romfs_ld_override')]
+
+    debug('romfs feature: enabled')
+    deps_cargo_features += ['romfs']
+endif
+
 # nx-rand
 if get_option('use_nx_rand').enabled()
     nx_rand_proj = subproject('nx-rand')

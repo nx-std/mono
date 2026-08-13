@@ -27,6 +27,13 @@ option(
 )
 
 option(
+    'use_nx_romfs',
+    type : 'feature', value : 'auto',
+    description : 'Enable the `romfs` feature',
+    yield : true
+)
+
+option(
     'use_nx_rt',
     type : 'feature', value : 'auto',
     description : 'Enable the `rt` feature',

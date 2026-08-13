@@ -347,6 +347,47 @@ custom_target(name + '.nro',
               input : elf, output : name + '.nro',
               build_by_default : true, depends : elf)
 
+# ── nx-tests-romfs ────────────────────────────────────────────────────────
+# Runs unattended, and carries its own fixture: the tree under `suites/romfs/assets`
+# is packed into this NRO, so the suite needs no SD card contents and no network.
+# It does need to be launched from a path it can find itself by — an NRO reaches
+# its own image by opening the file named on its command line — so a run says as
+# much about the runtime and the descriptor table as about the image reader. It
+# links either way: with `use_nx_romfs` off the `romfs*` surface resolves to
+# libnx, which is the baseline to compare our implementation against — with one
+# case that fails there by construction rather than by regression, since libnx's
+# romfs lets a name be mounted twice and this crate refuses.
+name = 'nx-tests-romfs'
+src = files(
+    'suites/romfs/fixture.h',
+    'suites/romfs/suite.h',
+    'suites/romfs/test_0001_romfs_init_mounts_the_programs_own_image.c',
+    'suites/romfs/test_0002_reading_a_file_returns_the_bundled_bytes.c',
+    'suites/romfs/test_0003_stat_reports_size_and_type.c',
+    'suites/romfs/test_0004_opendir_lists_every_entry_once.c',
+    'suites/romfs/test_0005_seek_moves_the_read_position.c',
+    'suites/romfs/test_0006_a_file_larger_than_one_read_round_trips.c',
+    'suites/romfs/test_0007_opening_a_missing_file_reports_enoent.c',
+    'suites/romfs/test_0008_opening_for_writing_is_refused.c',
+    'suites/romfs/test_0009_chdir_makes_relative_paths_resolve.c',
+    'suites/romfs/test_0010_a_non_ascii_name_resolves.c',
+    'suites/romfs/test_0011_unmounting_makes_the_paths_stop_resolving.c',
+    'suites/romfs/test_0012_mounting_a_name_twice_is_refused.c',
+    'suites/romfs/main.c',
+)
+elf = executable(name + '.elf', src,
+                 dependencies : [nx_dep, nx_std_sync_dep, nx_tests_framework_dep],
+                 c_args : c_opts, cpp_args : cpp_opts,
+                 link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
+                 pie : true)
+custom_target(name + '.lst',
+              input : elf, output : name + '.lst',
+              command : [nm, '-CSn', '@INPUT@'], capture : true)
+custom_target(name + '.nro',
+              command : bundle_base + ['--name', name, '--romfs', meson.current_source_dir() / 'suites/romfs/assets'],
+              input : elf, output : name + '.nro',
+              build_by_default : true, depends : elf)
+
 # ── nx-tests-net ──────────────────────────────────────────────────────────
 # The socket surface, kept in its own binary because it brings up a network
 # stack: the driver claims transfer memory and several IPC sessions for as long

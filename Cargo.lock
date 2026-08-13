@@ -170,6 +170,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "nx-romfs"
+version = "0.1.0"
+dependencies = [
+ "nx-alloc",
+ "nx-fsdev",
+ "nx-panic-handler",
+ "nx-service-fs",
+ "nx-sf",
+ "nx-std-path",
+ "nx-std-sync",
+ "nx-sys-fd",
+ "thiserror",
+ "zerocopy",
+]
+
+[[package]]
 name = "nx-rt-core"
 version = "0.1.0"
 dependencies = [
@@ -214,6 +230,7 @@ dependencies = [
  "nx-fsdev",
  "nx-nv",
  "nx-panic-handler",
+ "nx-romfs",
  "nx-rt-core",
  "nx-service-apm",
  "nx-service-applet",
@@ -232,9 +249,11 @@ dependencies = [
  "nx-service-time",
  "nx-service-vi",
  "nx-sf",
+ "nx-std-path",
  "nx-std-sync",
  "nx-svc",
  "nx-sys-args",
+ "nx-sys-fd",
  "nx-sys-mem",
  "nx-sys-thread-tls",
  "nx-time",
@@ -248,8 +267,10 @@ version = "0.1.0"
 dependencies = [
  "nx-alloc",
  "nx-panic-handler",
+ "nx-romfs",
  "nx-rt-core",
  "nx-service-applet",
+ "nx-sf",
  "nx-svc",
  "nx-sys-args",
 ]
@@ -1564,6 +1585,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-pm",
  "nx-rand",
+ "nx-romfs",
  "nx-rt-core",
  "nx-rt-nro",
  "nx-rt-nso",

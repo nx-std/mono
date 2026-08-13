@@ -19,9 +19,13 @@ bench = false
 # Pulls `nx-sys-args/ffi`: that crate gates the C-style `(argc, argv)` view on
 # the feature, and the only reader of it is the `__system_argc` / `__system_argv`
 # pair below this switch.
+# Pulls `nx-romfs?/ffi`: `romfsMountSelf` is defined below this switch and the
+# rest of the `romfs*` surface in that crate, and a link carrying one override
+# without the others has calls landing back in the C it replaced.
 ffi = [
     "nx-sf/ffi",
     "nx-rt-core/ffi",
+    "nx-romfs?/ffi",
     "nx-sys-args/ffi",
     "nx-service-applet?/ffi",
     "nx-service-applet-album?/ffi",
@@ -36,6 +40,12 @@ ffi = [
 # Memory objects on the NV driver — gates `ffi::nvmap`. Pulls `service-nv`: the
 # device is opened on the driver session that feature establishes.
 nvmap = ["dep:nx-nv", "service-nv"]
+# A program's own romfs image — gates `romfs` + `ffi::libnx::romfs`, which hold
+# the `romfsMountSelf` an NRO needs: the image is appended to the NRO itself, so
+# finding it means reading the file the loader launched.
+# Pulls `service-fs`: that file sits on a mounted device, which only exists once
+# the filesystem session and the SD card mount that feature establishes are up.
+romfs = ["dep:nx-romfs", "dep:nx-std-path", "dep:nx-sys-fd", "service-fs"]
 # Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the homebrew-loader startup ABI). Leave it off on the
 # GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
@@ -106,6 +116,7 @@ nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
 nx-fsdev = { version = "0.1.0", path = "../nx-fsdev", optional = true }
 nx-nv = { version = "0.1.0", path = "../nx-nv", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-romfs = { version = "0.1.0", path = "../nx-romfs", optional = true }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
@@ -124,9 +135,11 @@ nx-service-set = { version = "0.1.0", path = "../nx-service-set", optional = tru
 nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = true }
 nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-path = { version = "0.1.0", path = "../nx-std-path", optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-args = { version = "0.1.0", path = "../nx-sys-args" }
+nx-sys-fd = { version = "0.1.0", path = "../nx-sys-fd", optional = true }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }

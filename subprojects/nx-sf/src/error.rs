@@ -65,8 +65,14 @@ pub const GENERIC_ERROR: ResultCode = libnx_error(LibnxError::ShouldNotHappen);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum LibnxError {
+    /// A fixed-size table a registration needed had no room left.
+    OutOfMemory = 2,
     /// The subsystem was used before its `*_initialize` hook ran.
     NotInitialized = 8,
+    /// Nothing is registered under the name a caller addressed.
+    NotFound = 9,
+    /// Bytes a caller pointed at could not be read, or are not what they claim.
+    IoError = 10,
     /// A caller-supplied argument failed validation at the boundary.
     BadInput = 11,
     /// The service-override table is full.

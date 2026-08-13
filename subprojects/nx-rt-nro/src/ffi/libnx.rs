@@ -42,6 +42,8 @@ mod nvmap;
 mod pctlauth;
 #[cfg(feature = "service-applet-psel")]
 mod psel;
+#[cfg(feature = "romfs")]
+mod romfs;
 #[cfg(feature = "service-set")]
 mod setsys;
 #[cfg(feature = "service-time")]

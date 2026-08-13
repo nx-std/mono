@@ -15,6 +15,8 @@ mod applet;
 mod argv;
 mod env;
 mod init;
+#[cfg(feature = "romfs")]
+mod romfs;
 
 // Called by `argv::setup()` after parsing the `__argdata__` command line.
 // The startup sequence parses the command line, then calls this to point the

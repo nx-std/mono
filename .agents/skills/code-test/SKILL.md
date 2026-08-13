@@ -16,8 +16,8 @@ Runs the nx-std test suite. Tests are C-code linked against the Rust crates that
 
 There are no per-crate Rust unit-test profiles — coverage is exercised via the NRO binaries under
 `subprojects/tests/`, one per area (`nx-tests-rand`, `nx-tests-rt`, `nx-tests-thread`,
-`nx-tests-sync`, `nx-tests-fs`, `nx-tests-net`, and the interactive `nx-tests-applet-*`). Pick the
-binaries whose area the change touches.
+`nx-tests-sync`, `nx-tests-fs`, `nx-tests-romfs`, `nx-tests-net`, and the interactive
+`nx-tests-applet-*`). Pick the binaries whose area the change touches.
 
 `nx-tests` itself is **not** a suite: it is the runner that receives a suite over the netloader
 protocol and launches it (see Step 3).

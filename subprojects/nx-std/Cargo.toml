@@ -24,6 +24,7 @@ ffi = [
     "nx-fsdev?/ffi",
     "nx-pm?/ffi",
     "nx-rand?/ffi",
+    "nx-romfs?/ffi",
     "nx-rt-core?/ffi",
     "nx-rt-nro?/ffi",
     "nx-rt-nso?/ffi",
@@ -71,6 +72,11 @@ fs = ["sys-fd", "dep:nx-std-path", "dep:thiserror", "alloc"]
 fsdev = ["dep:nx-fsdev", "sys-fd", "service-fs"]
 pm = ["dep:nx-pm"]
 rand = ["dep:nx-rand"]
+# The read-only filesystem device, replacing libnx's romfs devoptab layer. Pulls
+# `fsdev`: the image's bytes are read through a mounted device, and the fsp-srv
+# session both reach for lives in that crate. Forwards to whichever entry crate
+# is in the link, which owns the one entry point that depends on the output kind.
+romfs = ["dep:nx-romfs", "fsdev", "nx-rt-nro?/romfs", "nx-rt-nso?/romfs"]
 rt = ["dep:nx-rt-core"]
 # Per-kind `.crt0` for the opt-in `rustc`-link pipeline. Forwards to whichever
 # entry crate is in the link, because the `_start` it emits only reaches the
@@ -139,6 +145,7 @@ nx-fsdev = { version = "0.1.0", path = "../nx-fsdev", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-pm = { version = "0.1.0", path = "../nx-pm", optional = true }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
+nx-romfs = { version = "0.1.0", path = "../nx-romfs", optional = true }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", optional = true }
 nx-rt-nro = { version = "0.1.0", path = "../nx-rt-nro", optional = true }
 nx-rt-nso = { version = "0.1.0", path = "../nx-rt-nso", optional = true }
