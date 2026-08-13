@@ -48,15 +48,33 @@
 //! next request. Together they are the `hyper` half of the picture; the router
 //! and extractors that would sit above them are not written yet.
 
+mod body;
 mod command;
+mod extract;
+mod handler;
+mod into_response;
 mod protocol;
 mod request;
 mod response;
+mod router;
 mod serve;
 mod service;
 
 pub use self::{
+    body::Body,
     command::CommandId,
+    extract::{
+        Args,
+        ArgsRejection,
+        FromRequest,
+        FromRequestParts,
+        State,
+    },
+    handler::Handler,
+    into_response::{
+        IntoResponse,
+        Payload,
+    },
     protocol::{
         CmifVersion,
         Protocol,
@@ -73,6 +91,7 @@ pub use self::{
         Reply,
         Response,
     },
+    router::Router,
     serve::{
         ServeError,
         Server,
