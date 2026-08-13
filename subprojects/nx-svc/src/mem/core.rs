@@ -417,6 +417,318 @@ impl ToResultCode for UnmapMemoryError {
 
 impl _sealed::Sealed for UnmapMemoryError {}
 
+/// Maps `size` bytes at `src` into `process` at `dst`, as code.
+///
+/// The destination lands in the region the kernel keeps for code mapped this way, which is what
+/// makes the pages executable once their permissions are set with
+/// [`set_process_memory_permission`]. Both addresses and the size are page aligned, and the source
+/// range is one `process` already has mapped.
+///
+/// `process` cannot be the pseudo-handle for the current process; a process that maps into itself
+/// passes a real handle to itself.
+///
+/// # Errors
+///
+/// Returns [`MapProcessCodeMemoryError::InvalidAddress`] when either address is not page aligned,
+/// [`MapProcessCodeMemoryError::InvalidSize`] when the size is zero or not page aligned,
+/// [`MapProcessCodeMemoryError::InvalidCurrentMemory`] when a range wraps or is not one the
+/// process holds, [`MapProcessCodeMemoryError::InvalidHandle`] when the handle names no process,
+/// and [`MapProcessCodeMemoryError::OutOfResource`] when the kernel cannot grow the page table.
+/// Nothing is mapped on any of them.
+pub fn map_process_code_memory(
+    process: crate::process::Handle,
+    dst: NonNull<c_void>,
+    src: NonNull<c_void>,
+    size: usize,
+) -> Result<(), MapProcessCodeMemoryError> {
+    let rc = unsafe {
+        raw::map_process_code_memory(
+            process.to_raw(),
+            dst.as_ptr() as u64,
+            src.as_ptr() as u64,
+            size as u64,
+        )
+    };
+
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidAddress == desc => MapProcessCodeMemoryError::InvalidAddress,
+        desc if KError::InvalidSize == desc => MapProcessCodeMemoryError::InvalidSize,
+        desc if KError::InvalidCurrentMemory == desc => {
+            MapProcessCodeMemoryError::InvalidCurrentMemory
+        }
+        desc if KError::InvalidHandle == desc => MapProcessCodeMemoryError::InvalidHandle,
+        desc if KError::OutOfResource == desc => MapProcessCodeMemoryError::OutOfResource,
+        _ => MapProcessCodeMemoryError::Unknown(rc.into()),
+    })
+}
+
+/// Error returned by [`map_process_code_memory`].
+#[derive(Debug, thiserror::Error)]
+pub enum MapProcessCodeMemoryError {
+    /// An address is not page aligned
+    ///
+    /// Detected before the process is looked up, so nothing was mapped.
+    #[error("Invalid address")]
+    InvalidAddress,
+
+    /// The size is zero, or not page aligned
+    ///
+    /// Detected before the process is looked up, so nothing was mapped.
+    #[error("Invalid size")]
+    InvalidSize,
+
+    /// A range wraps, or is not one the process holds
+    ///
+    /// Occurs when the source is outside the process's address space, or the destination is
+    /// outside the region this mapping goes into. Nothing was mapped.
+    #[error("Invalid memory state")]
+    InvalidCurrentMemory,
+
+    /// The handle names no process
+    ///
+    /// Occurs when the handle was closed, names another kind of object, or is the pseudo-handle
+    /// for the current process, which this SVC refuses. Nothing was mapped.
+    #[error("Invalid handle")]
+    InvalidHandle,
+
+    /// The kernel could not grow the page table
+    ///
+    /// Occurs when the mapping needs kernel memory the process's resource limit does not cover.
+    /// Nothing was left half-mapped.
+    #[error("Out of resource")]
+    OutOfResource,
+
+    /// An unknown error occurred
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for MapProcessCodeMemoryError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidAddress => KError::InvalidAddress.to_rc(),
+            Self::InvalidSize => KError::InvalidSize.to_rc(),
+            Self::InvalidCurrentMemory => KError::InvalidCurrentMemory.to_rc(),
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::OutOfResource => KError::OutOfResource.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for MapProcessCodeMemoryError {}
+
+/// Undoes what [`map_process_code_memory`] mapped.
+///
+/// The arguments are the ones the mapping was made with: the source range is named again so the
+/// kernel can check the mapping being removed is the one that was made.
+///
+/// # Errors
+///
+/// The same conditions as [`map_process_code_memory`], with
+/// [`UnmapProcessCodeMemoryError::InvalidCurrentMemory`] also covering a destination that does not
+/// hold the mapping being removed. Nothing is unmapped on any of them.
+pub fn unmap_process_code_memory(
+    process: crate::process::Handle,
+    dst: NonNull<c_void>,
+    src: NonNull<c_void>,
+    size: usize,
+) -> Result<(), UnmapProcessCodeMemoryError> {
+    let rc = unsafe {
+        raw::unmap_process_code_memory(
+            process.to_raw(),
+            dst.as_ptr() as u64,
+            src.as_ptr() as u64,
+            size as u64,
+        )
+    };
+
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidAddress == desc => UnmapProcessCodeMemoryError::InvalidAddress,
+        desc if KError::InvalidSize == desc => UnmapProcessCodeMemoryError::InvalidSize,
+        desc if KError::InvalidCurrentMemory == desc => {
+            UnmapProcessCodeMemoryError::InvalidCurrentMemory
+        }
+        desc if KError::InvalidHandle == desc => UnmapProcessCodeMemoryError::InvalidHandle,
+        desc if KError::OutOfResource == desc => UnmapProcessCodeMemoryError::OutOfResource,
+        _ => UnmapProcessCodeMemoryError::Unknown(rc.into()),
+    })
+}
+
+/// Error returned by [`unmap_process_code_memory`].
+#[derive(Debug, thiserror::Error)]
+pub enum UnmapProcessCodeMemoryError {
+    /// An address is not page aligned
+    ///
+    /// Detected before the process is looked up, so nothing was unmapped.
+    #[error("Invalid address")]
+    InvalidAddress,
+
+    /// The size is zero, or not page aligned
+    ///
+    /// Detected before the process is looked up, so nothing was unmapped.
+    #[error("Invalid size")]
+    InvalidSize,
+
+    /// A range wraps, or does not hold the mapping being removed
+    ///
+    /// Occurs when the destination is not where the source was mapped, or either range is outside
+    /// the process's address space. Nothing was unmapped.
+    #[error("Invalid memory state")]
+    InvalidCurrentMemory,
+
+    /// The handle names no process
+    ///
+    /// Occurs when the handle was closed, names another kind of object, or is the pseudo-handle
+    /// for the current process, which this SVC refuses. Nothing was unmapped.
+    #[error("Invalid handle")]
+    InvalidHandle,
+
+    /// The kernel could not grow the page table
+    ///
+    /// Occurs when splitting a mapping needs kernel memory the process's resource limit does not
+    /// cover. Nothing was left half-unmapped.
+    #[error("Out of resource")]
+    OutOfResource,
+
+    /// An unknown error occurred
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for UnmapProcessCodeMemoryError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidAddress => KError::InvalidAddress.to_rc(),
+            Self::InvalidSize => KError::InvalidSize.to_rc(),
+            Self::InvalidCurrentMemory => KError::InvalidCurrentMemory.to_rc(),
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::OutOfResource => KError::OutOfResource.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for UnmapProcessCodeMemoryError {}
+
+/// Sets what `process` may do with `size` bytes at `addr`.
+///
+/// This is what turns pages [`map_process_code_memory`] placed into the code region into something
+/// that runs: the mapping arrives with no permissions, and each segment is given its own here.
+///
+/// # Errors
+///
+/// Returns [`SetProcessMemoryPermissionError::InvalidAddress`] when `addr` is not page aligned,
+/// [`SetProcessMemoryPermissionError::InvalidSize`] when the size is zero or not page aligned,
+/// [`SetProcessMemoryPermissionError::InvalidCurrentMemory`] when the range wraps or is not one
+/// the process holds, and [`SetProcessMemoryPermissionError::InvalidHandle`] when the handle names
+/// no process. Nothing is changed on any of them.
+pub fn set_process_memory_permission(
+    process: crate::process::Handle,
+    addr: NonNull<c_void>,
+    size: usize,
+    perm: ProcessMemoryPermission,
+) -> Result<(), SetProcessMemoryPermissionError> {
+    let rc = unsafe {
+        raw::set_process_memory_permission(
+            process.to_raw(),
+            addr.as_ptr() as u64,
+            size as u64,
+            perm.to_raw(),
+        )
+    };
+
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidAddress == desc => SetProcessMemoryPermissionError::InvalidAddress,
+        desc if KError::InvalidSize == desc => SetProcessMemoryPermissionError::InvalidSize,
+        desc if KError::InvalidCurrentMemory == desc => {
+            SetProcessMemoryPermissionError::InvalidCurrentMemory
+        }
+        desc if KError::InvalidHandle == desc => SetProcessMemoryPermissionError::InvalidHandle,
+        _ => SetProcessMemoryPermissionError::Unknown(rc.into()),
+    })
+}
+
+/// Error returned by [`set_process_memory_permission`].
+#[derive(Debug, thiserror::Error)]
+pub enum SetProcessMemoryPermissionError {
+    /// The address is not page aligned
+    ///
+    /// Detected before the process is looked up, so no permission was changed.
+    #[error("Invalid address")]
+    InvalidAddress,
+
+    /// The size is zero, or not page aligned
+    ///
+    /// Detected before the process is looked up, so no permission was changed.
+    #[error("Invalid size")]
+    InvalidSize,
+
+    /// The range wraps, or is not one the process holds
+    ///
+    /// Occurs when the range is outside the process's address space, or covers memory whose state
+    /// does not allow its permissions to be set. No permission was changed.
+    #[error("Invalid memory state")]
+    InvalidCurrentMemory,
+
+    /// The handle names no process
+    ///
+    /// Occurs when the handle was closed or names another kind of object. No permission was
+    /// changed.
+    #[error("Invalid handle")]
+    InvalidHandle,
+
+    /// An unknown error occurred
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for SetProcessMemoryPermissionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::InvalidAddress => KError::InvalidAddress.to_rc(),
+            Self::InvalidSize => KError::InvalidSize.to_rc(),
+            Self::InvalidCurrentMemory => KError::InvalidCurrentMemory.to_rc(),
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for SetProcessMemoryPermissionError {}
+
+/// What a process may do with a range of its memory.
+///
+/// The kernel accepts these five combinations for [`set_process_memory_permission`] and refuses
+/// every other one, so they are an enum rather than a set of flags a caller can combine into a
+/// value no kernel will take.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessMemoryPermission {
+    /// No access at all, which is how a fresh code mapping arrives.
+    None,
+    /// Read only.
+    Read,
+    /// Read and write, which is what a data segment is given.
+    ReadWrite,
+    /// Read and execute, which is what a text segment is given.
+    ReadExecute,
+    /// Execute only, which the kernel allows from `[11.0.0]`.
+    Execute,
+}
+
+impl ProcessMemoryPermission {
+    /// Returns the permission word the SVC carries.
+    pub fn to_raw(self) -> u32 {
+        match self {
+            Self::None => 0,
+            Self::Read => MemoryPermission::R.bits(),
+            Self::ReadWrite => MemoryPermission::R.bits() | MemoryPermission::W.bits(),
+            Self::ReadExecute => MemoryPermission::R.bits() | MemoryPermission::X.bits(),
+            Self::Execute => MemoryPermission::X.bits(),
+        }
+    }
+}
+
 /// Information about a memory region.
 #[derive(Debug, Clone)]
 pub struct MemoryInfo {

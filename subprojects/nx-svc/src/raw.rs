@@ -103,16 +103,21 @@ pub enum ArbitrationType {
 }
 
 /// Code memory mapping operations
+///
+/// The names are the kernel's own. A C header in wide circulation calls these `MapOwner`,
+/// `MapSlave`, `UnmapOwner` and `UnmapSlave`, which reads the first two backwards: operation 0
+/// maps into the process that *created* the object, and operation 1 maps into the process that
+/// owns the pages.
 #[repr(u32)]
 pub enum CodeMapOperation {
-    /// Map owner
-    MapOwner = 0,
-    /// Map slave
-    MapSlave = 1,
-    /// Unmap owner
-    UnmapOwner = 2,
-    /// Unmap slave
-    UnmapSlave = 3,
+    /// Map into the process that created the object
+    Map = 0,
+    /// Map into the process that owns the pages
+    MapToOwner = 1,
+    /// Unmap from the process that created the object
+    Unmap = 2,
+    /// Unmap from the process that owns the pages
+    UnmapFromOwner = 3,
 }
 
 /// Process Information
