@@ -1,12 +1,16 @@
 //! Resolving a path to the device that serves it.
 //!
-//! The C standard library addresses a device by writing its name into the path: `"sdmc:/save.dat"`
-//! names the device registered as `sdmc`, and `"/save.dat"` goes to whichever device was made the
-//! default. Splitting that apart is the first thing every path-taking entry point does.
+//! A device is addressed by writing its name into the path: `"sdmc:/save.dat"` names the device
+//! registered as `sdmc`, and `"/save.dat"` goes to whichever device was made the default. Splitting
+//! that apart is the first thing every path-taking operation does.
 //!
-//! It lives in its own module because both callers need it and neither can own it: the entry points
-//! resolve a path before dispatching, and the shims resolve it again because the operations that
-//! take a path are handed no other clue about which device they are being called for.
+//! The convention comes from the C standard library, which is how a device is addressed there, but
+//! the naming is the platform's rather than C's: a caller reaching the descriptor table from Rust
+//! addresses a device the same way and needs the same split. So this sits beside the table rather
+//! than inside the C surface, where all three of its callers can reach it — the entry points, which
+//! resolve a path before dispatching; the shims, which resolve it again because an operation taking
+//! a path is handed no other clue about which device it is being called for; and a Rust caller
+//! opening a path of its own.
 
 use core::cell::UnsafeCell;
 

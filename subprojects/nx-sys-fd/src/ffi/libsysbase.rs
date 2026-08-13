@@ -35,7 +35,6 @@ mod devoptab;
 mod dir_state;
 mod errno;
 mod handle;
-mod path;
 mod reent;
 
 use self::{
@@ -53,6 +52,7 @@ use crate::{
         DeviceId,
         MAX_DEVICES,
     },
+    path,
     registry,
     table::{
         self,

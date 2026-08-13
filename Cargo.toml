@@ -115,6 +115,7 @@ members = [
     "subprojects/nx-service-wlaninf",
     "subprojects/nx-sf",
     "subprojects/nx-std",
+    "subprojects/nx-std-fs",
     "subprojects/nx-std-path",
     "subprojects/nx-std-sync",
     "subprojects/nx-svc",

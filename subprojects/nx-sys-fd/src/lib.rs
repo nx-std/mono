@@ -194,5 +194,6 @@ extern crate nx_alloc as _;
 pub mod device;
 #[cfg(feature = "ffi")]
 pub mod ffi;
+pub mod path;
 pub mod registry;
 pub mod table;
