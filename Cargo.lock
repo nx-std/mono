@@ -145,9 +145,12 @@ dependencies = [
 name = "nx-hbabi"
 version = "0.1.0"
 dependencies = [
+ "nx-object",
  "nx-panic-handler",
  "nx-sf",
  "nx-svc",
+ "nx-sys-virtmem",
+ "thiserror",
 ]
 
 [[package]]

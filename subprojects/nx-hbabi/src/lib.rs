@@ -1,23 +1,35 @@
 //! # nx-hbabi
 //!
-//! The homebrew ABI: the handover a loader performs when it starts a program it
-//! has just mapped, and the only thing the two sides agree on in advance.
+//! The homebrew ABI: everything a loader and the program it starts must agree
+//! on in advance, because at the moment of the handover neither can ask.
 //!
-//! A loader maps a program, then jumps to its entry point with a pointer to an
-//! array of [`ConfigEntry`] in the first argument register. Each entry is a key,
-//! a flag word, and two payload words whose meaning the key decides. The array
-//! ends at the entry whose key is [`Key::LOADER_INFO`], which doubles as the
-//! terminator and as the loader's chance to name itself.
+//! There are two agreements, and this crate holds both.
 //!
-//! That is the whole format. Everything the program learns about how it was
-//! started - where its heap is, what its command line says, which services the
-//! loader has already opened on its behalf, which supervisor calls it is allowed
-//! to make - arrives through it, because at that moment nothing else has been
-//! set up to ask.
+//! # Where the program goes: [`nro`]
+//!
+//! A program arrives as an NRO image, which is three segments and a zero-filled
+//! tail. Which of them ends up executable, which read-only, and which writable
+//! is fixed by the format: a loader that mapped them some other way would map a
+//! program that cannot run. [`nro::map`] performs that placement and
+//! [`MappedNro::unmap`](nro::MappedNro::unmap) reverses it, so a loader chooses
+//! *which* program to run and not how one is laid out.
+//!
+//! # What the program is told: [`ConfigEntry`]
+//!
+//! Having mapped it, the loader jumps to the program's entry point with a
+//! pointer to an array of [`ConfigEntry`] in the first argument register. Each
+//! entry is a key, a flag word, and two payload words whose meaning the key
+//! decides. The array ends at the entry whose key is [`Key::LOADER_INFO`],
+//! which doubles as the terminator and as the loader's chance to name itself.
+//!
+//! Everything the program learns about how it was started - where its heap is,
+//! what its command line says, which services the loader has already opened on
+//! its behalf, which supervisor calls it is allowed to make - arrives through
+//! that array, because at that moment nothing else has been set up to ask.
 //!
 //! # Why this is a crate and not a parser
 //!
-//! The format has two sides, and until now this workspace only had one: the
+//! The array has two sides, and until now this workspace only had one: the
 //! program's. A loader is the other side, and a loader that writes its entries
 //! against a second, hand-written copy of the key table has an ABI defined in
 //! two places that agree only as long as someone keeps checking.
@@ -133,6 +145,7 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 mod entry;
 mod list;
+pub mod nro;
 
 pub use self::{
     entry::{
