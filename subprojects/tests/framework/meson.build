@@ -41,7 +41,8 @@ deps = [
 #---------------------------------------------------------------------------------
 # Static library
 #---------------------------------------------------------------------------------
-inc = include_directories('include')
+nx_tests_framework_inc = include_directories('include')
+
 
 # Target
 #
@@ -69,8 +70,15 @@ nx_tests_framework_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Dependency declaration
 #---------------------------------------------------------------------------------
+# The declarations on their own, for a binary that reads them and links none of
+# the reporting: the runner reports nothing, and a second Rust static library in
+# that binary is what the one-archive rule forbids.
+nx_tests_framework_hdrs_dep = declare_dependency(
+    include_directories : nx_tests_framework_inc,
+)
+
 nx_tests_framework_dep = declare_dependency(
-    include_directories : inc,
+    include_directories : nx_tests_framework_inc,
     sources : nx_tests_framework_tgt,
     link_with : nx_tests_framework_tgt[0],
     dependencies : deps,
