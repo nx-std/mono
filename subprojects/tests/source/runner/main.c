@@ -21,9 +21,10 @@
 
 #include <switch.h>
 
+#include "../rig.h"
 #include "handback.h"
 #include "ledger.h"
-#include "netloader.h"
+#include <nx_netloader.h>
 
 /**
  * @brief How long the runner waits between looks at the network.
@@ -40,7 +41,7 @@
  * The longest thing a line has to hold is the reason a transfer failed, dressed
  * in the escapes that colour it, so it is sized from that.
  */
-#define RUNNER_LINE_SIZE (NETLOADER_ERROR_SIZE + 64)
+#define RUNNER_LINE_SIZE (NX_NETLOADER_ERROR_SIZE + 64)
 
 /**
  * @brief The rule drawn across the screen between sections.
@@ -109,10 +110,10 @@ static void screen_draw_network(void)
         printf("  Listening   %" PRIu32 ".%" PRIu32 ".%" PRIu32 ".%" PRIu32 ":%d\n",
                g_screen.address & 0xFF, (g_screen.address >> 8) & 0xFF,
                (g_screen.address >> 16) & 0xFF, (g_screen.address >> 24) & 0xFF,
-               NETLOADER_SERVER_PORT);
+               NX_NETLOADER_SERVER_PORT);
     }
 
-    printf("  Programs    %s\n", NETLOADER_DROP_DIR);
+    printf("  Programs    %s\n", RIG_DIR);
 }
 
 /**
@@ -357,8 +358,8 @@ int main(void)
 
     g_screen.address = (uint32_t)gethostid();
 
-    NetloaderServer server;
-    if (!netloader_open(&server)) {
+    NxNetloaderServer* server = __nx_netloader__server_open(RIG_DIR);
+    if (server == NULL) {
         screen_show(CONSOLE_RED "cannot listen for programs" CONSOLE_RESET,
                     "  Another program may already hold the port.");
         wait_for_exit(&pad);
@@ -381,7 +382,7 @@ int main(void)
 
     // Every suite is told where to come back to, so that a run does not end
     // with the first one.
-    char handback[NETLOADER_PATH_SIZE];
+    char handback[NX_NETLOADER_PATH_SIZE];
     const bool has_handback = format_handback_arg(handback, sizeof(handback));
 
     RunnerProgress progress = { .percent = -1 };
@@ -417,12 +418,17 @@ int main(void)
         // protocol can report that on its own — the discovery socket simply stops hearing
         // pings, and the listening socket stops being connected to — so a failure on
         // either is what says the pair has to be rebuilt.
-        if (!netloader_answer_discovery(&server)) {
+        if (__nx_netloader__server_answer_discovery(server) != 0) {
             server_lost = true;
         }
 
         if (server_lost) {
-            if (netloader_reopen(&server)) {
+            // Freed and opened rather than rebuilt in one call: a rebuild that consumed the
+            // server would leave nothing to retry with once it failed, and failing is the ordinary
+            // case here for as long as the network is still down.
+            __nx_netloader__server_free(server);
+            server = __nx_netloader__server_open(RIG_DIR);
+            if (server != NULL) {
                 server_lost = false;
                 screen_show("Waiting for a program", "  (listening again)");
             } else {
@@ -435,19 +441,19 @@ int main(void)
             continue;
         }
 
-        NetloaderOutcome outcome;
-        switch (netloader_receive(&server, &outcome, has_handback ? handback : NULL, on_progress,
-                                  &progress)) {
-        case NETLOADER_IDLE:
+        NxNetloaderOutcome outcome;
+        switch (__nx_netloader__server_receive(server, &outcome, has_handback ? handback : NULL,
+                                               on_progress, &progress)) {
+        case NX_NETLOADER_IDLE:
             break;
 
-        case NETLOADER_SERVER_LOST:
+        case NX_NETLOADER_SERVER_LOST:
             snprintf(detail, sizeof(detail), CONSOLE_RED "  %s" CONSOLE_RESET, outcome.error);
             screen_show("Waiting for a program", detail);
             server_lost = true;
             break;
 
-        case NETLOADER_RECEIVED: {
+        case NX_NETLOADER_RECEIVED: {
             const Result rc = envSetNextLoad(outcome.path, outcome.cmdline);
             if (R_SUCCEEDED(rc)) {
                 screen_show("Launching", outcome.path);
@@ -459,7 +465,7 @@ int main(void)
             break;
         }
 
-        case NETLOADER_FAILED:
+        case NX_NETLOADER_FAILED:
             snprintf(detail, sizeof(detail), CONSOLE_RED "  %s" CONSOLE_RESET, outcome.error);
             screen_show("Waiting for a program", detail);
             progress.percent = -1;
@@ -479,7 +485,7 @@ int main(void)
     // left unable to sleep by a runner that has finished would stay awake until
     // somebody noticed.
     appletSetAutoSleepDisabled(false);
-    netloader_close(&server);
+    __nx_netloader__server_free(server);
     socketExit();
     consoleExit(NULL);
     return 0;

@@ -10,9 +10,11 @@ use core::cell::UnsafeCell;
 
 use nx_sys_sync::Mutex;
 
+// Only the build that defines the registry implements the device seeding its standard slots.
+#[cfg(not(feature = "extern-state"))]
+use crate::device::DeviceError;
 use crate::device::{
     Device,
-    DeviceError,
     DeviceId,
     MAX_DEVICES,
 };
@@ -28,6 +30,12 @@ pub const STD_ERR: usize = 2;
 const FIRST_DYNAMIC_DEVICE: usize = 3;
 
 /// The process-wide device registry.
+///
+/// The symbol is spelled out, and `extern-state` swaps this definition for a declaration, so that a
+/// program linking a second static library shares one registry rather than getting a second empty
+/// one. See [rust-process-wide-state](../../../docs/code/rust-process-wide-state.md).
+#[cfg(not(feature = "extern-state"))]
+#[unsafe(no_mangle)]
 static REGISTRY: Registry = Registry {
     mutex: Mutex::new(),
     devices: UnsafeCell::new({
@@ -41,7 +49,37 @@ static REGISTRY: Registry = Registry {
     }),
 };
 
+#[cfg(feature = "extern-state")]
+unsafe extern "Rust" {
+    /// The process-wide device registry, owned by another static library.
+    static REGISTRY: Registry;
+}
+
+/// The one registry, however this build reaches it.
+///
+/// Every use goes through here so the borrowed case costs one `unsafe`, where what is vouched for
+/// can be stated.
+fn registry() -> &'static Registry {
+    #[cfg(not(feature = "extern-state"))]
+    {
+        &REGISTRY
+    }
+
+    #[cfg(feature = "extern-state")]
+    // SAFETY: the symbol is defined by the one static library built without `extern-state`, as a
+    // `Registry` from this same source at this same version, so the reference has the type and
+    // layout it claims. It is a `static`, so the `'static` lifetime is honest. The mutex inside
+    // orders access to the devices; a shared reference to the registry itself races with nothing.
+    unsafe {
+        &REGISTRY
+    }
+}
+
 /// The device the standard slots start on.
+///
+/// Defined alongside the registry it seeds: a build that borrows the registry borrows the slots
+/// already pointing here, so it needs no device of its own.
+#[cfg(not(feature = "extern-state"))]
 static NULL_DEVICE: NullDevice = NullDevice;
 
 /// Registers `device`, returning the slot it took.
@@ -81,7 +119,7 @@ pub fn bind_at(index: usize, device: &'static dyn Device) {
         return;
     }
 
-    REGISTRY.lock().devices()[index] = Some(device);
+    registry().lock().devices()[index] = Some(device);
 }
 
 /// Returns the slot [`register`] would hand out for a device named `name`.
@@ -91,7 +129,7 @@ pub fn bind_at(index: usize, device: &'static dyn Device) {
 ///
 /// Returns `None` when every slot from 3 upward is taken.
 pub fn free_slot_for(name: &str) -> Option<usize> {
-    let mut registry = REGISTRY.lock();
+    let mut registry = registry().lock();
     registry
         .devices()
         .iter()
@@ -110,7 +148,7 @@ pub fn unregister(id: DeviceId) {
     if index >= MAX_DEVICES {
         return;
     }
-    REGISTRY.lock().devices()[index] = None;
+    registry().lock().devices()[index] = None;
 }
 
 /// Returns the device registered at `id`.
@@ -119,7 +157,7 @@ pub fn get(id: DeviceId) -> Option<&'static dyn Device> {
     if index >= MAX_DEVICES {
         return None;
     }
-    REGISTRY.lock().devices()[index]
+    registry().lock().devices()[index]
 }
 
 /// Returns the device registered under `name`.
@@ -127,7 +165,7 @@ pub fn get(id: DeviceId) -> Option<&'static dyn Device> {
 /// `name` is the bare device name, without the `":"` that follows it in a path, so the `"name:"`
 /// prefix the C boundary splits off a path can be matched directly.
 pub fn find_by_name(name: &str) -> Option<DeviceId> {
-    let mut registry = REGISTRY.lock();
+    let mut registry = registry().lock();
     registry
         .devices()
         .iter()
@@ -140,8 +178,13 @@ pub fn find_by_name(name: &str) -> Option<DeviceId> {
 ///
 /// Stands in for a real device on the standard slots until something binds one, so that a `printf`
 /// before the console is up is a no-op rather than a fault.
+///
+/// Defined alongside the registry it seeds: a build that borrows the registry finds the standard
+/// slots already pointing at the owning library's instance.
+#[cfg(not(feature = "extern-state"))]
 struct NullDevice;
 
+#[cfg(not(feature = "extern-state"))]
 impl Device for NullDevice {
     fn name(&self) -> &'static str {
         "stdnull"

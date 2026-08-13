@@ -10,6 +10,11 @@ test = false
 doctest = false
 bench = false
 
+[features]
+# Borrow the descriptor layer's process-wide state instead of defining it. Forwarded to
+# `nx-sys-fd`; see docs/code/rust-process-wide-state.md.
+extern-state = ["nx-sys-fd/extern-state"]
+
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }

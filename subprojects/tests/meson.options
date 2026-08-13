@@ -12,3 +12,10 @@ option(
     yield : true
 )
 
+
+option(
+    'use_nx_sys_net',
+    type : 'feature', value : 'auto',
+    description : 'Required: the runner serves the netloader protocol through the Rust socket driver',
+    yield : true
+)
