@@ -13,6 +13,8 @@ bench = false
 [features]
 # Enable the __nx_sf FFI
 ffi = []
+# Enable the server-side message types
+server = []
 
 [dependencies]
 modular-bitfield = "0.11"

@@ -1,14 +1,18 @@
-//! TIPC request building.
+//! TIPC request messages: building one as a client, parsing one as a server.
 //!
-//! This module contains request values and fluent builders for TIPC requests.
-//! Response parsing lives in the sibling `response` module.
+//! [`TipcRequestBuilder`] produces a request to send to a service;
+//! [`parse_request`] reads one a client sent to a service this process hosts.
+//! Reply building and response parsing live in the sibling `response` module.
 
 use core::ptr;
 
 use nx_svc::raw::Handle as RawHandle;
 use nx_sys_thread_tls::IpcBuffer;
 
-use super::wire::CommandType;
+use super::wire::{
+    CommandType,
+    REQUEST_TYPE_BASE,
+};
 use crate::{
     array_vec::ArrayVec,
     hipc::{
@@ -247,4 +251,77 @@ impl TipcCloseRequest {
     ) -> Result<(), SendError> {
         self.hipc.send_inner(buf, session)
     }
+}
+
+/// Interprets an already-parsed HIPC request as a TIPC one.
+///
+/// Takes the [`hipc::Request`] rather than the raw buffer because a server
+/// needs both halves: the HIPC value owns the buffer descriptors and handles
+/// the command's arguments live in, and this function only adds the TIPC
+/// reading of its message type. TIPC writes no in-band header of its own, so
+/// the data words are the argument region as they stand.
+///
+/// # Errors
+///
+/// Returns [`RequestParseError`] when the message type names neither a close
+/// nor a command, which is every value below [`CommandType::Close`].
+pub fn parse_request<'a>(request: &hipc::Request<'a>) -> Result<Request<'a>, RequestParseError> {
+    let raw_type = request.message_type.to_raw();
+    match raw_type {
+        t if t == CommandType::Close as u16 => Ok(Request::Close),
+        t if t >= REQUEST_TYPE_BASE => Ok(Request::Command(Command {
+            command_id: u32::from(t - REQUEST_TYPE_BASE),
+            payload: request.data_words,
+        })),
+        other => Err(RequestParseError(other)),
+    }
+}
+
+/// Error returned by [`parse_request`].
+///
+/// Occurs when the HIPC message type falls below the range TIPC assigns, so it
+/// names neither a close nor a command id. The low types belong to CMIF, so
+/// this is the shape a CMIF client reaching a TIPC-only interface produces.
+/// Detected before any part of the message body is read.
+#[derive(Debug, thiserror::Error)]
+#[error("unsupported TIPC command type: {0:#x}")]
+pub struct RequestParseError(pub u16);
+
+#[cfg(feature = "ffi")]
+impl crate::error::ToResultCode for RequestParseError {
+    fn to_rc(self) -> crate::error::ResultCode {
+        // A request rejected before any handler saw it, so no service assigned
+        // it a code to forward.
+        crate::error::GENERIC_ERROR
+    }
+}
+
+/// Parsed inbound TIPC request.
+///
+/// Returned by [`parse_request`]. The message type decides which of these a
+/// request is, so a caller cannot read a command id off a session close. TIPC
+/// has no control requests: domain conversion and object cloning are CMIF
+/// facilities, and the protocol that dropped domains dropped their control
+/// path with them.
+#[derive(Debug)]
+pub enum Request<'a> {
+    /// A command invocation on the session's interface.
+    Command(Command<'a>),
+    /// A session close. Carries no in-band data, and is not replied to.
+    Close,
+}
+
+/// Command id and raw arguments decoded from a TIPC request.
+#[derive(Debug)]
+pub struct Command<'a> {
+    /// Method id to invoke on the target interface.
+    pub command_id: u32,
+    /// The whole data-words region.
+    ///
+    /// TIPC writes no in-band header, so this is the argument region from its
+    /// first byte. It is the raw remainder rather than a sized argument tuple:
+    /// it still holds the word padding HIPC added, and how much of it is
+    /// arguments is a property of the command's own signature, which a
+    /// wire-format parser does not know.
+    pub payload: &'a [u8],
 }

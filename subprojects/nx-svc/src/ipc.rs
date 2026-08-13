@@ -1,8 +1,9 @@
 //! IPC session management for Horizon OS.
 //!
-//! This module provides safe wrappers around the kernel's IPC session SVCs.
-//! A session handle represents the client side of an IPC connection to a
-//! service port (named port or anonymous port).
+//! This module provides safe wrappers around the kernel's IPC session SVCs, for
+//! both ends of a session: connecting to a port and sending requests on the
+//! session that opens, and hosting a port, accepting the sessions that arrive
+//! on it, and answering the requests they carry.
 //!
 //! ## Horizon OS Terminology
 //!
@@ -11,6 +12,17 @@
 //!   that clients can connect to by name.
 //! - **Client Session**: The handle held by the client side of an IPC session,
 //!   used to send requests to the server.
+//! - **Server Port**: The handle held by the process hosting a port, used to
+//!   accept incoming sessions.
+//!
+//! ## The two ends are not symmetric
+//!
+//! A client sends one request at a time on one session and blocks until the
+//! answer arrives, so its primitive is [`send_sync_request`], taking a single
+//! handle. A server waits on every session it holds *and* its port at once, so
+//! its primitive is [`reply_and_receive`], taking the whole set and reporting
+//! which member woke it. There is no per-session blocking call for a server to
+//! build a thread around: the multiplexing is the syscall's, not the caller's.
 
 use core::ffi::CStr;
 
@@ -20,13 +32,23 @@ use crate::{
         KernelError as KError,
         ToResultCode,
     },
-    raw,
+    raw::{
+        self,
+        Handle as RawHandle,
+    },
     result::{
         Error,
         ResultCode,
         raw::Result as RawResult,
     },
 };
+
+/// Timeout value that makes a wait block until something signals.
+///
+/// The kernel reads the timeout as a signed nanosecond count and takes a
+/// negative one to mean "no deadline", which is what the all-ones pattern of
+/// the maximum is when read that way.
+const TIMEOUT_INFINITE: u64 = u64::MAX;
 
 define_waitable_handle_type! {
     /// A handle to a client session kernel object.
@@ -555,3 +577,337 @@ impl ToResultCode for CloseHandleError {
 }
 
 impl _sealed::Sealed for CloseHandleError {}
+
+define_waitable_handle_type! {
+    /// A handle to the server side of an IPC port.
+    ///
+    /// Held by the process hosting the port rather than by a client connecting
+    /// to it: it accepts sessions through [`accept_session`] instead of opening
+    /// them. Obtained from [`manage_named_port`], or from the service manager
+    /// when a service registers itself.
+    ///
+    /// It is waitable, and waiting on it is how a server learns a client is
+    /// trying to connect. That is why a server's [`reply_and_receive`] set
+    /// holds the port alongside the sessions: both signal the same call.
+    pub struct PortHandle
+}
+
+/// Registers a named port and returns its server handle.
+///
+/// The name is the one clients pass to [`connect_to_named_port`], and the
+/// kernel bounds it at 11 characters plus the terminator. Passing a
+/// `max_sessions` of zero unregisters a name this process previously took.
+///
+/// # Errors
+///
+/// Returns [`ManageNamedPortError`] when the kernel refuses the registration,
+/// in which case no name was taken and no handle opened.
+pub fn manage_named_port(
+    name: &CStr,
+    max_sessions: i32,
+) -> Result<PortHandle, ManageNamedPortError> {
+    let mut handle = raw::INVALID_HANDLE;
+    // SAFETY: `name` is a valid null-terminated C string (guaranteed by CStr),
+    // and `handle` is a valid mutable pointer to receive the output handle.
+    let rc = unsafe { raw::manage_named_port(&mut handle, name.as_ptr(), max_sessions) };
+
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::OutOfRange == desc => ManageNamedPortError::OutOfRange,
+        desc if KError::OutOfResource == desc => ManageNamedPortError::OutOfResource,
+        desc if KError::OutOfHandles == desc => ManageNamedPortError::OutOfHandles,
+        desc if KError::InvalidState == desc => ManageNamedPortError::NameTaken,
+        desc if KError::LimitReached == desc => ManageNamedPortError::LimitReached,
+        _ => ManageNamedPortError::Unknown(rc.into()),
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    PortHandle::try_from(handle).map_err(ManageNamedPortError::NoPortHandle)
+}
+
+/// Error returned by [`manage_named_port`].
+#[derive(Debug, thiserror::Error)]
+pub enum ManageNamedPortError {
+    /// Port name exceeds 11 characters or is not null-terminated.
+    #[error("Port name out of range")]
+    OutOfRange,
+    /// Failed to allocate the port object.
+    #[error("Out of resource")]
+    OutOfResource,
+    /// Process handle table is full.
+    #[error("Out of handles")]
+    OutOfHandles,
+    /// Another registration already holds this name.
+    ///
+    /// Names are system-global, so this reports a collision with a service
+    /// already hosting under the requested name rather than anything about the
+    /// arguments passed.
+    #[error("A port is already registered under this name")]
+    NameTaken,
+    /// Process resource limit exceeded.
+    #[error("Limit reached")]
+    LimitReached,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Indicates a mismatch with the SVC ABI rather than anything the caller
+    /// passed, and no port this process owns was registered.
+    #[error("The kernel reported success without returning a port handle")]
+    NoPortHandle(#[source] crate::handle::InvalidHandleError),
+    /// Unexpected kernel error.
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for ManageNamedPortError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::NoPortHandle(_) => KError::InvalidHandle.to_rc(),
+            Self::OutOfRange => KError::OutOfRange.to_rc(),
+            Self::OutOfResource => KError::OutOfResource.to_rc(),
+            Self::OutOfHandles => KError::OutOfHandles.to_rc(),
+            Self::NameTaken => KError::InvalidState.to_rc(),
+            Self::LimitReached => KError::LimitReached.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for ManageNamedPortError {}
+
+/// Accepts a pending session on a hosted port.
+///
+/// Call it once the port has signalled through [`reply_and_receive`]; on a port
+/// with nothing pending it fails rather than blocking, so the wait and the
+/// accept are two steps by design.
+///
+/// # Errors
+///
+/// Returns [`AcceptSessionError`] when the kernel refuses the accept, in which
+/// case no session handle was opened.
+pub fn accept_session(port: PortHandle) -> Result<Handle, AcceptSessionError> {
+    let mut session = raw::INVALID_HANDLE;
+    // SAFETY: `session` is a valid mutable pointer to receive the output
+    // handle. The kernel validates the port handle and returns an error if it
+    // is not one.
+    let rc = unsafe { raw::accept_session(&mut session, port.to_raw()) };
+
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::InvalidHandle == desc => AcceptSessionError::InvalidHandle,
+        desc if KError::OutOfHandles == desc => AcceptSessionError::OutOfHandles,
+        desc if KError::OutOfResource == desc => AcceptSessionError::OutOfResource,
+        desc if KError::InvalidState == desc => AcceptSessionError::NothingPending,
+        desc if KError::LimitReached == desc => AcceptSessionError::LimitReached,
+        _ => AcceptSessionError::Unknown(rc.into()),
+    })?;
+
+    // Wrapped only after the result code says the kernel filled the out-param;
+    // on the failure path it still holds `INVALID_HANDLE`.
+    Handle::try_from(session).map_err(AcceptSessionError::NoSessionHandle)
+}
+
+/// Error returned by [`accept_session`].
+#[derive(Debug, thiserror::Error)]
+pub enum AcceptSessionError {
+    /// The supplied handle is not a server port handle.
+    #[error("Invalid handle")]
+    InvalidHandle,
+    /// Process handle table is full.
+    #[error("Out of handles")]
+    OutOfHandles,
+    /// Failed to allocate the session object.
+    #[error("Out of resource")]
+    OutOfResource,
+    /// No client is waiting to connect on this port.
+    ///
+    /// Occurs when the accept runs without the port having signalled, so it
+    /// reports a caller that skipped the wait rather than a client that went
+    /// away. Nothing was consumed: a later accept still takes the next arrival.
+    #[error("No session is pending on the port")]
+    NothingPending,
+    /// Process session resource limit exceeded.
+    #[error("Limit reached")]
+    LimitReached,
+    /// The kernel reported success but left the handle out-param unset.
+    ///
+    /// Indicates a mismatch with the SVC ABI rather than anything the caller
+    /// passed, and no session this process owns was accepted.
+    #[error("The kernel reported success without returning a session handle")]
+    NoSessionHandle(#[source] crate::handle::InvalidHandleError),
+    /// Unexpected kernel error.
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for AcceptSessionError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::NoSessionHandle(_) => KError::InvalidHandle.to_rc(),
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::OutOfHandles => KError::OutOfHandles.to_rc(),
+            Self::OutOfResource => KError::OutOfResource.to_rc(),
+            Self::NothingPending => KError::InvalidState.to_rc(),
+            Self::LimitReached => KError::LimitReached.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for AcceptSessionError {}
+
+/// Replies to one session and then waits for the next message on any of
+/// `handles`.
+///
+/// This is a server's whole event loop in one syscall. When `reply_target` is
+/// `Some`, the message currently in the thread's TLS IPC buffer is sent to that
+/// session first. The call then blocks until a session in `handles` has a
+/// request, a port in `handles` has a connection pending, a session in
+/// `handles` is closed, or `timeout` elapses; on a request it copies the
+/// message into the TLS IPC buffer and returns the index that produced it.
+///
+/// Passing `None` for `timeout` blocks indefinitely.
+///
+/// The wait set is raw handles rather than a handle newtype because it is
+/// heterogeneous by design: a server waits on its [`PortHandle`] and its
+/// session [`Handle`]s in one call, and no single object type names both.
+/// Build it from `to_raw`, keeping the association from index back to handle
+/// on the caller's side, which is where the returned index is interpreted.
+///
+/// # Safety
+///
+/// When `reply_target` is `Some`, every descriptor serialized in the TLS IPC
+/// buffer must point to memory that is live, correctly sized, and appropriately
+/// loaned for the whole duration of this call, exactly as [`send_sync_request`]
+/// requires of a request. No reference into the TLS IPC buffer may be held
+/// across the call either way: the kernel overwrites the buffer with the
+/// message it receives.
+///
+/// # Errors
+///
+/// Returns [`ReplyAndReceiveError`]. Note that
+/// [`SessionClosed`](ReplyAndReceiveError::SessionClosed) carries the index of
+/// the session that closed and is the normal way a server learns to drop one,
+/// rather than a failure of the call.
+pub unsafe fn reply_and_receive(
+    handles: &[RawHandle],
+    reply_target: Option<Handle>,
+    timeout: Option<u64>,
+) -> Result<usize, ReplyAndReceiveError> {
+    let handle_count =
+        i32::try_from(handles.len()).map_err(|_| ReplyAndReceiveError::TooManyHandles {
+            count: handles.len(),
+        })?;
+
+    let mut index: i32 = 0;
+    let reply_to = match reply_target {
+        Some(handle) => handle.to_raw(),
+        None => raw::INVALID_HANDLE,
+    };
+
+    // SAFETY: `index` is a valid mutable pointer for the output, and `handles`
+    // names `handle_count` consecutive raw handles borrowed for the call. The
+    // TLS message contract is this function's own `# Safety` precondition,
+    // forwarded verbatim.
+    let rc = unsafe {
+        raw::reply_and_receive(
+            &mut index,
+            handles.as_ptr(),
+            handle_count,
+            reply_to,
+            timeout.unwrap_or(TIMEOUT_INFINITE),
+        )
+    };
+
+    // Read before the result code is inspected: the kernel writes the index on
+    // the session-closed path too, and that is the only place the identity of
+    // the closed session appears. The clamp covers the paths that signal no
+    // member at all, where the kernel leaves the slot untouched.
+    // `index` is clamped at zero and the count it indexes came from a `usize`,
+    // so the widening back cannot lose anything.
+    let signalled = index.max(0) as usize;
+
+    RawResult::from_raw(rc).map((), |rc| match rc.description() {
+        desc if KError::SessionClosed == desc => {
+            ReplyAndReceiveError::SessionClosed { index: signalled }
+        }
+        desc if KError::TimedOut == desc => ReplyAndReceiveError::TimedOut,
+        desc if KError::Cancelled == desc => ReplyAndReceiveError::Cancelled,
+        desc if KError::TerminationRequested == desc => ReplyAndReceiveError::TerminationRequested,
+        desc if KError::InvalidHandle == desc => ReplyAndReceiveError::InvalidHandle,
+        desc if KError::OutOfRange == desc => ReplyAndReceiveError::OutOfRange,
+        desc if KError::ReceiveListBroken == desc => ReplyAndReceiveError::ReceiveListBroken,
+        _ => ReplyAndReceiveError::Unknown(rc.into()),
+    })?;
+
+    Ok(signalled)
+}
+
+/// Error returned by [`reply_and_receive`].
+#[derive(Debug, thiserror::Error)]
+pub enum ReplyAndReceiveError {
+    /// A session in the wait set was closed by the process on its other end.
+    ///
+    /// The expected end of every session's life rather than a fault: `index`
+    /// names the closed member of the wait set, and a server responds by
+    /// closing that handle and dropping it from the set. No message was
+    /// received, so nothing is owed a reply.
+    #[error("Session at index {index} was closed by its client")]
+    SessionClosed {
+        /// Position in the wait set of the session that closed.
+        index: usize,
+    },
+    /// The timeout elapsed with nothing signalled.
+    #[error("Timed out")]
+    TimedOut,
+    /// Another thread cancelled this wait.
+    ///
+    /// Occurs when a thread issues the cancel-synchronization SVC against the
+    /// waiting thread, which is how a server is asked to stop. No message was
+    /// received and the wait set is unchanged.
+    #[error("Wait cancelled")]
+    Cancelled,
+    /// The waiting thread is terminating.
+    #[error("Termination requested")]
+    TerminationRequested,
+    /// The wait set holds a handle that is neither a session nor a port, or the
+    /// reply target does not name a live session.
+    #[error("Invalid handle")]
+    InvalidHandle,
+    /// The wait set exceeds the number of handles the kernel accepts.
+    #[error("Handle count out of range")]
+    OutOfRange,
+    /// The reply did not fit the receive list the client supplied.
+    ///
+    /// Reports a mismatch between the pointer data the reply carries and the
+    /// buffers the client reserved for it, so the reply was not delivered.
+    #[error("Receive list broken")]
+    ReceiveListBroken,
+    /// The wait set does not fit the count the SVC takes.
+    ///
+    /// Detected before the syscall, so no reply was sent and no message
+    /// received.
+    #[error("Wait set of {count} handles does not fit the syscall's count")]
+    TooManyHandles {
+        /// Number of handles the caller supplied.
+        count: usize,
+    },
+    /// Unexpected kernel error.
+    #[error("Unknown error: {0}")]
+    Unknown(Error),
+}
+
+impl ToResultCode for ReplyAndReceiveError {
+    fn to_rc(self) -> ResultCode {
+        match self {
+            Self::SessionClosed { .. } => KError::SessionClosed.to_rc(),
+            Self::TimedOut => KError::TimedOut.to_rc(),
+            Self::Cancelled => KError::Cancelled.to_rc(),
+            Self::TerminationRequested => KError::TerminationRequested.to_rc(),
+            Self::InvalidHandle => KError::InvalidHandle.to_rc(),
+            Self::TooManyHandles { .. } | Self::OutOfRange => KError::OutOfRange.to_rc(),
+            Self::ReceiveListBroken => KError::ReceiveListBroken.to_rc(),
+            Self::Unknown(err) => err.to_raw(),
+        }
+    }
+}
+
+impl _sealed::Sealed for ReplyAndReceiveError {}
