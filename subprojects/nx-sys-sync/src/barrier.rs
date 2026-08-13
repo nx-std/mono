@@ -106,7 +106,9 @@ impl Barrier {
             });
         } else {
             *count = count.checked_add(1).expect("Barrier count overflow");
-            self.condvar.wait(&self.mutex);
+            // SAFETY: this thread took `self.mutex` at the top of the call and has not released
+            // it, so it holds the lock the wait releases and reacquires.
+            unsafe { self.condvar.wait(&self.mutex) };
         }
 
         self.mutex.unlock();

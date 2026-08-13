@@ -151,8 +151,8 @@ impl ReentrantMutex {
 
     /// Waits on a condition variable while holding this reentrant mutex.
     ///
-    /// Used by libsysbase's `__syscall_cond_wait_recursive`. The mutex must be held
-    /// exactly once (counter == 1) for this operation to succeed.
+    /// Used by libsysbase's `__syscall_cond_wait_recursive`. The calling thread must hold the
+    /// mutex exactly once (counter == 1) for this operation to succeed.
     ///
     /// # Errors
     ///
@@ -165,8 +165,14 @@ impl ReentrantMutex {
         condvar: &super::Condvar,
         timeout: Option<core::time::Duration>,
     ) -> Result<nx_svc::result::ResultCode, NotHeldOnceError> {
-        // SAFETY: the caller holds the lock, or the count read here says it does not and nothing
-        // is touched.
+        // The recursion count belongs to whoever holds the inner mutex. Read from a thread that
+        // does not hold it, it races with the owner and reports the owner's nesting depth as if
+        // it were the caller's, so ownership is what decides this first.
+        if !self.mutex.is_locked_by_current_thread() {
+            return Err(NotHeldOnceError { held: 0 });
+        }
+
+        // SAFETY: the inner mutex is held by this thread, so nothing else reaches the count.
         let counter = unsafe { *self.counter.get() };
         if counter != 1 {
             return Err(NotHeldOnceError { held: counter });
@@ -179,7 +185,9 @@ impl ReentrantMutex {
         // only one that can reach the count until the wait releases it.
         unsafe { *self.counter.get() = 0 };
 
-        let result = condvar.wait_timeout(&self.mutex, timeout);
+        // SAFETY: this thread was observed to hold `self.mutex` above and nothing since has
+        // released it, which is the ownership the wait requires.
+        let result = unsafe { condvar.wait_timeout(&self.mutex, timeout) };
 
         // SAFETY: the wait returns with the inner mutex reacquired by this thread, so the count is
         // once again reachable only from here.

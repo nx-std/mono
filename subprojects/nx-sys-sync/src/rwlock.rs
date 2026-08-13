@@ -95,7 +95,9 @@ impl RwLock {
         #[allow(clippy::while_immutable_condition)]
         while *write_waiter_count > 0 {
             *read_waiter_count += 1;
-            self.condvar_reader_wait.wait(&self.mutex);
+            // SAFETY: this thread took `self.mutex` above and has not released it, so it holds
+            // the lock the wait releases and reacquires.
+            unsafe { self.condvar_reader_wait.wait(&self.mutex) };
             *read_waiter_count -= 1;
         }
 
@@ -225,7 +227,9 @@ impl RwLock {
         #[allow(clippy::while_immutable_condition)]
         while *read_lock_count > 0 {
             *write_waiter_count += 1;
-            self.condvar_writer_wait.wait(&self.mutex);
+            // SAFETY: this thread took `self.mutex` above and has not released it, so it holds
+            // the lock the wait releases and reacquires.
+            unsafe { self.condvar_writer_wait.wait(&self.mutex) };
             *write_waiter_count -= 1;
         }
 

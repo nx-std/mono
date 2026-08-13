@@ -63,8 +63,11 @@ pub unsafe extern "C" fn __nx_sys_sync__condvar_wait_timeout(
     // the call.
     let mutex = unsafe { &*mutex };
     // SAFETY: the caller guarantees `condvar` points to a live, initialized object that outlives
-    // the call, and that this thread holds `mutex`.
-    unsafe { &*condvar }.wait_timeout(mutex, nx_svc::sync::timeout_from_raw(timeout))
+    // the call.
+    let condvar = unsafe { &*condvar };
+    // SAFETY: the caller guarantees this thread holds `mutex`, which is the ownership the wait
+    // requires.
+    unsafe { condvar.wait_timeout(mutex, nx_svc::sync::timeout_from_raw(timeout)) }
 }
 
 /// Waits on a condition variable indefinitely
@@ -101,8 +104,11 @@ pub unsafe extern "C" fn __nx_sys_sync__condvar_wait(
     // the call.
     let mutex = unsafe { &*mutex };
     // SAFETY: the caller guarantees `condvar` points to a live, initialized object that outlives
-    // the call, and that this thread holds `mutex`.
-    unsafe { &*condvar }.wait_timeout(mutex, None)
+    // the call.
+    let condvar = unsafe { &*condvar };
+    // SAFETY: the caller guarantees this thread holds `mutex`, which is the ownership the wait
+    // requires.
+    unsafe { condvar.wait(mutex) }
 }
 
 /// Wakes up a specified number of threads waiting on a condition variable.
