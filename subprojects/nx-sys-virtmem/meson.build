@@ -10,10 +10,6 @@ cargo = find_program('cargo', required : true)
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-rand
-nx_rand_proj = subproject('nx-rand')
-nx_rand_dep = nx_rand_proj.get_variable('nx_rand_dep')
-
 # nx-svc
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
@@ -25,7 +21,6 @@ nx_sys_sync_dep = nx_sys_sync_proj.get_variable('nx_sys_sync_dep')
 # Dependencies list
 deps = [
     nx_panic_handler_dep,
-    nx_rand_dep,
     nx_svc_dep,
     nx_sys_sync_dep,
 ]

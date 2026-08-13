@@ -13,8 +13,11 @@ cargo = find_program('cargo', required : true)
 # resolves to a single choice, so the value is always unambiguous. The `none`
 # choice selects the background-sysmodule profile: no Application Manager
 # identity, the AM handshake skipped.
+# `RUSTFLAGS` replaces the `.cargo/config.toml` list rather than adding to it, so
+# `getrandom_backend` is repeated here: without it `getrandom` has no backend for
+# this target and fails to build.
 cargo_env = {
-    'RUSTFLAGS' : '--cfg nso_applet_type="' + get_option('nso_applet_type') + '"',
+    'RUSTFLAGS' : '--cfg nso_applet_type="' + get_option('nso_applet_type') + '" --cfg getrandom_backend="custom"',
 }
 
 cargo_features = []

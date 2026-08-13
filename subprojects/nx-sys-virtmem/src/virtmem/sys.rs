@@ -8,7 +8,6 @@ use core::{
     ptr::NonNull,
 };
 
-use nx_rand::sys::next_u64;
 use nx_svc::mem::{
     self,
     MemoryType,
@@ -17,6 +16,10 @@ use nx_svc::mem::{
 use nx_sys_sync::data::{
     Mutex,
     MutexGuard,
+};
+use rand::{
+    TryRng as _,
+    rngs::SysRng,
 };
 
 use super::reservation::{
@@ -232,7 +235,11 @@ impl VirtmemState {
         for _ in 0..RANDOM_MAX_ATTEMPTS {
             // Calculate a random memory range outside reserved areas
             let region = loop {
-                let page_offset = (next_u64() as usize) % (aslr_max_page_offset + 1);
+                // A system source that cannot produce entropy leaves no way to place the range,
+                // and the C caller sees only a null return, so the reason is dropped here rather
+                // than at the boundary.
+                let entropy = SysRng.try_next_u64().ok()?;
+                let page_offset = (entropy as usize) % (aslr_max_page_offset + 1);
                 let addr = region.start + (page_offset << 12);
 
                 let region = MemRegion::new(addr, addr + size);

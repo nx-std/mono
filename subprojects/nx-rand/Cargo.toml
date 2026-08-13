@@ -13,10 +13,16 @@ bench = false
 [features]
 # Enable the __nx_rand FFI
 ffi = []
+# Defines `__getrandom_v03_custom`, the symbol `getrandom` resolves this target's entropy through,
+# which is what makes `rand::rngs::SysRng` work anywhere in the workspace. The symbol is
+# `#[no_mangle]`, so exactly one static library in a program turns this on, on the same terms as
+# `ffi`. See docs/code/rust-process-wide-state.md.
+getrandom-backend = []
 
 [dependencies]
+chacha20 = { version = "0.10", default-features = false, features = ["rng"] }
+getrandom = { version = "0.4", default-features = false }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
-rand = { version = "0.8", default-features = false }
-rand_chacha = { version = "0.3", default-features = false }
+nx-sys-sync = { version = "0.1.0", path = "../nx-sys-sync" }
 thiserror = { version = "2.0", default-features = false }

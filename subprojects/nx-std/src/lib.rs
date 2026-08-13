@@ -14,10 +14,6 @@ pub extern crate nx_alloc; // Provides #[global_allocator]
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
-#[cfg(feature = "rand")]
-pub mod rand {
-    pub use nx_rand::*;
-}
 #[cfg(feature = "env")]
 pub mod env;
 #[cfg(feature = "fs")]
