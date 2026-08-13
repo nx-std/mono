@@ -44,10 +44,27 @@ endif
 nx_std_sync_proj = subproject('nx-std-sync')
 nx_std_sync_dep = nx_std_sync_proj.get_variable('nx_std_sync_dep')
 
-# zlib
-# The netloader protocol sends a program as a deflate stream, so the runner
-# needs an inflate to receive one.
-zlib_dep = dependency('zlib', method : 'pkg-config', static : true, required : true)
+# nx-netloader
+# The runner serves the netloader protocol through this crate. It stands on the
+# Rust socket driver rather than on libnx's, so `use_nx_sys_net` has to be on:
+# with it off the driver the crate talks to is never initialized and every call
+# reports a socket that was never connected. Fail configuration early instead of
+# letting the runner come up unable to listen.
+if not get_option('use_nx_sys_net').enabled()
+    error('nx-tests requires -Duse_nx_sys_net=enabled (currently @0@)'.format(get_option('use_nx_sys_net')))
+endif
+
+# The netloader writes what it receives through the Rust filesystem API, which reaches a device by
+# resolving the path against the descriptor registry. A device registered from C is held there only
+# as a name: it is dispatched by C through the devoptab table, so its Rust `Device` methods are the
+# trait's defaults and opening a path on one reports the operation as unsupported. So the SD card
+# has to be served by the Rust device, not libnx's.
+if not get_option('use_nx_fsdev').enabled()
+    error('nx-tests requires -Duse_nx_fsdev=enabled (currently @0@): the netloader opens files through the Rust filesystem device, and a device registered from C cannot serve one'.format(get_option('use_nx_fsdev')))
+endif
+
+nx_netloader_proj = subproject('nx-netloader')
+nx_netloader_dep = nx_netloader_proj.get_variable('nx_netloader_dep')
 
 #---------------------------------------------------------------------------------
 # Build options
@@ -103,15 +120,14 @@ bundle_base = [
 # keeps its own dependencies to what serving the protocol costs.
 name = 'nx-tests'
 src = files(
+    'source/rig.h',
     'source/runner/handback.h',
     'source/runner/ledger.h',
     'source/runner/ledger.c',
-    'source/runner/netloader.h',
-    'source/runner/netloader.c',
     'source/runner/main.c',
 )
 elf = executable(name + '.elf', src,
-                 dependencies : [nx_dep, zlib_dep],
+                 dependencies : [nx_dep, nx_netloader_dep],
                  c_args : c_opts, cpp_args : cpp_opts,
                  link_args : ld_base + ['-Wl,-Map,@0@/@1@.map'.format(meson.current_build_dir(), name)],
                  pie : true)
@@ -135,6 +151,7 @@ custom_target(name + '.nro',
 # to libnx, which is the baseline to compare our implementation against.
 name = 'nx-tests-rand'
 src = files(
+    'source/rig.h',
     'source/suites/handback.h',
     'source/suites/tap.h',
     'source/suites/tap.c',
@@ -163,6 +180,7 @@ custom_target(name + '.nro',
 # off the runtime is libnx's own, the baseline to compare against.
 name = 'nx-tests-rt'
 src = files(
+    'source/rig.h',
     'source/suites/handback.h',
     'source/suites/tap.h',
     'source/suites/tap.c',
@@ -191,6 +209,7 @@ custom_target(name + '.nro',
 # so the detach cases fail there by construction rather than by regression.
 name = 'nx-tests-thread'
 src = files(
+    'source/rig.h',
     'source/suites/handback.h',
     'source/suites/tap.h',
     'source/suites/tap.c',
@@ -224,6 +243,7 @@ custom_target(name + '.nro',
 # baseline to compare against.
 name = 'nx-tests-sync'
 src = files(
+    'source/rig.h',
     'source/suites/handback.h',
     'source/suites/tap.h',
     'source/suites/tap.c',
@@ -292,6 +312,7 @@ custom_target(name + '.nro',
 # implementation against.
 name = 'nx-tests-fs'
 src = files(
+    'source/rig.h',
     'source/suites/handback.h',
     'source/suites/tap.h',
     'source/suites/tap.c',
@@ -352,6 +373,7 @@ custom_target(name + '.nro',
 # the baseline to compare against.
 name = 'nx-tests-net'
 src = files(
+    'source/rig.h',
     'source/suites/handback.h',
     'source/suites/tap.h',
     'source/suites/tap.c',

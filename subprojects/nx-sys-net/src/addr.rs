@@ -85,17 +85,21 @@ pub fn decode(raw: &RawSockAddr) -> Result<SocketAddr, DecodeAddrError> {
         return Err(DecodeAddrError::NoAddress);
     }
 
-    // The two layouts keep their family byte in different places, because one opens with a length
-    // byte and the other does not, so each is looked for where its own layout puts it.
+    // Two conventions put the family in different places, and which one the service answers in is
+    // not something this layer gets to decide, so both are recognised.
     //
-    // Only one can match. An IPv4 address carries its own length, 16, in the byte an IPv6 address
-    // carries the family in, and 16 is not a family this reads; an IPv6 address carries its padding
-    // byte, zero, where an IPv4 address carries the family. Neither value is the other's.
+    // The older one opens with a length byte and gives the family the second: `[16, 2, ...]` for
+    // IPv4. The other has no length and makes the family a two-byte word: `[2, 0, ...]` for the
+    // same address. They cannot be confused, because the first byte is a length in one and a family
+    // in the other, and no length this reads is also a family it reads.
+    //
+    // Only the leading pair differs. Every field after it sits at the same offset under both, which
+    // is why one structure decodes either once the family is known.
     match (bytes.first(), bytes.get(1)) {
         (Some(&AF_INET6), _) => decode_v6(bytes),
         (_, Some(&AF_INET)) => decode_v4(bytes),
-        // Neither position named a family, so the leading byte is the most this can report: it is
-        // the family for one layout and a length for the other, and nothing here says which.
+        (Some(&AF_INET), Some(0)) => decode_v4(bytes),
+        // Neither convention named a family this layer decodes.
         (Some(&leading), _) => Err(DecodeAddrError::UnknownFamily { family: leading }),
         (None, _) => Err(DecodeAddrError::Truncated { len: bytes.len() }),
     }

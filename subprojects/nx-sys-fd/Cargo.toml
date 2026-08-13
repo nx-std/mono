@@ -13,6 +13,10 @@ bench = false
 [features]
 # Enable the __nx_sys_fd FFI
 ffi = []
+# Borrow the process-wide registry and default device from another static library instead of
+# defining them. Exactly one static library in a program leaves this off. Must not be combined with
+# `ffi`. See docs/code/rust-process-wide-state.md.
+extern-state = []
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }

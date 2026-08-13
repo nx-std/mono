@@ -19,6 +19,7 @@ use nx_service_bsd::{
     BsdSockFd,
     CommandError,
     FcntlOp,
+    PosixError,
     RecvFlags,
     SendFlags,
     StatusFlags,
@@ -258,6 +259,28 @@ impl Socket {
         session::with_service(|svc| svc.close_fd(fd))
             .map_err(|_| CloseFailed::NotConnected)?
             .map_err(CloseFailed::Service)
+    }
+}
+
+impl Error {
+    /// Whether the operation refused because a non-blocking socket had nothing to report.
+    ///
+    /// The one condition a caller polling a non-blocking socket must tell apart from every other,
+    /// because it is not a failure: it means "ask again", and it arrives on every idle look at an
+    /// accept, a receive or a send. `std` answers the same question with
+    /// `io::ErrorKind::WouldBlock`.
+    ///
+    /// Without this, a caller has to match through this type into the service crate's error and
+    /// then into its condition enum, which is three crates deep for a question every polling loop
+    /// asks.
+    pub fn is_would_block(&self) -> bool {
+        matches!(
+            self,
+            Self::Service(CommandError::Service {
+                source: PosixError::WouldBlock,
+                ..
+            })
+        )
     }
 }
 

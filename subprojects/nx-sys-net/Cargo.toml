@@ -13,6 +13,13 @@ bench = false
 [features]
 # Enable the __nx_sys_net FFI
 ffi = []
+# Borrow the process-wide session from another static library instead of defining it.
+#
+# For an application library compiled into its own archive alongside the one that owns the driver.
+# Exactly one static library in a program leaves this off; every other one turns it on. Must not be
+# combined with `ffi`, whose `#[no_mangle]` entry points would collide. See the crate documentation,
+# "Process-wide when the process links this crate twice".
+extern-state = []
 
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }

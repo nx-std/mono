@@ -18,7 +18,7 @@
 
 // For the directory the test rig keeps its files in: a suite's report belongs
 // beside the programs the runner received and the run it is recording.
-#include "../runner/netloader.h"
+#include "../rig.h"
 
 /** @brief The version of the protocol this reports in. */
 #define TAP_VERSION_LINE "TAP version 14\n"
@@ -220,12 +220,12 @@ static void tap_write_document(FILE* file, int host_fd, const char* suite)
  */
 static FILE* tap_open_file(const char* suite)
 {
-    if (mkdir(NETLOADER_DROP_DIR, 0777) != 0 && errno != EEXIST) {
+    if (mkdir(RIG_DIR, 0777) != 0 && errno != EEXIST) {
         return NULL;
     }
 
     char path[256];
-    const int written = snprintf(path, sizeof(path), "%s/%s.tap", NETLOADER_DROP_DIR, suite);
+    const int written = snprintf(path, sizeof(path), "%s/%s.tap", RIG_DIR, suite);
     if (written < 0 || (size_t)written >= sizeof(path)) {
         return NULL;
     }

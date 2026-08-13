@@ -50,6 +50,49 @@
 //! initializes the socket driver before calling anything, and a lazy connect would paper over the
 //! omission with a config nobody chose.
 //!
+//! ## "Process-wide" when the process links this crate twice
+//!
+//! The session above is a `static`, and a `static` is only process-wide if the crate holding it is
+//! linked once. That is the ordinary case: every Rust crate in this workspace reaches a program
+//! through the single umbrella static library, so there is one compilation and one slot.
+//!
+//! It stops being the ordinary case as soon as a program links a static library of its own. An
+//! application library that wants sockets -- a netloader, a telemetry client -- takes this crate as
+//! a dependency and is compiled into its own archive. Cargo resolves features per build, and two
+//! builds that disagree on a feature produce two crate hashes; a `static` is mangled with that hash,
+//! so the program ends up with two slots. The half that ran `socketInitialize` fills one, and the
+//! half that calls [`Socket::open`] reads the other and finds nothing.
+//!
+//! **That failure is silent.** Nothing is reported at link time, because the two symbols are
+//! genuinely different symbols. It surfaces at run time as [`Error::NotConnected`] from a driver the
+//! program did initialize, which reads as a bug anywhere except where it is.
+//!
+//! ### The `extern-state` feature
+//!
+//! So the slot has a spelled-out symbol rather than a mangled one, and the crate can be built to
+//! borrow it rather than define it:
+//!
+//! - **Default:** the session is defined here. The static library that owns the driver -- the one
+//!   whose `socketInitialize` runs -- is built this way.
+//! - **`extern-state`:** the session is *declared* and resolved by the linker to the definition in
+//!   the other archive. Every other static library in the program is built this way.
+//!
+//! **Exactly one static library in a program may leave `extern-state` off.** Two definitions is a
+//! duplicate-symbol error, which is loud and easily fixed; zero is an undefined-symbol error, which
+//! is equally loud. Both are better than the silent version this replaces, and that is the point of
+//! spelling the symbol out: it converts a runtime mystery into a link-time complaint.
+//!
+//! ### What a consumer must not do
+//!
+//! A build with `extern-state` must not also enable `ffi`. The C surface is `#[no_mangle]`
+//! throughout, so a second archive carrying it collides on every entry point. The division is the
+//! same one the session follows: one archive owns the driver and exposes it to C, and the others
+//! borrow it from Rust.
+//!
+//! `extern-state` must never change the layout of anything it touches. The two builds agree on
+//! [`nx_service_bsd::BsdService`]'s layout because they are the same source at the same version, and
+//! that is the whole of the guarantee; a feature that altered a field would break it silently.
+//!
 //! ## The service's error numbering is not the caller's
 //!
 //! The BSD service was built against Linux's error numbering and the C library here uses newlib's.

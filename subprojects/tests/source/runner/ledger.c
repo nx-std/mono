@@ -7,10 +7,10 @@
 
 // For the directory the runner keeps its files in: the programs it receives and
 // this run's results live in the same place.
-#include "netloader.h"
+#include "../rig.h"
 
 /** @brief The file the run is kept in between the runner's own lifetimes. */
-#define LEDGER_PATH NETLOADER_DROP_DIR "/results.log"
+#define LEDGER_PATH RIG_DIR "/results.log"
 
 /**
  * @brief Writes the run out, so the next start of the runner can read it back.
@@ -22,7 +22,7 @@
  */
 static void ledger_save(const Ledger* ledger)
 {
-    if (mkdir(NETLOADER_DROP_DIR, 0777) != 0 && errno != EEXIST) {
+    if (mkdir(RIG_DIR, 0777) != 0 && errno != EEXIST) {
         return;
     }
 
