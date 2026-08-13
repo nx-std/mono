@@ -17,16 +17,10 @@
 //! flag does, may read it directly and check the width the interface reports back.
 
 use nx_service_sm::SmService;
-use nx_sf::{
-    error::{
-        ResultCode,
-        ToResultCode,
-    },
-    service::{
-        BorrowedSessionHandle,
-        DispatchError,
-        Session,
-    },
+use nx_sf::service::{
+    BorrowedSessionHandle,
+    DispatchError,
+    Session,
 };
 
 mod cmif;
@@ -217,8 +211,9 @@ pub enum GetColorSetIdError {
     UnknownTheme(#[source] UnknownColorSetId),
 }
 
-impl ToResultCode for GetColorSetIdError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetColorSetIdError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             Self::UnknownTheme(_) => nx_sf::error::GENERIC_ERROR,
@@ -247,8 +242,9 @@ pub enum GetSettingsItemValueU64Error {
     },
 }
 
-impl ToResultCode for GetSettingsItemValueU64Error {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetSettingsItemValueU64Error {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             Self::UnexpectedWidth { .. } => nx_sf::error::GENERIC_ERROR,
@@ -277,8 +273,9 @@ pub fn connect_sys_cmif(sm: &SmService) -> Result<SetSysService, ConnectSysCmifE
 #[error("failed to get set:sys service")]
 pub struct ConnectSysCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
 
-impl ToResultCode for ConnectSysCmifError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ConnectSysCmifError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         self.0.to_rc()
     }
 }
@@ -304,8 +301,9 @@ pub fn connect_sys_tipc(sm: &SmService) -> Result<SetSysService, ConnectSysTipcE
 #[error("failed to get set:sys service")]
 pub struct ConnectSysTipcError(#[source] pub nx_service_sm::GetServiceTipcError);
 
-impl ToResultCode for ConnectSysTipcError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ConnectSysTipcError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         self.0.to_rc()
     }
 }

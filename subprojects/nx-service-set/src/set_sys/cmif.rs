@@ -2,10 +2,6 @@
 
 use nx_sf::{
     cmif,
-    error::{
-        ResultCode,
-        ToResultCode,
-    },
     hipc::OutPointer,
     service::{
         BorrowedSessionHandle,
@@ -79,8 +75,9 @@ pub enum GetFirmwareVersionError {
     ParseResponse(#[source] cmif::ParseError),
 }
 
-impl ToResultCode for GetFirmwareVersionError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetFirmwareVersionError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::SendRequest(err) => err.to_rc(),
             Self::ParseResponse(err) => err.to_rc(),

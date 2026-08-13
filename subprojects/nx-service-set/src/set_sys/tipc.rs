@@ -4,10 +4,6 @@
 //! which is used on HOS 12.0.0+ and by Atmosphere.
 
 use nx_sf::{
-    error::{
-        ResultCode,
-        ToResultCode,
-    },
     hipc::{
         BufferMode,
         OutputBuffer,
@@ -79,8 +75,9 @@ pub enum GetFirmwareVersionError {
     ParseResponse(#[source] tipc::ParseResponseError),
 }
 
-impl ToResultCode for GetFirmwareVersionError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetFirmwareVersionError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::SendRequest(err) => err.to_rc(),
             Self::ParseResponse(err) => err.to_rc(),

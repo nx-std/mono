@@ -7,15 +7,9 @@
 //! [`set:sys`]: crate::set_sys
 
 use nx_service_sm::SmService;
-use nx_sf::{
-    error::{
-        ResultCode,
-        ToResultCode,
-    },
-    service::{
-        DispatchError,
-        Session,
-    },
+use nx_sf::service::{
+    DispatchError,
+    Session,
 };
 
 mod cmif;
@@ -180,7 +174,7 @@ impl SetService {
 }
 
 /// Error returned by [`SetService::get_language_code`] and
-/// [`SetService::make_language_code`].
+/// [`SetService::get_language_code_for`].
 #[derive(Debug, thiserror::Error)]
 pub enum GetLanguageCodeError {
     /// The command failed
@@ -198,8 +192,9 @@ pub enum GetLanguageCodeError {
     InvalidCode(#[source] InvalidLanguageCode),
 }
 
-impl ToResultCode for GetLanguageCodeError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetLanguageCodeError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             Self::InvalidCode(_) => nx_sf::error::GENERIC_ERROR,
@@ -277,8 +272,9 @@ pub enum GetAvailableLanguageCodesError {
     InvalidCode(#[source] InvalidLanguageCode),
 }
 
-impl ToResultCode for GetAvailableLanguageCodesError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetAvailableLanguageCodesError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             Self::InvalidCode(_) => nx_sf::error::GENERIC_ERROR,
@@ -303,8 +299,9 @@ pub enum GetRegionCodeError {
     UnknownRegion(#[source] UnknownRegionCode),
 }
 
-impl ToResultCode for GetRegionCodeError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for GetRegionCodeError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         match self {
             Self::Dispatch(err) => err.to_rc(),
             Self::UnknownRegion(_) => nx_sf::error::GENERIC_ERROR,
@@ -331,8 +328,9 @@ pub fn connect_cmif(sm: &SmService) -> Result<SetService, ConnectCmifError> {
 #[error("failed to get the set service")]
 pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
 
-impl ToResultCode for ConnectCmifError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ConnectCmifError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         self.0.to_rc()
     }
 }
@@ -360,8 +358,9 @@ pub fn connect_tipc(sm: &SmService) -> Result<SetService, ConnectTipcError> {
 #[error("failed to get the set service")]
 pub struct ConnectTipcError(#[source] pub nx_service_sm::GetServiceTipcError);
 
-impl ToResultCode for ConnectTipcError {
-    fn to_rc(self) -> ResultCode {
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for ConnectTipcError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
         self.0.to_rc()
     }
 }
