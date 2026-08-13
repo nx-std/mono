@@ -135,4 +135,5 @@ members = [
 ]
 
 [workspace.dependencies]
+nx-object = { git = "https://github.com/nx-std/nx-object.git", rev = "d9b2c686b5dc133fdfb6d497b93c7269749c5f09", default-features = false }
 zerocopy = { version = "0.8", default-features = false, features = ["derive"] }

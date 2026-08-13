@@ -45,7 +45,7 @@ nvmap = ["dep:nx-nv", "service-nv"]
 # finding it means reading the file the loader launched.
 # Pulls `service-fs`: that file sits on a mounted device, which only exists once
 # the filesystem session and the SD card mount that feature establishes are up.
-romfs = ["dep:nx-romfs", "dep:nx-std-path", "dep:nx-sys-fd", "service-fs"]
+romfs = ["dep:nx-object", "dep:nx-romfs", "dep:nx-std-path", "dep:nx-sys-fd", "service-fs"]
 # Per-kind hbloader `.crt0` for the opt-in `rustc`-link pipeline. Emits this
 # crate's own `_start` (the homebrew-loader startup ABI). Leave it off on the
 # GCC pipeline, where `_start` still comes from libnx's `switch_crt0.s`.
@@ -115,6 +115,7 @@ sys-virtmem = ["nx-rt-core/sys-virtmem"]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc" }
 nx-fsdev = { version = "0.1.0", path = "../nx-fsdev", optional = true }
 nx-nv = { version = "0.1.0", path = "../nx-nv", optional = true }
+nx-object = { workspace = true, optional = true, features = ["nro"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-romfs = { version = "0.1.0", path = "../nx-romfs", optional = true }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }

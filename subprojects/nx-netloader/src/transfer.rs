@@ -37,6 +37,10 @@ use miniz_oxide::{
         inflate,
     },
 };
+use nx_object::raw::nro::{
+    NRO_MAGIC,
+    NroStart,
+};
 use nx_std::fs::File;
 use nx_std_path::Path;
 use nx_sys_net::Socket;
@@ -281,19 +285,18 @@ fn finish(written: usize, total: usize) -> Result<(), TransferError> {
 /// the loader will refuse anything without this marker, and refusing it here costs a read of a few
 /// bytes rather than a launch that fails on the console with nothing to say why.
 fn looks_like_program(path: &str) -> Result<bool, TransferError> {
-    /// Where the marker sits, past the branch and the header the loader reads first.
-    const MAGIC_OFFSET: u64 = 0x10;
-    /// What every program starts with, at that offset.
-    const MAGIC: &[u8; 4] = b"NRO0";
+    /// Where the marker sits: past the branch stub the loader enters at, which the format puts
+    /// before the header rather than after it.
+    const MAGIC_OFFSET: u64 = size_of::<NroStart>() as u64;
 
     let mut file = File::open(Path::new(path)).map_err(TransferError::Reopen)?;
     file.seek(nx_std::fs::SeekFrom::Start(MAGIC_OFFSET))
         .map_err(TransferError::Reopen)?;
 
-    let mut magic = [0u8; MAGIC.len()];
+    let mut magic = [0u8; size_of::<u32>()];
     let read = file.read(&mut magic).map_err(TransferError::Reopen)?;
 
-    Ok(read == magic.len() && &magic == MAGIC)
+    Ok(read == magic.len() && u32::from_le_bytes(magic) == NRO_MAGIC)
 }
 
 /// Reads the name the host is sending, reduced to its last component.
