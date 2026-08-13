@@ -49,6 +49,13 @@ option(
 )
 
 option(
+    'use_nx_std_env',
+    type : 'feature', value : 'auto',
+    description : 'Enable nx-std-env (the process environment in `std::env` shape)',
+    yield : true
+)
+
+option(
     'use_nx_std_sync',
     type : 'feature', value : 'auto',
     description : 'Override all libnx functions with nx-std-sync functions',
