@@ -14,5 +14,10 @@ bench = false
 bitflags = "2"
 modular-bitfield = "0.11"
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
+nx-service-vi = { version = "0.1.0", path = "../nx-service-vi" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 static_assertions = "1"
+thiserror = { version = "2", default-features = false }
 zerocopy = { workspace = true }

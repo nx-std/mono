@@ -709,86 +709,8 @@ dependencies = [
  "bitflags",
  "modular-bitfield",
  "nx-panic-handler",
- "static_assertions",
- "zerocopy",
-]
-
-[[package]]
-name = "nx-service-capsa"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
- "nx-service-caps",
- "nx-service-sm",
- "nx-sf",
- "nx-sys-thread-tls",
- "static_assertions",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "nx-service-capsc"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
- "nx-service-caps",
- "nx-service-sm",
- "nx-sf",
- "nx-sys-thread-tls",
- "static_assertions",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "nx-service-capsdc"
-version = "0.1.0"
-dependencies = [
- "modular-bitfield",
- "nx-panic-handler",
- "nx-service-sm",
- "nx-sf",
- "nx-sys-thread-tls",
- "static_assertions",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "nx-service-capssc"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
  "nx-service-sm",
  "nx-service-vi",
- "nx-sf",
- "nx-sys-thread-tls",
- "static_assertions",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "nx-service-capssu"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
- "nx-service-sm",
- "nx-sf",
- "nx-sys-thread-tls",
- "static_assertions",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "nx-service-capsu"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
- "nx-service-caps",
- "nx-service-sm",
  "nx-sf",
  "nx-sys-thread-tls",
  "static_assertions",
