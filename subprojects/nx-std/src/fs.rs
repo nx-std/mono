@@ -1,20 +1,17 @@
-//! # nx-std-fs
-//!
 //! Files and directories, addressed by path.
 //!
-//! This crate is the front door [`nx_sys_fd`] has no opinion about. The descriptor table below it
+//! This module is the front door [`nx_sys_fd`] has no opinion about. The descriptor table below it
 //! already defines what a filesystem can do: [`nx_sys_fd::device::Device`] declares `open`,
 //! `rename`, `remove_file` and the rest, and [`nx_sys_fd::device::File`] declares the operations on
 //! an open one. What it does not define is how a caller *reaches* one of those from a path, because
 //! the table's own callers arrive holding a descriptor somebody else opened.
 //!
-//! That gap is this crate. It resolves `"sdmc:/switch/a.nro"` to the device registered as `sdmc`,
+//! That gap is this module. It resolves `"sdmc:/switch/a.nro"` to the device registered as `sdmc`,
 //! hands the rest of the path to it, and wraps what comes back in a type that closes on drop.
 //!
 //! ## Where this sits
 //!
-//! It backs `std::fs`, the way [`nx_std_path`] backs `std::path` and `nx-std-sync` backs
-//! `std::sync`. The layer beneath it, [`nx_sys_fd`], is the platform layer `std::sys` names; the
+//! It is `std::fs`, the way [`nx_std_path`] is `std::path` and `nx_std_sync` is `std::sync`. The layer beneath it, [`nx_sys_fd`], is the platform layer `std::sys` names; the
 //! split between the two is the same one `std` draws, and the names follow it.
 //!
 //! The C standard library reaches the same devices by a different road: newlib calls `libsysbase`,
@@ -28,19 +25,6 @@
 //! that serves it, against the working directory that device holds, which is the arrangement the C
 //! library already established: `chdir("sdmc:/a")` moves the SD card's directory and leaves every
 //! other mount where it was.
-//!
-//! ## no-std
-//!
-//! The crate is `#![no_std]` and uses `alloc` for the boxed file a device hands back; the umbrella
-//! `nx-std` crate owns the single `#[global_allocator]`.
-#![no_std]
-
-extern crate nx_panic_handler as _; // provides #[panic_handler]
-
-// A device hands back its open file as a `Box<dyn File>`.
-extern crate alloc;
-// `nx-alloc` exposes the `#[global_allocator]` backing `alloc` for this crate.
-extern crate nx_alloc as _;
 
 use alloc::boxed::Box;
 

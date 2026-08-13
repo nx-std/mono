@@ -117,7 +117,6 @@ members = [
     "subprojects/nx-sf",
     "subprojects/nx-std",
     "subprojects/nx-std-env",
-    "subprojects/nx-std-fs",
     "subprojects/nx-std-path",
     "subprojects/nx-std-sync",
     "subprojects/nx-svc",

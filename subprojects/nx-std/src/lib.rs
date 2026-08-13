@@ -22,6 +22,8 @@ pub mod rand {
 pub mod env {
     pub use nx_std_env::*;
 }
+#[cfg(feature = "fs")]
+pub mod fs;
 #[cfg(feature = "sync")]
 pub mod sync {
     pub use nx_std_sync::*;

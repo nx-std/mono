@@ -18,9 +18,9 @@ nx_cpu_dep = nx_cpu_proj.get_variable('nx_cpu_dep')
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
-# nx-std-fs
-nx_std_fs_proj = subproject('nx-std-fs')
-nx_std_fs_dep = nx_std_fs_proj.get_variable('nx_std_fs_dep')
+# nx-std
+nx_std_proj = subproject('nx-std')
+nx_std_dep = nx_std_proj.get_variable('nx_std_dep')
 
 # nx-std-path
 nx_std_path_proj = subproject('nx-std-path')
@@ -39,7 +39,7 @@ deps = [
     nx_alloc_dep,
     nx_cpu_dep,
     nx_panic_handler_dep,
-    nx_std_fs_dep,
+    nx_std_dep,
     nx_std_path_dep,
     nx_svc_dep,
     nx_sys_net_dep,

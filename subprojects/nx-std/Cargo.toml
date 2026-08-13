@@ -46,6 +46,16 @@ ffi = [
 # High-level features
 services = ["service-apm", "service-applet", "service-fs", "service-hid", "service-nv", "service-sm", "service-set", "service-sfdnsres", "service-time", "service-vi"]
 
+# Borrow the process-wide state of the crates below instead of defining it. An application library
+# linked alongside the umbrella turns this on and leaves `ffi` off; exactly one static library in a
+# program does the reverse. See docs/code/rust-process-wide-state.md.
+# Every direct dependency here that holds process-wide state carries the feature; one reached only
+# through another crate is forwarded by that crate, as `nx-std-env` forwards to `nx-sys-args`.
+extern-state = [
+    "nx-sys-fd?/extern-state",
+    "nx-sys-net?/extern-state",
+]
+
 # Dependency features
 alloc = ["dep:nx-alloc", "nx-alloc/global-allocator"]
 display = ["dep:nx-display", "service-vi"]
@@ -54,6 +64,8 @@ env = ["dep:nx-std-env", "alloc"]
 # Forwards to `nx-rt-core`, which owns the five resolver symbols that reach
 # `sfdnsres` over the service-manager session it holds.
 net = ["dep:nx-net", "nx-rt-core?/net"]
+# Files and directories addressed by path: the `std::fs` surface over the descriptor table.
+fs = ["sys-fd", "dep:nx-std-path", "dep:thiserror", "alloc"]
 # The filesystem device, replacing libnx's fsdev devoptab layer.
 fsdev = ["dep:nx-fsdev", "sys-fd", "service-fs"]
 pm = ["dep:nx-pm"]
@@ -139,6 +151,8 @@ nx-service-time = { version = "0.1.0", path = "../nx-service-time", optional = t
 nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true }
 nx-sf = { version = "0.1.0", path = "../nx-sf", optional = true }
 nx-std-env = { version = "0.1.0", path = "../nx-std-env", optional = true }
+nx-std-path = { version = "0.1.0", path = "../nx-std-path", optional = true }
+thiserror = { version = "2.0", default-features = false, optional = true }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync", optional = true }
 nx-svc = { version = "0.1.0", path = "../nx-svc", optional = true }
 nx-sys-env = { version = "0.1.0", path = "../nx-sys-env", optional = true }
