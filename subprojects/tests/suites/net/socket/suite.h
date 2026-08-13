@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * @brief Test that a socket descriptor is issued and released.

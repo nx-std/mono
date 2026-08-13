@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * Test rwlock basic read lock functionality in a single thread.

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 /**
 * Test mutex lock and unlock in a single thread.

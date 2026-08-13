@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0001: getaddrinfo with a numeric host returns that address">

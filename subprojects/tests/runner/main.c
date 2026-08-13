@@ -22,7 +22,7 @@
 #include <switch.h>
 
 #include "nx_tests_rig.h"
-#include "handback.h"
+#include "nx_tests_handback.h"
 #include "ledger.h"
 #include <nx_netloader.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * @brief Test that __nx_rand_get fills buffers with random data.

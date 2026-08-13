@@ -4,7 +4,7 @@
 
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * @brief Sleeps the current thread for the given number of milliseconds.

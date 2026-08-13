@@ -4,7 +4,7 @@
 
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "program.h"
 
 //<editor-fold desc="Test 0001: startup cwd is the program directory">

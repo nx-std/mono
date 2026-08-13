@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0002: bind then getsockname reports the address">

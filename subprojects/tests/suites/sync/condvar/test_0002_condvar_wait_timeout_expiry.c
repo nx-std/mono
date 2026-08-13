@@ -1,6 +1,6 @@
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 #define HANDLE_WAIT_MASK 0x40000000
 

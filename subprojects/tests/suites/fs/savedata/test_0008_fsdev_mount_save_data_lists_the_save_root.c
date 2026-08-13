@@ -2,7 +2,7 @@
 
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0008: fsdev mount save data lists the save root">

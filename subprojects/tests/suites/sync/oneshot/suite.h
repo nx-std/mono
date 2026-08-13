@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * Test sending and receiving a value across two threads using a oneshot channel.

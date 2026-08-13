@@ -1,6 +1,6 @@
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0005: open save data opens an account save">

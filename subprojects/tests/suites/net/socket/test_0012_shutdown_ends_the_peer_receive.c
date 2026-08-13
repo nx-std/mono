@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0012: shutdown ends the peer receive">

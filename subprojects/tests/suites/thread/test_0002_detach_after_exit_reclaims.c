@@ -3,7 +3,7 @@
 
 #include <switch.h>
 
-#include "../harness.h"
+#include "nx_tests_harness.h"
 
 //<editor-fold desc="Test 0002: detach after exit reclaims">
 

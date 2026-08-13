@@ -2,7 +2,7 @@
 
 #include <switch.h>
 
-#include "../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * @brief Test that randomGet fills buffers with random data.

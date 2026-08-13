@@ -25,8 +25,8 @@
 
 #include <switch.h>
 
-#include "../handback.h"
-#include "../harness.h"
+#include "nx_tests_handback.h"
+#include "nx_tests_harness.h"
 #include "savedata/suite.h"
 #include "sdmc/suite.h"
 

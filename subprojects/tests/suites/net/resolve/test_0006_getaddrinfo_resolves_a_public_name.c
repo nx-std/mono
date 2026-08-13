@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0006: getaddrinfo resolves a public name">

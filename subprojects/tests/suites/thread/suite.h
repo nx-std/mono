@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * @brief Test that a thread detached while still running self-reclaims on exit.

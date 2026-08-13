@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "nx_sync_oneshot.h"
 
 /**

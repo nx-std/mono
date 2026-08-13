@@ -3,7 +3,7 @@
 
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "program.h"
 
 //<editor-fold desc="Test 0002: a bare path resolves next to the program">

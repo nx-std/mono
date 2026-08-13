@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0007: poll reports readability when data arrives">

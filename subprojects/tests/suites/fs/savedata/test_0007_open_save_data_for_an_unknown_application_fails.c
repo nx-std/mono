@@ -1,6 +1,6 @@
 #include <switch.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0007: open save data for an unknown application fails">

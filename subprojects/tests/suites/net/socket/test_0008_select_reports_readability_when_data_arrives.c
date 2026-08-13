@@ -2,7 +2,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0008: select reports readability when data arrives">

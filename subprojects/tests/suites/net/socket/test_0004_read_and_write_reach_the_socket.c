@@ -2,7 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 #include "fixture.h"
 
 //<editor-fold desc="Test 0004: read and write reach the socket">

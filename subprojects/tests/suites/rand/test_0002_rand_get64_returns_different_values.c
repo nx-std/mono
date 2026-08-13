@@ -1,6 +1,6 @@
 #include <switch.h>
 
-#include "../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * @brief Test that randomGet64 returns different values on consecutive calls.

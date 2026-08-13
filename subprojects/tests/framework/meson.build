@@ -43,6 +43,16 @@ deps = [
 #---------------------------------------------------------------------------------
 nx_tests_framework_inc = include_directories('include')
 
+# The C surface, declared here rather than in each binary that includes it: these
+# arrive with the dependency, so a consumer listing one would be declaring a file
+# it does not own.
+nx_tests_framework_hdrs = files(
+    'include/nx_tests_framework.h',
+    'include/nx_tests_handback.h',
+    'include/nx_tests_harness.h',
+    'include/nx_tests_rig.h',
+)
+
 # Target
 #
 # Built with `ffi` here, unlike every other producer in this workspace. The umbrella crate is what
@@ -71,7 +81,7 @@ nx_tests_framework_tgt = custom_target(
 #---------------------------------------------------------------------------------
 nx_tests_framework_dep = declare_dependency(
     include_directories : nx_tests_framework_inc,
-    sources : nx_tests_framework_tgt,
+    sources : [nx_tests_framework_tgt, nx_tests_framework_hdrs],
     link_with : nx_tests_framework_tgt[0],
     dependencies : deps,
 )

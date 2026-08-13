@@ -19,8 +19,8 @@
 
 #include <switch.h>
 
-#include "../handback.h"
-#include "../harness.h"
+#include "nx_tests_handback.h"
+#include "nx_tests_harness.h"
 #include "suite.h"
 
 /** The one definition of the result table this binary records into. */

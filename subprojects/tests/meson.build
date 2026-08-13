@@ -126,7 +126,6 @@ bundle_base = [
 # keeps its own dependencies to what serving the protocol costs.
 name = 'nx-tests'
 src = files(
-    'runner/handback.h',
     'runner/ledger.h',
     'runner/ledger.c',
     'runner/main.c',
@@ -160,7 +159,6 @@ custom_target(name + '.nro',
 # to libnx, which is the baseline to compare our implementation against.
 name = 'nx-tests-rand'
 src = files(
-    'suites/handback.h',
     'suites/rand/suite.h',
     'suites/rand/test_0001_rand_get_fills_buffers_with_random_data.c',
     'suites/rand/test_0002_rand_get64_returns_different_values.c',
@@ -186,7 +184,6 @@ custom_target(name + '.nro',
 # off the runtime is libnx's own, the baseline to compare against.
 name = 'nx-tests-rt'
 src = files(
-    'suites/handback.h',
     'suites/rt/cwd/program.h',
     'suites/rt/cwd/suite.h',
     'suites/rt/cwd/test_0001_startup_cwd_is_the_program_directory.c',
@@ -212,7 +209,6 @@ custom_target(name + '.nro',
 # so the detach cases fail there by construction rather than by regression.
 name = 'nx-tests-thread'
 src = files(
-    'suites/handback.h',
     'suites/thread/suite.h',
     'suites/thread/test_0001_detach_running_thread_self_reclaims.c',
     'suites/thread/test_0002_detach_after_exit_reclaims.c',
@@ -243,7 +239,6 @@ custom_target(name + '.nro',
 # baseline to compare against.
 name = 'nx-tests-sync'
 src = files(
-    'suites/handback.h',
     'suites/sync/suite.h',
     'suites/sync/mutex/suite.h',
     'suites/sync/mutex/test_0001_mutex_lock_unlock_single_thread.c',
@@ -309,7 +304,6 @@ custom_target(name + '.nro',
 # implementation against.
 name = 'nx-tests-fs'
 src = files(
-    'suites/handback.h',
     'suites/fs/sdmc/fixture.h',
     'suites/fs/sdmc/suite.h',
     'suites/fs/sdmc/test_0001_write_then_read_returns_same_bytes.c',
@@ -367,7 +361,6 @@ custom_target(name + '.nro',
 # the baseline to compare against.
 name = 'nx-tests-net'
 src = files(
-    'suites/handback.h',
     'suites/net/resolve/fixture.h',
     'suites/net/resolve/suite.h',
     'suites/net/resolve/test_0001_getaddrinfo_with_a_numeric_host_returns_that_address.c',

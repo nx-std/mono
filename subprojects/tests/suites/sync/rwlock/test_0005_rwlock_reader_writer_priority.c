@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <switch.h>
-#include "../../harness.h"
+#include "nx_tests_harness.h"
 
 /**
  * Test reader-writer priority scenarios and starvation prevention.
