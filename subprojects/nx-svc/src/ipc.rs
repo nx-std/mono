@@ -32,7 +32,10 @@ use crate::{
         KernelError as KError,
         ToResultCode,
     },
-    raw,
+    raw::{
+        self,
+        Handle as RawHandle,
+    },
     result::{
         Error,
         ResultCode,
@@ -763,6 +766,12 @@ impl _sealed::Sealed for AcceptSessionError {}
 ///
 /// Passing `None` for `timeout` blocks indefinitely.
 ///
+/// The wait set is raw handles rather than a handle newtype because it is
+/// heterogeneous by design: a server waits on its [`PortHandle`] and its
+/// session [`Handle`]s in one call, and no single object type names both.
+/// Build it from `to_raw`, keeping the association from index back to handle
+/// on the caller's side, which is where the returned index is interpreted.
+///
 /// # Safety
 ///
 /// When `reply_target` is `Some`, every descriptor serialized in the TLS IPC
@@ -779,7 +788,7 @@ impl _sealed::Sealed for AcceptSessionError {}
 /// the session that closed and is the normal way a server learns to drop one,
 /// rather than a failure of the call.
 pub unsafe fn reply_and_receive(
-    handles: &[Handle],
+    handles: &[RawHandle],
     reply_target: Option<Handle>,
     timeout: Option<u64>,
 ) -> Result<usize, ReplyAndReceiveError> {
@@ -789,22 +798,19 @@ pub unsafe fn reply_and_receive(
         })?;
 
     let mut index: i32 = 0;
-    // `Handle` is `#[repr(transparent)]` over the raw handle, so a slice of
-    // them already has the layout of the `u32` array the SVC reads.
-    let handles_ptr = handles.as_ptr().cast::<raw::Handle>();
     let reply_to = match reply_target {
         Some(handle) => handle.to_raw(),
         None => raw::INVALID_HANDLE,
     };
 
-    // SAFETY: `index` is a valid mutable pointer for the output, and
-    // `handles_ptr` names `handle_count` consecutive raw handles borrowed for
-    // the call. The TLS message contract is this function's own `# Safety`
-    // precondition, forwarded verbatim.
+    // SAFETY: `index` is a valid mutable pointer for the output, and `handles`
+    // names `handle_count` consecutive raw handles borrowed for the call. The
+    // TLS message contract is this function's own `# Safety` precondition,
+    // forwarded verbatim.
     let rc = unsafe {
         raw::reply_and_receive(
             &mut index,
-            handles_ptr,
+            handles.as_ptr(),
             handle_count,
             reply_to,
             timeout.unwrap_or(TIMEOUT_INFINITE),
