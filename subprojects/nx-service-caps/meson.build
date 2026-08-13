@@ -5,11 +5,28 @@ cargo = find_program('cargo', required : true)
 #---------------------------------------------------------------------------------
 # Dependencies
 #---------------------------------------------------------------------------------
+# Rust dependencies here are just informative so Meson can build the dependencies in the correct order
 nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
+nx_service_sm_proj = subproject('nx-service-sm')
+nx_service_sm_dep = nx_service_sm_proj.get_variable('nx_service_sm_dep')
+
+nx_service_vi_proj = subproject('nx-service-vi')
+nx_service_vi_dep = nx_service_vi_proj.get_variable('nx_service_vi_dep')
+
+nx_sf_proj = subproject('nx-sf')
+nx_sf_dep = nx_sf_proj.get_variable('nx_sf_dep')
+
+nx_sys_thread_tls_proj = subproject('nx-sys-thread-tls')
+nx_sys_thread_tls_dep = nx_sys_thread_tls_proj.get_variable('nx_sys_thread_tls_dep')
+
 deps = [
     nx_panic_handler_dep,
+    nx_service_sm_dep,
+    nx_service_vi_dep,
+    nx_sf_dep,
+    nx_sys_thread_tls_dep,
 ]
 
 #---------------------------------------------------------------------------------
