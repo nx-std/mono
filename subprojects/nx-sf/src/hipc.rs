@@ -121,15 +121,27 @@
 //! Bits 92-95: address[32:35] (4 bits)
 //! ```
 //!
-//! # Server-side request parsing
+//! # Both roles, one module per message
 //!
-//! Only the **client** side of HIPC is implemented in this crate: requests are
-//! built (see [`make_request`] / [`Request`]) and responses are parsed (see
-//! [`parse_response`] / [`Response`]). There is intentionally no
-//! `parse_request` counterpart - `nx-sf` exists to talk *to* Horizon services
-//! from a homebrew client, so the inbound request path the kernel would deliver
-//! to a server is out of scope. If server hosting is added later it will land
-//! in a dedicated module rather than here.
+//! HIPC is symmetric in the messages it carries but not in who trusts what, so
+//! each message kind owns both of its directions:
+//!
+//! | Message | Client does | Server does |
+//! |---|---|---|
+//! | request | builds ([`HipcRequest`]) | parses ([`parse_request`]) |
+//! | response | parses ([`parse_response`]) | builds ([`HipcReply`]) |
+//!
+//! Encoding and decoding sit beside each other because they are two views of
+//! one layout, and the layout types they share live in `wire`. What they do
+//! **not** share is a trust model: a builder emits descriptors derived from
+//! loans the process itself holds, while [`parse_request`] reads a message an
+//! untrusted client wrote, so it validates the declared layout before touching
+//! it and returns a typed error rather than panicking.
+//!
+//! This module is the codec only. Hosting a service - creating a port,
+//! accepting sessions, and driving `ReplyAndReceive` - is not implemented
+//! here; when it lands it will be a module of its own built on these two
+//! paths.
 //!
 //! # Design boundary: synchronous IPC only
 //!
@@ -153,7 +165,6 @@ mod request;
 mod response;
 mod wire;
 
-pub(crate) use self::request::HipcRequestBuilder;
 pub use self::{
     buffer::{
         InOutBuffer,
@@ -163,15 +174,19 @@ pub use self::{
         OutputBuffer,
     },
     request::{
-        HIPC_MAX_DESCRIPTORS,
         HIPC_MAX_RECV_LIST,
-        HipcPayload,
         HipcRequest,
+        RecvList,
+        Request,
+        RequestParseError,
         SendError,
-        WriteError,
+        parse_request,
     },
     response::{
         Envelope,
+        HipcReply,
+        HipcReplyBuilder,
+        REPLY_MESSAGE_TYPE,
         Response,
         ResponseParseError,
         parse_response,
@@ -184,10 +199,18 @@ pub use self::{
     wire::{
         BufferDescriptor,
         BufferMode,
+        HIPC_MAX_DESCRIPTORS,
         Header,
+        HipcPayload,
         MessageType,
+        ProcessId,
         RecvListEntry,
         SpecialHeader,
         StaticDescriptor,
+        WriteError,
     },
+};
+pub(crate) use self::{
+    request::HipcRequestBuilder,
+    wire::write_section,
 };

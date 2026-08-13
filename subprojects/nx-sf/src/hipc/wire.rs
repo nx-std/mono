@@ -1,21 +1,136 @@
-//! Wire-format types and prefix decoding for HIPC.
+//! Wire-format types, prefix decoding, and section writing for HIPC.
 //!
 //! The bitfield structs in this module describe the on-the-wire byte layouts
-//! the kernel reads and writes. Higher-level views (`Response`, request
-//! building) live in the sibling `request`/`response` modules and consume
-//! these types.
+//! the kernel reads and writes. Higher-level views (`Request`, `Response`,
+//! request and reply building) live in the sibling `request`/`response`
+//! modules and consume these types.
+//!
+//! The two directions meet here. A request and a reply share the same prefix
+//! shape, so [`parse_prefix`] decodes it once for both the inbound parser and
+//! the response parser, and [`write_section`] emits a fixed-layout section for
+//! both the request builder and the reply builder.
+//!
+//! Everything either direction needs and neither owns lives here for the same
+//! reason: [`HipcPayload`] because both a request and a reply are parametric
+//! over their data-words encoder, [`WriteError`] because both writers return
+//! it, and [`HIPC_MAX_DESCRIPTORS`] because it is a property of the header
+//! field rather than of a direction. Parking any of them in `request` would
+//! make `response` import from its sibling to reach a fact neither one owns.
 
 #![expect(clippy::identity_op)]
 
-use core::mem::size_of;
+use core::mem::{
+    size_of,
+    size_of_val,
+};
 
 use modular_bitfield::prelude::*;
 use static_assertions::const_assert_eq;
+
+use crate::{
+    cursor::Cursor,
+    error::{
+        GENERIC_ERROR,
+        ResultCode,
+        ToResultCode,
+    },
+};
 
 /// Minimum buffer size required to decode the worst-case HIPC wire prefix:
 /// [`Header`] (8) + [`SpecialHeader`] (4) + sender PID (`u64`, 8) = 20 bytes.
 pub const MIN_PREFIX_BUF_SIZE: usize =
     size_of::<Header>() + size_of::<SpecialHeader>() + size_of::<u64>();
+
+/// Maximum descriptors of any single kind that fit in an HIPC header
+/// (each `num_*` field is 4 bits wide).
+pub const HIPC_MAX_DESCRIPTORS: usize = 15;
+
+/// Encoder for the in-band data-words region of an HIPC message.
+///
+/// HIPC owns the envelope (header, descriptors, handles); the payload owns
+/// everything that goes into the data-words region. Higher-level protocols
+/// (CMIF, TIPC) implement this trait for their wire-format bodies and attach
+/// them to a request or a reply.
+///
+/// # Contract
+///
+/// The writer computes the data-words region as
+/// `encoded_len().next_multiple_of(4)` and hands the impl a `dst` slice of
+/// exactly that length. The region is **not** pre-zeroed: IPC is on the hot
+/// path, and a global fill duplicates writes the impl already performs for its
+/// sections. Bytes in `dst` that the impl does not overwrite (alignment slack,
+/// trailing word padding) are transmitted as-is from the caller's TLS buffer;
+/// well-behaved peers parse by structure layout and ignore them. Impls that
+/// need deterministic wire bytes must zero those regions themselves. Encoding
+/// is infallible: the destination slice is guaranteed large enough by
+/// construction, and CMIF/TIPC wire-format bodies have no other failure modes.
+pub trait HipcPayload {
+    /// Byte length of the encoded payload, **unrounded**.
+    ///
+    /// HIPC rounds this up to the next 4-byte word boundary when sizing the
+    /// data-words region.
+    fn encoded_len(&self) -> usize;
+
+    /// Writes the payload into the data-words region starting at `dst[0]`.
+    ///
+    /// `dst.len()` equals [`encoded_len`](Self::encoded_len) rounded up to a
+    /// 4-byte multiple. The region is **not** pre-zeroed; see the trait-level
+    /// [`Contract`](Self#contract) for the rules governing untouched bytes.
+    fn write_to(&self, dst: &mut [u8]);
+}
+
+impl HipcPayload for () {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        0
+    }
+
+    #[inline]
+    fn write_to(&self, _: &mut [u8]) {}
+}
+
+impl HipcPayload for &[u8] {
+    #[inline]
+    fn encoded_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn write_to(&self, dst: &mut [u8]) {
+        dst[..self.len()].copy_from_slice(self);
+    }
+}
+
+/// Error returned when a destination buffer is too small to hold an encoded
+/// message.
+///
+/// The layout is computed from the accumulated envelope (descriptors, handles,
+/// recv-list, optional special header) plus the payload's data-words region
+/// (sized as `payload.encoded_len().next_multiple_of(4)`). If that total
+/// exceeds the caller-supplied destination buffer's `N` bytes, the writer
+/// returns this instead of emitting a partial message. The fields report the
+/// layout requirement and the buffer capacity, so a caller can either size its
+/// IPC buffer to fit or drop descriptors and payload until it does.
+///
+/// Building a request or a reply is infallible: this only surfaces at
+/// serialization time, when the destination buffer is known. Both directions
+/// return it, which is why it lives here rather than beside either writer.
+#[derive(Debug, thiserror::Error)]
+#[error("message layout requires {needed} bytes, IPC buffer holds {limit}")]
+pub struct WriteError {
+    /// Total bytes the encoded layout requires.
+    pub needed: usize,
+    /// Capacity of the destination buffer.
+    pub limit: usize,
+}
+
+impl ToResultCode for WriteError {
+    fn to_rc(self) -> ResultCode {
+        // Caught before the message went anywhere, so no peer saw it and there
+        // is no service code to forward.
+        GENERIC_ERROR
+    }
+}
 
 /// 4-bit `recv_static_mode` wire encoding.
 ///
@@ -30,9 +145,11 @@ pub const MIN_PREFIX_BUF_SIZE: usize =
 /// - `2 + n` for `n ∈ 1..=13` - per-pointer recv-list of `n` entries; entry
 ///   `i` destinations the `i`-th out-pointer descriptor.
 pub const RECV_LIST_WIRE_NONE: u8 = 0;
-/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `1` ("to message buffer") sits
-/// between these two values; it is a server-side receive pattern with no
-/// client-side constant.
+/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `1`: returned pointer data goes into
+/// the client's TLS message buffer, so no wire slot is reserved.
+pub const RECV_LIST_WIRE_TO_MESSAGE_BUFFER: u8 = 1;
+/// See [`RECV_LIST_WIRE_NONE`]. Wire mode `2` reserves one slot; `2 + n`
+/// reserves `n`.
 pub const RECV_LIST_WIRE_SINGLE_BUFFER: u8 = 2;
 
 /// HIPC message header (8 bytes).
@@ -408,4 +525,181 @@ impl MessageType {
     pub const fn to_raw(self) -> u16 {
         self.0
     }
+}
+
+/// Decodes the wire-level prefix (header + optional special header + optional PID)
+/// from a fixed-size IPC buffer slice, returning the parsed [`Prefix`] and the
+/// remainder of the buffer after the prefix bytes.
+///
+/// # Wire layout
+///
+/// Three valid prefix shapes, selected by two bits in the wire bytes:
+///
+/// ```text
+/// offset:   0                  8              12             20
+///           ┌──────────────────┬──────────────┬──────────────┐
+/// shape A:  │      Header      │ ⋯ payload ⋯
+///           │     (8 bytes)    │
+///           └──────────────────┘
+///           has_special_header = 0
+///
+///           ┌──────────────────┬──────────────┬──────────────┐
+/// shape B:  │      Header      │ SpecialHdr   │ ⋯ payload ⋯
+///           │     (8 bytes)    │  (4 bytes)   │
+///           └──────────────────┴──────────────┘
+///           has_special_header = 1, send_pid = 0
+///
+///           ┌──────────────────┬──────────────┬──────────────┐
+/// shape C:  │      Header      │ SpecialHdr   │  ProcessId   │ ⋯ payload ⋯
+///           │     (8 bytes)    │  (4 bytes)   │  (8 bytes)   │
+///           └──────────────────┴──────────────┴──────────────┘
+///           has_special_header = 1, send_pid = 1
+/// ```
+///
+/// Infallible: the caller supplies a buffer at least [`MIN_PREFIX_BUF_SIZE`]
+/// bytes long (the worst-case prefix), enforced at monomorphization via a
+/// `const` assertion on `N`.
+pub(crate) fn parse_prefix<const N: usize>(buf: &[u8; N]) -> (Prefix, &[u8]) {
+    // Compile-time check: the buffer must fit the worst-case prefix
+    const {
+        assert!(
+            N >= MIN_PREFIX_BUF_SIZE,
+            "parse_prefix buffer must be at least MIN_PREFIX_BUF_SIZE bytes",
+        );
+    }
+
+    let cursor = Cursor::new(buf);
+    // SAFETY: the `const` block above rejects any `N` below
+    // `MIN_PREFIX_BUF_SIZE`, which is `size_of::<Header>()` plus the two
+    // optional sections. The cursor is at offset 0 and a `Header` is the
+    // smallest of the three summands, so `N` bytes remain and the read fits.
+    let (header, cursor) = cursor
+        .read::<Header>()
+        .expect("internal: TLR buffer fits HIPC header");
+    if !header.has_special_header() {
+        return (
+            Prefix {
+                header: *header,
+                extras: None,
+            },
+            cursor.remaining(),
+        );
+    }
+
+    // SAFETY: the `const` block above rejects any `N` below
+    // `MIN_PREFIX_BUF_SIZE`, which counts a `Header` and a `SpecialHeader` and
+    // a PID slot. Exactly one `Header` has been read, so at least the latter
+    // two remain and this read fits.
+    let (special_hdr, cursor) = cursor
+        .read::<SpecialHeader>()
+        .expect("internal: TLR buffer fits special header");
+
+    let (pid, cursor) = if special_hdr.send_pid() {
+        // SAFETY: the `const` block above rejects any `N` below
+        // `MIN_PREFIX_BUF_SIZE`, which counts a `Header` and a `SpecialHeader`
+        // and a PID slot. One of each of the first two has been read, so the
+        // PID slot remains and this read fits.
+        let (pid_ref, cursor) = cursor
+            .read::<ProcessId>()
+            .expect("internal: TLR buffer fits PID");
+        (Some(*pid_ref), cursor)
+    } else {
+        (None, cursor)
+    };
+
+    let prefix = Prefix {
+        header: *header,
+        extras: Some(Extras {
+            num_copy_handles: special_hdr.num_copy_handles(),
+            num_move_handles: special_hdr.num_move_handles(),
+            pid,
+        }),
+    };
+
+    (prefix, cursor.remaining())
+}
+
+/// Parsed wire-level prefix shared by requests and responses.
+///
+/// The three valid prefix shapes on the wire (header only, header + special
+/// header, header + special header + PID) collapse into a single value with
+/// nested `Option`s, so a consumer cannot read the discriminant bits
+/// independently from the bytes they describe.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Prefix {
+    /// Wire-level message header (always present).
+    pub header: Header,
+    /// Optional special header + PID payload. `None` ⇔ the header's
+    /// `has_special_header` bit is clear.
+    pub extras: Option<Extras>,
+}
+
+/// Decoded contents of the special header section.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Extras {
+    /// Number of copy handles (≤ 15, bound by the `B4` bitfield width).
+    pub num_copy_handles: u8,
+    /// Number of move handles (≤ 15, bound by the `B4` bitfield width).
+    pub num_move_handles: u8,
+    /// Sender's process ID, if the `send_pid` bit was set on the wire.
+    pub pid: Option<ProcessId>,
+}
+
+/// Sender's process ID as decoded from the HIPC special header payload.
+///
+/// The HIPC wire layout stores the PID as a native-endian `u64` immediately
+/// after the special header, so the type derives the zerocopy byte-conversion
+/// traits and is decoded in place rather than copied out.
+///
+/// The kernel fills this slot itself on transmission, so a server that reads it
+/// off an inbound request learns which process sent it without trusting the
+/// sender to say.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+)]
+#[repr(transparent)]
+pub struct ProcessId(u64);
+
+impl ProcessId {
+    /// Returns the raw process ID.
+    #[inline]
+    pub const fn to_raw(self) -> u64 {
+        self.0
+    }
+}
+
+/// Writes `value`'s bytes into the prefix of `buf` and returns the tail.
+///
+/// Both writers total their whole layout and compare it against the
+/// destination before emitting a single section, so by the time a section is
+/// written the space for it is already accounted for. That is what makes this
+/// function infallible, and it is a precondition of calling it rather than
+/// something it checks.
+#[inline]
+pub(crate) fn write_section<'a, T>(buf: &'a mut [u8], value: &T) -> &'a mut [u8]
+where
+    T: zerocopy::IntoBytes + zerocopy::Immutable + ?Sized,
+{
+    // SAFETY: `HipcRequest::write_to` and `HipcReply::write_to` both compute
+    // the total encoded length and return `WriteError` unless the destination
+    // holds it, before emitting any section. Every call here is therefore
+    // preceded by a check covering this section, so `buf` holds at least
+    // `size_of_val(value)` bytes and the split cannot panic.
+    let (buf, tail) = buf.split_at_mut(size_of_val(value));
+    // SAFETY: `split_at_mut` above returned a `buf` of exactly
+    // `size_of_val(value)` bytes, which is the length `write_to` requires, so
+    // the only error it can report is unreachable here.
+    value
+        .write_to(buf)
+        .expect("internal: edge check guarantees buffer fits");
+    tail
 }
