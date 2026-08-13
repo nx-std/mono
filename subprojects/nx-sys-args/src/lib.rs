@@ -41,6 +41,17 @@
 //! What it costs is a bound: [`MAX_ARGS`] arguments, past which the rest are
 //! dropped. A growable table would need the allocator this crate exists without.
 //!
+//! ## Which archive owns the command line
+//!
+//! The store is one process-wide `static`, and a program that links this crate
+//! through more than one static library gets one slot per archive unless it is
+//! told otherwise. The entry crate installs the command line, so the archive
+//! that carries the runtime is the one that owns it: that archive leaves
+//! `extern-state` off, and every other turns it on to borrow the same symbol.
+//! Two owners is a duplicate-symbol error and none is an undefined-symbol
+//! error, which is the point — the alternative is a second, permanently empty
+//! command line that nothing reports.
+//!
 //! ## Bytes, not text
 //!
 //! An argument is a byte string. Nothing here validates UTF-8, so a command
