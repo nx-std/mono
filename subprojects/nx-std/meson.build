@@ -59,11 +59,15 @@ if get_option('use_nx_rand').enabled()
     deps_cargo_features += ['rand']
 endif
 
-# nx-std-env
+# nx-std::env — a module of this crate, over the platform crates below it
 if get_option('use_nx_std_env').enabled()
-    nx_std_env_proj = subproject('nx-std-env')
+    nx_sys_args_proj = subproject('nx-sys-args')
+    nx_sys_env_proj = subproject('nx-sys-env')
+    nx_std_path_proj = subproject('nx-std-path')
 
-    deps += nx_std_env_proj.get_variable('nx_std_env_dep')
+    deps += nx_sys_args_proj.get_variable('nx_sys_args_dep')
+    deps += nx_sys_env_proj.get_variable('nx_sys_env_dep')
+    deps += nx_std_path_proj.get_variable('nx_std_path_dep')
 
     debug('env feature: enabled')
     deps_cargo_features += ['env']
