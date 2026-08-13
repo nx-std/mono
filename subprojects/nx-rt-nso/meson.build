@@ -51,12 +51,17 @@ nx_service_applet_dep = nx_service_applet_proj.get_variable('nx_service_applet_d
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
+# nx-sys-args (the command-line store the __argdata__ reader installs into)
+nx_sys_args_proj = subproject('nx-sys-args')
+nx_sys_args_dep = nx_sys_args_proj.get_variable('nx_sys_args_dep')
+
 deps = [
     nx_alloc_dep,
     nx_panic_handler_dep,
     nx_rt_core_dep,
     nx_service_applet_dep,
     nx_svc_dep,
+    nx_sys_args_dep,
 ]
 
 # The main-thread registration step, which `nx-rt-core` owns and builds.

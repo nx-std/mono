@@ -16,9 +16,13 @@ bench = false
 # Pulls `nx-service-applet*?/ffi`: those crates gate their result-code mapping on
 # the feature, and only the adapters below this switch call `to_rc`. A consumer
 # that enables `service-applet` without this compiles none of the mapping.
+# Pulls `nx-sys-args/ffi`: that crate gates the C-style `(argc, argv)` view on
+# the feature, and the only reader of it is the `__system_argc` / `__system_argv`
+# pair below this switch.
 ffi = [
     "nx-sf/ffi",
     "nx-rt-core/ffi",
+    "nx-sys-args/ffi",
     "nx-service-applet?/ffi",
     "nx-service-applet-album?/ffi",
     "nx-service-applet-err?/ffi",
@@ -122,6 +126,7 @@ nx-service-vi = { version = "0.1.0", path = "../nx-service-vi", optional = true 
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-args = { version = "0.1.0", path = "../nx-sys-args" }
 nx-sys-mem = { version = "0.1.0", path = "../nx-sys-mem" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }

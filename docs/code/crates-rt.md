@@ -1,6 +1,6 @@
 ---
 name: "crates-rt"
-description: "One runtime crate per output kind, with the kind resolved by which crate the code lives in rather than by a runtime check, and the kind-agnostic rule binding every layer below. Load when porting a function that branches on output kind, deciding which nx-rt-* crate an entry point belongs to, or reaching for envIsNso or the argv globals from outside the runtime"
+description: "One runtime crate per output kind, with the kind resolved by which crate the code lives in rather than by a runtime check, and the kind-agnostic rule binding every layer below. Load when porting a function that branches on output kind, deciding which nx-rt-* crate an entry point belongs to, reaching for envIsNso from outside the runtime, or looking for where the command line is stored"
 type: "arch"
 scope: "global"
 ---
@@ -98,16 +98,20 @@ to fork a function across entry crates.
 ## 4. Layers Below the Runtime Never Ask
 
 The runtime knows the kind. **Nothing below it may ask.** Device, filesystem, synchronization and service
-crates must not branch on the output kind, must not read the runtime's `argv` globals, and must not depend
-on an `nx-rt-*` crate.
+crates must not branch on the output kind, and must not depend on an `nx-rt-*` crate.
 
 A function that needs the answer is in the wrong crate. Move it up to the runtime rather than teaching the
 layer below to ask.
 
+The command line is not one of those answers. Each entry crate reads it from its own kind-specific source
+and installs it in `nx-sys-args`, which holds it the way `std::sys::args` does: below every caller. A crate
+that wants the arguments calls `nx_sys_args::args()` and needs nothing from the runtime.
+
 ```rust
-// ❌ Bad — a device crate reaching through the C ABI for a fact the runtime holds in Rust.
+// ❌ Bad — a device crate reaching through the C ABI twice over: for the output kind, which
+// only the runtime knows, and for arguments `nx_sys_args::args()` would have handed it.
 // It builds either way, so nothing catches that this reads libnx's state rather than the
-// runtime's whenever the runtime override happens to be off.
+// workspace's whenever the runtime override happens to be off.
 unsafe extern "C" {
     fn envIsNso() -> bool;
     static __system_argc: c_int;
@@ -151,7 +155,8 @@ Before committing a runtime change, verify:
 - [ ] An entry point a kind does not have is omitted from that kind's crate, not defined as an early return
 - [ ] A function that reads no kind-specific fact lives in `nx-rt-core` and is re-exported, not copied per kind
 - [ ] A per-kind difference small enough to pass as an argument is a parameter, not a forked function
-- [ ] No crate below the runtime branches on the output kind or reads the runtime's `argv` globals
+- [ ] No crate below the runtime branches on the output kind
+- [ ] A crate that needs the command line calls `nx_sys_args::args()`, not an entry crate's `__system_argv`
 - [ ] No crate below the runtime depends on an `nx-rt-*` crate, in its manifest or through an `extern "C"` declaration
 - [ ] A workspace symbol is reached through its Rust API, never through the `__nx_*` name the linker exports
 

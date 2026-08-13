@@ -5,19 +5,14 @@
 //! region the process manager maps at the end of the executable) rather than
 //! through a homebrew-loader `argv` pointer.
 //!
-//! [`get_nso_args`] is the NSO-specific `__argdata__` reader; the kind-agnostic
-//! scanner, the parsed-argument store, and the [`Args`] iterator are shared
-//! from [`nx_rt_core::argv`].
+//! [`get_nso_args`] is the NSO-specific `__argdata__` reader; the scanner and
+//! the store that holds the result live in `nx-sys-args`.
 
 use core::{
     ptr,
     slice,
 };
 
-pub use nx_rt_core::argv::{
-    Args,
-    args,
-};
 use nx_svc::mem::query_memory;
 
 /// Byte offset of the argument string within the `__argdata__` region.
@@ -32,30 +27,36 @@ const HEADER_SIZE: usize = 2 * size_of::<u32>();
 /// This function can be called multiple times safely: initialization only
 /// happens once. Subsequent calls are no-ops.
 ///
-/// # Safety
-///
-/// Must be called after the global allocator is initialized.
-pub unsafe fn setup() {
+/// Nothing here allocates, so this needs no heap and may run before one exists.
+pub fn setup() {
     // An NSO sources its arguments from the `__argdata__` region.
-    // SAFETY: called during initialization, after the allocator is up.
-    let args_str = match unsafe { get_nso_args() } {
-        Some(args_str) => args_str,
+    // SAFETY: this runs during initialization, before any other thread exists,
+    // and `__argdata__` is this process's to write.
+    let args = match unsafe { get_nso_args() } {
+        Some(args) => args,
         None => return, // No arguments available.
     };
 
-    nx_rt_core::argv::setup_from(args_str);
+    nx_sys_args::setup_from(args);
 }
 
 /// Reads the NSO command-line arguments from the `__argdata__` region.
 ///
-/// Returns the argument string truncated at its first NUL byte, or `None`
-/// when no argument data is mapped or the `__argdata__` header is empty or
-/// malformed.
+/// Returns the argument string up to and including its first NUL byte, or
+/// `None` when no argument data is mapped, the `__argdata__` header is empty or
+/// malformed, or no NUL terminates the string. The bytes are handed on
+/// unvalidated: an argument the encoding rules do not describe is still an
+/// argument the process manager meant to pass.
+///
+/// The terminator is part of the slice because the scanner writes the last
+/// argument's own terminator into it, and the slice stops there because bytes
+/// past it are buffer capacity rather than argument text.
 ///
 /// # Safety
 ///
-/// Must be called during initialization.
-unsafe fn get_nso_args() -> Option<&'static str> {
+/// Must be called during initialization, before any other thread exists, and
+/// this process must be the only writer of `__argdata__`.
+unsafe fn get_nso_args() -> Option<&'static mut [u8]> {
     unsafe extern "C" {
         /// Linker symbol for the NSO argument data, page-aligned at the end
         /// of the executable.
@@ -91,9 +92,12 @@ unsafe fn get_nso_args() -> Option<&'static str> {
     // the argument-string length.
     let header = argdata_ptr as *const u32;
     // SAFETY: the check above proves the mapped region holds `HEADER_SIZE`
-    // bytes from `argdata_ptr`, and the read-write check proves they are
-    // readable.
+    // bytes from `argdata_ptr`, which covers this first `u32`, and the
+    // read-write check proves they are readable.
     let argdata_allocsize = unsafe { *header.add(0) } as usize;
+    // SAFETY: the check above proves the mapped region holds `HEADER_SIZE`
+    // bytes from `argdata_ptr`, which is exactly the two `u32`s this is the
+    // second of, and the read-write check proves they are readable.
     let argdata_strsize = unsafe { *header.add(1) } as usize;
     if argdata_allocsize == 0 || argdata_strsize == 0 {
         return None;
@@ -110,26 +114,31 @@ unsafe fn get_nso_args() -> Option<&'static str> {
         return None;
     }
 
-    // SAFETY: the two checks above bound `ARGS_OFFSET + argdata_strsize`
-    // within the mapped allocation, so the string bytes are all readable.
+    // SAFETY: the two checks above bound `ARGS_OFFSET + argdata_strsize` within
+    // the mapped allocation, so this offset stays inside the same object as
+    // `argdata_ptr`.
     let args_ptr = unsafe { argdata_ptr.add(ARGS_OFFSET) };
-    let args_slice = unsafe { slice::from_raw_parts(args_ptr, argdata_strsize) };
+
+    // SAFETY: the same two checks prove `argdata_strsize` bytes from `args_ptr`
+    // lie within the mapped allocation, and the read-write check above proves
+    // they are both readable and writable. The process manager maps the region
+    // before this process runs, so they are initialized, and the mapping lives
+    // as long as the process does. This runs during initialization with no
+    // other thread in existence, and `__argdata__` belongs to this process
+    // alone, so the exclusive borrow aliases nothing.
+    let args_slice = unsafe { slice::from_raw_parts_mut(args_ptr.cast_mut(), argdata_strsize) };
 
     // `argdata_strsize` is the upper bound on the readable region, not the
     // exact content length: it may count the NUL terminator or be a buffer
-    // capacity. `libnx`'s `argvSetup` walks the argument string with a
-    // `while (*i)` loop, treating the NUL as authoritative; mirror that here.
+    // capacity. The startup ABI walks the argument string until its NUL,
+    // treating that as authoritative; mirror it here. Bytes past the NUL are
+    // buffer capacity, not arguments, and may be uninitialized or garbage.
+    // The bounds checks above keep `argdata_strsize` as the memory-safety
+    // bound; the NUL is the content terminator.
     //
-    // Locate the content terminator in the raw bytes *before* UTF-8
-    // validation, then validate only the content prefix. Bytes past the NUL
-    // are buffer capacity, not arguments, and may be uninitialized or garbage;
-    // validating them would let a single non-UTF-8 trailing byte fail
-    // `from_utf8` and silently drop *every* argument. The bounds checks above
-    // keep `argdata_strsize` as the memory-safety bound; the NUL is the
-    // content terminator.
-    let end = args_slice
-        .iter()
-        .position(|&b| b == 0)
-        .unwrap_or(args_slice.len());
-    core::str::from_utf8(&args_slice[..end]).ok()
+    // A region with no NUL has no terminator to hand the scanner, and looking
+    // past `argdata_strsize` for one would leave the bound established above.
+    // Report no arguments instead.
+    let end = args_slice.iter().position(|&byte| byte == 0)?;
+    Some(&mut args_slice[..=end])
 }

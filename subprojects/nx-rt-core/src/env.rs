@@ -132,11 +132,15 @@ pub fn heap_override() -> Option<(NonNull<c_void>, usize)> {
     state.heap_override
 }
 
-/// Get argv string pointer if present
-pub fn argv() -> Option<*const c_char> {
+/// The argument string the startup source supplied, if it supplied one.
+///
+/// Handed out as the mutable buffer the loader gave this process, because that
+/// is what it is: the entry crate that installs the command line terminates
+/// each argument in place rather than copying the string somewhere writable.
+pub fn argv() -> Option<NonNull<c_char>> {
     // SAFETY: ENV_STATE is initialized once via init_once() and is read-only after that.
     let state = unsafe { ENV_STATE.get_ref() };
-    state.argv.map(|ptr| ptr.as_ptr() as *const c_char)
+    state.argv
 }
 
 /// Which syscalls the startup source said this process may issue.

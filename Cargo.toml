@@ -120,6 +120,7 @@ members = [
     "subprojects/nx-std-path",
     "subprojects/nx-std-sync",
     "subprojects/nx-svc",
+    "subprojects/nx-sys-args",
     "subprojects/nx-sys-fd",
     "subprojects/nx-sys-mem",
     "subprojects/nx-sys-net",

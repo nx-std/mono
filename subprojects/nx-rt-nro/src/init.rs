@@ -83,9 +83,7 @@ pub unsafe fn init(
     nx_rt_core::init::setup_heap();
     nx_rt_core::init::init_main_thread();
 
-    // SAFETY: the heap is up, which is what the argument scanner allocates
-    // from, and no other thread exists to race the parse.
-    let _nxlink_host = unsafe { argv::setup() };
+    let _nxlink_host = argv::setup();
     #[cfg(feature = "ffi")]
     // SAFETY: the arguments were just parsed, which is what leaves something
     // to publish.
