@@ -10,6 +10,11 @@ test = false
 doctest = false
 bench = false
 
+[features]
+# Enable the __nx_sys_env FFI: redirects newlib's environment surface at this
+# crate's store, so C and Rust share one environment instead of keeping two.
+ffi = []
+
 [dependencies]
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }

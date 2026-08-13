@@ -1582,6 +1582,7 @@ dependencies = [
  "nx-std-env",
  "nx-std-sync",
  "nx-svc",
+ "nx-sys-env",
  "nx-sys-fd",
  "nx-sys-mem",
  "nx-sys-net",
