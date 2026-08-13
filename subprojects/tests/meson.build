@@ -54,6 +54,15 @@ if not get_option('use_nx_sys_net').enabled()
     error('nx-tests requires -Duse_nx_sys_net=enabled (currently @0@)'.format(get_option('use_nx_sys_net')))
 endif
 
+# The netloader writes what it receives through the Rust filesystem API, which reaches a device by
+# resolving the path against the descriptor registry. A device registered from C is held there only
+# as a name: it is dispatched by C through the devoptab table, so its Rust `Device` methods are the
+# trait's defaults and opening a path on one reports the operation as unsupported. So the SD card
+# has to be served by the Rust device, not libnx's.
+if not get_option('use_nx_fsdev').enabled()
+    error('nx-tests requires -Duse_nx_fsdev=enabled (currently @0@): the netloader opens files through the Rust filesystem device, and a device registered from C cannot serve one'.format(get_option('use_nx_fsdev')))
+endif
+
 nx_netloader_proj = subproject('nx-netloader')
 nx_netloader_dep = nx_netloader_proj.get_variable('nx_netloader_dep')
 

@@ -215,9 +215,13 @@ fn inflate_to_file(
         recv_exact(sock, &mut compressed[..announced])?;
 
         // One chunk can inflate to more than the output buffer holds, so it is fed until the
-        // decompressor has taken all of it.
+        // decompressor has taken all of it -- and then once more with nothing left to give it,
+        // because the end of the stream is a status it reports on a call of its own rather than
+        // alongside the last bytes it consumed. Stopping as soon as the chunk was consumed would
+        // leave that status unread and send the loop back to wait for a chunk the host already
+        // finished sending.
         let mut taken = 0usize;
-        while taken < announced {
+        loop {
             let result = inflate(
                 &mut state,
                 &compressed[taken..announced],
