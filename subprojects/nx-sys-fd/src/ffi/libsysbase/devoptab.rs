@@ -64,7 +64,6 @@ use super::{
         ToErrno as _,
     },
     handle,
-    path,
     reent::Reent,
 };
 use crate::{
@@ -75,6 +74,7 @@ use crate::{
         MAX_DEVICES,
         SeekFrom,
     },
+    path,
     registry,
     table,
 };
