@@ -152,7 +152,7 @@ Required data represented as `Option` forces every consumer to handle a `None` t
 
 ## Pragmatism Caveat
 
-Not every struct needs a builder. A struct with 2-3 required fields all available at construction time is clearer with a plain `new()`. Use a builder when construction is genuinely complex: many fields, a mix of required and optional, or an order that matters. Prefer a staged builder of distinct concrete types when misuse would be a serious bug; a runtime `build() -> Result` is fine for attribute-style objects where a clear error value suffices.
+Not every struct needs a builder. A struct with 2-3 required fields all available at construction time is clearer with a plain `new()`. Use a builder when construction is genuinely complex: many fields, a mix of required and optional, or an order that matters. Prefer a staged builder of distinct concrete types when misuse would be a serious bug and the required fields arrive in a fixed order, and a fluent typestate builder when they are independent ([pattern-builder-fluent](pattern-builder-fluent.md)); a runtime `build() -> Result` is fine for attribute-style objects where a clear error value suffices.
 
 ## Checklist
 
@@ -162,10 +162,12 @@ Before committing code, verify:
 - [ ] Builder's `build()` method validates all required fields are set
 - [ ] Consumers of the built type never unwrap fields that the builder guarantees
 - [ ] Simple structs with few required fields use `new()` instead of a builder
-- [ ] Staged builders of distinct concrete types (not a generic builder carrying `PhantomData` markers) considered for
-      safety-critical construction where compile-time enforcement is warranted
+- [ ] Staged builders of distinct concrete types considered for safety-critical construction where compile-time
+      enforcement is warranted, with a fluent typestate builder where the required fields are independent rather
+      than ordered ([pattern-builder-fluent](pattern-builder-fluent.md))
 
 ## References
 
 - [principle-type-driven-design](principle-type-driven-design.md) - Foundation: Design principle this pattern implements
 - [pattern-typestate](pattern-typestate.md) - Related: Type-state pattern used for compile-time builder enforcement
+- [pattern-builder-fluent](pattern-builder-fluent.md) - Related: A sealed marker module per required field, so an incomplete builder has no terminal method
