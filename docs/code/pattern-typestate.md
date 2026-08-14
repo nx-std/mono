@@ -15,6 +15,8 @@ A struct that guards transitions with a status enum and runtime assertions catch
 
 Model each state as its own concrete struct (`ReservedPages` → `MappedPages` → `ReleasedPages`), not as a generic `Pages<S>` carrying a `PhantomData` marker. Concrete structs give each state a name that appears in signatures, error messages, and rustdoc, and let a state hold exactly the fields it owns without threading type parameters through every caller.
 
+That holds for a lifecycle: an ordered handful of states, each carrying different data, all of them nameable. A builder tracking `N` independently-set required fields is the other shape — `2^N` states over one set of data, which no set of names can enumerate — and it is governed by [pattern-builder-fluent](pattern-builder-fluent.md).
+
 ## Examples
 
 ```rust
@@ -112,7 +114,7 @@ Not every stateful object needs typestate. An object with two states, or simple 
 Before committing code, verify:
 
 - [ ] State transitions consume `self` (move semantics) to prevent reuse of the old state
-- [ ] Each state is a distinct concrete struct that only exposes operations valid for that state, not a generic wrapper parameterized by a `PhantomData` marker
+- [ ] Each lifecycle state is a distinct concrete struct that only exposes operations valid for that state, not a generic wrapper parameterized by a `PhantomData` marker (a builder tracking construction completeness is the exception: [pattern-builder-fluent](pattern-builder-fluent.md))
 - [ ] No runtime assertions (`assert!`, `panic!`) for state validity that the type system could enforce
 - [ ] State-specific data is only present in the types where it exists (e.g., `handle` only in `MappedPages`)
 - [ ] Simple two-state objects or FFI-facing types use status enums when typestate adds unnecessary complexity
@@ -121,3 +123,5 @@ Before committing code, verify:
 
 - [principle-type-driven-design](principle-type-driven-design.md) - Foundation: Design principle this pattern implements
 - [pattern-builder](pattern-builder.md) - Related: Builder pattern can use typestate for compile-time required field enforcement
+- [pattern-builder-fluent](pattern-builder-fluent.md) - Related: The construction-completeness case, where the states are `2^N` marker parameters rather than named lifecycle structs
+- [pattern-trait-sealed](pattern-trait-sealed.md) - Related: Closing a marker trait to this crate, which the lifecycle case does not need because concrete types already close the state set
