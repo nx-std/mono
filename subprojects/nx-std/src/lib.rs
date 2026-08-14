@@ -28,12 +28,12 @@ pub mod sync {
 pub mod time {
     pub use nx_time::*;
 }
-// One entry crate per output kind, and a link takes exactly one of them: the
+// One entry crate per launch path, and a link takes exactly one of them: the
 // homebrew-loader runtime or the `pm`-launched process runtime. The Meson
 // `nx_rt_kind` combo picks which, so only its module is compiled in.
-#[cfg(feature = "rt-nro")]
-pub mod rt_nro {
-    pub use nx_rt_nro::*;
+#[cfg(feature = "rt-hbapp")]
+pub mod rt_hbapp {
+    pub use nx_rt_hbapp::*;
 }
 #[cfg(feature = "rt-nso")]
 pub mod rt_nso {

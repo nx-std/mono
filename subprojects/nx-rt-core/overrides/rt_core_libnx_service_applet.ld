@@ -9,8 +9,8 @@
  * feature is active.
  *
  * The applet-type-sourcing entry points (appletInitialize, appletGetAppletType,
- * __nx_applet_type) are deliberately NOT aliased here — each output-kind entry
- * crate (nx-rt-nro, nx-rt-nso) owns those.
+ * __nx_applet_type) are deliberately NOT aliased here — each entry crate
+ * (nx-rt-hbapp, nx-rt-nso) owns those.
  *
  * The `libapplet*` launcher surface is aliased here for the same reason: every
  * function in libnx's applets/libapplet.c dispatches through the same zeroed

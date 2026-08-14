@@ -29,7 +29,7 @@ ffi = [
     "nx-rand?/getrandom-backend",
     "nx-romfs?/ffi",
     "nx-rt-core?/ffi",
-    "nx-rt-nro?/ffi",
+    "nx-rt-hbapp?/ffi",
     "nx-rt-nso?/ffi",
     "nx-service-sm?/ffi",
     "nx-sf?/ffi",
@@ -79,36 +79,37 @@ rand = ["dep:nx-rand"]
 # `fsdev`: the image's bytes are read through a mounted device, and the fsp-srv
 # session both reach for lives in that crate. Forwards to whichever entry crate
 # is in the link, which owns the one entry point that depends on the output kind.
-romfs = ["dep:nx-romfs", "fsdev", "nx-rt-nro?/romfs", "nx-rt-nso?/romfs"]
+romfs = ["dep:nx-romfs", "fsdev", "nx-rt-hbapp?/romfs", "nx-rt-nso?/romfs"]
 rt = ["dep:nx-rt-core"]
+# The entry crate for the homebrew loader handoff; mutually exclusive with `rt-nso`.
+rt-hbapp = ["dep:nx-rt-hbapp", "rt"]
 # Per-kind `.crt0` for the opt-in `rustc`-link pipeline. Forwards to whichever
 # entry crate is in the link, because the `_start` it emits only reaches the
 # binary through this crate: the entry crates build as rlibs, and a feature set
 # on their own cargo invocation does not travel to the staticlib linked here.
-rt-link = ["nx-rt-nro?/rt-link", "nx-rt-nso?/rt-link"]
-rt-nro = ["dep:nx-rt-nro", "rt"]
+rt-link = ["nx-rt-hbapp?/rt-link", "nx-rt-nso?/rt-link"]
 rt-nso = ["dep:nx-rt-nso", "rt"]
-service-apm = ["dep:nx-service-apm", "nx-rt-nro?/service-apm"]
-service-applet = ["dep:nx-service-applet", "nx-rt-nro?/service-applet"]
-# No `dep:` entry: each library applet's FFI surface lives in `nx-rt-nro`, so the
-# umbrella only forwards the feature rather than linking the crate itself.
-service-applet-album = ["nx-rt-nro?/service-applet-album"]
-service-applet-err = ["nx-rt-nro?/service-applet-err"]
-service-applet-friends = ["nx-rt-nro?/service-applet-friends"]
-service-applet-hid = ["nx-rt-nro?/service-applet-hid"]
-service-applet-mii = ["nx-rt-nro?/service-applet-mii"]
-service-applet-nfp = ["nx-rt-nro?/service-applet-nfp"]
-service-applet-pctlauth = ["nx-rt-nro?/service-applet-pctlauth"]
-service-applet-psel = ["nx-rt-nro?/service-applet-psel"]
+service-apm = ["dep:nx-service-apm", "nx-rt-hbapp?/service-apm"]
+service-applet = ["dep:nx-service-applet", "nx-rt-hbapp?/service-applet"]
+# No `dep:` entry: each library applet's FFI surface lives in `nx-rt-hbapp`, so
+# the umbrella only forwards the feature rather than linking the crate itself.
+service-applet-album = ["nx-rt-hbapp?/service-applet-album"]
+service-applet-err = ["nx-rt-hbapp?/service-applet-err"]
+service-applet-friends = ["nx-rt-hbapp?/service-applet-friends"]
+service-applet-hid = ["nx-rt-hbapp?/service-applet-hid"]
+service-applet-mii = ["nx-rt-hbapp?/service-applet-mii"]
+service-applet-nfp = ["nx-rt-hbapp?/service-applet-nfp"]
+service-applet-pctlauth = ["nx-rt-hbapp?/service-applet-pctlauth"]
+service-applet-psel = ["nx-rt-hbapp?/service-applet-psel"]
 service-bsd = ["dep:nx-service-bsd"]
-service-fs = ["dep:nx-service-fs", "nx-rt-nro?/service-fs"]
-service-hid = ["dep:nx-service-hid", "nx-rt-nro?/service-hid"]
-service-nv = ["dep:nx-service-nv", "nx-rt-nro?/service-nv"]
-service-set = ["dep:nx-service-set", "nx-rt-nro?/service-set"]
+service-fs = ["dep:nx-service-fs", "nx-rt-hbapp?/service-fs"]
+service-hid = ["dep:nx-service-hid", "nx-rt-hbapp?/service-hid"]
+service-nv = ["dep:nx-service-nv", "nx-rt-hbapp?/service-nv"]
+service-set = ["dep:nx-service-set", "nx-rt-hbapp?/service-set"]
 service-sfdnsres = ["dep:nx-service-sfdnsres"]
 service-sm = ["dep:nx-service-sm"]
-service-time = ["dep:nx-service-time", "nx-rt-nro?/service-time"]
-service-vi = ["dep:nx-service-vi", "nx-rt-nro?/service-vi"]
+service-time = ["dep:nx-service-time", "nx-rt-hbapp?/service-time"]
+service-vi = ["dep:nx-service-vi", "nx-rt-hbapp?/service-vi"]
 sf = ["dep:nx-sf"]
 svc = ["dep:nx-svc"]
 sync = ["dep:nx-std-sync", "alloc"]
@@ -127,7 +128,7 @@ sys-mem = [
     "dep:nx-sys-virtmem",
     "alloc",
     "rand",
-    "nx-rt-nro?/sys-virtmem",
+    "nx-rt-hbapp?/sys-virtmem",
     "nx-rt-nso?/sys-virtmem",
 ]
 # The socket driver, replacing libnx's socket.c: the "soc" device plus the BSD C API.
@@ -136,7 +137,7 @@ sys-mem = [
 sys-net = ["dep:nx-sys-net", "sys-fd", "service-bsd", "nx-rt-core?/sys-net"]
 sys-sync = ["dep:nx-sys-sync"]
 # Forwards `sys-thread` to the runtime crate, on the same terms as `sys-mem`.
-sys-thread = ["dep:nx-sys-thread", "nx-rt-nro?/sys-thread", "nx-rt-nso?/sys-thread"]
+sys-thread = ["dep:nx-sys-thread", "nx-rt-hbapp?/sys-thread", "nx-rt-nso?/sys-thread"]
 sys-thread-tls = ["dep:nx-sys-thread-tls"]
 # Threads in `std::thread` shape: the builder, `spawn`, and a `JoinHandle<T>`
 # that yields the closure's value, over the non-generic `nx-sys-thread` layer.
@@ -154,7 +155,7 @@ nx-pm = { version = "0.1.0", path = "../nx-pm", optional = true }
 nx-rand = { version = "0.1.0", path = "../nx-rand", optional = true }
 nx-romfs = { version = "0.1.0", path = "../nx-romfs", optional = true }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core", optional = true }
-nx-rt-nro = { version = "0.1.0", path = "../nx-rt-nro", optional = true }
+nx-rt-hbapp = { version = "0.1.0", path = "../nx-rt-hbapp", optional = true }
 nx-rt-nso = { version = "0.1.0", path = "../nx-rt-nso", optional = true }
 nx-service-apm = { version = "0.1.0", path = "../nx-service-apm", optional = true }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }

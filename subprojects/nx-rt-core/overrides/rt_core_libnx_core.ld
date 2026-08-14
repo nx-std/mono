@@ -3,9 +3,9 @@
  * Redirects the libnx C runtime + Service Manager symbols that every Switch
  * executable kind shares to the Rust FFI implementations in nx-rt-core.
  *
- * Kind-specific entry points (envSetup, argvSetup, __system_argc/argv,
+ * Launch-path-specific entry points (envSetup, argvSetup, __system_argc/argv,
  * __nxlink_host, __nx_applet_type) are deliberately NOT aliased here — each
- * output-kind entry crate (nx-rt-nro, nx-rt-nso, ...) owns those.
+ * entry crate (nx-rt-hbapp, nx-rt-nso, ...) owns those.
  *
  * Organization:
  *   - Rust FFI:  subprojects/nx-rt-core/src/ffi/libnx/*.rs

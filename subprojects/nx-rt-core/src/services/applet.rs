@@ -255,7 +255,7 @@ pub fn process_message(msg: AppletMessage) {
 }
 
 // Each `as_<role>` is public API of the shared applet manager: the
-// per-output-kind entry crates (`nx-rt-nro`, `nx-rt-nso`) consume them from
+// per-launch-path entry crates (`nx-rt-hbapp`, `nx-rt-nso`) consume them from
 // their own FFI shims to route role-gated commands through the typed proxy.
 
 /// Returns a typed handle if the applet is initialized as

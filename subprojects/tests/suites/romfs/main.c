@@ -14,7 +14,7 @@
 // whichever way the build is configured — with `use_nx_romfs` off the `romfs*`
 // surface resolves to libnx and shows what the stock implementation does; with
 // it on, the source-named mounts resolve to `__nx_romfs__*` and
-// `romfsMountSelf` to `__nx_rt_nro__libnx_romfs_mount_self`. Running both is
+// `romfsMountSelf` to `__nx_rt_hbapp__libnx_romfs_mount_self`. Running both is
 // the comparison worth making.
 //
 // One case does not agree across the two, and is meant not to: mounting a name

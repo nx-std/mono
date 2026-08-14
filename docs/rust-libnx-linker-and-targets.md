@@ -213,7 +213,7 @@ nx-rt-core       env-agnostic runtime: .dynamic relocation processing, .bss clea
                  TLS bring-up, init_array / fini_array, panic glue.
                  No _start, no environment assumptions.
 
-nx-rt-nro        homebrew app: _start for hbloader's ABI, parse hbl config entries
+nx-rt-hbapp      homebrew app: _start for hbloader's ABI, parse hbl config entries
                  (heap override, argv, applet type, stdio). -> nx-rt-core
 nx-rt-sysmodule  exefs/NSP sysmodule: _start for pm's launch ABI, own heap via
                  svcSetHeapSize, minimal service profile.            -> nx-rt-core
@@ -250,7 +250,7 @@ With the three foundations in place, the build tool (an extended `cargo-nx`, or 
 carries **no runtime or ABI logic**. Its job becomes pure orchestration:
 
 1. Read `[package.metadata.nx]` and resolve the package type.
-2. Map the package type 1:1 to a runtime crate dependency (`nro` → `nx-rt-nro`,
+2. Map the package type 1:1 to a runtime crate dependency (`nro` → `nx-rt-hbapp`,
    `nsp` → `nx-rt-sysmodule`, `lib` → `nx-rt-module`); inject or verify that dependency.
 3. Build the kind-agnostic ELF.
 4. Pick the post-processor — reuse [`linkle`](https://lib.rs/crates/linkle) /
@@ -270,7 +270,7 @@ Platform layer  (shared, kind-agnostic)
   custom target JSON  ──  one linker script  ──  .crt0 reserved as a fill-in slot
 
 Runtime layer   (the variation point)
-  nx-rt-core  +  exactly one of { nx-rt-nro | nx-rt-sysmodule | nx-rt-module | nx-rt-kip }
+  nx-rt-core  +  exactly one of { nx-rt-hbapp | nx-rt-sysmodule | nx-rt-module | nx-rt-kip }
 
 Application code
   the homebrew / sysmodule / module crate — identical regardless of kind

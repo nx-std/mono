@@ -427,7 +427,7 @@ The final executable link can be driven by one of two pipelines, selected by the
   libnx's `switch.ld` linker script and `switch_crt0.s` startup object.
 - **`rustc`** — the opt-in rustc-driven link pipeline: a custom
   `aarch64-nintendo-horizon.json` target embeds the section layout, and each
-  runtime entry crate (`nx-rt-nro`, `nx-rt-nso`, `nx-rt-kip`) supplies its own
+  runtime entry crate (`nx-rt-hbapp`, `nx-rt-nso`, `nx-rt-kip`) supplies its own
   per-kind `.crt0` via the `rt-link` Cargo feature.
 
 ```bash

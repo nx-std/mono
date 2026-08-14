@@ -267,7 +267,7 @@ The forward-looking design isolates the parts that vary:
   layout (`rust-libnx-linker-and-targets.md` §4.1).
 - **The startup ABI varies by kind.** `_start` differs for the hbloader, the
   `pm` launch path, and kernel launch — so each entry crate owns its own:
-  `nx-rt-nro` (hbloader `_start`), `nx-rt-nso` (`pm` launch `_start`),
+  `nx-rt-hbapp` (hbloader `_start`), `nx-rt-nso` (`pm` launch `_start`),
   `nx-rt-kip` (kernel `_start`). `nx-rt-module` is a loadable module and has
   **no `_start`** — it inherits the host process's entry. All hand off to the
   kind-agnostic `nx-rt-core`.

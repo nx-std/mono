@@ -30,9 +30,9 @@ envSetup = __nx_rt_nso__libnx_env_setup;
  * there — `if (&__libnx_exit)` — so defining it is what keeps `exit()` from
  * falling into the `for (;;)` behind the test.
  *
- * The same pair is aliased by nx-rt-nro's rt_nro_libnx_core.ld. The two never
- * collide: the `nx_rt_kind` option selects one entry crate, so exactly one of
- * the fragments reaches any given final link.
+ * The same pair is aliased by nx-rt-hbapp's rt_hbapp_libnx_core.ld. The two
+ * never collide: the `nx_rt_kind` option selects one entry crate, so exactly
+ * one of the fragments reaches any given final link.
  *
  * `__appInit` and `__appExit` are deliberately absent: this output kind has
  * not taken over the default-service sequence, so the Rust startup order calls

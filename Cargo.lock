@@ -273,23 +273,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nx-rt-kip"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
- "nx-rt-core",
-]
-
-[[package]]
-name = "nx-rt-module"
-version = "0.1.0"
-dependencies = [
- "nx-panic-handler",
- "nx-rt-core",
-]
-
-[[package]]
-name = "nx-rt-nro"
+name = "nx-rt-hbapp"
 version = "0.1.0"
 dependencies = [
  "nx-alloc",
@@ -327,6 +311,22 @@ dependencies = [
  "nx-time",
  "thiserror",
  "zerocopy",
+]
+
+[[package]]
+name = "nx-rt-kip"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-rt-core",
+]
+
+[[package]]
+name = "nx-rt-module"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-rt-core",
 ]
 
 [[package]]
@@ -1577,7 +1577,7 @@ dependencies = [
  "nx-rand",
  "nx-romfs",
  "nx-rt-core",
- "nx-rt-nro",
+ "nx-rt-hbapp",
  "nx-rt-nso",
  "nx-service-apm",
  "nx-service-applet",

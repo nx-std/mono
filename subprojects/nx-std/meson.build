@@ -218,7 +218,7 @@ endif
 # The runtime is split across two crates: the kind-agnostic `nx-rt-core` (heap
 # init, env state, HOS version, Service Manager) and one entry crate for the
 # output kind being built. `nx_rt_kind` picks that entry crate: `nro` builds
-# the homebrew-loader runtime (`nx-rt-nro`: loader-config parser, argv, applet
+# the homebrew-loader runtime (`nx-rt-hbapp`: loader-config parser, argv, applet
 # dispatch), `nso` the `pm`-launched process runtime (`nx-rt-nso`: no loader
 # block, `__argdata__` argv, build-time applet identity). Only one may be
 # linked, since both bind the same `libnx` entry points (`envSetup`,
@@ -256,15 +256,15 @@ if get_option('use_nx_rt').enabled()
         debug('rt-nso feature: enabled')
         deps_cargo_features += ['rt-nso']
     else
-        nx_rt_nro_proj = subproject('nx-rt-nro')
+        nx_rt_hbapp_proj = subproject('nx-rt-hbapp')
 
-        deps += nx_rt_nro_proj.get_variable('nx_rt_nro_dep')
-        foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
+        deps += nx_rt_hbapp_proj.get_variable('nx_rt_hbapp_dep')
+        foreach script : nx_rt_hbapp_proj.get_variable('nx_rt_hbapp_ld_overrides')
             deps_override_link_args += ['-T', script]
         endforeach
 
-        debug('rt-nro feature: enabled')
-        deps_cargo_features += ['rt-nro']
+        debug('rt-hbapp feature: enabled')
+        deps_cargo_features += ['rt-hbapp']
     endif
 
     debug('rt feature: enabled')
@@ -329,7 +329,7 @@ endif
 
 # nx-service-applet-album
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the album
-# applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+# applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and builds it.
 if get_option('use_nx_service_applet_album').enabled()
     debug('service-applet-album feature: enabled')
     deps_cargo_features += ['service-applet-album']
@@ -337,7 +337,7 @@ endif
 
 # nx-service-applet-err
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the error
-# applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+# applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and builds it.
 if get_option('use_nx_service_applet_err').enabled()
     debug('service-applet-err feature: enabled')
     deps_cargo_features += ['service-applet-err']
@@ -345,7 +345,7 @@ endif
 
 # nx-service-applet-friends
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the MyPage
-# applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+# applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and builds it.
 if get_option('use_nx_service_applet_friends').enabled()
     debug('service-applet-friends feature: enabled')
     deps_cargo_features += ['service-applet-friends']
@@ -353,7 +353,7 @@ endif
 
 # nx-service-applet-hid
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the
-# controller applet's FFI lives in `nx-rt-nro`, which pulls the crate in and
+# controller applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and
 # builds it.
 if get_option('use_nx_service_applet_hid').enabled()
     debug('service-applet-hid feature: enabled')
@@ -362,7 +362,7 @@ endif
 
 # nx-service-applet-mii
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the Mii
-# editor applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+# editor applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and builds it.
 if get_option('use_nx_service_applet_mii').enabled()
     debug('service-applet-mii feature: enabled')
     deps_cargo_features += ['service-applet-mii']
@@ -370,7 +370,7 @@ endif
 
 # nx-service-applet-nfp
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the cabinet
-# applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+# applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and builds it.
 if get_option('use_nx_service_applet_nfp').enabled()
     debug('service-applet-nfp feature: enabled')
     deps_cargo_features += ['service-applet-nfp']
@@ -378,7 +378,7 @@ endif
 
 # nx-service-applet-pctlauth
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the auth
-# applet's FFI lives in `nx-rt-nro`, which pulls the crate in and builds it.
+# applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in and builds it.
 if get_option('use_nx_service_applet_pctlauth').enabled()
     debug('service-applet-pctlauth feature: enabled')
     deps_cargo_features += ['service-applet-pctlauth']
@@ -386,8 +386,8 @@ endif
 
 # nx-service-applet-psel
 # No `subproject(...)` entry, mirroring the absent Cargo dependency: the
-# player-select applet's FFI lives in `nx-rt-nro`, which pulls the crate in and
-# builds it.
+# player-select applet's FFI lives in `nx-rt-hbapp`, which pulls the crate in
+# and builds it.
 if get_option('use_nx_service_applet_psel').enabled()
     debug('service-applet-psel feature: enabled')
     deps_cargo_features += ['service-applet-psel']

@@ -1,31 +1,33 @@
 //! # nx-rt-core
 //!
-//! Kind-agnostic foundation for the Nintendo Switch runtime crate family.
+//! Launch-path-agnostic foundation for the Nintendo Switch runtime crate
+//! family.
 //!
-//! `nx-rt-core` holds the runtime machinery that every Switch executable kind
+//! `nx-rt-core` holds the runtime machinery that every Switch executable
 //! shares, regardless of how it is launched or linked: the parsed
 //! environment-state container and its read accessors, heap initialization,
 //! Horizon OS version detection, syscall hints, main-thread TLS setup, the
 //! panic glue, and the Service Manager (`sm`) bootstrap.
 //!
-//! The command line is deliberately absent. Each entry crate reads it from its
-//! own kind-specific source and installs it in `nx-sys-args`, which holds it
-//! the way `std::sys::args` does: below every caller, rather than in the last
-//! crate of the graph where nothing else could reach it.
+//! The command line is deliberately absent. Each entry crate reads it from the
+//! source its own launch path provides and installs it in `nx-sys-args`, which
+//! holds it the way `std::sys::args` does: below every caller, rather than in
+//! the last crate of the graph where nothing else could reach it.
 //!
 //! It deliberately contains **no** process entry point, no
 //! loader-configuration parser, and no Application Manager (applet) logic.
-//! Those concerns belong to the per-output-kind entry crates that depend on
+//! Those concerns belong to the per-launch-path entry crates that depend on
 //! this one.
 //!
 //! ## The runtime crate family
 //!
-//! A Switch binary is exactly one *output kind*: an `NRO`, an `NSO`, a
-//! dynamically loadable module, or a boot-time `KIP`. Each output kind is a
-//! distinct entry crate stacked on top of `nx-rt-core`; a final binary depends
-//! on exactly one entry crate, and that dependency *is* its output kind. The
-//! output kind cannot be a Cargo feature, because features are additive and
-//! unify across a dependency graph: they cannot model mutual exclusivity.
+//! A Switch binary is entered exactly one way: handed over by the homebrew
+//! loader, launched by `pm`, launched by the kernel, or loaded into a running
+//! host process by `ro`. Each of those *launch paths* gets its own entry crate
+//! stacked on top of `nx-rt-core`; a final binary depends on exactly one entry
+//! crate, and that dependency *is* its launch path. The launch path cannot be a
+//! Cargo feature, because features are additive and unify across a dependency
+//! graph: they cannot model mutual exclusivity.
 //!
 //! The *applet type*, the Application Manager identity a process registers as
 //! (`Application`, `SystemApplet`, `LibraryApplet`, `OverlayApplet`,
@@ -37,16 +39,16 @@
 //! processes select it at build time. It always flows as a value into the
 //! applet-init entry point: never as a link-time global.
 //!
-//! ## App-Type / Output-Kind matrix
+//! ## App-Type / Launch-Path matrix
 //!
-//! This table enumerates every Switch executable kind the `nx-rt-*` family
-//! serves, including each applet kind, and maps each to its entry crate and
-//! runtime profile.
+//! This table enumerates every Switch executable the `nx-rt-*` family serves,
+//! including each applet role, and maps each to the entry crate its launch
+//! path selects, and to its runtime profile.
 //!
-//! | App type / kind | Executable | Launched by | Entry crate | Applet type | Applet type sourced | AM behavior |
-//! |-----------------|-----------|-------------|-------------|-------------|---------------------|-------------|
-//! | Homebrew application | NRO | hbloader (hbmenu) | `nx-rt-nro` | `Application` (or `LibraryApplet` on album-launch; `SystemApplication`→`Application` via `ApplicationOverride`) | **Runtime**: hbl `EntryType_AppletType` config | `appletOE` cmd 0 / `appletAE` cmd 200·201 |
-//! | Homebrew library applet | NRO | hbloader / album | `nx-rt-nro` | `LibraryApplet` | **Runtime**: hbl config | `appletAE` cmd 200·201 |
+//! | App type | Executable | Launched by | Entry crate | Applet type | Applet type sourced | AM behavior |
+//! |----------|-----------|-------------|-------------|-------------|---------------------|-------------|
+//! | Homebrew application | NRO | hbloader (hbmenu) | `nx-rt-hbapp` | `Application` (or `LibraryApplet` on album-launch; `SystemApplication`→`Application` via `ApplicationOverride`) | **Runtime**: hbl `EntryType_AppletType` config | `appletOE` cmd 0 / `appletAE` cmd 200·201 |
+//! | Homebrew library applet | NRO | hbloader / album | `nx-rt-hbapp` | `LibraryApplet` | **Runtime**: hbl config | `appletAE` cmd 200·201 |
 //! | Regular application | NSO | `pm` | `nx-rt-nso` | `Application` | **Build time** | `appletOE` cmd 0 |
 //! | System applet (qlaunch) | NSO | `pm` | `nx-rt-nso` | `SystemApplet` | **Build time** | `appletAE` cmd 100 |
 //! | Library applet (system) | NSO | `pm` | `nx-rt-nso` | `LibraryApplet` | **Build time** | `appletAE` cmd 200·201 |
@@ -56,10 +58,13 @@
 //! | Dynamically loadable module | NRO + NRR | `ro` dynamic load | `nx-rt-module` | inherited from host process | n/a | n/a (no own `_start`) |
 //! | Boot-time sysmodule | KIP | kernel | `nx-rt-kip` | `None` | **Build time** | skip AM entirely |
 //!
-//! The entry-crate axis is the output **format**: not the app role and not
-//! the applet type. All six AM identities share the NSO startup ABI, so the
-//! applet type is a runtime-profile sub-axis owned by the NRO and NSO entry
-//! crates, never a fifth, sixth, … entry crate.
+//! The entry-crate axis is the **launch path**: not the output format, not the
+//! app role and not the applet type. The format cannot be the axis, as two rows
+//! above show: both are an `NRO`, but the loader hands one over as a process of
+//! its own while `ro` loads the other into a host process already running. All
+//! six AM identities share the `pm`-launch startup ABI, so the applet type is a
+//! runtime-profile sub-axis owned by the entry crates, never a fifth, sixth, …
+//! entry crate.
 #![no_std]
 
 extern crate alloc;

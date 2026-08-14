@@ -1,8 +1,8 @@
 //! Common FFI helpers shared across the `nx-rt-*` runtime crates.
 //!
-//! `nx-rt-core` is the single authoritative home for the kind-agnostic FFI
+//! `nx-rt-core` is the single authoritative home for the launch-path-agnostic FFI
 //! helpers: the generic error code and the `SyncUnsafeCell` static-storage
-//! wrapper. The per-output-kind entry crates (`nx-rt-nro`, …) re-export these
+//! wrapper. The per-launch-path entry crates (`nx-rt-hbapp`, …) re-export these
 //! from here rather than re-defining them.
 //!
 //! The per-error converters that used to live here are gone: every error now

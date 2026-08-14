@@ -7,7 +7,7 @@
 //!
 //! # Scope of the family
 //!
-//! `nx-rt-core` plus the per-output-kind entry crates (`nx-rt-nro`,
+//! `nx-rt-core` plus the per-launch-path entry crates (`nx-rt-hbapp`,
 //! `nx-rt-nso`, `nx-rt-kip`, `nx-rt-module`), which implement this trait for
 //! the runtime errors they own. It is therefore unsealed, like `nx-sf`'s: the
 //! entry crates are the rest of this family, not foreign implementors, and

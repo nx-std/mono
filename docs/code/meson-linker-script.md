@@ -205,38 +205,38 @@ When a crate's override surface is partitioned — by override target and/or an 
 The `nx-rt-*` runtime family uses this layout. Every fragment targets `libnx`, so each crate's `overrides/` holds one `<crate>_libnx_*.ld` family, mirrored by a single `src/ffi/libnx/` submodule tree:
 
 ```
-subprojects/nx-rt-nro/
+subprojects/nx-rt-hbapp/
 ├── Cargo.toml
 ├── meson.build
 ├── overrides/
-│   ├── rt_nro_libnx_core.ld              # always present
-│   ├── rt_nro_libnx_service_apm.ld
-│   ├── rt_nro_libnx_service_applet.ld
-│   └── rt_nro_libnx_service_<name>.ld    # one per service feature
+│   ├── rt_hbapp_libnx_core.ld              # always present
+│   ├── rt_hbapp_libnx_service_apm.ld
+│   ├── rt_hbapp_libnx_service_applet.ld
+│   └── rt_hbapp_libnx_service_<name>.ld    # one per service feature
 └── src/
     └── ffi/
-        └── libnx/                        # FFI symbols grouped by the same target
+        └── libnx/                          # FFI symbols grouped by the same target
 ```
 
 The Meson wiring conditionally appends fragments based on setup-time options and exposes them as a list:
 
 ```meson
-ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_core.ld']
+ld_overrides = [meson.current_source_dir() / 'overrides' / 'rt_hbapp_libnx_core.ld']
 
 if get_option('use_nx_service_apm').enabled()
     # ... subproject + deps wiring ...
-    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_nro_libnx_service_apm.ld'
+    ld_overrides += meson.current_source_dir() / 'overrides' / 'rt_hbapp_libnx_service_apm.ld'
 endif
 
 # ... one block per service feature ...
 
-nx_rt_nro_ld_overrides = ld_overrides   # plural variable: list of paths
+nx_rt_hbapp_ld_overrides = ld_overrides   # plural variable: list of paths
 ```
 
 Downstream consumers iterate the list when building `-T` arguments:
 
 ```meson
-foreach script : nx_rt_nro_proj.get_variable('nx_rt_nro_ld_overrides')
+foreach script : nx_rt_hbapp_proj.get_variable('nx_rt_hbapp_ld_overrides')
     deps_override_link_args += ['-T', script]
 endforeach
 ```

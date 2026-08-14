@@ -10,9 +10,9 @@
  * appletGetOperationMode, …) is owned by nx-rt-core's
  * rt_core_libnx_service_applet.ld.
  *
- * The __nx_applet_type alias below is also defined by nx-rt-nro's
- * rt_nro_libnx_service_applet.ld. This is not a collision: an NRO build links
- * nx-rt-nro and an NSO build links nx-rt-nso, never both — the two entry
+ * The __nx_applet_type alias below is also defined by nx-rt-hbapp's
+ * rt_hbapp_libnx_service_applet.ld. This is not a collision: an NRO build links
+ * nx-rt-hbapp and an NSO build links nx-rt-nso, never both — the two entry
  * crates are mutually exclusive at link time, so exactly one fragment owns
  * __nx_applet_type in any given final link.
  *

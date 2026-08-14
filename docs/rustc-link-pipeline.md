@@ -9,7 +9,7 @@ target specification, the embedded linker script, and the per-kind `.crt0`.
 > **Status**: partially implemented. The custom target JSON
 > (`aarch64-nintendo-horizon.json`) with its embedded linker script exists, and
 > the per-kind `.crt0` sections described below exist in the entry crates
-> (`nx-rt-nro`, `nx-rt-nso`, `nx-rt-kip`), feature-gated behind `rt-link`. The
+> (`nx-rt-hbapp`, `nx-rt-nso`, `nx-rt-kip`), feature-gated behind `rt-link`. The
 > build orchestration that selects the pipeline per build is future work.
 
 The `rustc` link is **additive and opt-in**, not a cutover. It does not replace
@@ -171,7 +171,7 @@ startup ABI, then hands off to `nx-rt-core`'s kind-agnostic init:
 
 | Entry crate    | `.crt0` startup ABI                       |
 |----------------|-------------------------------------------|
-| `nx-rt-nro`    | hbloader `_start`                         |
+| `nx-rt-hbapp`    | hbloader `_start`                         |
 | `nx-rt-nso`    | `pm` process-launch `_start`              |
 | `nx-rt-kip`    | kernel-launch `_start`                    |
 | `nx-rt-module` | none — a module has no own `_start`       |
