@@ -11,6 +11,9 @@ doctest = false
 bench = false
 
 [dependencies]
+nx-object = { workspace = true, features = ["nro"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-svc = { version = "0.1.0", path = "../nx-svc" }
+nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem" }
+thiserror = { version = "2", default-features = false }

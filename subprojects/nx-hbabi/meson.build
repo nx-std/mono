@@ -15,10 +15,14 @@ nx_sf_dep = nx_sf_proj.get_variable('nx_sf_dep')
 nx_svc_proj = subproject('nx-svc')
 nx_svc_dep = nx_svc_proj.get_variable('nx_svc_dep')
 
+nx_sys_virtmem_proj = subproject('nx-sys-virtmem')
+nx_sys_virtmem_dep = nx_sys_virtmem_proj.get_variable('nx_sys_virtmem_dep')
+
 deps = [
     nx_panic_handler_dep,
     nx_sf_dep,
     nx_svc_dep,
+    nx_sys_virtmem_dep,
 ]
 
 #---------------------------------------------------------------------------------
