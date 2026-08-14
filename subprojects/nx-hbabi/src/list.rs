@@ -30,8 +30,9 @@ pub const MAX_ENTRIES: usize = 48;
 /// How many entries a loader may append with [`push`](ConfigListBuilder::push)
 /// or [`push_mandatory`](ConfigListBuilder::push_mandatory).
 ///
-/// Short of [`MAX_ENTRIES`] by [`RESERVED`], the slots held back for the
-/// entries the builder writes itself. That is what lets those writes be
+/// Short of [`MAX_ENTRIES`] by the four slots held back for the entries the
+/// builder writes itself: the three a loader must supply, and the terminator.
+/// That is what lets those writes be
 /// infallible: no run of pushes can take a slot one of them needs, so there is
 /// no arrangement of calls that drops a required entry or leaves a list
 /// unterminated.
@@ -281,8 +282,8 @@ impl<'a> ConfigListBuilder<'a, heap::Set, main_thread::Set, process::Set> {
     /// nothing. It is borrowed for as long as the list is, because the program
     /// reads it through the pointer this entry carries rather than a copy.
     ///
-    /// Terminating cannot fail for want of room: [`RESERVED`] holds a slot back
-    /// for exactly this entry.
+    /// Terminating cannot fail for want of room: one of the slots held back
+    /// from [`MAX_APPENDED`] is reserved for exactly this entry.
     pub fn build(self, info: &'a [u8]) -> ConfigList<'a> {
         // An empty slice still has a non-null address, so absence is decided on
         // the length rather than on what the slice's pointer happens to be.
@@ -312,9 +313,12 @@ impl<'a, H: heap::State, T: main_thread::State, P: process::State> ConfigListBui
     /// Appends an entry the program must act on or return to the loader over.
     ///
     /// Mark an entry this way when running without it would be worse than not
-    /// running: a service session the program does not use in place of opening
-    /// its own. See the crate docs. The three required entries carry the mark
-    /// already, so they do not go through here.
+    /// running, and when a reader might not recognise the key: the mark is
+    /// read-time and only reaches the branch where the reader cannot act on the
+    /// entry. A service override is the case that pays, since a program that
+    /// skips it opens its own session and bypasses the interposition without
+    /// anything faulting. See the crate docs for what the mark can and cannot
+    /// reach.
     ///
     /// # Panics
     ///
