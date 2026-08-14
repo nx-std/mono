@@ -20,7 +20,7 @@
 //! These impls previously sat on [`nx_svc::error::ToResultCode`]. That trait
 //! answers "which kernel result code describes this failure", and its
 //! implementors are the kernel's own errors. A thread failure is not a kernel
-//! failure: `CreateError::StackTooSmall` and `TsdAllocError::NoSlotsAvailable`
+//! failure: `CreateError::StackTooSmall` and `TsdAllocError`
 //! are this crate's own preconditions, rejected before any SVC is issued. They
 //! borrow a [`KernelError`](nx_svc::error::KernelError) code because it is the
 //! closest thing a C caller can decode - a choice this crate makes, not a fact

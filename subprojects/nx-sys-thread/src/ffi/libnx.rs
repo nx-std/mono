@@ -435,7 +435,7 @@ pub unsafe extern "C" fn __nx_sys_thread__thread_tls_alloc(destructor: Option<De
         // A slot id is below `NUM_TSD_KEYS` (128), well within `i32` range.
         Ok(key) => key.to_raw() as i32,
         // libnx `threadTlsAlloc` reports exhaustion as a negative slot id.
-        Err(tsd::TsdAllocError::NoSlotsAvailable) => -1,
+        Err(tsd::TsdAllocError) => -1,
     }
 }
 

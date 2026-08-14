@@ -486,7 +486,7 @@ pub fn connect_cmif_legacy(
 ) -> Result<NewsServiceLegacy, ConnectCmifLegacyError> {
     let session = sm
         .get_service_handle_cmif(service_type.service_name())
-        .map_err(ConnectCmifLegacyError::GetService)?;
+        .map_err(ConnectCmifLegacyError)?;
 
     let service = Session::new(session, 0);
 
@@ -510,8 +510,5 @@ pub enum ConnectCmifError {
 
 /// Errors returned by [`connect_cmif_legacy`].
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectCmifLegacyError {
-    /// SM lookup for the news service failed.
-    #[error("failed to look up news service via sm")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to look up news service via sm")]
+pub struct ConnectCmifLegacyError(#[source] pub nx_service_sm::GetServiceCmifError);

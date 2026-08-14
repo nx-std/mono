@@ -175,7 +175,7 @@ fn connect_ro_impl(
 pub fn connect_ro_dmnt_cmif(sm: &SmService) -> Result<RoDmntService, ConnectDmntCmifError> {
     let handle = sm
         .get_service_handle_cmif(proto::RO_DMNT_SERVICE_NAME)
-        .map_err(ConnectDmntCmifError::GetService)?;
+        .map_err(ConnectDmntCmifError)?;
 
     let service = Session::new(handle, 0);
 
@@ -195,8 +195,5 @@ pub enum ConnectCmifError {
 
 /// Errors returned by [`connect_ro_dmnt_cmif`].
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectDmntCmifError {
-    /// SM lookup for `ro:dmnt` failed.
-    #[error("failed to look up ro:dmnt service via sm")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to look up ro:dmnt service via sm")]
+pub struct ConnectDmntCmifError(#[source] pub nx_service_sm::GetServiceCmifError);

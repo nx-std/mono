@@ -179,7 +179,7 @@ static TSD_KEYS: RwLock<TsdKeyTable> = RwLock::new(TsdKeyTable::new());
 /// first free slot. When `destructor` is `None` the slot stores the
 /// [`noop_destructor`] sentinel, so the slot still reads as allocated.
 ///
-/// Returns [`TsdAllocError::NoSlotsAvailable`] when every slot is in use.
+/// Returns [`TsdAllocError`] when every slot is in use.
 pub fn alloc(destructor: Option<Destructor>) -> Result<TsdKey, TsdAllocError> {
     // Keys allocated without a user destructor still occupy the slot; the
     // no-op sentinel keeps `Some`/`None` meaning allocated/free.
@@ -204,24 +204,19 @@ pub fn alloc(destructor: Option<Destructor>) -> Result<TsdKey, TsdAllocError> {
 
     match claimed {
         Some(idx) => Ok(TsdKey::from_index(idx)),
-        None => Err(TsdAllocError::NoSlotsAvailable),
+        None => Err(TsdAllocError),
     }
 }
 
 /// Errors returned when allocating a runtime thread-specific-data (TSD) key.
 #[derive(Debug, thiserror::Error)]
-pub enum TsdAllocError {
-    /// Every TSD key slot is already in use.
-    #[error("no free TSD key slots available")]
-    NoSlotsAvailable,
-}
+#[error("no free TSD key slots available")]
+pub struct TsdAllocError;
 
 #[cfg(feature = "ffi")]
 impl ToResultCode for TsdAllocError {
     fn to_rc(self) -> ResultCode {
-        match self {
-            TsdAllocError::NoSlotsAvailable => KernelError::OutOfResource.to_rc(),
-        }
+        KernelError::OutOfResource.to_rc()
     }
 }
 
@@ -279,7 +274,7 @@ pub fn set(key: TsdKey, value: *mut c_void) {
 /// array, then drops the global key entry. Walking the registry takes
 /// `THREAD_MUTEX`, keeping the [`TSD_KEYS`]-then-`THREAD_MUTEX` lock order.
 ///
-/// Returns [`TsdFreeError::UnallocatedSlot`] for a slot that is not currently
+/// Returns [`TsdFreeError`] for a slot that is not currently
 /// allocated.
 ///
 /// # Caller contract: the key must not be in use by other threads
@@ -306,7 +301,7 @@ pub fn free(key: TsdKey) -> Result<(), TsdFreeError> {
     let mut table = TSD_KEYS.write();
 
     if table.keys[idx].is_none() {
-        return Err(TsdFreeError::UnallocatedSlot);
+        return Err(TsdFreeError);
     }
 
     // Clear this slot in every live thread, then drop the global key entry.
@@ -325,19 +320,15 @@ pub fn free(key: TsdKey) -> Result<(), TsdFreeError> {
 }
 
 /// Errors returned when freeing a runtime TSD key.
+/// The key names an in-range slot that was never allocated.
 #[derive(Debug, thiserror::Error)]
-pub enum TsdFreeError {
-    /// The key names an in-range slot that was never allocated.
-    #[error("TSD slot is not allocated")]
-    UnallocatedSlot,
-}
+#[error("TSD slot is not allocated")]
+pub struct TsdFreeError;
 
 #[cfg(feature = "ffi")]
 impl ToResultCode for TsdFreeError {
     fn to_rc(self) -> ResultCode {
-        match self {
-            TsdFreeError::UnallocatedSlot => KernelError::InvalidState.to_rc(),
-        }
+        KernelError::InvalidState.to_rc()
     }
 }
 

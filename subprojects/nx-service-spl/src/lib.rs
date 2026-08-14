@@ -125,7 +125,7 @@ impl SplGeneralService {
 pub fn connect_general_cmif(sm: &SmService) -> Result<SplGeneralService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(GENERAL_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     Ok(SplGeneralService(Session::new(handle, 0)))
 }
@@ -281,7 +281,7 @@ impl SplCryptoService {
 pub fn connect_crypto_cmif(sm: &SmService) -> Result<SplCryptoService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(CRYPTO_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     Ok(SplCryptoService(Session::new(handle, 0)))
 }
@@ -466,7 +466,7 @@ impl SplSslService {
 pub fn connect_ssl_cmif(sm: &SmService) -> Result<SplSslService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(SSL_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     Ok(SplSslService(Session::new(handle, 0)))
 }
@@ -736,7 +736,7 @@ impl SplEsService {
 pub fn connect_es_cmif(sm: &SmService) -> Result<SplEsService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(ES_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     Ok(SplEsService(Session::new(handle, 0)))
 }
@@ -969,7 +969,7 @@ impl SplFsService {
 pub fn connect_fs_cmif(sm: &SmService) -> Result<SplFsService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(FS_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     Ok(SplFsService(Session::new(handle, 0)))
 }
@@ -1123,7 +1123,7 @@ impl SplManuService {
 pub fn connect_manu_cmif(sm: &SmService) -> Result<SplManuService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(MANU_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     Ok(SplManuService(Session::new(handle, 0)))
 }
@@ -1134,7 +1134,5 @@ pub fn connect_manu_cmif(sm: &SmService) -> Result<SplManuService, ConnectCmifEr
 
 /// Error returned by all `connect_*_cmif` functions.
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectCmifError {
-    #[error("failed to get SPL service")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to get SPL service")]
+pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);

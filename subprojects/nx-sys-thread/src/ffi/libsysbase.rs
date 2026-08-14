@@ -347,7 +347,7 @@ pub unsafe extern "C" fn __nx_sys_thread__syscall_tls_create(
             0
         }
         // newlib maps key-table exhaustion to `EAGAIN`.
-        Err(tsd::TsdAllocError::NoSlotsAvailable) => EAGAIN,
+        Err(tsd::TsdAllocError) => EAGAIN,
     }
 }
 
@@ -380,7 +380,7 @@ pub extern "C" fn __nx_sys_thread__syscall_tls_delete(key: u32) -> c_int {
     match tsd::TsdKey::from_raw(key) {
         Some(tsd_key) => match tsd::free(tsd_key) {
             Ok(()) => 0,
-            Err(tsd::TsdFreeError::UnallocatedSlot) => EINVAL,
+            Err(tsd::TsdFreeError) => EINVAL,
         },
         None => EINVAL,
     }

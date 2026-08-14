@@ -109,18 +109,15 @@ where
     } = sm;
 
     // Ensure the memory is properly unmapped from the process address space.
-    svc::unmap_memory(mapped_mem_ptr, buffer.ptr(), buffer.size()).map_err(UnmapError::Svc)?;
+    svc::unmap_memory(mapped_mem_ptr, buffer.ptr(), buffer.size()).map_err(UnmapError)?;
 
     Ok(buffer)
 }
 
 /// Errors that can occur when unmapping stack memory.
 #[derive(Debug, thiserror::Error)]
-pub enum UnmapError {
-    /// System call to unmap memory failed.
-    #[error(transparent)]
-    Svc(#[from] svc::UnmapMemoryError),
-}
+#[error(transparent)]
+pub struct UnmapError(#[from] pub svc::UnmapMemoryError);
 
 /// Represents stack memory that has been mapped into the process address space.
 ///

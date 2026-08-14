@@ -522,16 +522,15 @@ impl Inner {
 unsafe impl Send for NativeWindow {}
 
 /// Internal kind for native-handle-acquisition failure.
+///
+/// The underlying CMIF/transact-parcel call failed.
 #[derive(Debug, thiserror::Error)]
-pub enum NativeHandleErrorKind {
-    /// Underlying CMIF/transact-parcel call failed.
-    #[error("get_native_handle failed")]
-    Cmif,
-}
+#[error("get_native_handle failed")]
+pub struct NativeHandleErrorKind;
 
 impl NativeHandleErrorKind {
     fn from_cmif(_: nx_service_vi::GetNativeHandleError) -> Self {
-        Self::Cmif
+        Self
     }
 }
 

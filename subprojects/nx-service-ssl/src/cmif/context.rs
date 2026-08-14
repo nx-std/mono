@@ -140,7 +140,7 @@ pub(crate) fn remove_pki(
         Ok(()) => return Ok(()),
         Err(err) => {
             if !is_ssl_not_found(&err) {
-                return Err(RemovePkiError::Dispatch(err));
+                return Err(RemovePkiError(err));
             }
         }
     }
@@ -151,13 +151,13 @@ pub(crate) fn remove_pki(
         Ok(()) => return Ok(()),
         Err(err) => {
             if !include_crl || !is_ssl_not_found(&err) {
-                return Err(RemovePkiError::Dispatch(err));
+                return Err(RemovePkiError(err));
             }
         }
     }
 
     // Try RemoveCrl (3.0.0+)
-    dispatch_in(object, proto::CTX_REMOVE_CRL, id).map_err(RemovePkiError::Dispatch)
+    dispatch_in(object, proto::CTX_REMOVE_CRL, id).map_err(RemovePkiError)
 }
 
 /// Checks if a dispatch error corresponds to SSL "not found" (module 123, description 214).
@@ -176,11 +176,8 @@ fn is_ssl_not_found(_err: &DispatchError) -> bool {
 
 /// Error returned by [`remove_pki`].
 #[derive(Debug, thiserror::Error)]
-pub enum RemovePkiError {
-    /// IPC dispatch failed.
-    #[error("failed to dispatch RemovePki")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch RemovePki")]
+pub struct RemovePkiError(#[source] pub DispatchError);
 
 /// Registers an internal PKI. Returns the assigned ID.
 pub(crate) fn register_internal_pki(

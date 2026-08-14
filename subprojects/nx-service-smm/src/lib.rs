@@ -122,7 +122,7 @@ impl SmmService {
 pub fn connect(sm: &SmService) -> Result<SmmService, ConnectError> {
     let handle = sm
         .get_service_handle_cmif(SERVICE_NAME)
-        .map_err(ConnectError::GetService)?;
+        .map_err(ConnectError)?;
 
     let service = Session::new(handle, 0);
 
@@ -131,8 +131,5 @@ pub fn connect(sm: &SmService) -> Result<SmmService, ConnectError> {
 
 /// Error returned by [`connect`].
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Failed to get the `sm:m` service handle from SM.
-    #[error("failed to get service")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to get the sm:m service handle from SM")]
+pub struct ConnectError(#[source] pub nx_service_sm::GetServiceCmifError);

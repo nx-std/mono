@@ -356,25 +356,20 @@ pub fn acquire_foreground_rights(
     window_controller
         .dispatch(CMD_WC_ACQUIRE_FOREGROUND_RIGHTS)
         .send(&mut buf)
-        .map_err(AcquireForegroundRightsError::Dispatch)?;
+        .map_err(AcquireForegroundRightsError)?;
 
     Ok(())
 }
 
 /// Error returned by [`acquire_foreground_rights`].
 #[derive(Debug, thiserror::Error)]
-pub enum AcquireForegroundRightsError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct AcquireForegroundRightsError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for AcquireForegroundRightsError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 
@@ -525,25 +520,20 @@ pub fn set_out_of_focus_suspending_enabled(
         .dispatch(CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED)
         .in_raw(core::slice::from_ref(&input))
         .send(&mut buf)
-        .map_err(SetOutOfFocusSuspendingEnabledError::Dispatch)?;
+        .map_err(SetOutOfFocusSuspendingEnabledError)?;
 
     Ok(())
 }
 
 /// Error returned by [`set_out_of_focus_suspending_enabled`].
 #[derive(Debug, thiserror::Error)]
-pub enum SetOutOfFocusSuspendingEnabledError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct SetOutOfFocusSuspendingEnabledError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for SetOutOfFocusSuspendingEnabledError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 
@@ -584,25 +574,20 @@ pub fn set_operation_mode_changed_notification(
         .dispatch(CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION)
         .in_raw(core::slice::from_ref(&input))
         .send(&mut buf)
-        .map_err(SetOperationModeChangedNotificationError::Dispatch)?;
+        .map_err(SetOperationModeChangedNotificationError)?;
 
     Ok(())
 }
 
 /// Error returned by [`set_operation_mode_changed_notification`].
 #[derive(Debug, thiserror::Error)]
-pub enum SetOperationModeChangedNotificationError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct SetOperationModeChangedNotificationError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for SetOperationModeChangedNotificationError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 
@@ -622,25 +607,20 @@ pub fn set_performance_mode_changed_notification(
         .dispatch(CMD_SC_SET_PERFORMANCE_MODE_CHANGED_NOTIFICATION)
         .in_raw(core::slice::from_ref(&input))
         .send(&mut buf)
-        .map_err(SetPerformanceModeChangedNotificationError::Dispatch)?;
+        .map_err(SetPerformanceModeChangedNotificationError)?;
 
     Ok(())
 }
 
 /// Error returned by [`set_performance_mode_changed_notification`].
 #[derive(Debug, thiserror::Error)]
-pub enum SetPerformanceModeChangedNotificationError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct SetPerformanceModeChangedNotificationError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for SetPerformanceModeChangedNotificationError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 
