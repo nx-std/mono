@@ -55,6 +55,30 @@
 //! than trusting the caller to remember it. A list without a terminator is not
 //! a shorter list, it is a program reading whatever follows it in memory.
 //!
+//! # What a loader cannot leave out
+//!
+//! Most of the format is a loader telling a program something it would
+//! otherwise have to default. Three entries are not like that: the heap, the
+//! main thread's handle and the process's own handle name things a program has
+//! no way to obtain for itself. A process cannot ask the kernel for a real
+//! handle to itself or to its main thread, and the pseudo-handles standing in
+//! for them cannot be sent over IPC; the heap belongs to the loader because the
+//! program runs inside a process the loader already carved one out of.
+//!
+//! So those three are not appended, they are type parameters on
+//! [`ConfigListBuilder`], each starting at its own unsupplied marker and moved
+//! to the supplied one by its own setter.
+//! [`build`](ConfigListBuilder::build) exists only where all three are
+//! supplied. Forgetting one is a compile error rather than a program that
+//! starts and then behaves as though the loader had said nothing, and the
+//! entries the setters write carry [`MANDATORY`](EntryFlags::MANDATORY) for the
+//! same reason.
+//!
+//! The markers are per entry, one small module each: [`heap::Set`] stands only
+//! in the heap parameter, so the three cannot be transposed, and a builder type
+//! reads as [`heap::Set`], [`main_thread::Unset`] and so on rather than asking
+//! the reader to count positions.
+//!
 //! # The mandatory flag
 //!
 //! An entry may be marked [mandatory](EntryFlags::MANDATORY), which means the
@@ -93,5 +117,8 @@ pub use self::{
         ConfigListBuilder,
         MAX_APPENDED,
         MAX_ENTRIES,
+        heap,
+        main_thread,
+        process,
     },
 };
