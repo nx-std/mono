@@ -6,7 +6,7 @@
 //
 // The same binary links with or without `use_nx_service_applet_err`. With the
 // option off the calls resolve to libnx and show what the stock implementation
-// does; with it on they resolve to `__nx_rt_nro__libnx_error_*`. Running both
+// does; with it on they resolve to `__nx_rt_hbapp__libnx_error_*`. Running both
 // is the comparison worth making.
 
 #include <stdio.h>

@@ -148,7 +148,7 @@ the paragraph that described it, so the doc churns on a change that does not alt
 /// # Panics
 ///
 /// Always: the command is not implemented yet.
-pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
+pub unsafe extern "C" fn __nx_rt_hbapp__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
     todo!("fsOpenDeviceOperator")
 }
 
@@ -158,7 +158,7 @@ pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut S
 /// # Safety
 ///
 /// `out` must point to a writable `Service`.
-pub unsafe extern "C" fn __nx_rt_nro__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
+pub unsafe extern "C" fn __nx_rt_hbapp__libnx_fs_open_device_operator(_out: *mut Service) -> u32 {
     todo!("fsOpenDeviceOperator")
 }
 ```

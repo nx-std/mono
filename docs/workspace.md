@@ -72,7 +72,7 @@ A prefix says **which part of `std` a crate is destined to become**, not where i
 | `nx-std-*` | a top-level module of `std` | `nx-std-env` ↔ `std::env` |
 | `nx-sf`, `nx-service-*` | no `std` counterpart — Horizon IPC clients | `nx-service-sm` speaks to the service manager |
 | device crates (`nx-net`, `nx-fsdev`, `nx-nv`, `nx-display`, `nx-pm`, `nx-wlaninf`, `nx-netloader`) | no `std` counterpart — a device or driver above IPC | `nx-fsdev` serves the SD card as a device |
-| `nx-rt-*` | the process entry runtime: `std::rt`, plus what `crt0` and the C runtime do beneath it | one entry crate per output kind ([code/crates-rt](code/crates-rt.md)) |
+| `nx-rt-*` | the process entry runtime: `std::rt`, plus what `crt0` and the C runtime do beneath it | one entry crate per launch path ([code/crates-rt](code/crates-rt.md)) |
 | `nx-std` | the umbrella `staticlib`, not a member of the `nx-std-*` family | the single linkable artifact |
 
 Two consequences worth stating outright, because both have been misread:

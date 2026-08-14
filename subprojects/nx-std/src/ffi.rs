@@ -17,16 +17,16 @@ pub use nx_pm::ffi as pm;
 #[cfg(feature = "rand")]
 pub use nx_rand::ffi as rand;
 // `romfsMountSelf` is not here: it is the one `romfs*` entry point that depends
-// on the output kind, so it comes from whichever entry crate is in the link.
+// on the launch path, so it comes from whichever entry crate is in the link.
 #[cfg(feature = "romfs")]
 pub use nx_romfs::ffi as romfs;
 #[cfg(feature = "rt")]
 pub use nx_rt_core::ffi as rt_core;
-// The entry-crate surfaces are alternatives, one per output kind: a link takes
-// `rt_nro` or `rt_nso`, never both, since their libnx override fragments bind
+// The entry-crate surfaces are alternatives, one per launch path: a link takes
+// `rt_hbapp` or `rt_nso`, never both, since their libnx override fragments bind
 // the same entry points. The Meson `nx_rt_kind` combo is what enforces that.
-#[cfg(feature = "rt-nro")]
-pub use nx_rt_nro::ffi as rt_nro;
+#[cfg(feature = "rt-hbapp")]
+pub use nx_rt_hbapp::ffi as rt_hbapp;
 #[cfg(feature = "rt-nso")]
 pub use nx_rt_nso::ffi as rt_nso;
 #[cfg(feature = "sf")]

@@ -26,7 +26,7 @@
  *
  * The `.crt0` mechanism — the `_start` header, the relative MOD0 pointer,
  * `__nx_dynamic` self-relocation and BSS zeroing — is identical to the
- * homebrew-NRO (`nx-rt-nro`) and NSO (`nx-rt-nso`) kinds; only the entry ABI
+ * homebrew-NRO (`nx-rt-hbapp`) and NSO (`nx-rt-nso`) kinds; only the entry ABI
  * above differs. The `"HOMEBREW"` magic and `"LNY*"` MOD0 blocks match libnx's
  * `switch_crt0.s`: `__nx_dynamic` consumes the `LNY0`/`LNY1` blocks to
  * re-protect the RELRO segment after relocation, so they are carried here too.

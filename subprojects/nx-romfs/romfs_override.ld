@@ -11,9 +11,9 @@
  * to know whether the process is an NRO or an NSO before it can pick a source,
  * and that question is answered by which runtime crate the binary links rather
  * than by asking at run time. Its alias therefore lives in the per-kind
- * fragments, `rt_nro_libnx_romfs.ld` and `rt_nso_libnx_romfs.ld`, each pointing
- * at the symbol its own entry crate defines. Exactly one of those fragments is
- * ever in a link, so the two definitions cannot collide.
+ * fragments, `rt_hbapp_libnx_romfs.ld` and `rt_nso_libnx_romfs.ld`, each
+ * pointing at the symbol its own entry crate defines. Exactly one of those
+ * fragments is ever in a link, so the two definitions cannot collide.
  *
  * `romfsInit` and `romfsExit` are absent for a different reason: both are
  * `static inline` in the libnx header, so they are compiled into each caller

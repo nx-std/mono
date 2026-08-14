@@ -17,8 +17,8 @@
 // whichever way the build is configured — with `use_nx_service_fs` and
 // `use_nx_fsdev` off, the commands and the device above them resolve to libnx
 // and show what the stock implementation does; with them on, they resolve to
-// `__nx_rt_nro__libnx_fs_*` and `__nx_fsdev__*` and Rust owns both the session
-// and the device. Running both is the comparison worth making.
+// `__nx_rt_hbapp__libnx_fs_*` and `__nx_fsdev__*` and Rust owns both the
+// session and the device. Running both is the comparison worth making.
 
 #include <inttypes.h>
 #include <stdio.h>

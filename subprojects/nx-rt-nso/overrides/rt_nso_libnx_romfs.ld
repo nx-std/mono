@@ -1,6 +1,6 @@
 /* Linker script — libnx romfsMountSelf override, NSO arm.
  *
- * The NSO counterpart of `rt_nro_libnx_romfs.ld`; see that fragment for why this
+ * The NSO counterpart of `rt_hbapp_libnx_romfs.ld`; see that fragment for why this
  * one entry point is claimed per output kind rather than alongside the rest of
  * the `romfs*` surface in `subprojects/nx-romfs/romfs_override.ld`.
  *

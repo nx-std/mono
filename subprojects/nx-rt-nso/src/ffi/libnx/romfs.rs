@@ -4,7 +4,7 @@
 //! what kind of program is asking. Here the answer is settled: a packaged program's data is a
 //! partition the filesystem service hands out, so this mounts that and nothing else.
 //!
-//! `nx-rt-nro` defines the same C name over its own source, and exactly one of the two entry crates
+//! `nx-rt-hbapp` defines the same C name over its own source, and exactly one of the two entry crates
 //! is in any link, so the two definitions never meet.
 
 use core::ffi::{
