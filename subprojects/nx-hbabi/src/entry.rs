@@ -425,6 +425,11 @@ impl Key {
 /// Only one bit is assigned. The rest are kept rather than masked away, so an
 /// entry from a newer loader round-trips unchanged and a consumer that knows a
 /// bit this crate does not can still find it.
+///
+/// Flags survive decoding only on [`Entry::Unknown`] and [`Entry::Malformed`].
+/// Every named variant drops them, because the flags exist to tell a reader
+/// what to do about an entry it cannot act on, and a reader that got a named
+/// variant can act on it.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EntryFlags(u32);
@@ -434,7 +439,15 @@ impl EntryFlags {
     pub const NONE: Self = Self(0);
     /// The program must act on this entry or return to the loader.
     ///
-    /// See the crate docs for why skipping one is not a safe default.
+    /// Read-time, and live on one branch only: the one where the reader has a
+    /// key it cannot act on. A reader that recognises the key acts on it and
+    /// the mark changes nothing, so the mark is worth setting on a key a reader
+    /// might not know and worth nothing on a key every reader handles.
+    ///
+    /// It is dropped by [`Entry::decode`] for every key this crate names, so a
+    /// consumer sees it only through [`Entry::Unknown`] or
+    /// [`Entry::Malformed`]. See the crate docs for which entries it can reach
+    /// and why skipping one is not a safe default.
     pub const MANDATORY: Self = Self(1 << 0);
 
     /// Names the flags the given word stands for.
@@ -443,6 +456,12 @@ impl EntryFlags {
     }
 
     /// Returns whether the loader requires this entry be acted on.
+    ///
+    /// Ask this where the answer can change what happens, which is on
+    /// [`Entry::Unknown`] and [`Entry::Malformed`]: a `true` there means the
+    /// program must return to the loader rather than carry on without the
+    /// entry. Everywhere else the flags arrived as [`NONE`](Self::NONE),
+    /// because decoding a key this crate names discards them.
     pub const fn is_mandatory(self) -> bool {
         self.0 & Self::MANDATORY.0 != 0
     }

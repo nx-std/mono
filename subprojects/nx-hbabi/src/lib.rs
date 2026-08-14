@@ -70,9 +70,11 @@
 //! to the supplied one by its own setter.
 //! [`build`](ConfigListBuilder::build) exists only where all three are
 //! supplied. Forgetting one is a compile error rather than a program that
-//! starts and then behaves as though the loader had said nothing, and the
-//! entries the setters write carry [`MANDATORY`](EntryFlags::MANDATORY) for the
-//! same reason.
+//! starts and then behaves as though the loader had said nothing. The type
+//! parameters are what enforce that, and they are the only thing that does: the
+//! entries the setters write also carry
+//! [`MANDATORY`](EntryFlags::MANDATORY), but on keys this well known that mark
+//! is a statement of intent rather than a check, for the reasons below.
 //!
 //! The markers are per entry, one small module each: [`heap::Set`] stands only
 //! in the heap parameter, so the three cannot be transposed, and a builder type
@@ -86,11 +88,40 @@
 //! program that does not recognise such a key must return to the loader instead
 //! of continuing.
 //!
-//! The rule exists because the alternative failure is silent. A loader that
-//! overrides the heap and marks the entry mandatory is saying the program's
-//! usual heap is not there; a program that skipped the key it did not know
-//! would run against an address that is not mapped, and the fault would surface
-//! somewhere unrelated to the entry that caused it.
+//! The flag is written by a loader but it is a **read-time** instruction, and
+//! it takes effect on exactly one branch: the one where the reader has a key it
+//! cannot act on. A reader that handles the key acts on it, and the flag
+//! changes nothing; a reader that does not handle it would otherwise skip it,
+//! and the flag is what turns that skip into a refusal to run.
+//!
+//! So the flag is a forward-compatibility device. It is there for an older
+//! program meeting a newer loader, and the failure it prevents is a silent one:
+//! a loader that overrides the heap is saying the program's usual heap is not
+//! there, and a program that skipped the key it did not know would run against
+//! an address that is not mapped, faulting somewhere unrelated to the entry
+//! that caused it. [`Key::OVERRIDE_SERVICE`] is the sharpest case, because
+//! nothing faults at all: the program opens its own session and quietly
+//! bypasses the interposition the loader set up.
+//!
+//! ## Which entries it can reach
+//!
+//! Only the ones a reader could fail to recognise. [`Entry::decode`] keeps
+//! `flags` on [`Entry::Unknown`] and [`Entry::Malformed`] and nowhere else, so
+//! a mandatory mark on a key this crate knows is dropped on the way in and no
+//! consumer can branch on it. Marking a well-known key costs nothing and buys
+//! nothing.
+//!
+//! It is also not preserved across a round trip. `ConfigEntry::from` writes
+//! [`EntryFlags::NONE`] for every named variant, so a loader that decodes a
+//! list and re-encodes it to pass on drops the mark from every key it
+//! recognised. Only the two catch-all variants carry their flags back out.
+//!
+//! The three entries [`ConfigListBuilder`] requires are marked, and that mark
+//! reaches only a reader that inspects raw [`ConfigEntry`] values rather than
+//! decoding them: they are keys every reader of a list handles, so nothing that
+//! goes through [`Entry::decode`] will ever see the bit.
+//!
+//! ## Acting on it
 //!
 //! This crate reports the condition and does not act on it: returning to the
 //! loader means calling the address the loader left behind, which the runtime
