@@ -235,7 +235,7 @@ impl NsGetterService {
 pub fn connect_cmif(sm: &SmService) -> Result<NsGetterService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(NS_AM2_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
     Ok(NsGetterService(Session::new(handle, 0)))
 }
 
@@ -249,7 +249,7 @@ pub fn connect_cmif_fallback(
 ) -> Result<NsGetterService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(service_name)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
     Ok(NsGetterService(Session::new(handle, 0)))
 }
 
@@ -260,15 +260,13 @@ pub fn connect_cmif_fallback(
 pub fn connect_cmif_legacy(sm: &SmService) -> Result<NsAppManagerService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(NS_AM_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
     Ok(NsAppManagerService(Session::new(handle, 0)))
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectCmifError {
-    #[error("failed to get ns service")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to get ns service")]
+pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);
 
 // ===========================================================================
 // NsAppManagerService — IApplicationManagerInterface
@@ -1636,7 +1634,7 @@ impl NsvmService {
 pub fn connect_nsvm_cmif(sm: &SmService) -> Result<NsvmService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(NSVM_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
     Ok(NsvmService(Session::new(handle, 0)))
 }
 
@@ -1774,7 +1772,7 @@ impl NsdevService {
 pub fn connect_nsdev_cmif(sm: &SmService) -> Result<NsdevService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(NSDEV_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
     Ok(NsdevService(Session::new(handle, 0)))
 }
 
@@ -1878,7 +1876,7 @@ impl NssuService {
 pub fn connect_nssu_cmif(sm: &SmService) -> Result<NssuService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(NSSU_SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
     Ok(NssuService(Session::new(handle, 0)))
 }
 

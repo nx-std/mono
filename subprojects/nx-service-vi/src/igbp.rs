@@ -660,18 +660,14 @@ impl ToResultCode for QueueBufferError {
 
 /// Error returned by [`cancel_buffer`].
 #[derive(Debug, thiserror::Error)]
-pub enum CancelBufferError {
-    #[error("binder transact failed")]
-    Transact(#[from] TransactError),
-}
+#[error("binder transact failed")]
+pub struct CancelBufferError(#[from] pub TransactError);
 
 impl ToResultCode for CancelBufferError {
     fn to_rc(self) -> ResultCode {
-        match self {
-            // Rejected locally after a successful reply, so no server
-            // named a code for it.
-            Self::Transact(_) => GENERIC_ERROR,
-        }
+        // Rejected locally after a successful reply, so no server named a code
+        // for it.
+        GENERIC_ERROR
     }
 }
 

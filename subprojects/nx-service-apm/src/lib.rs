@@ -132,23 +132,18 @@ impl ApmSession {
 pub fn connect(sm: &SmService) -> Result<ApmService, ConnectError> {
     let handle = sm
         .get_service_handle_cmif(SERVICE_NAME)
-        .map_err(ConnectError::GetService)?;
+        .map_err(ConnectError)?;
 
     Ok(ApmService(Session::new(handle, 0)))
 }
 
 /// Error returned by [`connect`].
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Failed to get service handle from SM.
-    #[error("failed to get service")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to get service handle from SM")]
+pub struct ConnectError(#[source] pub nx_service_sm::GetServiceCmifError);
 
 impl ToResultCode for ConnectError {
     fn to_rc(self) -> ResultCode {
-        match self {
-            Self::GetService(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }

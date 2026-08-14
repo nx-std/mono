@@ -81,16 +81,15 @@ use super::{
 /// The returned session is passed by reference to the per-operation resolver
 /// functions, which keeps session ownership with the caller.
 pub fn connect(sm: &SmService) -> Result<SfdnsresService, ConnectError> {
-    nx_service_sfdnsres::connect_cmif(sm).map_err(ConnectError::Service)
+    nx_service_sfdnsres::connect_cmif(sm).map_err(ConnectError)
 }
 
 /// Error returned when establishing the `sfdnsres` resolver connection.
+///
+/// Acquiring the `sfdnsres` session from the service manager failed.
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Acquiring the `sfdnsres` session from the service manager failed.
-    #[error("failed to connect to the sfdnsres service")]
-    Service(#[source] ConnectCmifError),
-}
+#[error("failed to connect to the sfdnsres service")]
+pub struct ConnectError(#[source] pub ConnectCmifError);
 
 /// Resolves a node name and/or service into a list of socket addresses.
 ///

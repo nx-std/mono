@@ -283,7 +283,7 @@ pub fn port_open_legacy(
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
-        .map_err(OpenPortError::Dispatch)?;
+        .map_err(OpenPortError)?;
 
     let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
@@ -325,7 +325,7 @@ pub fn port_open_v6(
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
-        .map_err(OpenPortError::Dispatch)?;
+        .map_err(OpenPortError)?;
 
     let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
@@ -370,7 +370,7 @@ pub fn port_open_v7(
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
-        .map_err(OpenPortError::Dispatch)?;
+        .map_err(OpenPortError)?;
 
     let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
@@ -405,7 +405,7 @@ pub fn port_open_for_dev_legacy(
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
-        .map_err(OpenPortError::Dispatch)?;
+        .map_err(OpenPortError)?;
 
     let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
@@ -447,7 +447,7 @@ pub fn port_open_for_dev_v6(
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
-        .map_err(OpenPortError::Dispatch)?;
+        .map_err(OpenPortError)?;
 
     let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
@@ -492,7 +492,7 @@ pub fn port_open_for_dev_v7(
         .in_handle(receive_tmem_handle)
         .out_size(size_of::<u8>())
         .send(&mut buf)
-        .map_err(OpenPortError::Dispatch)?;
+        .map_err(OpenPortError)?;
 
     let raw = *result.value::<u8>();
     Ok(raw & 1 != 0)
@@ -514,7 +514,7 @@ pub fn port_send(service: &Session, data: &[u8]) -> Result<u64, PortSendError> {
         .in_buffer(data, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<u64>())
         .send(&mut buf)
-        .map_err(PortSendError::Dispatch)?;
+        .map_err(PortSendError)?;
 
     Ok(*result.value::<u64>())
 }
@@ -535,7 +535,7 @@ pub fn port_receive(service: &Session, buf: &mut [u8]) -> Result<u64, PortReceiv
         .out_buffer(buf, BufferAttr::HIPC_AUTO_SELECT)
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)
-        .map_err(PortReceiveError::Dispatch)?;
+        .map_err(PortReceiveError)?;
 
     Ok(*result.value::<u64>())
 }
@@ -592,24 +592,18 @@ pub enum CreatePortSessionError {
 
 /// Error returned by the open port commands.
 #[derive(Debug, thiserror::Error)]
-pub enum OpenPortError {
-    #[error("failed to dispatch open port")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch open port")]
+pub struct OpenPortError(#[source] pub DispatchError);
 
 /// Error returned by [`port_send`].
 #[derive(Debug, thiserror::Error)]
-pub enum PortSendError {
-    #[error("failed to dispatch send")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch send")]
+pub struct PortSendError(#[source] pub DispatchError);
 
 /// Error returned by [`port_receive`].
 #[derive(Debug, thiserror::Error)]
-pub enum PortReceiveError {
-    #[error("failed to dispatch receive")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch receive")]
+pub struct PortReceiveError(#[source] pub DispatchError);
 
 /// Error returned by [`port_bind_port_event`].
 #[derive(Debug, thiserror::Error)]

@@ -537,7 +537,7 @@ impl LdnService {
     pub fn open_client_process_monitor(&mut self) -> Result<(), OpenClientProcessMonitorError> {
         let id = self
             .dispatch_creator(creator::create_client_process_monitor)
-            .map_err(OpenClientProcessMonitorError::Dispatch)?;
+            .map_err(OpenClientProcessMonitorError)?;
         self.icpm_object_id = Some(id);
         Ok(())
     }
@@ -619,13 +619,12 @@ pub enum ConnectCmifError {
     CreateService(#[source] CreateServiceError),
 }
 
-/// Errors returned by [`LdnService::open_client_process_monitor`].
+/// Error returned by [`LdnService::open_client_process_monitor`].
+///
+/// IPC dispatch failed. Most commonly: caller invoked on pre-`[18.0.0]`.
 #[derive(Debug, thiserror::Error)]
-pub enum OpenClientProcessMonitorError {
-    /// IPC dispatch failed. Most commonly: caller invoked on pre-`[18.0.0]`.
-    #[error("failed to dispatch CreateClientProcessMonitor")]
-    Dispatch(#[source] CreateClientProcessMonitorError),
-}
+#[error("failed to dispatch CreateClientProcessMonitor")]
+pub struct OpenClientProcessMonitorError(#[source] pub CreateClientProcessMonitorError);
 
 /// Errors returned by [`LdnService::lcs_initialize_with_priority`].
 #[derive(Debug, thiserror::Error)]

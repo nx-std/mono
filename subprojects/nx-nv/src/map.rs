@@ -73,7 +73,7 @@ impl<'s> NvMapDevice<'s> {
     /// Returns [`OpenError`] when the driver refuses the device, which happens
     /// when the session was established for a service that does not carry it.
     pub fn open(service: &'s NvService) -> Result<Self, OpenError> {
-        let fd = service.open(DEVICE_PATH).map_err(OpenError::Open)?;
+        let fd = service.open(DEVICE_PATH).map_err(OpenError)?;
         Ok(Self { service, fd })
     }
 
@@ -154,12 +154,11 @@ impl Drop for NvMapDevice<'_> {
 }
 
 /// Errors returned by [`NvMapDevice::open`].
+///
+/// The driver refused to open the memory-object device.
 #[derive(Debug, thiserror::Error)]
-pub enum OpenError {
-    /// The driver refused to open the memory-object device
-    #[error("Failed to open the memory-object device")]
-    Open(#[source] nx_service_nv::OpenError),
-}
+#[error("Failed to open the memory-object device")]
+pub struct OpenError(#[source] pub nx_service_nv::OpenError);
 
 /// An open memory-object device borrowed for the length of an operation.
 ///
@@ -272,7 +271,7 @@ impl<'d> BorrowedMapDevice<'d> {
             handle: 0,
         };
         self.request(ioctl::FROM_ID, &mut from_id)
-            .map_err(AdoptMapError::Resolve)?;
+            .map_err(AdoptMapError)?;
 
         Ok(MemoryMap {
             device: self,
@@ -450,12 +449,11 @@ pub enum CreateMapError {
 }
 
 /// Errors returned by [`NvMapDevice::adopt_map`].
+///
+/// The id names no object this process may reference.
 #[derive(Debug, thiserror::Error)]
-pub enum AdoptMapError {
-    /// The id names no object this process may reference
-    #[error("Failed to resolve the memory object id")]
-    Resolve(#[source] IoctlError),
-}
+#[error("Failed to resolve the memory object id")]
+pub struct AdoptMapError(#[source] pub IoctlError);
 
 /// Names a memory object inside this process.
 ///
@@ -670,7 +668,7 @@ impl MapBuffer {
             )
         };
         if rc != 0 {
-            return Err(CacheAttrError::Rejected { rc });
+            return Err(CacheAttrError { rc });
         }
         Ok(())
     }
@@ -714,15 +712,14 @@ pub enum MapBufferError {
     },
 }
 
-/// Errors returned when changing a buffer's cache attribute.
+/// Error returned when changing a buffer's cache attribute.
+///
+/// The kernel refused the attribute change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-pub enum CacheAttrError {
-    /// The kernel refused the attribute change
-    #[error("The kernel refused the cache attribute change ({rc:#x})")]
-    Rejected {
-        /// The result code the kernel returned.
-        rc: u32,
-    },
+#[error("The kernel refused the cache attribute change ({rc:#x})")]
+pub struct CacheAttrError {
+    /// The result code the kernel returned.
+    pub rc: u32,
 }
 
 #[cfg(test)]

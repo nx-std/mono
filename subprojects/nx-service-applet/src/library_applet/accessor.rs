@@ -75,7 +75,7 @@ impl<'d> LibraryAppletAccessor<'d> {
         self.object
             .dispatch(CMD_LAA_START)
             .send(&mut buf)
-            .map_err(StartError::Dispatch)?;
+            .map_err(StartError)?;
 
         Ok(())
     }
@@ -92,7 +92,7 @@ impl<'d> LibraryAppletAccessor<'d> {
             Err(DispatchError::ParseResponse(nx_sf::cmif::ParseError::ServiceError(code))) => {
                 Ok(LibraryAppletExitReason::from_result_code(code))
             }
-            Err(err) => Err(GetResultError::Dispatch(err)),
+            Err(err) => Err(GetResultError(err)),
         }
     }
 
@@ -118,7 +118,7 @@ impl<'d> LibraryAppletAccessor<'d> {
             .dispatch(CMD_LAA_PUSH_IN_DATA)
             .in_object(storage.object_id())
             .send(&mut buf)
-            .map_err(PushInDataError::Dispatch)?;
+            .map_err(PushInDataError)?;
 
         Ok(())
     }
@@ -171,35 +171,25 @@ impl nx_sf::error::ToResultCode for GetAppletStateChangedEventError {
 
 /// Error returned by [`LibraryAppletAccessor::start`].
 #[derive(Debug, thiserror::Error)]
-pub enum StartError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct StartError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for StartError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 
 /// Error returned by [`LibraryAppletAccessor::get_result`].
 #[derive(Debug, thiserror::Error)]
-pub enum GetResultError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct GetResultError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for GetResultError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 
@@ -226,18 +216,13 @@ impl nx_sf::error::ToResultCode for JoinError {
 
 /// Error returned by [`LibraryAppletAccessor::push_in_data`].
 #[derive(Debug, thiserror::Error)]
-pub enum PushInDataError {
-    /// Failed to dispatch the request.
-    #[error("failed to dispatch request")]
-    Dispatch(#[source] DispatchError),
-}
+#[error("failed to dispatch request")]
+pub struct PushInDataError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for PushInDataError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
-        match self {
-            Self::Dispatch(err) => err.to_rc(),
-        }
+        self.0.to_rc()
     }
 }
 

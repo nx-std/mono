@@ -504,7 +504,7 @@ impl HiddbgService {
 pub fn connect_cmif(sm: &SmService) -> Result<HiddbgService, ConnectCmifError> {
     let handle = sm
         .get_service_handle_cmif(SERVICE_NAME)
-        .map_err(ConnectCmifError::GetService)?;
+        .map_err(ConnectCmifError)?;
 
     let session = Session::new(handle, 0);
 
@@ -513,7 +513,5 @@ pub fn connect_cmif(sm: &SmService) -> Result<HiddbgService, ConnectCmifError> {
 
 /// Error returned by [`connect_cmif`].
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectCmifError {
-    #[error("failed to get service handle")]
-    GetService(#[source] nx_service_sm::GetServiceCmifError),
-}
+#[error("failed to get service handle")]
+pub struct ConnectCmifError(#[source] pub nx_service_sm::GetServiceCmifError);

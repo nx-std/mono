@@ -28,7 +28,7 @@ impl FromStr for ServiceSpec {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            return Err(ServiceSpecError::Empty);
+            return Err(ServiceSpecError);
         }
         match s.parse::<u16>() {
             Ok(port) => Ok(Self::Port(port)),
@@ -37,13 +37,10 @@ impl FromStr for ServiceSpec {
     }
 }
 
-/// Errors produced when parsing a [`ServiceSpec`].
+/// Error produced when parsing a [`ServiceSpec`].
+///
+/// The supplied service identifier was empty. A caller meaning "no service"
+/// must pass an absent value rather than an empty string.
 #[derive(Debug, thiserror::Error)]
-pub enum ServiceSpecError {
-    /// The supplied service identifier was empty.
-    ///
-    /// A caller meaning "no service" must pass an absent value rather than an
-    /// empty string.
-    #[error("service identifier must not be empty")]
-    Empty,
-}
+#[error("service identifier must not be empty")]
+pub struct ServiceSpecError;
