@@ -11,6 +11,7 @@ use nx_sf::service::{
     BufferAttr,
     DispatchError,
     DomainObjectRef,
+    DomainTarget,
     OutHandleAttr,
 };
 use nx_svc::sync::EventHandle;
@@ -36,6 +37,7 @@ use crate::{
     },
     types::{
         AppletInfo,
+        SocketFd,
         Uuid,
     },
 };
@@ -149,17 +151,19 @@ pub(crate) fn set_kept_in_sleep(
 }
 
 /// `RegisterSocketDescriptor` (cmd 24). Caller must guard on `[3.0.0+]`.
-pub(crate) fn register_socket_descriptor(
-    object: DomainObjectRef<'_>,
-    sockfd: i32,
+pub(crate) fn register_socket_descriptor<'d>(
+    object: impl DomainTarget<'d>,
+    sockfd: impl Into<SocketFd>,
 ) -> Result<(), DispatchError> {
-    dispatch_in(object, CMD_REQ_REGISTER_SOCKET_DESCRIPTOR, sockfd as u32)
+    let sockfd = sockfd.into();
+    dispatch_in(object, CMD_REQ_REGISTER_SOCKET_DESCRIPTOR, sockfd)
 }
 
 /// `UnregisterSocketDescriptor` (cmd 25). Caller must guard on `[3.0.0+]`.
-pub(crate) fn unregister_socket_descriptor(
-    object: DomainObjectRef<'_>,
-    sockfd: i32,
+pub(crate) fn unregister_socket_descriptor<'d>(
+    object: impl DomainTarget<'d>,
+    sockfd: impl Into<SocketFd>,
 ) -> Result<(), DispatchError> {
-    dispatch_in(object, CMD_REQ_UNREGISTER_SOCKET_DESCRIPTOR, sockfd as u32)
+    let sockfd = sockfd.into();
+    dispatch_in(object, CMD_REQ_UNREGISTER_SOCKET_DESCRIPTOR, sockfd)
 }

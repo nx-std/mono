@@ -125,6 +125,7 @@ members = [
     "subprojects/nx-sys-thread-tls",
     "subprojects/nx-sys-virtmem",
     "subprojects/nx-time",
+    "subprojects/nx-tls",
     "subprojects/nx-wlaninf",
     "subprojects/tests/framework",
 ]

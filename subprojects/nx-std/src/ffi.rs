@@ -39,6 +39,8 @@ pub use nx_svc::ffi as svc;
 pub use nx_sys_env::ffi as sys_env;
 #[cfg(feature = "sys-fd")]
 pub use nx_sys_fd::ffi as sys_fd;
+#[cfg(feature = "tls")]
+pub use nx_tls::ffi as tls;
 #[cfg(feature = "sys-mem")]
 pub mod sys_mem {
     pub use nx_sys_mem::{

@@ -21,6 +21,7 @@ sys = ["svc", "sys-fd", "sys-mem", "sys-net", "sys-sync", "sys-thread", "sys-thr
 ffi = [
     "nx-alloc?/ffi",
     "nx-net?/ffi",
+    "nx-tls?/ffi",
     "nx-fsdev?/ffi",
     "nx-pm?/ffi",
     "nx-rand?/ffi",
@@ -69,6 +70,9 @@ env = ["dep:nx-sys-args", "dep:nx-sys-env", "dep:nx-std-path", "dep:thiserror", 
 # Forwards to `nx-rt-core`, which owns the five resolver symbols that reach
 # `sfdnsres` over the service-manager session it holds.
 net = ["dep:nx-net", "nx-rt-core?/net"]
+# TLS socket hand-offs. Gates the `socketSslConnection*` overrides; the crate
+# sits above the runtime, so it resolves the firmware its DTLS gate needs itself.
+tls = ["dep:nx-tls"]
 # Files and directories addressed by path: the `std::fs` surface over the descriptor table.
 fs = ["sys-fd", "dep:nx-std-path", "dep:thiserror", "alloc"]
 # The filesystem device, replacing libnx's fsdev devoptab layer.
@@ -182,6 +186,7 @@ nx-sys-thread = { version = "0.1.0", path = "../nx-sys-thread", optional = true 
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls", optional = true }
 nx-sys-virtmem = { version = "0.1.0", path = "../nx-sys-virtmem", optional = true }
 nx-time = { version = "0.1.0", path = "../nx-time", optional = true }
+nx-tls = { version = "0.1.0", path = "../nx-tls", optional = true }
 nx-wlaninf = { version = "0.1.0", path = "../nx-wlaninf", optional = true }
 thiserror = { version = "2.0", default-features = false, optional = true }
 

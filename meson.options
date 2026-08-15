@@ -350,6 +350,13 @@ option(
 )
 
 option(
+    'use_nx_tls',
+    type : 'feature', value : 'disabled',
+    description : 'Enable nx-tls (TLS socket hand-offs; replaces the libnx socketSslConnection* functions)',
+    yield : true
+)
+
+option(
     'use_nx_service_bsd',
     type : 'feature', value : 'disabled', # Disable by default, WIP
     description : 'Enable nx-service-bsd (BSD socket service IPC client)',

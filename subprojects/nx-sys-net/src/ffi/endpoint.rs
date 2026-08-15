@@ -18,7 +18,10 @@ use super::{
         borrow_sockaddr,
         write_sockaddr,
     },
-    descriptor::with_socket,
+    descriptor::{
+        to_c_fd,
+        with_socket,
+    },
     errno,
 };
 use crate::{
@@ -258,17 +261,5 @@ fn create(
         Ok(fd) => to_c_fd(fd.number()),
         Err(device::AdoptFailed::NotRegistered) => errno::fail(errno::EBADF),
         Err(device::AdoptFailed::NoDescriptors) => errno::fail(errno::EMFILE),
-    }
-}
-
-/// Reports a descriptor number as C's `int`.
-///
-/// The table's numbers are far below what an `int` holds, so the conversion cannot fail; it is
-/// written as a fallible one anyway because a silent wrap here would hand back a descriptor that
-/// names something else.
-fn to_c_fd(number: usize) -> c_int {
-    match c_int::try_from(number) {
-        Ok(fd) => fd,
-        Err(_) => errno::fail(errno::EMFILE),
     }
 }

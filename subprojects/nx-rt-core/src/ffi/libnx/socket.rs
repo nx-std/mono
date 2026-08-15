@@ -1,9 +1,9 @@
-//! Socket driver initialization.
+//! Socket driver initialization, and the network-interface descriptor hand-offs.
 //!
 //! The socket driver itself lives in [`nx_sys_net`], and every one of its C symbols is exported
-//! from there: except this one.
+//! from there: except these three.
 //!
-//! # Why this entry point is here
+//! # Why these entry points are here
 //!
 //! `socketInitialize`'s C contract is that the interface revision it declares to the BSD service
 //! follows the running firmware. That makes it the one socket call whose behaviour depends on the
@@ -12,13 +12,73 @@
 //! that needs it lives beside it, calling [`nx_sys_net`]'s Rust entry with the choice already made.
 //!
 //! This is the same arrangement the controller applet uses, and for the same reason.
+//!
+//! The two network-interface hand-offs are the glue tier of a two-tier surface, and this is not
+//! their final home. Upstream splits them: `services/nifm.c` holds the command that takes a socket
+//! descriptor the BSD service issued, and `runtime/devices/socket.c` holds the wrapper that takes a
+//! *process* descriptor, translates it, and delegates. The workspace has a crate per service C
+//! surface, and the wrapper belongs with the crate owning the surface it delegates to.
+//!
+//! They sit here because `nx-nifm` does not claim them yet. `nx-tls` is the worked example of where
+//! they are going: it owns the TLS pair of these, sits *above* this crate so it reads the running
+//! firmware itself, and needed no help from the runtime to do it. A version gate is a reason to
+//! write a check, not a reason to strand a symbol away from its surface.
+//!
+//! What [`nx_sys_net`] owns either way is the map between the process's descriptors and the
+//! service's, so that is all these call it for: [`nx_sys_net::ffi::descriptor::resolve`] on the
+//! way in.
+//!
+//! ## Reading a service the C side owns
+//!
+//! Each takes a pointer to a libnx service struct. [`nx_sf::ffi::Service`] is that struct's shape,
+//! and [`nx_sf::ffi::Service::as_domain_object`] addresses what it names without adopting it: the
+//! C caller created the request and closes it, and nothing here may do either.
+//!
+//! A struct that names no object is one the C side never converted to a domain. libnx tolerates
+//! that case because its own conversion is allowed to fail, and dispatches on the plain session
+//! instead. This does not: [`nx_service_nifm`] models the interface as a domain object, so there is
+//! nothing to dispatch a command through, and the call reports the failure an inactive service
+//! would rather than guessing.
+//!
+//! ## What the firmware decides
+//!
+//! Both hand-offs arrived in `[3.0.0]` and do not exist below it. That is not a version an API
+//! should branch on, so no API here holds one: [`offers_nifm_socket_descriptor`] answers whether
+//! the command is there, in the one place a version is compared.
 
-use core::ffi::c_void;
+// TODO: move the two network-interface hand-offs to `nx-nifm`, which already claims the
+//  `nifmRequest*` tier they delegate to. It needs the same shape `nx-tls` has: a dependency on
+//  `nx-rt-core` so it reads the `[3.0.0]` gate itself.
 
-use nx_service_bsd::ConfigVersion;
-use nx_sys_net::ffi::driver::{
-    DEFAULT_INIT_CONFIG,
-    SocketInitConfig,
+use core::ffi::{
+    c_int,
+    c_void,
+};
+
+use nx_service_bsd::{
+    BsdSockFd,
+    ConfigVersion,
+};
+use nx_service_nifm::ffi::ForeignNifmRequest;
+use nx_sf::{
+    error::{
+        LibnxError,
+        ToResultCode as _,
+        libnx_error,
+    },
+    ffi::Service,
+    service::{
+        DispatchError,
+        ForeignDomainObject,
+    },
+};
+use nx_sys_net::ffi::{
+    descriptor,
+    driver::{
+        DEFAULT_INIT_CONFIG,
+        SocketInitConfig,
+    },
+    errno,
 };
 
 use crate::{
@@ -82,4 +142,107 @@ fn version() -> ConfigVersion {
     } else {
         ConfigVersion::V1
     }
+}
+
+/// Registers a socket descriptor with a network-interface request.
+///
+/// # Safety
+///
+/// `request` must point to a readable libnx `NifmRequest`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_socket_nifm_request_register_socket_descriptor(
+    request: *mut c_void,
+    sockfd: c_int,
+) -> c_int {
+    // SAFETY: the caller guarantees a readable `NifmRequest` at `request`, whose first member is
+    // the service struct this reads.
+    let object = unsafe { domain_object_at(request) };
+    nifm_socket_descriptor(
+        object,
+        sockfd,
+        ForeignNifmRequest::register_socket_descriptor,
+    )
+}
+
+/// Unregisters a socket descriptor from a network-interface request.
+///
+/// # Safety
+///
+/// `request` must point to a readable libnx `NifmRequest`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_socket_nifm_request_unregister_socket_descriptor(
+    request: *mut c_void,
+    sockfd: c_int,
+) -> c_int {
+    // SAFETY: the caller guarantees a readable `NifmRequest` at `request`, whose first member is
+    // the service struct this reads.
+    let object = unsafe { domain_object_at(request) };
+    nifm_socket_descriptor(
+        object,
+        sockfd,
+        ForeignNifmRequest::unregister_socket_descriptor,
+    )
+}
+
+/// Runs one of the network-interface request's two socket-descriptor commands.
+///
+/// The pair differ only in which command they send: the firmware they need, the descriptor
+/// translation and the way each failure is reported are the same, so they are written once here.
+fn nifm_socket_descriptor(
+    object: Option<ForeignDomainObject<'static>>,
+    sockfd: c_int,
+    command: impl FnOnce(&ForeignNifmRequest<'static>, BsdSockFd) -> Result<(), DispatchError>,
+) -> c_int {
+    // The guards run in the order the C driver applies them: the descriptor is resolved before the
+    // service function is called, and that function tests the request before the firmware.
+    let sock = match descriptor::resolve(sockfd) {
+        Ok(sock) => sock,
+        Err(number) => return errno::fail(number),
+    };
+
+    let Some(object) = object else {
+        return errno::report_result(libnx_error(LibnxError::NotInitialized));
+    };
+
+    if !offers_nifm_socket_descriptor() {
+        return errno::report_result(libnx_error(LibnxError::IncompatSysVer));
+    }
+
+    match command(&ForeignNifmRequest::new(object), sock) {
+        Ok(()) => 0,
+        Err(err) => errno::report_result(err.to_rc()),
+    }
+}
+
+/// Whether the running firmware implements the network-interface hand-offs.
+///
+/// One resolver for the whole module, so a firmware version is compared in exactly one place and
+/// every entry point below reads a named fact instead of a version. The commands are not optional
+/// features of one interface: each was introduced by a firmware and simply does not exist before
+/// it, so what a caller needs to know is whether the command is there, not which release it is on.
+///
+/// The version is a run-constant: the entry crate stores it once during environment setup and it
+/// cannot change while the process lives: so this recomputes nothing that could have moved.
+fn offers_nifm_socket_descriptor() -> bool {
+    hos_version::get() >= HosVersion::new(3, 0, 0)
+}
+
+/// Reads the libnx service struct at `ptr` and addresses the object it names.
+///
+/// Returns `None` when the struct names no object, which is what a service the C side never
+/// converted to a domain looks like. Both interfaces reached from here are modelled as domain
+/// objects, so there is nothing to send a command through in that case.
+///
+/// # Safety
+///
+/// `ptr` must be null or point to a readable libnx service struct: which every type reached
+/// through here begins with, so a pointer to one of those is a pointer to this.
+unsafe fn domain_object_at(ptr: *mut c_void) -> Option<ForeignDomainObject<'static>> {
+    if ptr.is_null() {
+        return None;
+    }
+
+    // SAFETY: the caller guarantees a readable service struct at a non-null `ptr`.
+    let service = unsafe { *ptr.cast::<Service>() };
+    service.as_domain_object()
 }

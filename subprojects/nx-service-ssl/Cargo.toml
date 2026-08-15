@@ -10,9 +10,16 @@ test = false
 doctest = false
 bench = false
 
+[features]
+# Gates `src/ffi.rs`, which holds the C boundary's view of an `ISslConnection` a caller
+# owns. The module defines no `__nx_*` symbol of its own; it exists so another
+# crate's entry points have a shape to address, and a pure-Rust link skips it.
+ffi = []
+
 [dependencies]
 bitflags = "2"
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-service-bsd = { version = "0.1.0", path = "../nx-service-bsd" }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-sys-thread-tls = { version = "0.1.0", path = "../nx-sys-thread-tls" }

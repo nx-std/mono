@@ -25,7 +25,10 @@ use nx_service_bsd::{
     CommandError,
     PosixError,
 };
-use nx_sf::error::ToResultCode as _;
+use nx_sf::error::{
+    ResultCode,
+    ToResultCode as _,
+};
 
 /// The Horizon result code the last failed call left behind.
 ///
@@ -73,6 +76,20 @@ pub fn report(err: CommandError) -> c_int {
         }
     }
 
+    -1
+}
+
+/// Reports a command that failed at a service other than the socket service, and returns C's
+/// integer failure value.
+///
+/// The calls that hand a socket descriptor to the TLS stack or to a network-interface request are
+/// dispatched by the layer holding those services, not by this crate, so their failure arrives as
+/// a result code rather than a [`CommandError`] and there is no POSIX condition behind it. The C
+/// driver answers `EIO` for every one of them and leaves the reason in the result code, which is
+/// what this does.
+pub fn report_result(code: ResultCode) -> c_int {
+    LAST_RESULT.set(code);
+    set_errno(EIO);
     -1
 }
 

@@ -541,6 +541,43 @@ if get_option('use_nx_net').enabled()
     deps_cargo_features += ['net']
 endif
 
+# nx-tls
+# The TLS socket hand-offs: `socketSslConnection*`. Depends on `nx-service-ssl`
+# and `nx-sys-net` for the two halves it joins, a connection object and the
+# process descriptor table.
+#
+# It also depends on `nx-rt-core`, which is the point: sitting above the runtime
+# is what lets it read the firmware its `[16.0.0]` DTLS gate needs, instead of
+# stranding that symbol in the runtime away from its siblings. `nx-rt-core` must
+# never depend on it in return.
+#
+# It requires `use_nx_sys_net`: the hand-offs translate a process descriptor into
+# the one the service issued, and that map is the socket driver's.
+if get_option('use_nx_tls').enabled()
+    if not get_option('use_nx_sys_net').enabled()
+        error(
+            'use_nx_tls=enabled requires -Duse_nx_sys_net=enabled (currently @0@): a TLS hand-off takes a descriptor from the Rust socket driver\'s table, and without it there is no table to resolve one against'.format(
+                get_option('use_nx_sys_net'),
+            ),
+        )
+    endif
+    if not get_option('use_nx_rt').enabled()
+        error(
+            'use_nx_tls=enabled requires -Duse_nx_rt=enabled (currently @0@): the DTLS hand-off exists only on [16.0.0+] and reads the running firmware, which the runtime holds'.format(
+                get_option('use_nx_rt'),
+            ),
+        )
+    endif
+
+    nx_tls_proj = subproject('nx-tls')
+
+    deps += nx_tls_proj.get_variable('nx_tls_dep')
+    deps_override_link_args += ['-T', nx_tls_proj.get_variable('nx_tls_ld_override')]
+
+    debug('tls feature: enabled')
+    deps_cargo_features += ['tls']
+endif
+
 # nx-sys-net
 # The socket driver. Depends on `nx-service-bsd` and `nx-sys-fd` internally;
 # enabling `use_nx_sys_net` pulls both in transitively via Cargo and Meson's

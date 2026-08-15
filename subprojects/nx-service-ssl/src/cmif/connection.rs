@@ -2,10 +2,12 @@
 
 use core::mem::size_of;
 
+use nx_service_bsd::RawSockAddr;
 use nx_sf::service::{
     BufferAttr,
     DispatchError,
     DomainObjectRef,
+    DomainTarget,
 };
 use zerocopy::IntoBytes as _;
 
@@ -25,16 +27,18 @@ use crate::{
         PollIn,
         SetPrivateOptionIn,
         SetPrivateOptionLegacyIn,
+        SocketFd,
     },
 };
 
 /// Sets the socket descriptor on the connection.
-pub(crate) fn set_socket_descriptor(
-    object: DomainObjectRef<'_>,
-    sockfd: i32,
-) -> Result<i32, DispatchError> {
+pub(crate) fn set_socket_descriptor<'d>(
+    object: impl DomainTarget<'d>,
+    sockfd: impl Into<SocketFd>,
+) -> Result<Option<SocketFd>, DispatchError> {
+    let sockfd = sockfd.into();
     let result = dispatch_in_out_u32(object, proto::CONN_SET_SOCKET_DESCRIPTOR, sockfd)?;
-    Ok(result as i32)
+    Ok((result as i32).try_into().ok())
 }
 
 /// Sets the host name for TLS verification.
@@ -62,8 +66,10 @@ pub(crate) fn set_io_mode(object: DomainObjectRef<'_>, mode: u32) -> Result<(), 
 }
 
 /// Gets the socket descriptor.
-pub(crate) fn get_socket_descriptor(object: DomainObjectRef<'_>) -> Result<i32, DispatchError> {
-    dispatch_out_u32(object, proto::CONN_GET_SOCKET_DESCRIPTOR).map(|v| v as i32)
+pub(crate) fn get_socket_descriptor<'d>(
+    object: impl DomainTarget<'d>,
+) -> Result<Option<SocketFd>, DispatchError> {
+    dispatch_out_u32(object, proto::CONN_GET_SOCKET_DESCRIPTOR).map(|v| (v as i32).try_into().ok())
 }
 
 /// Gets the host name string.
@@ -296,20 +302,21 @@ pub(crate) fn get_next_alpn_proto(
 }
 
 /// Sets DTLS socket descriptor (16.0.0+).
-pub(crate) fn set_dtls_socket_descriptor(
-    object: DomainObjectRef<'_>,
-    sockfd: i32,
-    sockaddr: &[u8],
-) -> Result<i32, DispatchError> {
+pub(crate) fn set_dtls_socket_descriptor<'d>(
+    object: impl DomainTarget<'d>,
+    sockfd: impl Into<SocketFd>,
+    sockaddr: &RawSockAddr,
+) -> Result<Option<SocketFd>, DispatchError> {
+    let sockfd = sockfd.into();
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CONN_SET_DTLS_SOCKET_DESCRIPTOR)
+        .request(proto::CONN_SET_DTLS_SOCKET_DESCRIPTOR)
         .in_raw(sockfd.as_bytes())
         .out_size(size_of::<i32>())
-        .in_buffer(sockaddr, BufferAttr::HIPC_MAP_ALIAS)
+        .in_buffer(sockaddr.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok(*result.value::<i32>())
+    Ok((*result.value::<i32>()).try_into().ok())
 }
 
 /// Gets DTLS handshake timeout in nanoseconds (16.0.0+).

@@ -32,15 +32,21 @@ impl BsdSockFd {
         self.0
     }
 
-    /// Adopts a descriptor the BSD service just issued.
+    /// Adopts a descriptor the BSD service issued.
     ///
-    /// The caller must ensure `fd` came from a command the service accepted,
+    /// The caller must ensure `fd` came from a command that was accepted,
     /// which is what makes it non-negative; nothing here can establish that
     /// on its own, since only the response the caller read says whether the
     /// command succeeded. A debug build asserts the part that is checkable.
     ///
-    /// Crate-private, so the only callers are the command wrappers that read
-    /// the response themselves.
+    /// Most callers are the command wrappers in this crate, which read the
+    /// response themselves. The exception is the descriptor another service
+    /// reports rather than issues: the TLS service answers the command that
+    /// takes a socket over with the descriptor it displaced, and that number
+    /// belongs to the BSD service's space like any other. A caller outside
+    /// this crate adopting one carries the same obligation: it has read a
+    /// response, and the sentinel the service uses for "no descriptor" is
+    /// ruled out before it gets here.
     ///
     /// # Panics
     ///
@@ -48,7 +54,7 @@ impl BsdSockFd {
     /// descriptor for a command it rejected, or a caller adopting one without
     /// checking the response first.
     #[inline]
-    pub(crate) const fn from_raw_unchecked(fd: i32) -> Self {
+    pub const fn from_raw_unchecked(fd: i32) -> Self {
         debug_assert!(fd >= 0, "adopted a negative BSD socket descriptor");
         Self(fd)
     }

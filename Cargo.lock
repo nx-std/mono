@@ -263,6 +263,7 @@ dependencies = [
  "nx-panic-handler",
  "nx-service-applet",
  "nx-service-bsd",
+ "nx-service-nifm",
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
@@ -1156,6 +1157,7 @@ name = "nx-service-nifm"
 version = "0.1.0"
 dependencies = [
  "nx-panic-handler",
+ "nx-service-bsd",
  "nx-service-sm",
  "nx-sf",
  "nx-svc",
@@ -1443,6 +1445,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "nx-panic-handler",
+ "nx-service-bsd",
  "nx-service-sm",
  "nx-sf",
  "nx-std-sync",
@@ -1607,6 +1610,7 @@ dependencies = [
  "nx-sys-thread-tls",
  "nx-sys-virtmem",
  "nx-time",
+ "nx-tls",
  "nx-wlaninf",
  "thiserror",
 ]
@@ -1763,6 +1767,17 @@ dependencies = [
  "nx-panic-handler",
  "static_assertions",
  "thiserror",
+]
+
+[[package]]
+name = "nx-tls"
+version = "0.1.0"
+dependencies = [
+ "nx-panic-handler",
+ "nx-rt-core",
+ "nx-service-ssl",
+ "nx-sf",
+ "nx-sys-net",
 ]
 
 [[package]]

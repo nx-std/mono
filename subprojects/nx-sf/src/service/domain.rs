@@ -21,6 +21,15 @@
 //! [`DomainObject`] is minted only where a close is genuinely owed: the server
 //! emits an object id in a reply, and `DomainDispatch::send` turns each one into
 //! exactly one owner.
+//!
+//! # Objects in a domain this process did not open
+//!
+//! The table above is the whole story for a domain this workspace converted. A C caller that
+//! owns one and passes a service struct in is a fourth case, and it gets a type of its own:
+//! [`ForeignDomainObject`]. It is kept apart from [`DomainObjectRef`] deliberately: that type
+//! carries its invariant by construction, and a constructor taking three loose integers would be
+//! a hole in it. The two meet again at [`DomainTarget`], which is what a command that merely
+//! names an object takes.
 
 use core::{
     marker::PhantomData,
@@ -33,7 +42,10 @@ use super::{
         CloneObjectError,
         CopyFromDomainError,
     },
-    dispatch::DomainDispatch,
+    dispatch::{
+        Dispatch,
+        DomainDispatch,
+    },
     handle::{
         BorrowedSessionHandle,
         OwnedSessionHandle,
@@ -343,4 +355,128 @@ impl<'d> DomainObjectRef<'d> {
     pub fn dispatch<'p>(&self, request_id: u32) -> DomainDispatch<'d, 'p> {
         DomainDispatch::new(self.domain, Some(self.object_id), request_id)
     }
+}
+
+/// Non-owning view onto a single object inside a domain **this process did not open**.
+///
+/// The case is a C caller that owns a service struct and passes it in. What that struct records
+/// is the parent session's handle, the server's pointer-buffer size, and the id of one object:
+/// enough to address the object, and not enough to be a [`DomainObjectRef`], which assumes a
+/// [`DomainRef`] this process holds.
+///
+/// Keeping it a separate type is what stops the two from being confused. A [`DomainObjectRef`]
+/// carries its invariant by construction, since `DomainDispatch::send` mints one per id the
+/// server emitted, and there is no constructor that takes three loose integers. This type is the
+/// one that does, and its name says the id came from outside.
+///
+/// Like every borrowed form here it is `Copy`, has no destructor, and carries a lifetime: the C
+/// owner closes the session and the object, and nothing here may do either.
+///
+/// ## It cannot adopt an object a reply carries
+///
+/// [`DomainTarget::request`] hands back the non-domain [`Dispatch`], which sends the domain
+/// header the object id needs and parses the domain response, but exposes no `out_objects`. That
+/// is the correct restriction rather than a missing feature: an object the server emits into
+/// somebody else's domain is owed a close by that domain's owner, and minting a
+/// [`DomainObject`] for it here would be a second closer.
+#[derive(Debug, Clone, Copy)]
+pub struct ForeignDomainObject<'d> {
+    handle: BorrowedSessionHandle<'d>,
+    pointer_buffer_size: u16,
+    object_id: ObjectId,
+    owner: PhantomData<&'d ()>,
+}
+
+impl<'d> ForeignDomainObject<'d> {
+    /// Addresses an object inside a domain owned outside this workspace, without checking that
+    /// any of it names what the caller says. Returns `None` if `raw_object_id` is the sentinel
+    /// zero, which is what a service struct never converted to a domain records.
+    ///
+    /// The caller must ensure the session is a domain its owner keeps open for as long as this
+    /// view is used, that `pointer_buffer_size` is the size that owner recorded, and that
+    /// `raw_object_id` names a live object inside it. None of that is checkable here: the owner
+    /// is on the far side of a C boundary, and only the server knows which ids are live. A wrong
+    /// size mis-sizes pointer buffers and a stale id is answered with an error by the request it
+    /// reaches, rather than faulting, which is why this is a safe function.
+    ///
+    /// Crate-private: the one place that holds the proof is the FFI boundary, which reads the
+    /// three out of a service struct a C caller passed in. A consumer reaches this through
+    /// [`Service::as_domain_object`](crate::ffi::Service::as_domain_object) and cannot mint one
+    /// from integers of its own.
+    #[cfg(feature = "ffi")]
+    #[inline]
+    pub(crate) fn new_unchecked(
+        handle: BorrowedSessionHandle<'d>,
+        pointer_buffer_size: u16,
+        raw_object_id: u32,
+    ) -> Option<Self> {
+        Some(Self {
+            handle,
+            pointer_buffer_size,
+            object_id: ObjectId::new(raw_object_id)?,
+            owner: PhantomData,
+        })
+    }
+
+    /// Returns the object id this view addresses.
+    #[inline]
+    pub fn object_id(&self) -> ObjectId {
+        self.object_id
+    }
+}
+
+/// A server-side object inside a domain that a request can be addressed to.
+///
+/// The two implementors differ only in where the object came from, one from a domain this
+/// process opened and one from a service struct a C caller owns, and a command that merely names
+/// an object has no reason to care which. Taking this trait is what lets one command body serve
+/// both.
+///
+/// Sealed: those two are the whole of the set, and a third would be an object nobody in this
+/// workspace closes.
+pub trait DomainTarget<'d>: _priv::Sealed {
+    /// Starts a request builder addressed at this object.
+    ///
+    /// The builder is [`Dispatch`] rather than [`DomainDispatch`]: it carries the domain header
+    /// the object id needs and parses the domain response, and it exposes no `out_objects`. A
+    /// command that adopts an object the reply carries takes [`DomainObjectRef`] directly and
+    /// uses [`DomainObjectRef::dispatch`], because only a domain this process owns can take on
+    /// that close.
+    fn request<'p>(&self, request_id: u32) -> Dispatch<'d, 'p>;
+}
+
+impl<'d> DomainTarget<'d> for DomainObjectRef<'d> {
+    #[inline]
+    fn request<'p>(&self, request_id: u32) -> Dispatch<'d, 'p> {
+        Dispatch::new(
+            self.domain.handle(),
+            self.domain.pointer_buffer_size(),
+            Some(self.object_id),
+            request_id,
+        )
+    }
+}
+
+impl<'d> DomainTarget<'d> for ForeignDomainObject<'d> {
+    #[inline]
+    fn request<'p>(&self, request_id: u32) -> Dispatch<'d, 'p> {
+        Dispatch::new(
+            self.handle,
+            self.pointer_buffer_size,
+            Some(self.object_id),
+            request_id,
+        )
+    }
+}
+
+mod _priv {
+    use super::{
+        DomainObjectRef,
+        ForeignDomainObject,
+    };
+
+    pub trait Sealed {}
+
+    impl Sealed for DomainObjectRef<'_> {}
+    impl Sealed for ForeignDomainObject<'_> {}
 }
