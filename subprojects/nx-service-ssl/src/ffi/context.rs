@@ -6,17 +6,17 @@ use nx_sf::service::{
 };
 
 use crate::{
+    certificate::{
+        CertificateFormat,
+        InternalPki,
+        KeyAndCertParams,
+    },
     cmif::{
         self,
         GenerateKeyAndCertError,
         RemovePkiError,
     },
-    types::{
-        CertificateFormat,
-        ContextOption,
-        InternalPki,
-        KeyAndCertParams,
-    },
+    context::ContextOption,
 };
 
 /// An `ISslContext` a C caller owns.
