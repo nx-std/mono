@@ -8,7 +8,7 @@ use nx_sf::service::{
 
 use crate::{
     cmif,
-    types::{
+    connection::{
         AlpnProtoState,
         CipherInfo,
         IoMode,
@@ -17,9 +17,9 @@ use crate::{
         PrivateOptionType,
         RenegotiationMode,
         SessionCacheMode,
-        SocketFd,
         VerifyOption,
     },
+    socket::SocketFd,
 };
 
 /// An `ISslConnection` a C caller owns.

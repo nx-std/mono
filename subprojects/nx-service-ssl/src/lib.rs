@@ -44,53 +44,64 @@ use nx_sf::service::{
     clone_current_object,
 };
 
+pub mod certificate;
 mod cmif;
+pub mod connection;
+pub mod context;
 mod dispatch;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 mod proto;
+pub mod service;
 mod session;
-pub mod types;
+pub mod socket;
 
 pub use nx_sf::service::DispatchError as IpcDispatchError;
 
 use self::session::SessionPool;
 pub use self::{
+    certificate::{
+        CaCertificateId,
+        CertificateFormat,
+        InternalPki,
+        KeyAndCertParams,
+        ServerCertDetailEntry,
+        ServerCertDetailHeader,
+        TrustedCertStatus,
+    },
     cmif::{
         CreateConnectionError,
         CreateContextError,
         GenerateKeyAndCertError,
         RemovePkiError,
     },
-    proto::{
-        SERVICE_NAME,
-        SERVICE_NAME_SYSTEM,
-    },
-    types::{
+    connection::{
         AlpnProtoState,
-        CaCertificateId,
-        CertificateFormat,
         CipherInfo,
-        ContextOption,
-        DebugOptionType,
-        FlushSessionCacheOptionType,
-        InternalPki,
         IoMode,
-        KeyAndCertParams,
-        NoDescriptor,
         OptionType,
         PollEvent,
         PrivateOptionType,
         RenegotiationMode,
-        ServerCertDetailEntry,
-        ServerCertDetailHeader,
         SessionCacheMode,
-        SocketFd,
-        SslServiceType,
-        SslVersion,
-        TrustedCertStatus,
-        UnknownOption,
         VerifyOption,
+    },
+    context::{
+        ContextOption,
+        SslVersion,
+    },
+    proto::{
+        SERVICE_NAME,
+        SERVICE_NAME_SYSTEM,
+    },
+    service::{
+        DebugOptionType,
+        FlushSessionCacheOptionType,
+        SslServiceType,
+    },
+    socket::{
+        NoDescriptor,
+        SocketFd,
     },
 };
 
@@ -686,4 +697,21 @@ pub enum ConnectCmifError {
     /// Cloning the session for the pool failed.
     #[error("failed to clone ssl session for the pool")]
     CloneSession(#[source] nx_sf::service::CloneObjectError),
+}
+
+/// Error returned when a word names no variant of the option it was read as.
+///
+/// One type serves every option in the crate, because they all fail the same way and for the same
+/// reason: a C caller passed a number, and the service defines what the numbers mean. Which option
+/// was being read is the conversion's own type, so the error does not repeat it.
+///
+/// Declared here rather than beside any one of them because no single module owns it: the
+/// conversions that return it are spread across [`certificate`], [`connection`], [`context`] and
+/// [`service`], and picking one of those as its home would make the other three reach sideways
+/// into it.
+#[derive(Debug, thiserror::Error)]
+#[error("no option is numbered {value:#x}")]
+pub struct UnknownOption {
+    /// The value that was offered.
+    pub value: u32,
 }

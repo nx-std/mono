@@ -11,14 +11,7 @@ use nx_sf::service::{
 use zerocopy::IntoBytes as _;
 
 use crate::{
-    dispatch::{
-        dispatch_in,
-        dispatch_in_out_u32,
-        dispatch_no_io,
-        dispatch_out_u32,
-    },
-    proto,
-    types::{
+    connection::{
         CipherInfo,
         ConnSetOptionIn,
         GetNextAlpnProtoOut,
@@ -32,9 +25,16 @@ use crate::{
         SessionCacheMode,
         SetPrivateOptionIn,
         SetPrivateOptionLegacyIn,
-        SocketFd,
         VerifyOption,
     },
+    dispatch::{
+        dispatch_in,
+        dispatch_in_out_u32,
+        dispatch_no_io,
+        dispatch_out_u32,
+    },
+    proto,
+    socket::SocketFd,
 };
 
 /// Sets the socket descriptor on the connection.
