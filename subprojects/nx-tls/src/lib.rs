@@ -9,8 +9,8 @@
 //! ## Why it sits above the runtime
 //!
 //! Every other crate holding a service's C surface sits *below* `nx-rt-core`, and pays for it: the
-//! symbols needing something the runtime holds — a service-manager session, the firmware version —
-//! get stranded in the runtime, away from the surface they belong to. `nx-net` is split that way
+//! symbols needing something the runtime holds, a service-manager session or the firmware
+//! version, get stranded in the runtime away from the surface they belong to. `nx-net` is split that way
 //! today, with five of its resolver symbols defined in `nx-rt-core`.
 //!
 //! This crate takes the dependency the other direction instead. It depends on `nx-rt-core`, so it
@@ -22,14 +22,34 @@
 //! acyclic. Nothing here is reached from the runtime; a program links this crate because it wants
 //! TLS, and the linker script binds the symbols.
 //!
-//! ## What it does not do yet
+//! ## What it holds
 //!
-//! The `ssl` C surface is large — contexts, connections, handshakes, certificate handling — and
-//! only the socket hand-offs are ported. Those are the ones a socket program reaches first: they
-//! take a descriptor from the process's table and give it to a TLS connection, which is the one
-//! operation that needs a layer knowing both the descriptor table and the service. The rest is a
-//! port of [`nx_service_ssl`]'s surface with no such crossing in it, and it lands here as it is
-//! written.
+//! The whole of upstream's `ssl` client: bringing the service up, contexts, connections,
+//! handshakes, certificate handling, and the three socket hand-offs that gave the crate its first
+//! reason to exist. All of it sits under [`ffi`], because all of it exists for the C boundary:
+//! this crate exports no Rust API, and [`nx_service_ssl`] is what a Rust caller wants instead.
+//!
+//! That is also why the process-wide service connection needs no `extern-state` treatment. A
+//! second static library cannot reach it, since there is nothing here to reach it *through*, and
+//! the C ABI is single by construction.
+//!
+//! ## The system service variant is not selectable
+//!
+//! Upstream lets a program pick `ssl:s` by defining a weak `__nx_ssl_service_type` global, and
+//! reading that from Rust would mean declaring a weak *undefined* symbol, which needs an unstable
+//! compiler feature. So this connects to `ssl` and nothing else, and the two commands that exist
+//! only on the system variant report the service as uninitialized, exactly as they do for any
+//! program on the default one.
+//!
+//! Nothing is lost for the programs this workspace targets: `ssl:s` needs permissions homebrew
+//! does not have.
+//!
+//! ## What it does not hold
+//!
+//! Nothing sends a request on the caller's behalf beyond what the C API describes. Removing a PKI
+//! searches three places for an id, because the id does not say which kind it is, but only while
+//! the service keeps answering "not here": any other failure is reported rather than searched
+//! past.
 #![no_std]
 
 extern crate nx_panic_handler as _; // provides #[panic_handler]

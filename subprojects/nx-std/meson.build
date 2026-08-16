@@ -547,9 +547,10 @@ endif
 # process descriptor table.
 #
 # It also depends on `nx-rt-core`, which is the point: sitting above the runtime
-# is what lets it read the firmware its `[16.0.0]` DTLS gate needs, instead of
-# stranding that symbol in the runtime away from its siblings. `nx-rt-core` must
-# never depend on it in return.
+# is what lets it read the running firmware its version gates need and reach the
+# process's service-manager session, instead of stranding those symbols in the
+# runtime away from their siblings. `nx-rt-core` must never depend on it in
+# return.
 #
 # It requires `use_nx_sys_net`: the hand-offs translate a process descriptor into
 # the one the service issued, and that map is the socket driver's.
@@ -563,7 +564,7 @@ if get_option('use_nx_tls').enabled()
     endif
     if not get_option('use_nx_rt').enabled()
         error(
-            'use_nx_tls=enabled requires -Duse_nx_rt=enabled (currently @0@): the DTLS hand-off exists only on [16.0.0+] and reads the running firmware, which the runtime holds'.format(
+            'use_nx_tls=enabled requires -Duse_nx_rt=enabled (currently @0@): the ssl client opens its session over the process\'s service-manager session and gates commands on the running firmware, and the runtime holds both'.format(
                 get_option('use_nx_rt'),
             ),
         )

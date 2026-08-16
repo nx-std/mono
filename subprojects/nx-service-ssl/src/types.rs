@@ -224,6 +224,23 @@ pub enum AlpnProtoState {
     EarlyValue = 4,
 }
 
+impl AlpnProtoState {
+    /// Reads the state out of the word `GetNextAlpnProto` reports.
+    ///
+    /// A value outside the set reads as [`NoSupport`](Self::NoSupport), which is what a caller
+    /// does with a state it cannot act on anyway. Rejecting it would turn a service that grew a
+    /// state into a hard failure on firmware this crate predates.
+    pub(crate) fn from_raw(raw: u32) -> Self {
+        match raw {
+            1 => Self::Negotiated,
+            2 => Self::NoOverlap,
+            3 => Self::Selected,
+            4 => Self::EarlyValue,
+            _ => Self::NoSupport,
+        }
+    }
+}
+
 bitflags::bitflags! {
     /// TLS version bitmask controlling min/max TLS versions.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -515,3 +532,165 @@ impl TryFrom<i32> for SocketFd {
 #[derive(Debug, thiserror::Error)]
 #[error("the service reported no socket descriptor")]
 pub struct NoDescriptor;
+
+impl TryFrom<u32> for ContextOption {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::CrlImportDateCheckEnable),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for DebugOptionType {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::AllowDisableVerifyOption),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for CertificateFormat {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::Pem),
+            2 => Ok(Self::Der),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for InternalPki {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::DeviceClientCertDefault),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for IoMode {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::Blocking),
+            2 => Ok(Self::NonBlocking),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for SessionCacheMode {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::SessionId),
+            2 => Ok(Self::SessionTicket),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for RenegotiationMode {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Secure),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for OptionType {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::DoNotCloseSocket),
+            1 => Ok(Self::GetServerCertChain),
+            2 => Ok(Self::SkipDefaultVerify),
+            3 => Ok(Self::EnableAlpn),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for PrivateOptionType {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::DtlsSession),
+            2 => Ok(Self::SetCipher),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+impl TryFrom<u32> for FlushSessionCacheOptionType {
+    type Error = UnknownOption;
+
+    /// # Errors
+    ///
+    /// [`UnknownOption`] when `value` names no variant.
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::SingleHost),
+            1 => Ok(Self::AllHosts),
+            _ => Err(UnknownOption { value }),
+        }
+    }
+}
+
+/// Error returned when a word names no variant of the option it was read as.
+///
+/// One type serves every option in this module, because they all fail the same way and for the
+/// same reason: a C caller passed a number, and the service defines what the numbers mean. Which
+/// option was being read is the conversion's own type, so the error does not repeat it.
+#[derive(Debug, thiserror::Error)]
+#[error("no option is numbered {value:#x}")]
+pub struct UnknownOption {
+    /// The value that was offered.
+    pub value: u32,
+}

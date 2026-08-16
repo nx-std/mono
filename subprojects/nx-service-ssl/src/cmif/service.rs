@@ -11,7 +11,12 @@ use zerocopy::IntoBytes as _;
 
 use crate::{
     proto,
-    types::CreateContextIn,
+    types::{
+        CreateContextIn,
+        DebugOptionType,
+        FlushSessionCacheOptionType,
+        SslVersion,
+    },
 };
 
 /// Creates an SSL context. Returns the raw sub-object ID.
@@ -20,11 +25,11 @@ use crate::{
 /// re-addresses the id through the long-lived parent domain.
 pub(crate) fn create_context(
     domain: DomainRef<'_>,
-    ssl_version: u32,
+    ssl_version: SslVersion,
     system: bool,
 ) -> Result<u32, CreateContextError> {
     let input = CreateContextIn {
-        ssl_version,
+        ssl_version: ssl_version.bits(),
         _pad: 0,
         pid_placeholder: 0,
     };
@@ -57,6 +62,16 @@ pub enum CreateContextError {
     /// Response did not include the expected sub-object id.
     #[error("CreateContext response did not include the expected sub-object")]
     MissingObject,
+}
+
+impl nx_sf::error::ToResultCode for CreateContextError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // As `CreateConnectionError::MissingObject`: the reply parsed and carried no object.
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
+        }
+    }
 }
 
 /// Gets the context count.
@@ -136,13 +151,13 @@ pub(crate) fn set_interface_version(
 pub(crate) fn flush_session_cache(
     domain: DomainRef<'_>,
     hostname: &[u8],
-    option_type: u32,
+    option_type: FlushSessionCacheOptionType,
 ) -> Result<u32, DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = domain
         .dispatch(proto::FLUSH_SESSION_CACHE)
-        .in_raw(option_type.as_bytes())
+        .in_raw((option_type as u32).as_bytes())
         .out_size(size_of::<u32>())
         .in_buffer(hostname, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
@@ -152,14 +167,14 @@ pub(crate) fn flush_session_cache(
 /// Sets a debug option (6.0.0+).
 pub(crate) fn set_debug_option(
     domain: DomainRef<'_>,
-    debug_type: u32,
+    debug_type: DebugOptionType,
     buffer: &[u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::SET_DEBUG_OPTION)
-        .in_raw(debug_type.as_bytes())
+        .in_raw((debug_type as u32).as_bytes())
         .in_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
@@ -168,14 +183,14 @@ pub(crate) fn set_debug_option(
 /// Gets a debug option (6.0.0+).
 pub(crate) fn get_debug_option(
     domain: DomainRef<'_>,
-    debug_type: u32,
+    debug_type: DebugOptionType,
     buffer: &mut [u8],
 ) -> Result<(), DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     domain
         .dispatch(proto::GET_DEBUG_OPTION)
-        .in_raw(debug_type.as_bytes())
+        .in_raw((debug_type as u32).as_bytes())
         .out_buffer(buffer, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())

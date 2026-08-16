@@ -352,7 +352,7 @@ option(
 option(
     'use_nx_tls',
     type : 'feature', value : 'disabled',
-    description : 'Enable nx-tls (TLS socket hand-offs; replaces the libnx socketSslConnection* functions)',
+    description : 'Enable nx-tls (ssl client; replaces the libnx ssl client and the socketSslConnection* hand-offs)',
     yield : true
 )
 

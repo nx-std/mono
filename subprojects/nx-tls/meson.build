@@ -10,8 +10,9 @@ nx_panic_handler_proj = subproject('nx-panic-handler')
 nx_panic_handler_dep = nx_panic_handler_proj.get_variable('nx_panic_handler_dep')
 
 # This crate sits above the runtime rather than below it, which is what lets it
-# read the running firmware and keep the hand-off gated on `[16.0.0]` beside its
-# siblings. `nx-rt-core` must never depend on this crate in return.
+# read the running firmware its version gates need and reach the process's
+# service-manager session. `nx-rt-core` must never depend on this crate in
+# return.
 nx_rt_core_proj = subproject('nx-rt-core')
 nx_rt_core_dep = nx_rt_core_proj.get_variable('nx_rt_core_dep')
 
@@ -53,7 +54,7 @@ nx_tls_tgt = custom_target(
 #---------------------------------------------------------------------------------
 # Dependency declaration
 #---------------------------------------------------------------------------------
-# Linker script for overriding the libnx socket driver's `socketSslConnection*` functions
+# Linker script for overriding the libnx `ssl` client and its socket hand-offs
 nx_tls_ld_override = meson.current_source_dir() / 'tls_override.ld'
 
 nx_tls_dep = declare_dependency(

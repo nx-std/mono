@@ -23,4 +23,7 @@ nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
 nx-service-ssl = { version = "0.1.0", path = "../nx-service-ssl" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }
+nx-svc = { version = "0.1.0", path = "../nx-svc" }
 nx-sys-net = { version = "0.1.0", path = "../nx-sys-net" }
+thiserror = { version = "2", default-features = false }

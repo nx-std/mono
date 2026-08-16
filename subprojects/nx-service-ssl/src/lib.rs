@@ -21,7 +21,7 @@
 //! Per IC-4, this crate is hosversion-unaware. Hosversion-gated commands
 //! (e.g., `FlushSessionCache` 5.0.0+, `SetDebugOption` 6.0.0+,
 //! `ClearTls12FallbackFlag` 14.0.0+, system-only cmds 15.0.0+, DTLS
-//! cmds 16.0.0+) are exposed unconditionally — callers choose based on
+//! cmds 16.0.0+) are exposed unconditionally: callers choose based on
 //! the target firmware version. The `SetInterfaceVersion` internal
 //! command is exposed as a public method so callers can issue it after
 //! connect if needed.
@@ -54,10 +54,7 @@ pub mod types;
 
 pub use nx_sf::service::DispatchError as IpcDispatchError;
 
-use self::session::{
-    SSL_POOL_SIZE,
-    SessionPool,
-};
+use self::session::SessionPool;
 pub use self::{
     cmif::{
         CreateConnectionError,
@@ -92,14 +89,15 @@ pub use self::{
         SslServiceType,
         SslVersion,
         TrustedCertStatus,
+        UnknownOption,
         VerifyOption,
     },
 };
 
 /// Connected SSL service wrapper.
 ///
-/// Operates in domain mode with a session pool (default 4 slots,
-/// matching libnx). Dropping the service closes all pool sessions.
+/// Operates in domain mode with a session pool sized by the [`SessionCount`] passed to
+/// [`connect_cmif`]. Dropping the service closes all pool sessions.
 pub struct SslService {
     pool: SessionPool,
     system: bool,
@@ -120,7 +118,7 @@ impl SslService {
         ssl_version: SslVersion,
     ) -> Result<SslContext<'_>, CreateContextError> {
         let guard = self.pool.acquire();
-        let raw_object_id = cmif::create_context(guard.domain(), ssl_version.bits(), self.system)?;
+        let raw_object_id = cmif::create_context(guard.domain(), ssl_version, self.system)?;
         // SAFETY: `raw_object_id` was just returned by `cmif::create_context`
         // on this same domain; no other `DomainObject` references it.
         // All pool domains share the same server-side object table (see
@@ -184,7 +182,7 @@ impl SslService {
         option_type: FlushSessionCacheOptionType,
     ) -> Result<u32, DispatchError> {
         let guard = self.pool.acquire();
-        cmif::svc_flush_session_cache(guard.domain(), hostname, option_type as u32)
+        cmif::svc_flush_session_cache(guard.domain(), hostname, option_type)
     }
 
     /// Sets a debug option (6.0.0+).
@@ -194,7 +192,7 @@ impl SslService {
         buffer: &[u8],
     ) -> Result<(), DispatchError> {
         let guard = self.pool.acquire();
-        cmif::set_debug_option(guard.domain(), debug_type as u32, buffer)
+        cmif::set_debug_option(guard.domain(), debug_type, buffer)
     }
 
     /// Gets a debug option (6.0.0+).
@@ -204,7 +202,7 @@ impl SslService {
         buffer: &mut [u8],
     ) -> Result<(), DispatchError> {
         let guard = self.pool.acquire();
-        cmif::get_debug_option(guard.domain(), debug_type as u32, buffer)
+        cmif::get_debug_option(guard.domain(), debug_type, buffer)
     }
 
     /// Clears the TLS 1.2 fallback flag (14.0.0+).
@@ -239,32 +237,25 @@ pub struct SslContext<'svc> {
 impl SslContext<'_> {
     /// Sets a context option.
     pub fn set_option(&self, option: ContextOption, value: i32) -> Result<(), DispatchError> {
-        cmif::ctx_set_option(self.object.as_borrowed(), option as u32, value)
+        cmif::ctx_set_option(self.object.as_borrowed(), option, value)
     }
 
     /// Gets a context option.
     pub fn get_option(&self, option: ContextOption) -> Result<i32, DispatchError> {
-        cmif::ctx_get_option(self.object.as_borrowed(), option as u32)
+        cmif::ctx_get_option(self.object.as_borrowed(), option)
     }
 
-    /// Creates a connection sub-object.
-    pub fn create_connection(&self) -> Result<SslConnection<'_>, CreateConnectionError> {
-        let raw_object_id = cmif::create_connection(self.object.as_borrowed())?;
+    /// Creates a connection sub-object of the requested kind.
+    pub fn create_connection(
+        &self,
+        kind: ConnectionKind,
+    ) -> Result<SslConnection<'_>, CreateConnectionError> {
+        let raw_object_id = cmif::create_connection(self.object.as_borrowed(), kind)?;
         let guard = self.pool.acquire();
         // SAFETY: `raw_object_id` was just returned by `cmif::create_connection`
         // on a pool domain; all pool domains share the same server-side
         // object table (see `connect_cmif`), and no other `DomainObject`
         // references this id.
-        let object = DomainObject::from_raw_unchecked(guard.domain(), raw_object_id)
-            .ok_or(CreateConnectionError::MissingObject)?;
-        Ok(SslConnection { object })
-    }
-
-    /// Creates a connection sub-object for system (15.0.0+, system only).
-    pub fn create_connection_for_system(&self) -> Result<SslConnection<'_>, CreateConnectionError> {
-        let raw_object_id = cmif::create_connection_for_system(self.object.as_borrowed())?;
-        let guard = self.pool.acquire();
-        // SAFETY: see `create_connection` above.
         let object = DomainObject::from_raw_unchecked(guard.domain(), raw_object_id)
             .ok_or(CreateConnectionError::MissingObject)?;
         Ok(SslConnection { object })
@@ -281,7 +272,7 @@ impl SslContext<'_> {
         cert_data: &[u8],
         format: CertificateFormat,
     ) -> Result<u64, DispatchError> {
-        cmif::import_server_pki(self.object.as_borrowed(), cert_data, format as u32)
+        cmif::import_server_pki(self.object.as_borrowed(), cert_data, format)
     }
 
     /// Imports a client PKI (PKCS#12). Returns the assigned ID.
@@ -299,7 +290,7 @@ impl SslContext<'_> {
 
     /// Registers an internal PKI. Returns the assigned ID.
     pub fn register_internal_pki(&self, pki: InternalPki) -> Result<u64, DispatchError> {
-        cmif::register_internal_pki(self.object.as_borrowed(), pki as u32)
+        cmif::register_internal_pki(self.object.as_borrowed(), pki)
     }
 
     /// Adds a policy OID string.
@@ -319,12 +310,12 @@ impl SslContext<'_> {
         key: &[u8],
         format: CertificateFormat,
     ) -> Result<u64, DispatchError> {
-        cmif::import_client_cert_key_pki(self.object.as_borrowed(), cert, key, format as u32)
+        cmif::import_client_cert_key_pki(self.object.as_borrowed(), cert, key, format)
     }
 
     /// Generates a private key and certificate (16.0.0+).
     ///
-    /// Returns `(cert_size, key_size)` — the actual sizes written to the
+    /// Returns `(cert_size, key_size)`: the actual sizes written to the
     /// output buffers.
     pub fn generate_private_key_and_cert(
         &self,
@@ -341,6 +332,19 @@ impl SslContext<'_> {
         )?;
         Ok((out.cert_size, out.key_size))
     }
+}
+
+/// Which of the two connection-creating commands to send.
+///
+/// The service answers `CreateConnection` and `CreateConnectionForSystem` at different request
+/// ids, and a caller may ask for either regardless of which service variant it connected to. This
+/// is that choice, named rather than spelled as a second function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionKind {
+    /// The connection an application uses.
+    Application,
+    /// The connection a system title uses (15.0.0+).
+    System,
 }
 
 /// SSL connection sub-object obtained via [`SslContext::create_connection`].
@@ -368,12 +372,12 @@ impl SslConnection<'_> {
 
     /// Sets the verify option bitmask.
     pub fn set_verify_option(&self, options: VerifyOption) -> Result<(), DispatchError> {
-        cmif::set_verify_option(self.object.as_borrowed(), options.bits())
+        cmif::set_verify_option(self.object.as_borrowed(), options)
     }
 
     /// Sets the I/O mode.
     pub fn set_io_mode(&self, mode: IoMode) -> Result<(), DispatchError> {
-        cmif::set_io_mode(self.object.as_borrowed(), mode as u32)
+        cmif::set_io_mode(self.object.as_borrowed(), mode)
     }
 
     /// Gets the socket descriptor the connection holds, if it holds one.
@@ -434,7 +438,7 @@ impl SslConnection<'_> {
 
     /// Polls the connection for events.
     pub fn poll(&self, in_pollevent: PollEvent, timeout: u32) -> Result<PollEvent, DispatchError> {
-        cmif::poll(self.object.as_borrowed(), in_pollevent.bits(), timeout)
+        cmif::poll(self.object.as_borrowed(), in_pollevent, timeout)
             .map(PollEvent::from_bits_retain)
     }
 
@@ -450,7 +454,7 @@ impl SslConnection<'_> {
 
     /// Sets the session cache mode.
     pub fn set_session_cache_mode(&self, mode: SessionCacheMode) -> Result<(), DispatchError> {
-        cmif::set_session_cache_mode(self.object.as_borrowed(), mode as u32)
+        cmif::set_session_cache_mode(self.object.as_borrowed(), mode)
     }
 
     /// Gets the session cache mode.
@@ -465,7 +469,7 @@ impl SslConnection<'_> {
 
     /// Sets the renegotiation mode.
     pub fn set_renegotiation_mode(&self, mode: RenegotiationMode) -> Result<(), DispatchError> {
-        cmif::set_renegotiation_mode(self.object.as_borrowed(), mode as u32)
+        cmif::set_renegotiation_mode(self.object.as_borrowed(), mode)
     }
 
     /// Gets the renegotiation mode.
@@ -475,18 +479,18 @@ impl SslConnection<'_> {
 
     /// Sets a connection option.
     pub fn set_option(&self, option: OptionType, flag: bool) -> Result<(), DispatchError> {
-        cmif::set_option(self.object.as_borrowed(), option as u32, flag)
+        cmif::set_option(self.object.as_borrowed(), option, flag)
     }
 
     /// Gets a connection option.
     pub fn get_option(&self, option: OptionType) -> Result<bool, DispatchError> {
-        cmif::get_option(self.object.as_borrowed(), option as u32)
+        cmif::get_option(self.object.as_borrowed(), option)
     }
 
     /// Gets verify cert errors into a buffer.
     ///
-    /// Returns `(count_0, count_1)` — libnx throws an error if these
-    /// don't match, but this crate returns both for the caller to decide.
+    /// Returns `(count_0, count_1)`. The two are expected to agree; this
+    /// crate returns both and leaves the comparison to the caller.
     pub fn get_verify_cert_errors(&self, errors: &mut [u32]) -> Result<(u32, u32), DispatchError> {
         cmif::get_verify_cert_errors(self.object.as_borrowed(), errors)
     }
@@ -510,16 +514,7 @@ impl SslConnection<'_> {
         buffer: &mut [u8],
     ) -> Result<(AlpnProtoState, u32), DispatchError> {
         let out = cmif::get_next_alpn_proto(self.object.as_borrowed(), buffer)?;
-        // Transmute the raw state to the enum; unknown values map to NoSupport.
-        let state = match out.state {
-            0 => AlpnProtoState::NoSupport,
-            1 => AlpnProtoState::Negotiated,
-            2 => AlpnProtoState::NoOverlap,
-            3 => AlpnProtoState::Selected,
-            4 => AlpnProtoState::EarlyValue,
-            _ => AlpnProtoState::NoSupport,
-        };
-        Ok((state, out.proto_size))
+        Ok((AlpnProtoState::from_raw(out.state), out.proto_size))
     }
 
     /// Sets DTLS socket descriptor (16.0.0+). Returns the previous sockfd.
@@ -542,7 +537,7 @@ impl SslConnection<'_> {
         option: PrivateOptionType,
         value: bool,
     ) -> Result<(), DispatchError> {
-        cmif::set_private_option_legacy(self.object.as_borrowed(), option as u32, value)
+        cmif::set_private_option_legacy(self.object.as_borrowed(), option, value)
     }
 
     /// Sets a private option (17.0.0+, option+value layout).
@@ -551,7 +546,7 @@ impl SslConnection<'_> {
         option: PrivateOptionType,
         value: u32,
     ) -> Result<(), DispatchError> {
-        cmif::set_private_option(self.object.as_borrowed(), option as u32, value)
+        cmif::set_private_option(self.object.as_borrowed(), option, value)
     }
 
     /// Sets SRTP ciphers (16.0.0+).
@@ -587,9 +582,14 @@ impl SslConnection<'_> {
 
 /// Connects to the SSL service using CMIF.
 ///
-/// Sets up domain conversion and the session pool (up to 4 slots).
-/// The `system` parameter selects `ssl:s` (15.0.0+) vs `ssl`.
-pub fn connect_cmif(sm: &SmService, system: bool) -> Result<SslService, ConnectCmifError> {
+/// Sets up domain conversion and a session pool of `sessions` slots. The `system` parameter
+/// selects `ssl:s` (15.0.0+) over `ssl`; nothing here checks the firmware, so a caller asking for
+/// the system variant on firmware without it gets the service manager's answer.
+pub fn connect_cmif(
+    sm: &SmService,
+    system: bool,
+    sessions: SessionCount,
+) -> Result<SslService, ConnectCmifError> {
     let service_name = if system {
         proto::SERVICE_NAME_SYSTEM
     } else {
@@ -607,9 +607,10 @@ pub fn connect_cmif(sm: &SmService, system: bool) -> Result<SslService, ConnectC
         .convert_to_domain()
         .map_err(|(_session, err)| ConnectCmifError::ConvertToDomain(err))?;
 
-    let mut sessions: Vec<Domain> = Vec::with_capacity(SSL_POOL_SIZE);
+    let slots = sessions.to_len();
+    let mut sessions: Vec<Domain> = Vec::with_capacity(slots);
     sessions.push(creator);
-    for _ in 1..SSL_POOL_SIZE {
+    for _ in 1..slots {
         let cloned_handle =
             clone_current_object(sessions[0].handle()).map_err(ConnectCmifError::CloneSession)?;
         // SAFETY: cloning a domain session yields another kernel handle that
@@ -623,6 +624,54 @@ pub fn connect_cmif(sm: &SmService, system: bool) -> Result<SslService, ConnectC
     let pool = SessionPool::new(sessions.into_boxed_slice());
 
     Ok(SslService { pool, system })
+}
+
+/// How many IPC sessions the service's pool holds.
+///
+/// The service accepts a small pool so commands can run concurrently, and the C API takes the
+/// size as a plain integer. This is that integer once it has been checked: the bound is the
+/// service's, not this crate's, and a caller outside it is told rather than clamped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionCount(u32);
+
+impl SessionCount {
+    /// Fewest sessions a pool can be built from.
+    pub const MIN: u32 = 1;
+    /// Most sessions the service accepts.
+    pub const MAX: u32 = 4;
+
+    /// What a caller with no pool sizing of its own should use.
+    pub const DEFAULT: Self = Self(3);
+
+    /// The count, as a pool size.
+    ///
+    /// Exact rather than lossy: the value is bounded by [`MAX`](Self::MAX), which fits every
+    /// `usize` this workspace targets.
+    const fn to_len(self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl TryFrom<u32> for SessionCount {
+    type Error = SessionCountError;
+
+    /// # Errors
+    ///
+    /// [`SessionCountError`] when `count` falls outside [`MIN`](Self::MIN)`..=`[`MAX`](Self::MAX).
+    fn try_from(count: u32) -> Result<Self, Self::Error> {
+        match count {
+            Self::MIN..=Self::MAX => Ok(Self(count)),
+            _ => Err(SessionCountError { count }),
+        }
+    }
+}
+
+/// Error returned when a session count falls outside what the service accepts.
+#[derive(Debug, thiserror::Error)]
+#[error("session count {count} is outside 1..=4")]
+pub struct SessionCountError {
+    /// The count that was offered.
+    pub count: u32,
 }
 
 /// Errors returned by [`connect_cmif`].
