@@ -434,7 +434,11 @@ impl<'d> ForeignDomainObject<'d> {
 ///
 /// Sealed: those two are the whole of the set, and a third would be an object nobody in this
 /// workspace closes.
-pub trait DomainTarget<'d>: _priv::Sealed {
+///
+/// `Copy` is a supertrait because both implementors are borrowed forms, which this module requires
+/// to be `Copy` anyway. Stating it here is what lets a command send more than one request through
+/// the object it was handed, as `RemovePki` does three times, without the first one moving it away.
+pub trait DomainTarget<'d>: Copy + _priv::Sealed {
     /// Starts a request builder addressed at this object.
     ///
     /// The builder is [`Dispatch`] rather than [`DomainDispatch`]: it carries the domain header

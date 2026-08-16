@@ -1777,7 +1777,10 @@ dependencies = [
  "nx-rt-core",
  "nx-service-ssl",
  "nx-sf",
+ "nx-std-sync",
+ "nx-svc",
  "nx-sys-net",
+ "thiserror",
 ]
 
 [[package]]

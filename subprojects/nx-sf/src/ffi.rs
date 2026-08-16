@@ -39,6 +39,7 @@ use crate::{
     error::ToResultCode as _,
     service::{
         self,
+        DomainObject,
         ForeignDomainObject,
         OverrideService,
         handle::BorrowedSessionHandle,
@@ -112,6 +113,57 @@ impl Service {
     #[inline]
     pub fn as_session(&self) -> OverrideService {
         OverrideService::new_unchecked(self.session, self.pointer_buffer_size)
+    }
+
+    /// Performs the close the struct records an obligation for, and zeroes it.
+    ///
+    /// Which close that is comes from the (`own_handle`, `object_id`) encoding above: a struct
+    /// holding its own handle owes a session close, and a domain subservice owes a per-object
+    /// close on the parent's handle. A struct recording neither owes nothing, which is what an
+    /// override service and an already-closed one both look like.
+    ///
+    /// Zeroing afterwards is what makes a second call a no-op rather than a second close, so a C
+    /// caller that closes twice tears down nothing the kernel has since reissued.
+    pub fn close(&mut self) {
+        if self.own_handle != 0 {
+            service::control::close_session(borrow(self.session));
+        } else if let Some(object_id) = ObjectId::new(self.object_id) {
+            service::control::close_object(borrow(self.session), object_id);
+        }
+
+        // SAFETY: `Service` is `repr(C)` over four integers, every bit pattern of which is a valid
+        // value, so an all-zero one is inhabited. That is also the state the C surface reads as
+        // closed, since it is what libnx leaves behind.
+        *self = unsafe { mem::zeroed() };
+    }
+}
+
+/// Describes an object this process opened to the C caller taking it over.
+///
+/// This is the outward direction, and the mirror of [`Service::as_domain_object`]: that one reads
+/// a struct a C caller owns, and this one writes the struct a C caller is about to own. It is the
+/// shape an entry point returns when the C API it implements creates an object and hands it back:
+/// `SslContext`, `NifmRequest`, and every other C type whose first member is a `Service`.
+///
+/// # The close obligation moves with it
+///
+/// Taking [`DomainObject`] **by value** is the whole of the contract. That type is the sole closer
+/// for its id, so consuming it is what releases this side of the close, and the C caller becomes
+/// the one that owes it. A caller who wanted to keep dispatching would have to keep the object
+/// instead, and no borrowed form converts, so there is no way to spell the double close.
+///
+/// The struct records `own_handle: 0`: the object lives inside a domain this process still owns and
+/// still closes, so what the C caller took on is the per-object close and not the session's.
+impl From<DomainObject<'_>> for Service {
+    fn from(object: DomainObject<'_>) -> Self {
+        let domain = object.domain();
+
+        Self {
+            session: domain.handle().to_handle(),
+            own_handle: 0,
+            pointer_buffer_size: domain.pointer_buffer_size(),
+            object_id: object.into_raw_object_id(),
+        }
     }
 }
 
@@ -209,20 +261,8 @@ pub unsafe extern "C" fn __nx_sf__service_create_domain_subservice(
 /// `s` is zeroed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __nx_sf__service_close(s: *mut Service) {
-    // SAFETY: Caller guarantees s points to valid Service.
-    let srv = unsafe { *s };
-
-    // Mirror libnx semantics: domain subservices send a per-object close on
-    // the shared handle; everything else with `own_handle != 0` sends a
-    // session close and releases the handle.
-    if srv.own_handle != 0 {
-        service::control::close_session(borrow(srv.session));
-    } else if let Some(object_id) = ObjectId::new(srv.object_id) {
-        service::control::close_object(borrow(srv.session), object_id);
-    }
-
-    // SAFETY: s points to valid writable memory.
-    unsafe { *s = mem::zeroed() };
+    // SAFETY: Caller guarantees s points to valid, writable Service.
+    unsafe { &mut *s }.close();
 }
 
 /// Clones a service.

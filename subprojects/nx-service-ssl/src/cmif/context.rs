@@ -6,10 +6,12 @@ use nx_sf::service::{
     BufferAttr,
     DispatchError,
     DomainObjectRef,
+    DomainTarget,
 };
 use zerocopy::IntoBytes as _;
 
 use crate::{
+    ConnectionKind,
     dispatch::{
         dispatch_in,
         dispatch_in_out_u32,
@@ -17,57 +19,56 @@ use crate::{
     },
     proto,
     types::{
+        CertificateFormat,
+        ContextOption,
         CtxSetOptionIn,
         GenerateKeyAndCertOut,
+        InternalPki,
         KeyAndCertParams,
     },
 };
 
 /// Sets a context option.
-pub(crate) fn set_option(
-    object: DomainObjectRef<'_>,
-    option: u32,
+pub(crate) fn set_option<'d>(
+    object: impl DomainTarget<'d>,
+    option: ContextOption,
     value: i32,
 ) -> Result<(), DispatchError> {
-    let input = CtxSetOptionIn { option, value };
+    let input = CtxSetOptionIn {
+        option: option as u32,
+        value,
+    };
     dispatch_in(object, proto::CTX_SET_OPTION, input)
 }
 
 /// Gets a context option.
-pub(crate) fn get_option(object: DomainObjectRef<'_>, option: u32) -> Result<i32, DispatchError> {
-    let result = dispatch_in_out_u32(object, proto::CTX_GET_OPTION, option)?;
+pub(crate) fn get_option<'d>(
+    object: impl DomainTarget<'d>,
+    option: ContextOption,
+) -> Result<i32, DispatchError> {
+    let result = dispatch_in_out_u32(object, proto::CTX_GET_OPTION, option as u32)?;
     Ok(result as i32)
 }
 
-/// Creates a connection sub-object. Returns the raw sub-object ID.
+/// Creates a connection sub-object of the requested kind. Returns the raw sub-object ID.
 ///
 /// The close obligation is handed on rather than discharged: the caller
 /// re-addresses the id through the long-lived parent domain.
-pub(crate) fn create_connection(object: DomainObjectRef<'_>) -> Result<u32, CreateConnectionError> {
-    let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
-
-    let mut result = object
-        .dispatch(proto::CTX_CREATE_CONNECTION)
-        .out_objects(1)
-        .send(&mut ipc_buf)
-        .map_err(CreateConnectionError::Dispatch)?;
-    let sub = result
-        .take_object(0)
-        .ok_or(CreateConnectionError::MissingObject)?;
-    Ok(sub.into_raw_object_id())
-}
-
-/// Creates a connection sub-object for system (15.0.0+). Returns the raw sub-object ID.
 ///
-/// The close obligation is handed on rather than discharged: the caller
-/// re-addresses the id through the long-lived parent domain.
-pub(crate) fn create_connection_for_system(
+/// This takes [`DomainObjectRef`] rather than [`DomainTarget`], because it adopts the object the
+/// reply carries and only a domain this process owns can take on that close.
+pub(crate) fn create_connection(
     object: DomainObjectRef<'_>,
+    kind: ConnectionKind,
 ) -> Result<u32, CreateConnectionError> {
+    let request_id = match kind {
+        ConnectionKind::Application => proto::CTX_CREATE_CONNECTION,
+        ConnectionKind::System => proto::CTX_CREATE_CONNECTION_FOR_SYSTEM,
+    };
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let mut result = object
-        .dispatch(proto::CTX_CREATE_CONNECTION_FOR_SYSTEM)
+        .dispatch(request_id)
         .out_objects(1)
         .send(&mut ipc_buf)
         .map_err(CreateConnectionError::Dispatch)?;
@@ -77,7 +78,7 @@ pub(crate) fn create_connection_for_system(
     Ok(sub.into_raw_object_id())
 }
 
-/// Error returned by [`create_connection`] and [`create_connection_for_system`].
+/// Error returned by [`create_connection`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateConnectionError {
     /// IPC dispatch failed.
@@ -88,22 +89,35 @@ pub enum CreateConnectionError {
     MissingObject,
 }
 
+impl nx_sf::error::ToResultCode for CreateConnectionError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // No server assigned this one a code: the reply parsed, and simply carried no object
+            // where the command promises one.
+            Self::MissingObject => nx_sf::error::GENERIC_ERROR,
+        }
+    }
+}
+
 /// Gets the connection count for this context.
-pub(crate) fn get_connection_count(object: DomainObjectRef<'_>) -> Result<u32, DispatchError> {
+pub(crate) fn get_connection_count<'d>(
+    object: impl DomainTarget<'d>,
+) -> Result<u32, DispatchError> {
     dispatch_out_u32(object, proto::CTX_GET_CONNECTION_COUNT)
 }
 
 /// Imports a server PKI certificate. Returns the assigned ID.
-pub(crate) fn import_server_pki(
-    object: DomainObjectRef<'_>,
+pub(crate) fn import_server_pki<'d>(
+    object: impl DomainTarget<'d>,
     cert_data: &[u8],
-    format: u32,
+    format: CertificateFormat,
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CTX_IMPORT_SERVER_PKI)
-        .in_raw(format.as_bytes())
+        .request(proto::CTX_IMPORT_SERVER_PKI)
+        .in_raw((format as u32).as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(cert_data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
@@ -111,15 +125,15 @@ pub(crate) fn import_server_pki(
 }
 
 /// Imports a client PKI (PKCS#12). Returns the assigned ID.
-pub(crate) fn import_client_pki(
-    object: DomainObjectRef<'_>,
+pub(crate) fn import_client_pki<'d>(
+    object: impl DomainTarget<'d>,
     pkcs12: &[u8],
     password: &[u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CTX_IMPORT_CLIENT_PKI)
+        .request(proto::CTX_IMPORT_CLIENT_PKI)
         .out_size(size_of::<u64>())
         .in_buffer(pkcs12, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(password, BufferAttr::HIPC_MAP_ALIAS)
@@ -129,8 +143,8 @@ pub(crate) fn import_client_pki(
 
 /// Removes a PKI or CRL by ID, attempting RemoveServerPki, RemoveClientPki,
 /// and RemoveCrl in order (matching libnx behavior).
-pub(crate) fn remove_pki(
-    object: DomainObjectRef<'_>,
+pub(crate) fn remove_pki<'d>(
+    object: impl DomainTarget<'d>,
     id: u64,
     include_crl: bool,
 ) -> Result<(), RemovePkiError> {
@@ -160,18 +174,19 @@ pub(crate) fn remove_pki(
     dispatch_in(object, proto::CTX_REMOVE_CRL, id).map_err(RemovePkiError)
 }
 
-/// Checks if a dispatch error corresponds to SSL "not found" (module 123, description 214).
-fn is_ssl_not_found(_err: &DispatchError) -> bool {
-    // libnx checks for MAKERESULT(123, 214)
-    // Module 123 = SSL, description 214 = not found in that object type.
-    // We check the parsed response error's raw result code.
-    // The DispatchError wraps ParseResponseError which contains the raw result.
-    // For now, match on the string representation — the underlying code is 123*2048 + 214.
-    let _raw = (123u32 << 9) | 214;
-    // We cannot directly inspect the raw code from DispatchError in a generic way,
-    // so this function is best-effort. In practice libnx's behavior is to try all
-    // three cmds regardless of error code; we approximate that here.
-    true
+/// Whether the service answered "this object holds nothing under that id".
+///
+/// [`remove_pki`] tries three commands because an id names a server PKI, a client PKI or a CRL and
+/// the caller does not say which. Only this one answer means "look in the next place": any other
+/// failure is the answer, and moving on would replace it with whatever the next command said.
+fn is_ssl_not_found(err: &DispatchError) -> bool {
+    /// The SSL module's "not found in this object type", as `MAKERESULT(123, 214)` builds it.
+    const SSL_NOT_FOUND: u32 = (123 & 0x1FF) | ((214 & 0x1FFF) << 9);
+
+    matches!(
+        err,
+        DispatchError::ParseResponse(nx_sf::cmif::ParseError::ServiceError(SSL_NOT_FOUND))
+    )
 }
 
 /// Error returned by [`remove_pki`].
@@ -179,41 +194,50 @@ fn is_ssl_not_found(_err: &DispatchError) -> bool {
 #[error("failed to dispatch RemovePki")]
 pub struct RemovePkiError(#[source] pub DispatchError);
 
+impl nx_sf::error::ToResultCode for RemovePkiError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
+        self.0.to_rc()
+    }
+}
+
 /// Registers an internal PKI. Returns the assigned ID.
-pub(crate) fn register_internal_pki(
-    object: DomainObjectRef<'_>,
-    internal_pki: u32,
+pub(crate) fn register_internal_pki<'d>(
+    object: impl DomainTarget<'d>,
+    internal_pki: InternalPki,
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CTX_REGISTER_INTERNAL_PKI)
-        .in_raw(internal_pki.as_bytes())
+        .request(proto::CTX_REGISTER_INTERNAL_PKI)
+        .in_raw((internal_pki as u32).as_bytes())
         .out_size(size_of::<u64>())
         .send(&mut ipc_buf)?;
     Ok(*result.value::<u64>())
 }
 
 /// Adds a policy OID string.
-pub(crate) fn add_policy_oid(object: DomainObjectRef<'_>, oid: &[u8]) -> Result<(), DispatchError> {
+pub(crate) fn add_policy_oid<'d>(
+    object: impl DomainTarget<'d>,
+    oid: &[u8],
+) -> Result<(), DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     object
-        .dispatch(proto::CTX_ADD_POLICY_OID)
+        .request(proto::CTX_ADD_POLICY_OID)
         .in_buffer(oid, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)
         .map(|_| ())
 }
 
 /// Imports a CRL (3.0.0+). Returns the assigned ID.
-pub(crate) fn import_crl(
-    object: DomainObjectRef<'_>,
+pub(crate) fn import_crl<'d>(
+    object: impl DomainTarget<'d>,
     crl_data: &[u8],
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CTX_IMPORT_CRL)
+        .request(proto::CTX_IMPORT_CRL)
         .out_size(size_of::<u64>())
         .in_buffer(crl_data, BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
@@ -221,17 +245,17 @@ pub(crate) fn import_crl(
 }
 
 /// Imports client cert and key PKI (16.0.0+). Returns the assigned ID.
-pub(crate) fn import_client_cert_key_pki(
-    object: DomainObjectRef<'_>,
+pub(crate) fn import_client_cert_key_pki<'d>(
+    object: impl DomainTarget<'d>,
     cert: &[u8],
     key: &[u8],
-    format: u32,
+    format: CertificateFormat,
 ) -> Result<u64, DispatchError> {
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CTX_IMPORT_CLIENT_CERT_KEY_PKI)
-        .in_raw(format.as_bytes())
+        .request(proto::CTX_IMPORT_CLIENT_CERT_KEY_PKI)
+        .in_raw((format as u32).as_bytes())
         .out_size(size_of::<u64>())
         .in_buffer(cert, BufferAttr::HIPC_MAP_ALIAS)
         .in_buffer(key, BufferAttr::HIPC_MAP_ALIAS)
@@ -240,8 +264,8 @@ pub(crate) fn import_client_cert_key_pki(
 }
 
 /// Generates a private key and certificate (16.0.0+).
-pub(crate) fn generate_private_key_and_cert(
-    object: DomainObjectRef<'_>,
+pub(crate) fn generate_private_key_and_cert<'d>(
+    object: impl DomainTarget<'d>,
     cert_buf: &mut [u8],
     key_buf: &mut [u8],
     val: u32,
@@ -250,7 +274,7 @@ pub(crate) fn generate_private_key_and_cert(
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let result = object
-        .dispatch(proto::CTX_GENERATE_PRIVATE_KEY_AND_CERT)
+        .request(proto::CTX_GENERATE_PRIVATE_KEY_AND_CERT)
         .in_raw(val.as_bytes())
         .out_size(size_of::<GenerateKeyAndCertOut>())
         .out_buffer(cert_buf, BufferAttr::HIPC_MAP_ALIAS)
@@ -275,4 +299,15 @@ pub enum GenerateKeyAndCertError {
     /// Response payload was shorter than expected.
     #[error("GeneratePrivateKeyAndCert response too short")]
     ShortResponse,
+}
+
+impl nx_sf::error::ToResultCode for GenerateKeyAndCertError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
+        match self {
+            Self::Dispatch(err) => err.to_rc(),
+            // A reply too short to hold what it claims is this crate noticing a state no server
+            // reported, so it takes the code reserved for exactly that.
+            Self::ShortResponse => nx_sf::error::GENERIC_ERROR,
+        }
+    }
 }

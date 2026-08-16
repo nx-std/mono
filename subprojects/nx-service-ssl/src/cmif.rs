@@ -48,7 +48,6 @@ pub(crate) use self::{
     context::{
         add_policy_oid,
         create_connection,
-        create_connection_for_system,
         generate_private_key_and_cert,
         get_connection_count,
         get_option as ctx_get_option,

@@ -19,9 +19,6 @@ use nx_std_sync::{
 /// Maximum number of pool slots representable in the free-mask `u32`.
 pub(crate) const MAX_SESSIONS: usize = 32;
 
-/// Default pool size matching libnx's maximum (`num_sessions` capped at 4).
-pub(crate) const SSL_POOL_SIZE: usize = 4;
-
 pub(crate) struct SessionPool {
     sessions: Box<[Domain]>,
     state: Mutex<PoolState>,
@@ -45,6 +42,15 @@ impl SessionPool {
             state: Mutex::new(PoolState { free_mask }),
             cv: Condvar::new(),
         }
+    }
+
+    /// The slot the domain was converted on, which every other slot was cloned from.
+    ///
+    /// All slots address the same server-side object table, so this is not a privileged session so
+    /// much as a nameable one: something that has to hand out *a* session picks this.
+    #[cfg(feature = "ffi")]
+    pub(crate) fn root(&self) -> DomainRef<'_> {
+        self.sessions[0].as_borrowed()
     }
 
     pub(crate) fn acquire(&self) -> SessionGuard<'_> {
