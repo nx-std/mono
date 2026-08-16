@@ -44,7 +44,7 @@ pub(crate) fn set_socket_descriptor<'d>(
 ) -> Result<Option<SocketFd>, DispatchError> {
     let sockfd = sockfd.into();
     let result = dispatch_in_out_u32(object, proto::CONN_SET_SOCKET_DESCRIPTOR, sockfd)?;
-    Ok((result as i32).try_into().ok())
+    Ok(SocketFd::from_raw(result as i32))
 }
 
 /// Sets the host name for TLS verification.
@@ -81,7 +81,8 @@ pub(crate) fn set_io_mode<'d>(
 pub(crate) fn get_socket_descriptor<'d>(
     object: impl DomainTarget<'d>,
 ) -> Result<Option<SocketFd>, DispatchError> {
-    dispatch_out_u32(object, proto::CONN_GET_SOCKET_DESCRIPTOR).map(|v| (v as i32).try_into().ok())
+    dispatch_out_u32(object, proto::CONN_GET_SOCKET_DESCRIPTOR)
+        .map(|v| SocketFd::from_raw(v as i32))
 }
 
 /// Gets the host name string.
@@ -346,7 +347,7 @@ pub(crate) fn set_dtls_socket_descriptor<'d>(
         .out_size(size_of::<i32>())
         .in_buffer(sockaddr.as_bytes(), BufferAttr::HIPC_MAP_ALIAS)
         .send(&mut ipc_buf)?;
-    Ok((*result.value::<i32>()).try_into().ok())
+    Ok(SocketFd::from_raw(*result.value::<i32>()))
 }
 
 /// Gets DTLS handshake timeout in nanoseconds (16.0.0+).

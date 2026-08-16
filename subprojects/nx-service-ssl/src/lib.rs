@@ -99,10 +99,7 @@ pub use self::{
         FlushSessionCacheOptionType,
         SslServiceType,
     },
-    socket::{
-        NoDescriptor,
-        SocketFd,
-    },
+    socket::SocketFd,
 };
 
 /// Connected SSL service wrapper.
