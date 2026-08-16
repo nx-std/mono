@@ -33,6 +33,7 @@ extern crate nx_panic_handler as _; // provides #[panic_handler]
 
 use alloc::vec::Vec;
 
+use nx_service_bsd::RawSockAddr;
 use nx_service_sm::SmService;
 use nx_sf::service::{
     ConvertToDomainError,
@@ -45,6 +46,8 @@ use nx_sf::service::{
 
 mod cmif;
 mod dispatch;
+#[cfg(feature = "ffi")]
+pub mod ffi;
 mod proto;
 mod session;
 pub mod types;
@@ -77,6 +80,7 @@ pub use self::{
         InternalPki,
         IoMode,
         KeyAndCertParams,
+        NoDescriptor,
         OptionType,
         PollEvent,
         PrivateOptionType,
@@ -84,6 +88,7 @@ pub use self::{
         ServerCertDetailEntry,
         ServerCertDetailHeader,
         SessionCacheMode,
+        SocketFd,
         SslServiceType,
         SslVersion,
         TrustedCertStatus,
@@ -348,8 +353,11 @@ pub struct SslConnection<'ctx> {
 }
 
 impl SslConnection<'_> {
-    /// Sets the socket descriptor. Returns the previous sockfd.
-    pub fn set_socket_descriptor(&self, sockfd: i32) -> Result<i32, DispatchError> {
+    /// Sets the socket descriptor. Returns the one the connection gave up, if it held one.
+    pub fn set_socket_descriptor(
+        &self,
+        sockfd: impl Into<SocketFd>,
+    ) -> Result<Option<SocketFd>, DispatchError> {
         cmif::set_socket_descriptor(self.object.as_borrowed(), sockfd)
     }
 
@@ -368,8 +376,8 @@ impl SslConnection<'_> {
         cmif::set_io_mode(self.object.as_borrowed(), mode as u32)
     }
 
-    /// Gets the socket descriptor.
-    pub fn get_socket_descriptor(&self) -> Result<i32, DispatchError> {
+    /// Gets the socket descriptor the connection holds, if it holds one.
+    pub fn get_socket_descriptor(&self) -> Result<Option<SocketFd>, DispatchError> {
         cmif::get_socket_descriptor(self.object.as_borrowed())
     }
 
@@ -517,9 +525,9 @@ impl SslConnection<'_> {
     /// Sets DTLS socket descriptor (16.0.0+). Returns the previous sockfd.
     pub fn set_dtls_socket_descriptor(
         &self,
-        sockfd: i32,
-        sockaddr: &[u8],
-    ) -> Result<i32, DispatchError> {
+        sockfd: impl Into<SocketFd>,
+        sockaddr: &RawSockAddr,
+    ) -> Result<Option<SocketFd>, DispatchError> {
         cmif::set_dtls_socket_descriptor(self.object.as_borrowed(), sockfd, sockaddr)
     }
 

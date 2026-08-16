@@ -148,6 +148,37 @@ pub fn adopt(sock: Socket) -> Result<Fd, AdoptFailed> {
     Ok(fd)
 }
 
+/// Takes a descriptor for a socket another service reported, handing the table the obligation to
+/// close it.
+///
+/// [`adopt`] is the form to prefer; this is for the caller holding a bare number rather than a
+/// [`Socket`]. The TLS service is the case in practice: the command that hands it a socket answers
+/// with the descriptor it displaced, and that socket is still open and still owed a close, but it
+/// arrives as an `i32` from a service this crate does not speak to.
+///
+/// The caller must ensure `raw_fd` is a descriptor the BSD service issued and that nothing else
+/// will close it. Both are things only the response the caller read can say. A number that names
+/// nothing is answered with an error by the first command sent to it rather than faulting, which
+/// is why this is a safe function.
+///
+/// # Errors
+///
+/// As [`adopt`].
+///
+/// # Panics
+///
+/// In debug builds, if `raw_fd` is negative. The services that report a descriptor use a negative
+/// value to say there was none, and that case is the caller's to rule out: it is not a failure,
+/// so there is no error here to fold it into.
+pub fn adopt_raw_unchecked(raw_fd: i32) -> Result<Fd, AdoptFailed> {
+    // SAFETY: `BsdSockFd::from_raw_unchecked` requires a descriptor the BSD service issued, and
+    // `Socket::from_raw_unchecked` requires that nothing else will close it. This function's own
+    // contract asks the caller for both, and the caller is the layer that read the response the
+    // number arrived in, which is the only place either can be established.
+    let sock = Socket::from_raw_unchecked(BsdSockFd::from_raw_unchecked(raw_fd));
+    adopt(sock)
+}
+
 /// Errors returned by [`adopt`].
 #[derive(Debug, thiserror::Error)]
 pub enum AdoptFailed {

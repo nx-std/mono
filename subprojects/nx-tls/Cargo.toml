@@ -1,0 +1,26 @@
+[package]
+name = "nx-tls"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "nx_tls"
+crate-type = ["rlib"]
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enable the __nx_tls FFI
+# The three entries gate items only this crate's C boundary touches, each behind its own crate's
+# `ffi` feature: the libnx service struct's shape in `nx-sf`, the borrowed view of a connection a C
+# caller owns in `nx-service-ssl`, and the process-descriptor map in `nx-sys-net`. A pure-Rust
+# consumer of any of them compiles none of it.
+ffi = ["nx-service-ssl/ffi", "nx-sf/ffi", "nx-sys-net/ffi"]
+
+[dependencies]
+nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
+nx-rt-core = { version = "0.1.0", path = "../nx-rt-core" }
+nx-service-ssl = { version = "0.1.0", path = "../nx-service-ssl" }
+nx-sf = { version = "0.1.0", path = "../nx-sf" }
+nx-sys-net = { version = "0.1.0", path = "../nx-sys-net" }

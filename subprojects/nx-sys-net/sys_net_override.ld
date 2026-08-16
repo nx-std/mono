@@ -21,18 +21,10 @@ socketExit                 = __nx_sys_net__socketExit;
 socketGetDefaultInitConfig = __nx_sys_net__socketGetDefaultInitConfig;
 socketGetLastResult        = __nx_sys_net__socketGetLastResult;
 
-/* Descriptor hand-off to the TLS and network-interface services */
-EXTERN(__nx_sys_net__socketSslConnectionSetSocketDescriptor);
-EXTERN(__nx_sys_net__socketSslConnectionGetSocketDescriptor);
-EXTERN(__nx_sys_net__socketSslConnectionSetDtlsSocketDescriptor);
-EXTERN(__nx_sys_net__socketNifmRequestRegisterSocketDescriptor);
-EXTERN(__nx_sys_net__socketNifmRequestUnregisterSocketDescriptor);
-
-socketSslConnectionSetSocketDescriptor     = __nx_sys_net__socketSslConnectionSetSocketDescriptor;
-socketSslConnectionGetSocketDescriptor     = __nx_sys_net__socketSslConnectionGetSocketDescriptor;
-socketSslConnectionSetDtlsSocketDescriptor = __nx_sys_net__socketSslConnectionSetDtlsSocketDescriptor;
-socketNifmRequestRegisterSocketDescriptor   = __nx_sys_net__socketNifmRequestRegisterSocketDescriptor;
-socketNifmRequestUnregisterSocketDescriptor = __nx_sys_net__socketNifmRequestUnregisterSocketDescriptor;
+/* The five descriptor hand-offs to the TLS and network-interface services are
+ * absent: each dispatches a command at an object the C caller owns, and two of
+ * them are gated on the running firmware, so the runtime owns those entry
+ * points. See subprojects/nx-rt-core/overrides/rt_core_libnx_sys_net.ld. */
 
 /* Establishing and naming sockets */
 EXTERN(__nx_sys_net__socket);

@@ -8,10 +8,15 @@
 //! # Layout
 //!
 //! The exported [`Service`] struct is byte-compatible with libnx's `Service`
-//! (16 bytes; `const_assert_eq` enforces this). It is private to this module:
-//! safe Rust code uses [`Session`](crate::service::Session) / [`Domain`](crate::service::Domain)
+//! (16 bytes; `const_assert_eq` enforces this). Safe Rust code holding a service of its own uses
+//! [`Session`](crate::service::Session) / [`Domain`](crate::service::Domain)
 //! / [`DomainObject`](crate::service::DomainObject) / [`OverrideService`](crate::service::OverrideService)
 //! instead, and the FFI symbols translate between the two at the boundary.
+//!
+//! A C caller that owns one and passes it in is the other direction, and it is the reason this
+//! struct is `pub`: an entry point elsewhere in the workspace that receives a `Service *` reads it
+//! here and addresses it with [`Service::as_domain_object`] or [`Service::as_session`]. Both
+//! borrow, because the struct and everything it names belong to the caller.
 //!
 //! # Naming Convention
 //!
@@ -34,6 +39,8 @@ use crate::{
     error::ToResultCode as _,
     service::{
         self,
+        ForeignDomainObject,
+        OverrideService,
         handle::BorrowedSessionHandle,
     },
 };
@@ -73,6 +80,38 @@ impl Service {
     #[inline]
     fn is_domain_subservice(&self) -> bool {
         self.own_handle == 0 && self.object_id != 0
+    }
+
+    /// Addresses this C-owned service as an object inside a domain.
+    ///
+    /// Returns `None` when the struct names no object, which is what a service the C side never
+    /// converted to a domain looks like. Dispatching at that one is [`Self::as_session`]'s job.
+    ///
+    /// The view borrows: the C caller owns the struct, the session it names and the object inside
+    /// it, and remains the sole closer of each.
+    ///
+    /// This is the only way to obtain a [`ForeignDomainObject`], which is why its constructor is
+    /// crate-private: the proof its precondition asks for is exactly "a C caller handed us this
+    /// struct", and that fact exists here and nowhere else.
+    #[inline]
+    pub fn as_domain_object(&self) -> Option<ForeignDomainObject<'static>> {
+        // SAFETY: the C caller owns this struct and everything it names, and libnx records a
+        // domain subservice by writing the parent session's handle, the size that owner queried,
+        // and an id the server issued. Reading the three back addresses what it already holds;
+        // nothing here closes any of them.
+        ForeignDomainObject::new_unchecked(
+            borrow(self.session),
+            self.pointer_buffer_size,
+            self.object_id,
+        )
+    }
+
+    /// Addresses this C-owned service as a plain, non-domain session.
+    ///
+    /// The view borrows, for the reason given on [`Self::as_domain_object`].
+    #[inline]
+    pub fn as_session(&self) -> OverrideService {
+        OverrideService::new_unchecked(self.session, self.pointer_buffer_size)
     }
 }
 

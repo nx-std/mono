@@ -5,11 +5,6 @@
 //! failed. That is the only place in this module tree where a result code is a return value rather
 //! than something left in a thread-local.
 
-use core::{
-    ffi::c_void,
-    ptr,
-};
-
 use nx_service_bsd::{
     BsdConfig,
     BsdServiceType,
@@ -235,91 +230,4 @@ fn to_connect_options(config: &SocketInitConfig, version: ConfigVersion) -> Opti
             num_sessions,
         },
     })
-}
-
-/// Registers a socket descriptor with a network-interface request.
-///
-/// Not implemented: the request object belongs to the network interface manager, which this
-/// workspace does not yet wrap, and there is nothing to pass it to. Reports failure rather than
-/// falling through to the C driver, whose own state this build has replaced.
-///
-/// # Safety
-///
-/// Takes its arguments as C declares them; neither is dereferenced.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_net__socketNifmRequestRegisterSocketDescriptor(
-    request: *mut c_void,
-    sockfd: core::ffi::c_int,
-) -> core::ffi::c_int {
-    let _ = (request, sockfd);
-    errno::fail(errno::ENOSYS)
-}
-
-/// Unregisters a socket descriptor from a network-interface request.
-///
-/// Not implemented, for the reason given on
-/// [`__nx_sys_net__socketNifmRequestRegisterSocketDescriptor`].
-///
-/// # Safety
-///
-/// Takes its arguments as C declares them; neither is dereferenced.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_net__socketNifmRequestUnregisterSocketDescriptor(
-    request: *mut c_void,
-    sockfd: core::ffi::c_int,
-) -> core::ffi::c_int {
-    let _ = (request, sockfd);
-    errno::fail(errno::ENOSYS)
-}
-
-/// Hands a socket descriptor to a TLS connection.
-///
-/// Not implemented: the connection object belongs to the TLS service, which this workspace does
-/// not yet wrap.
-///
-/// # Safety
-///
-/// Takes its arguments as C declares them; neither is dereferenced.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_net__socketSslConnectionSetSocketDescriptor(
-    connection: *mut c_void,
-    sockfd: core::ffi::c_int,
-) -> core::ffi::c_int {
-    let _ = (connection, sockfd);
-    errno::fail(errno::ENOSYS)
-}
-
-/// Takes a socket descriptor back from a TLS connection.
-///
-/// Not implemented, for the reason given on
-/// [`__nx_sys_net__socketSslConnectionSetSocketDescriptor`].
-///
-/// # Safety
-///
-/// Takes its argument as C declares it; it is not dereferenced.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_net__socketSslConnectionGetSocketDescriptor(
-    connection: *mut c_void,
-) -> core::ffi::c_int {
-    let _ = connection;
-    errno::fail(errno::ENOSYS)
-}
-
-/// Hands a datagram socket descriptor to a TLS connection.
-///
-/// Not implemented, for the reason given on
-/// [`__nx_sys_net__socketSslConnectionSetSocketDescriptor`].
-///
-/// # Safety
-///
-/// Takes its arguments as C declares them; none is dereferenced.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __nx_sys_net__socketSslConnectionSetDtlsSocketDescriptor(
-    connection: *mut c_void,
-    sockfd: core::ffi::c_int,
-    addr: *const c_void,
-    addr_len: super::abi::SockLenT,
-) -> core::ffi::c_int {
-    let _ = (connection, sockfd, addr, addr_len, ptr::null::<c_void>());
-    errno::fail(errno::ENOSYS)
 }

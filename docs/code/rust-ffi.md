@@ -32,7 +32,7 @@ A crate's C-FFI surface and the linker scripts that redirect upstream archive sy
 | Source gating              | `#[cfg(feature = "ffi")] pub mod ffi;` in `src/lib.rs`.                                   |
 | Symbol naming              | `__nx_<aspect>__<symbol>` with `#[unsafe(no_mangle)] pub extern "C"`.                     |
 | Direct producer build      | The producer's own `meson.build` does NOT pass `--features ffi` to `cargo build`.         |
-| Crates without an `ffi` module | Service crates (`nx-service-*`) and pure Rust utilities OMIT the `ffi` feature entirely ([§6](#6-crates-without-an-ffi-surface)). |
+| Crates without an `ffi` module | Pure Rust utilities OMIT the `ffi` feature entirely, as does an `nx-service-*` client that holds nothing built for a C boundary ([§6](#6-crates-without-an-ffi-surface), [§7](#7-an-ffi-module-may-export-nothing-of-its-own)). |
 
 ---
 
@@ -200,12 +200,12 @@ The `?` makes the activation conditional on the consumer having also enabled `nx
 
 **The `ffi` feature exists to gate `src/ffi.rs`.** A crate with no such module MUST OMIT the feature entirely. Typical examples:
 
-- `nx-service-*` IPC clients — expose a pure Rust API; the upstream services they replace are wrapped by callers in their own bindings.
 - Pure Rust utilities such as `nx-cpu` and `nx-panic-handler`.
+- `nx-service-*` IPC clients, which expose a pure Rust API: the upstream services they replace are wrapped by callers in their own bindings. This holds unless the client itself holds an item built for a C boundary, which is what [§7](#7-an-ffi-module-may-export-nothing-of-its-own) governs.
 
 Do NOT add `ffi = []` "for symmetry" — its presence is a strong signal that an `ffi` module exists, and downstream `nx-<aspect>?/ffi` references will fail to resolve if the feature is declared without a corresponding `src/ffi.rs`.
 
-Having no symbols of its own is not the same as having no module ([§7](#7-an-ffi-module-may-export-nothing-of-its-own)).
+**The test is the module, not the crate's family.** Having no symbols of its own is not the same as having no module, and belonging to a family that usually has neither is not the same as having neither ([§7](#7-an-ffi-module-may-export-nothing-of-its-own)).
 
 ## 7. An `ffi` Module May Export Nothing of Its Own
 
@@ -214,6 +214,12 @@ Defining `__nx_*` symbols is the usual reason to have an `ffi` module, not the o
 The alternative is worse in both directions. Compiling the backing unconditionally bills every Rust-only consumer for a shape only C reads; moving it up to the exporting crate splits ownership of one data structure across a crate boundary, so the store and the view of it drift.
 
 The split follows ownership. `nx-sys-args` stores the process command line, so the nul-terminated copies and the pointer array behind an entry crate's `__nx_rt_<entry>__libnx_system_argv` sit there too: they are a second shape for data that crate already holds. The symbols stay with the entry crates, because the launch path is what defines them ([crates-rt](crates-rt.md)).
+
+**Stored data in a second shape**, as `nx-sys-args` holds above.
+
+**A view onto something the C caller owns.** A type that addresses an object a C caller created and closes, so this crate can send it commands without owning it. `nx-service-ssl` and `nx-service-nifm` each hold one: the entry point that hands a socket descriptor to a TLS connection or to a network-interface request dispatches at an object it did not create, and needs a shape to address it through. That shape is built for the boundary and useless without it, so it sits in `src/ffi.rs` behind the feature while the entry point stays with the crate that owns it.
+
+The second shape is what puts an `ffi` feature on an `nx-service-*` client, which [§6](#6-crates-without-an-ffi-surface) otherwise lists as omitting one. The two are not in conflict: §6 asks whether the crate has an `src/ffi.rs`, and a client holding a C-boundary view does. Leaving the feature off there is the error it looks like a virtue — the view is then compiled into every pure-Rust consumer, which cannot construct it, since the constructor it needs is itself behind somebody's `ffi` feature.
 
 Such a crate declares `ffi = []` and gates `src/ffi.rs` exactly as an exporting crate does. What it must not do is invent `__nx_<aspect>__*` names for items no linker script redirects — [§4](#4-symbol-naming) governs symbols, and this crate has none to name. Consumers activate it through their own `ffi` feature, unchanged ([§5](#5-producer-build-vs-consumer-activation)).
 
@@ -236,6 +242,9 @@ Before committing changes to a crate's `ffi` feature or `src/ffi.rs`, verify:
 - [ ] Symbol signatures match the upstream archive's prototype exactly (integer widths, signedness, pointer mutability).
 - [ ] The producer's `meson.build` does NOT pass `--features ffi` to `cargo build`.
 - [ ] A crate with no `src/ffi.rs` does NOT declare an `ffi` feature.
+- [ ] An `nx-service-*` client declares one exactly when it holds an item built for a C boundary — stored
+      data in a second shape, or a view onto an object a C caller owns — and omits it otherwise
+      ([§7](#7-an-ffi-module-may-export-nothing-of-its-own))
 - [ ] An `ffi` module holding only C-shaped backing for another crate's exports defines no `__nx_*` symbols of
       its own.
 

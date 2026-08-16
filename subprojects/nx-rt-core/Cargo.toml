@@ -19,16 +19,30 @@ bench = false
 # `nx-sys-net?/ffi` arrives here for the same reason: only this crate's C boundary
 # calls the socket driver's C-shaped entry, and it is gated on that crate's own
 # `ffi` feature.
-ffi = ["nx-sf/ffi", "nx-net?/ffi", "nx-service-applet?/ffi", "nx-sys-net?/ffi"]
+# `nx-service-nifm?/ffi` arrives here for the same reason: it gates the borrowed view of a
+# request object a C caller owns, and only this crate's C boundary holds one.
+ffi = [
+    "nx-sf/ffi",
+    "nx-net?/ffi",
+    "nx-service-applet?/ffi",
+    "nx-service-nifm?/ffi",
+    "nx-sys-net?/ffi",
+]
 # Name resolution — gates the five resolver symbols that reach `sfdnsres`, which
 # is acquired over the service-manager session this crate owns.
 net = ["dep:nx-net"]
 # Application Manager (am) manager — gates the shared `services::applet`
 # applet handshake. Entry crates enable it and source the applet-type value.
 service-applet = ["dep:nx-service-applet"]
-# Socket driver initialization — gates the one socket symbol whose interface
-# revision follows the running firmware, which only this crate can read.
-sys-net = ["dep:nx-service-bsd", "dep:nx-sys-net"]
+# Socket driver initialization and the descriptor hand-offs — gates the socket
+# symbols the driver crate cannot own: the one whose interface revision follows
+# the running firmware, and the five that dispatch a command at a TLS connection
+# or a network-interface request the C caller owns.
+sys-net = [
+    "dep:nx-service-bsd",
+    "dep:nx-service-nifm",
+    "dep:nx-sys-net",
+]
 # Main-thread bring-up. Gates the Rust arm of the thread-registration startup
 # step; with it off that step calls the C entry point, which is the only
 # implementation in the link when the matching Meson option is off.
@@ -43,6 +57,7 @@ nx-net = { version = "0.1.0", path = "../nx-net", optional = true }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-applet = { version = "0.1.0", path = "../nx-service-applet", optional = true }
 nx-service-bsd = { version = "0.1.0", path = "../nx-service-bsd", optional = true }
+nx-service-nifm = { version = "0.1.0", path = "../nx-service-nifm", optional = true }
 nx-service-sm = { version = "0.1.0", path = "../nx-service-sm" }
 nx-sf = { version = "0.1.0", path = "../nx-sf" }
 nx-std-sync = { version = "0.1.0", path = "../nx-std-sync" }

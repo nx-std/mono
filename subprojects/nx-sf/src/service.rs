@@ -60,6 +60,8 @@ pub use self::{
         DomainObject,
         DomainObjectRef,
         DomainRef,
+        DomainTarget,
+        ForeignDomainObject,
     },
     handle::{
         BorrowedSessionHandle,

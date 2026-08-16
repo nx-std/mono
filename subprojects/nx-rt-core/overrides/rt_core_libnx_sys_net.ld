@@ -1,14 +1,19 @@
-/* Linker script — socket driver initialization override.
+/* Linker script — the socket driver symbols the runtime owns.
  *
- * Redirects libnx's `socketInitialize` to the Rust FFI in nx-rt-core. The rest
- * of the socket driver is overridden by nx-sys-net's own script; this one
- * symbol is separated out because its C contract is that the interface
- * revision follows the running firmware, and the firmware version is held by
- * the runtime, which nx-sys-net may not depend on.
+ * The bulk of the socket driver is overridden by nx-sys-net's own script.
+ * These are separated out because each needs something nx-sys-net may not
+ * reach for:
+ *
+ *   - `socketInitialize` declares an interface revision that follows the
+ *     running firmware, and the firmware version is held by the runtime.
+ *   - The five descriptor hand-offs each dispatch a command at an object the
+ *     C caller owns — an ISslConnection or an IRequest — so they need the
+ *     service crates that speak those interfaces, and two of them are gated on
+ *     the running firmware as well.
  *
  * This fragment is gated by use_nx_sys_net on the consumer side: the
- * __nx_rt_core__libnx_socket_initialize symbol exists only when the `sys-net`
- * Cargo feature is active.
+ * __nx_rt_core__libnx_socket_* symbols exist only when the `sys-net` Cargo
+ * feature is active.
  *
  * Organization:
  *   - Rust FFI:  subprojects/nx-rt-core/src/ffi/libnx/socket.rs
@@ -18,3 +23,10 @@
 EXTERN(__nx_rt_core__libnx_socket_initialize);
 
 socketInitialize = __nx_rt_core__libnx_socket_initialize;
+
+/* Descriptor hand-off to the network-interface service */
+EXTERN(__nx_rt_core__libnx_socket_nifm_request_register_socket_descriptor);
+EXTERN(__nx_rt_core__libnx_socket_nifm_request_unregister_socket_descriptor);
+
+socketNifmRequestRegisterSocketDescriptor   = __nx_rt_core__libnx_socket_nifm_request_register_socket_descriptor;
+socketNifmRequestUnregisterSocketDescriptor = __nx_rt_core__libnx_socket_nifm_request_unregister_socket_descriptor;

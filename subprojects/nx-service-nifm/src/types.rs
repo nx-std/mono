@@ -436,3 +436,81 @@ pub fn sf_to_network_profile_basic_info(
     output.authentication = input.authentication;
     output.encryption = input.encryption;
 }
+
+/// A socket descriptor registered with a network request.
+///
+/// **A value of this type always names a socket.** A negative number is what the socket service
+/// uses to say there is none, and [`TryFrom`] rejects it, so there is no sentinel here to test
+/// against and no caller has to.
+///
+/// # It is not this crate's number
+///
+/// A request keeps a socket alive across a network change, but the network-interface manager does
+/// not issue the descriptor: it belongs to the socket service's space, and this crate does not
+/// speak to that service or know which numbers are live in it. So this type carries only what a
+/// caller asserted, which is what [`Self::from_raw_unchecked`] says.
+///
+/// The layer that holds both: the one that resolved the caller's descriptor against the socket
+/// driver: is where the two spaces are known to be the same, and that is where the conversion
+/// belongs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, zerocopy::IntoBytes, zerocopy::Immutable)]
+#[repr(transparent)]
+pub struct SocketFd(i32);
+
+impl SocketFd {
+    /// Names a socket for a command that registers it with, or removes it from, a request.
+    ///
+    /// The caller must ensure `raw` is a descriptor the socket service issued and has not since
+    /// closed, and that it is non-negative. Nothing here can establish either: this crate never
+    /// sees the socket service, and only that service knows which of its numbers are live. A
+    /// descriptor that names nothing is answered with an error by the command it reaches rather
+    /// than faulting, which is why this is a safe function.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, if `raw` is negative.
+    #[inline]
+    pub const fn from_raw_unchecked(raw: i32) -> Self {
+        debug_assert!(
+            raw >= 0,
+            "socket descriptor is the service's `no descriptor` sentinel"
+        );
+        Self(raw)
+    }
+
+    /// Returns the raw `i32` the services know this descriptor by.
+    #[inline]
+    pub const fn to_raw(self) -> i32 {
+        self.0
+    }
+}
+
+impl From<nx_service_bsd::BsdSockFd> for SocketFd {
+    /// Names a socket the socket service issued as the descriptor a request registers.
+    ///
+    /// Infallible, and no assertion is made: the two types carry the same invariant, so the proof
+    /// arrives with the value rather than being supplied at the call.
+    fn from(fd: nx_service_bsd::BsdSockFd) -> Self {
+        // SAFETY: `BsdSockFd`'s own invariant is that it names a descriptor the socket service
+        // issued, and it is non-negative because that crate rejects the service's failure return
+        // before ever building one. Both halves of this constructor's precondition therefore hold
+        // by the argument's type.
+        Self::from_raw_unchecked(fd.to_raw())
+    }
+}
+
+impl TryFrom<i32> for SocketFd {
+    type Error = NoDescriptor;
+
+    fn try_from(raw: i32) -> Result<Self, Self::Error> {
+        if raw < 0 {
+            return Err(NoDescriptor);
+        }
+        Ok(Self(raw))
+    }
+}
+
+/// Error returned when a value names no socket.
+#[derive(Debug, thiserror::Error)]
+#[error("the value names no socket descriptor")]
+pub struct NoDescriptor;

@@ -68,6 +68,8 @@ use nx_svc::sync::wait_synchronization;
 
 mod cmif;
 mod dispatch;
+#[cfg(feature = "ffi")]
+pub mod ffi;
 mod proto;
 pub mod types;
 
@@ -111,6 +113,10 @@ pub use crate::{
         SERVICE_NAME_ADMIN,
         SERVICE_NAME_SYSTEM,
         SERVICE_NAME_USER,
+    },
+    types::{
+        NoDescriptor,
+        SocketFd,
     },
 };
 
@@ -506,12 +512,18 @@ impl NifmRequest<'_> {
     }
 
     /// `RegisterSocketDescriptor` (cmd 24, `[3.0.0+]`).
-    pub fn register_socket_descriptor(&self, sockfd: i32) -> Result<(), DispatchError> {
+    pub fn register_socket_descriptor(
+        &self,
+        sockfd: impl Into<SocketFd>,
+    ) -> Result<(), DispatchError> {
         request::register_socket_descriptor(self.object.as_borrowed(), sockfd)
     }
 
     /// `UnregisterSocketDescriptor` (cmd 25, `[3.0.0+]`).
-    pub fn unregister_socket_descriptor(&self, sockfd: i32) -> Result<(), DispatchError> {
+    pub fn unregister_socket_descriptor(
+        &self,
+        sockfd: impl Into<SocketFd>,
+    ) -> Result<(), DispatchError> {
         request::unregister_socket_descriptor(self.object.as_borrowed(), sockfd)
     }
 
