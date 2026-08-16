@@ -10,12 +10,14 @@ use nx_sf::service::{
 use zerocopy::IntoBytes as _;
 
 use crate::{
-    proto,
-    types::{
+    context::{
         CreateContextIn,
+        SslVersion,
+    },
+    proto,
+    service::{
         DebugOptionType,
         FlushSessionCacheOptionType,
-        SslVersion,
     },
 };
 

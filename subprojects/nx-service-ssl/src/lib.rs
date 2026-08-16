@@ -44,54 +44,65 @@ use nx_sf::service::{
     clone_current_object,
 };
 
+pub mod certificate;
 mod cmif;
+pub mod connection;
+pub mod context;
 mod dispatch;
+pub mod option;
+mod proto;
+pub mod service;
+mod session;
+pub mod socket;
+
 #[cfg(feature = "ffi")]
 pub mod ffi;
-mod proto;
-mod session;
-pub mod types;
 
 pub use nx_sf::service::DispatchError as IpcDispatchError;
 
 use self::session::SessionPool;
 pub use self::{
+    certificate::{
+        CaCertificateId,
+        CertificateFormat,
+        InternalPki,
+        KeyAndCertParams,
+        ServerCertDetailEntry,
+        ServerCertDetailHeader,
+        TrustedCertStatus,
+    },
     cmif::{
         CreateConnectionError,
         CreateContextError,
         GenerateKeyAndCertError,
         RemovePkiError,
     },
-    proto::{
-        SERVICE_NAME,
-        SERVICE_NAME_SYSTEM,
-    },
-    types::{
+    connection::{
         AlpnProtoState,
-        CaCertificateId,
-        CertificateFormat,
         CipherInfo,
-        ContextOption,
-        DebugOptionType,
-        FlushSessionCacheOptionType,
-        InternalPki,
         IoMode,
-        KeyAndCertParams,
-        NoDescriptor,
         OptionType,
         PollEvent,
         PrivateOptionType,
         RenegotiationMode,
-        ServerCertDetailEntry,
-        ServerCertDetailHeader,
         SessionCacheMode,
-        SocketFd,
-        SslServiceType,
-        SslVersion,
-        TrustedCertStatus,
-        UnknownOption,
         VerifyOption,
     },
+    context::{
+        ContextOption,
+        SslVersion,
+    },
+    option::UnknownOption,
+    proto::{
+        SERVICE_NAME,
+        SERVICE_NAME_SYSTEM,
+    },
+    service::{
+        DebugOptionType,
+        FlushSessionCacheOptionType,
+        SslServiceType,
+    },
+    socket::SocketFd,
 };
 
 /// Connected SSL service wrapper.

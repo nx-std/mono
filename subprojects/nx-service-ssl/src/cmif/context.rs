@@ -12,20 +12,22 @@ use zerocopy::IntoBytes as _;
 
 use crate::{
     ConnectionKind,
+    certificate::{
+        CertificateFormat,
+        GenerateKeyAndCertOut,
+        InternalPki,
+        KeyAndCertParams,
+    },
+    context::{
+        ContextOption,
+        CtxSetOptionIn,
+    },
     dispatch::{
         dispatch_in,
         dispatch_in_out_u32,
         dispatch_out_u32,
     },
     proto,
-    types::{
-        CertificateFormat,
-        ContextOption,
-        CtxSetOptionIn,
-        GenerateKeyAndCertOut,
-        InternalPki,
-        KeyAndCertParams,
-    },
 };
 
 /// Sets a context option.
