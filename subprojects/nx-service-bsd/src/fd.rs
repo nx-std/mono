@@ -1,11 +1,11 @@
 //! BSD socket file descriptor newtype.
 //!
-//! [`BsdSockFd`] maintains one invariant: it always names a descriptor the BSD
+//! [`SocketFd`] maintains one invariant: it always names a descriptor the BSD
 //! service issued. Nothing in this module establishes it, because nothing here
 //! can — whether a descriptor was issued is what the command's response says,
 //! and only the caller that read that response knows. So validation happens in
 //! [`crate::cmif`], where a negative return becomes an error before any
-//! descriptor is built, and [`BsdSockFd::from_raw_unchecked`] is what the
+//! descriptor is built, and [`SocketFd::from_raw_unchecked`] is what the
 //! commands use to record that they did the check.
 
 /// A descriptor the BSD socket service issued.
@@ -23,9 +23,9 @@
 /// the guessing about whether it was performed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct BsdSockFd(i32);
+pub struct SocketFd(i32);
 
-impl BsdSockFd {
+impl SocketFd {
     /// Returns the raw `i32` the service knows this descriptor by.
     #[inline]
     pub const fn to_raw(self) -> i32 {

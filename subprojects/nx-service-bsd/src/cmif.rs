@@ -12,6 +12,7 @@
 //! load-bearing.
 
 use alloc::vec::Vec;
+use core::time::Duration;
 
 use nx_sf::{
     cmif::{
@@ -33,7 +34,7 @@ use zerocopy::IntoBytes as _;
 
 use crate::{
     config::BsdConfig,
-    fd::BsdSockFd,
+    fd::SocketFd,
     posix::PosixError,
     proto::{
         BsdServiceConfigWire,
@@ -58,6 +59,7 @@ use crate::{
         Timespec,
         Timeval,
     },
+    readiness::PollFd,
     sockaddr::RawSockAddr,
     transfer::{
         RecvFlags,
@@ -338,7 +340,7 @@ pub(crate) fn socket(
     domain: i32,
     type_: i32,
     protocol: i32,
-) -> Result<BsdSockFd, CommandError> {
+) -> Result<SocketFd, CommandError> {
     let payload = SocketIn {
         domain,
         type_,
@@ -347,7 +349,7 @@ pub(crate) fn socket(
     let outcome = send_value_only(session, Command::Socket, &payload)?;
     // SAFETY: `read_service_response` returned `Ok`, so the service accepted
     // the command and `ret` is the descriptor it issued, not a rejection.
-    Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
+    Ok(SocketFd::from_raw_unchecked(outcome.ret))
 }
 
 /// Creates a socket exempt from the system's socket
@@ -357,7 +359,7 @@ pub(crate) fn socket_exempt(
     domain: i32,
     type_: i32,
     protocol: i32,
-) -> Result<BsdSockFd, CommandError> {
+) -> Result<SocketFd, CommandError> {
     let payload = SocketIn {
         domain,
         type_,
@@ -366,7 +368,7 @@ pub(crate) fn socket_exempt(
     let outcome = send_value_only(session, Command::SocketExempt, &payload)?;
     // SAFETY: `read_service_response` returned `Ok`, so the service accepted
     // the command and `ret` is the descriptor it issued, not a rejection.
-    Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
+    Ok(SocketFd::from_raw_unchecked(outcome.ret))
 }
 
 /// Opens a path in the service's own namespace.
@@ -378,7 +380,7 @@ pub(crate) fn open(
     session: BorrowedSessionHandle<'_>,
     path: &Path,
     flags: i32,
-) -> Result<BsdSockFd, CommandError> {
+) -> Result<SocketFd, CommandError> {
     let command = Command::Open;
     let mut buf = nx_sys_thread_tls::ipc_buffer();
 
@@ -399,11 +401,11 @@ pub(crate) fn open(
     let outcome = read_service_response(&buf, command, ExtraWord::None)?;
     // SAFETY: `read_service_response` returned `Ok`, so the service accepted
     // the command and `ret` is the descriptor it issued, not a rejection.
-    Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
+    Ok(SocketFd::from_raw_unchecked(outcome.ret))
 }
 
 /// Releases a descriptor.
-pub(crate) fn close(session: BorrowedSessionHandle<'_>, fd: BsdSockFd) -> Result<(), CommandError> {
+pub(crate) fn close(session: BorrowedSessionHandle<'_>, fd: SocketFd) -> Result<(), CommandError> {
     send_value_only(session, Command::Close, &fd.to_raw())?;
     Ok(())
 }
@@ -411,8 +413,8 @@ pub(crate) fn close(session: BorrowedSessionHandle<'_>, fd: BsdSockFd) -> Result
 /// Returns a second descriptor naming the same socket.
 pub(crate) fn duplicate_socket(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
-) -> Result<BsdSockFd, CommandError> {
+    sockfd: SocketFd,
+) -> Result<SocketFd, CommandError> {
     let payload = DuplicateSocketIn {
         sockfd: sockfd.to_raw(),
         _pad: 0,
@@ -421,7 +423,7 @@ pub(crate) fn duplicate_socket(
     let outcome = send_value_only(session, Command::DuplicateSocket, &payload)?;
     // SAFETY: `read_service_response` returned `Ok`, so the service accepted
     // the command and `ret` is the descriptor it issued, not a rejection.
-    Ok(BsdSockFd::from_raw_unchecked(outcome.ret))
+    Ok(SocketFd::from_raw_unchecked(outcome.ret))
 }
 
 /// Sends a command that takes a descriptor plus one in-only address buffer.
@@ -430,7 +432,7 @@ pub(crate) fn duplicate_socket(
 fn send_sockfd_with_addr(
     session: BorrowedSessionHandle<'_>,
     command: Command,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     addr: &RawSockAddr,
 ) -> Result<(), CommandError> {
     let mut buf = nx_sys_thread_tls::ipc_buffer();
@@ -453,7 +455,7 @@ fn send_sockfd_with_addr(
 /// Assigns a local address to a socket.
 pub(crate) fn bind(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     addr: &RawSockAddr,
 ) -> Result<(), CommandError> {
     send_sockfd_with_addr(session, Command::Bind, sockfd, addr)
@@ -462,7 +464,7 @@ pub(crate) fn bind(
 /// Initiates a connection to a peer.
 pub(crate) fn connect(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     addr: &RawSockAddr,
 ) -> Result<(), CommandError> {
     send_sockfd_with_addr(session, Command::Connect, sockfd, addr)
@@ -477,7 +479,7 @@ pub(crate) fn connect(
 fn send_sockfd_for_addr(
     session: BorrowedSessionHandle<'_>,
     command: Command,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
 ) -> Result<(ServiceOutcome, RawSockAddr), CommandError> {
     let mut addr_buf = [0u8; RawSockAddr::CAPACITY];
     let mut buf = nx_sys_thread_tls::ipc_buffer();
@@ -502,18 +504,18 @@ fn send_sockfd_for_addr(
 /// returning its descriptor and the peer's address.
 pub(crate) fn accept(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
-) -> Result<(BsdSockFd, RawSockAddr), CommandError> {
+    sockfd: SocketFd,
+) -> Result<(SocketFd, RawSockAddr), CommandError> {
     let (outcome, addr) = send_sockfd_for_addr(session, Command::Accept, sockfd)?;
     // SAFETY: `send_sockfd_for_addr` returned `Ok`, so the service accepted the
     // command and `ret` is the descriptor it issued for the new connection.
-    Ok((BsdSockFd::from_raw_unchecked(outcome.ret), addr))
+    Ok((SocketFd::from_raw_unchecked(outcome.ret), addr))
 }
 
 /// Reports the socket's own address.
 pub(crate) fn get_sock_name(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
 ) -> Result<RawSockAddr, CommandError> {
     let (_outcome, addr) = send_sockfd_for_addr(session, Command::GetSockName, sockfd)?;
     Ok(addr)
@@ -522,7 +524,7 @@ pub(crate) fn get_sock_name(
 /// Reports the connected peer's address.
 pub(crate) fn get_peer_name(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
 ) -> Result<RawSockAddr, CommandError> {
     let (_outcome, addr) = send_sockfd_for_addr(session, Command::GetPeerName, sockfd)?;
     Ok(addr)
@@ -531,7 +533,7 @@ pub(crate) fn get_peer_name(
 /// Marks a socket as accepting connections.
 pub(crate) fn listen(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     backlog: i32,
 ) -> Result<(), CommandError> {
     let payload = ListenIn {
@@ -545,7 +547,7 @@ pub(crate) fn listen(
 /// Disables further sends, receives, or both, on one socket.
 pub(crate) fn shutdown(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     how: Shutdown,
 ) -> Result<(), CommandError> {
     let payload = ShutdownIn {
@@ -568,7 +570,7 @@ pub(crate) fn shutdown_all_sockets(
 /// Receives from a connected socket, returning the byte count.
 pub(crate) fn recv(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     buf: &mut [u8],
     flags: RecvFlags,
 ) -> Result<usize, CommandError> {
@@ -600,7 +602,7 @@ pub(crate) fn recv(
 /// [`crate::sockaddr`] gives.
 pub(crate) fn recv_from(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     buf: &mut [u8],
     flags: RecvFlags,
 ) -> Result<(usize, RawSockAddr), CommandError> {
@@ -631,7 +633,7 @@ pub(crate) fn recv_from(
 /// Sends on a connected socket, returning the accepted byte count.
 pub(crate) fn send(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     buf: &[u8],
     flags: SendFlags,
 ) -> Result<usize, CommandError> {
@@ -660,7 +662,7 @@ pub(crate) fn send(
 /// count.
 pub(crate) fn send_to(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     buf: &[u8],
     flags: SendFlags,
     dest_addr: &RawSockAddr,
@@ -690,7 +692,7 @@ pub(crate) fn send_to(
 /// Reads from a descriptor, returning the byte count.
 pub(crate) fn read(
     session: BorrowedSessionHandle<'_>,
-    fd: BsdSockFd,
+    fd: SocketFd,
     buf: &mut [u8],
 ) -> Result<usize, CommandError> {
     let command = Command::Read;
@@ -714,7 +716,7 @@ pub(crate) fn read(
 /// Writes to a descriptor, returning the accepted byte count.
 pub(crate) fn write(
     session: BorrowedSessionHandle<'_>,
-    fd: BsdSockFd,
+    fd: SocketFd,
     buf: &[u8],
 ) -> Result<usize, CommandError> {
     let command = Command::Write;
@@ -747,7 +749,7 @@ pub(crate) fn write(
 /// right and then discarded, as `std` discards its `option_len`.
 pub(crate) fn get_sock_opt<T>(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     level: i32,
     optname: i32,
 ) -> Result<T, CommandError>
@@ -783,7 +785,7 @@ where
 /// one: the length is the type's, not the caller's to get right.
 pub(crate) fn set_sock_opt<T>(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     level: i32,
     optname: i32,
     optval: &T,
@@ -825,7 +827,7 @@ where
 /// bounded by the buffer.
 pub(crate) fn get_sock_opt_bytes(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     level: i32,
     optname: i32,
     optval: &mut [u8],
@@ -863,7 +865,7 @@ pub(crate) fn get_sock_opt_bytes(
 /// [`get_sock_opt_bytes`].
 pub(crate) fn set_sock_opt_bytes(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     level: i32,
     optname: i32,
     optval: &[u8],
@@ -934,7 +936,7 @@ impl FcntlOp {
 /// through.
 pub(crate) fn fcntl(
     session: BorrowedSessionHandle<'_>,
-    fd: BsdSockFd,
+    fd: SocketFd,
     op: FcntlOp,
 ) -> Result<StatusFlags, CommandError> {
     let (cmd, flags) = op.to_wire();
@@ -977,7 +979,7 @@ mod ioc {
 /// than here.
 pub(crate) fn ioctl(
     session: BorrowedSessionHandle<'_>,
-    fd: BsdSockFd,
+    fd: SocketFd,
     request: i32,
     data: &mut [u8],
 ) -> Result<i32, CommandError> {
@@ -1046,7 +1048,7 @@ pub(crate) fn ioctl(
 /// reads the header to learn how much room the list has, then writes both back.
 pub(crate) fn ioctl_with_entries(
     session: BorrowedSessionHandle<'_>,
-    fd: BsdSockFd,
+    fd: SocketFd,
     request: i32,
     header: &mut [u8],
     entries: &mut [u8],
@@ -1181,20 +1183,23 @@ pub(crate) fn select(
 
 /// Waits for readiness across a descriptor array.
 ///
-/// `fds` must have the layout of the C `pollfd` array; it is read as input
-/// and written back as output.
+/// Each entry is read for what it asks about and written back with what the
+/// service reported. `None` for `timeout` waits indefinitely.
 pub(crate) fn poll(
     session: BorrowedSessionHandle<'_>,
-    fds: &mut [u8],
-    nfds: u64,
-    timeout: i32,
-) -> Result<i32, CommandError> {
+    fds: &mut [PollFd],
+    timeout: Option<Duration>,
+) -> Result<usize, CommandError> {
     let command = Command::Poll;
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
     let payload = PollIn {
-        nfds,
-        timeout,
+        // The count and the buffer are separate fields on the wire and the
+        // service trusts the count, so both are taken from the one slice
+        // rather than passed in separately, which is what kept them from
+        // disagreeing. Exact: `usize` is 64-bit on this target.
+        nfds: fds.len() as u64,
+        timeout: timeout_millis(timeout),
         _pad: 0,
     };
     // `fds` is both read and written by the kernel - the wire shape - so
@@ -1202,7 +1207,7 @@ pub(crate) fn poll(
     // an in-auto-buffer and an out-auto-buffer over the same memory.
     let req = cmif::CmifRequestBuilder::new(command.id())
         .with_data_value(&payload)
-        .add_inout_auto_buffer(InOutBuffer::new(fds, BufferMode::Normal))
+        .add_inout_auto_buffer(InOutBuffer::new(fds.as_mut_bytes(), BufferMode::Normal))
         .build();
     req.send(&mut ipc_buf, session)
         .map_err(|err| CommandError::SendRequest {
@@ -1211,7 +1216,26 @@ pub(crate) fn poll(
         })?;
 
     let outcome = read_service_response(&ipc_buf, command, ExtraWord::None)?;
-    Ok(outcome.ret)
+    // `read_service_response` turns a negative `ret` into an error, so what
+    // reaches here is a count of the entries that came back ready.
+    Ok(outcome.ret as usize)
+}
+
+/// Converts a wait into the milliseconds the `Poll` command carries.
+///
+/// Rounds a sub-millisecond remainder up, so a caller asking for a short wait
+/// gets one rather than a command that returns immediately. A wait longer than
+/// the field can hold is clamped to the longest it can, a little under 25 days.
+fn timeout_millis(timeout: Option<Duration>) -> i32 {
+    let Some(timeout) = timeout else {
+        // Negative is how the wire spells "wait indefinitely".
+        return -1;
+    };
+
+    let has_remainder = timeout.subsec_nanos() % 1_000_000 != 0;
+    let millis = timeout.as_millis() + u128::from(has_remainder);
+
+    i32::try_from(millis).unwrap_or(i32::MAX)
 }
 
 /// How long [`BsdService::recv_mmsg`](crate::BsdService::recv_mmsg) waits for
@@ -1240,7 +1264,7 @@ pub struct RecvTimeout {
 /// crate has no dependency on the runtime that knows the version.
 pub(crate) fn recv_mmsg(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     buf: &mut [u8],
     vlen: i32,
     flags: RecvFlags,
@@ -1283,7 +1307,7 @@ pub(crate) fn recv_mmsg(
 /// [`recv_mmsg`].
 pub(crate) fn send_mmsg(
     session: BorrowedSessionHandle<'_>,
-    sockfd: BsdSockFd,
+    sockfd: SocketFd,
     buf: &mut [u8],
     vlen: i32,
     flags: SendFlags,
@@ -1308,4 +1332,65 @@ pub(crate) fn send_mmsg(
 
     let outcome = read_service_response(&ipc_buf, command, ExtraWord::None)?;
     Ok(outcome.ret)
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use super::timeout_millis;
+
+    #[test]
+    fn timeout_millis_with_no_wait_returns_the_indefinite_sentinel() {
+        //* Given
+        let timeout = None;
+
+        //* When
+        let millis = timeout_millis(timeout);
+
+        //* Then
+        assert_eq!(millis, -1, "no timeout is the wire's wait-indefinitely");
+    }
+
+    #[test]
+    fn timeout_millis_with_a_whole_number_of_milliseconds_carries_it_exactly() {
+        //* Given
+        let timeout = Some(Duration::from_millis(250));
+
+        //* When
+        let millis = timeout_millis(timeout);
+
+        //* Then
+        assert_eq!(millis, 250, "a whole millisecond count needs no rounding");
+    }
+
+    #[test]
+    fn timeout_millis_with_a_sub_millisecond_remainder_rounds_up() {
+        //* Given
+        // Half a millisecond, which truncating would turn into no wait at all.
+        let timeout = Some(Duration::from_micros(500));
+
+        //* When
+        let millis = timeout_millis(timeout);
+
+        //* Then
+        assert_eq!(millis, 1, "a wait shorter than the wire's unit still waits");
+    }
+
+    #[test]
+    fn timeout_millis_with_a_wait_past_the_field_clamps_it() {
+        //* Given
+        // A year, far more than the field's 32 bits of milliseconds hold.
+        let timeout = Some(Duration::from_secs(60 * 60 * 24 * 365));
+
+        //* When
+        let millis = timeout_millis(timeout);
+
+        //* Then
+        assert_eq!(
+            millis,
+            i32::MAX,
+            "a wait too long to carry becomes the longest that fits"
+        );
+    }
 }

@@ -27,9 +27,9 @@
 use alloc::boxed::Box;
 
 use nx_service_bsd::{
-    BsdSockFd,
     CommandError,
     PosixError,
+    SocketFd,
 };
 use nx_std_path::Path;
 use nx_sys_fd::{
@@ -171,11 +171,11 @@ pub fn adopt(sock: Socket) -> Result<Fd, AdoptFailed> {
 /// value to say there was none, and that case is the caller's to rule out: it is not a failure,
 /// so there is no error here to fold it into.
 pub fn adopt_raw_unchecked(raw_fd: i32) -> Result<Fd, AdoptFailed> {
-    // SAFETY: `BsdSockFd::from_raw_unchecked` requires a descriptor the BSD service issued, and
+    // SAFETY: `SocketFd::from_raw_unchecked` requires a descriptor the BSD service issued, and
     // `Socket::from_raw_unchecked` requires that nothing else will close it. This function's own
     // contract asks the caller for both, and the caller is the layer that read the response the
     // number arrived in, which is the only place either can be established.
-    let sock = Socket::from_raw_unchecked(BsdSockFd::from_raw_unchecked(raw_fd));
+    let sock = Socket::from_raw_unchecked(SocketFd::from_raw_unchecked(raw_fd));
     adopt(sock)
 }
 
@@ -202,7 +202,7 @@ pub enum AdoptFailed {
 /// Returns [`LookupError::BadDescriptor`] when `fd` names nothing open, and
 /// [`LookupError::NotASocket`] when it is open but backed by something else. The two are kept
 /// apart because C reports them as different error numbers and callers branch on which they got.
-pub fn sock_of(fd: Fd) -> Result<BsdSockFd, LookupError> {
+pub fn sock_of(fd: Fd) -> Result<SocketFd, LookupError> {
     // The closure copies the descriptor out and returns, so the file's lock is released before the
     // command that uses it runs. See the module documentation for why that matters.
     let found = table::with_file(fd, |file| {

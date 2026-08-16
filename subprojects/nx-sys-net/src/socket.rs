@@ -1,6 +1,6 @@
 //! One open socket, and the obligation to close it.
 //!
-//! [`nx_service_bsd::BsdSockFd`] is a number the service issues and expects back exactly once, and
+//! [`nx_service_bsd::SocketFd`] is a number the service issues and expects back exactly once, and
 //! it is `Copy` — deliberately, so that the command wrappers can take one freely. That leaves
 //! somebody to hold the close obligation, and [`nx_service_bsd`] says so outright: taking the
 //! descriptor by value in its close command is what lets the layer above hold it in a type that
@@ -16,12 +16,12 @@ use core::{
 };
 
 use nx_service_bsd::{
-    BsdSockFd,
     CommandError,
     FcntlOp,
     PosixError,
     RecvFlags,
     SendFlags,
+    SocketFd,
     StatusFlags,
 };
 
@@ -37,7 +37,7 @@ use crate::{
 /// would land on whatever number the service had since reissued.
 #[derive(Debug)]
 pub struct Socket {
-    fd: BsdSockFd,
+    fd: SocketFd,
     /// Keeps the type from being constructed by a struct literal outside this module, so
     /// [`Socket::from_raw_unchecked`] stays the only way to take on the close obligation.
     _not_constructible: PhantomData<()>,
@@ -50,7 +50,7 @@ impl Socket {
     /// value closes it on drop. A second owner sends its close against a number the service may
     /// have reissued, tearing down an unrelated socket rather than faulting, which is why this is
     /// a safe function.
-    pub(crate) const fn from_raw_unchecked(fd: BsdSockFd) -> Self {
+    pub(crate) const fn from_raw_unchecked(fd: SocketFd) -> Self {
         Self {
             fd,
             _not_constructible: PhantomData,
@@ -62,7 +62,7 @@ impl Socket {
     /// Closes nothing: the returned value is the service's number, and this type remains the only
     /// closer. Crate-private, because outside this crate the number has no meaning and handing it
     /// out would be the first half of forming a second owner.
-    pub(crate) const fn service_fd(&self) -> BsdSockFd {
+    pub(crate) const fn service_fd(&self) -> SocketFd {
         self.fd
     }
 
@@ -70,7 +70,7 @@ impl Socket {
     ///
     /// The caller takes on closing it. This exists for the descriptor the service hands back from
     /// a command that has already adopted it elsewhere; ordinary code drops the [`Socket`].
-    pub(crate) fn into_service_fd(self) -> BsdSockFd {
+    pub(crate) fn into_service_fd(self) -> SocketFd {
         let this = core::mem::ManuallyDrop::new(self);
         this.fd
     }

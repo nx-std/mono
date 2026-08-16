@@ -25,7 +25,7 @@
 //!
 //! There are two kinds of number here and conflating them is the trap:
 //!
-//! - The **service's** descriptor, [`nx_service_bsd::BsdSockFd`]. Issued by the BSD service,
+//! - The **service's** descriptor, [`nx_service_bsd::SocketFd`]. Issued by the BSD service,
 //!   meaningful only in a command sent to it.
 //! - The **process's** descriptor, [`nx_sys_fd::table::Fd`]. Issued by the descriptor table, and
 //!   what every C caller passes and receives.
@@ -137,6 +137,7 @@ extern crate nx_alloc as _;
 pub mod addr;
 pub mod device;
 pub mod driver;
+pub mod readiness;
 pub mod session;
 pub mod socket;
 
@@ -147,6 +148,12 @@ pub use self::{
     driver::{
         exit,
         initialize,
+    },
+    readiness::{
+        Interest,
+        Readiness,
+        Watch,
+        poll,
     },
     socket::{
         Domain,

@@ -496,18 +496,18 @@ impl SocketFd {
     }
 }
 
-impl From<nx_service_bsd::BsdSockFd> for SocketFd {
+impl From<nx_service_bsd::SocketFd> for SocketFd {
     /// Names a socket the socket service issued as the descriptor this service exchanges.
     ///
     /// Infallible, and no assertion is made: the two types carry the same invariant. A
-    /// [`BsdSockFd`](nx_service_bsd::BsdSockFd) already names a descriptor the socket service
-    /// issued, which is exactly what [`SocketFd::from_raw_unchecked`] asks a caller to vouch for,
-    /// so the proof arrives with the value rather than being supplied at the call.
-    fn from(fd: nx_service_bsd::BsdSockFd) -> Self {
-        // SAFETY: `BsdSockFd`'s own invariant is that it names a descriptor the socket service
-        // issued, and it is non-negative because that crate rejects the service's failure return
-        // before ever building one. Both halves of this constructor's precondition therefore hold
-        // by the argument's type.
+    /// [`nx_service_bsd::SocketFd`] already names a descriptor the socket service issued, which is
+    /// exactly what [`SocketFd::from_raw_unchecked`] asks a caller to vouch for, so the proof
+    /// arrives with the value rather than being supplied at the call.
+    fn from(fd: nx_service_bsd::SocketFd) -> Self {
+        // SAFETY: `nx_service_bsd::SocketFd`'s own invariant is that it names a descriptor the
+        // socket service issued, and it is non-negative because that crate rejects the service's
+        // failure return before ever building one. Both halves of this constructor's precondition
+        // therefore hold by the argument's type.
         Self::from_raw_unchecked(fd.to_raw())
     }
 }

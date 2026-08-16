@@ -246,7 +246,7 @@ pub unsafe extern "C" fn __nx_sys_net__socketpair(
 fn create(
     op: impl FnOnce(
         &nx_service_bsd::BsdService,
-    ) -> Result<nx_service_bsd::BsdSockFd, nx_service_bsd::CommandError>,
+    ) -> Result<nx_service_bsd::SocketFd, nx_service_bsd::CommandError>,
 ) -> c_int {
     let created = match session::with_service(op) {
         Err(_) => return errno::fail(errno::EBADF),

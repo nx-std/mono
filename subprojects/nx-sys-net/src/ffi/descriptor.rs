@@ -14,7 +14,7 @@
 
 use core::ffi::c_int;
 
-use nx_service_bsd::BsdSockFd;
+use nx_service_bsd::SocketFd;
 use nx_sys_fd::table::Fd;
 
 use super::errno;
@@ -30,7 +30,7 @@ use crate::device::{
 /// Returns the error number C reports for the failure, so a caller does nothing but hand it to
 /// [`errno::fail`]: `EBADF` for a number that names nothing, and `ENOTSOCK` for one that names
 /// something other than a socket.
-pub fn resolve(fd: c_int) -> Result<BsdSockFd, c_int> {
+pub fn resolve(fd: c_int) -> Result<SocketFd, c_int> {
     let Ok(number) = usize::try_from(fd) else {
         return Err(errno::EBADF);
     };
@@ -51,7 +51,7 @@ pub fn resolve(fd: c_int) -> Result<BsdSockFd, c_int> {
 /// with the reason in `errno`.
 pub fn with_socket<T>(
     fd: c_int,
-    op: impl FnOnce(&nx_service_bsd::BsdService, BsdSockFd) -> Result<T, nx_service_bsd::CommandError>,
+    op: impl FnOnce(&nx_service_bsd::BsdService, SocketFd) -> Result<T, nx_service_bsd::CommandError>,
 ) -> Result<T, c_int> {
     let sock = resolve(fd).map_err(errno::fail)?;
 
@@ -83,9 +83,9 @@ pub fn to_c_fd(number: usize) -> c_int {
 ///
 /// The descriptor arrives as a bare number rather than a type, and that is forced rather than
 /// chosen: the crate that reported it carries its own descriptor newtype, and a conversion from
-/// that to [`BsdSockFd`] would have to be written in `nx-service-bsd`, which cannot depend on a
+/// that to [`SocketFd`] would have to be written in `nx-service-bsd`, which cannot depend on a
 /// service crate that already depends on it. So the number crosses this one seam untyped, and is
-/// a [`BsdSockFd`] again on the far side of it.
+/// a [`SocketFd`] again on the far side of it.
 ///
 /// A negative `raw_fd` says the command displaced nothing. That is not a failure of the command,
 /// but there is no descriptor to return either, so it is reported as one: `ENOENT`, as the C
