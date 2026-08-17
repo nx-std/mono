@@ -30,3 +30,17 @@ EXTERN(__nx_rt_core__libnx_socket_nifm_request_unregister_socket_descriptor);
 
 socketNifmRequestRegisterSocketDescriptor   = __nx_rt_core__libnx_socket_nifm_request_register_socket_descriptor;
 socketNifmRequestUnregisterSocketDescriptor = __nx_rt_core__libnx_socket_nifm_request_unregister_socket_descriptor;
+
+/* The console's own address, which the network-interface service answers.
+ *
+ * Upstream keeps this in runtime/resolver.c beside the name-resolution calls,
+ * but it asks nifm rather than sfdnsres, so it sits with the other nifm work
+ * here instead of with the resolver overrides in rt_core_libnx_net.ld. That
+ * also keeps it on the option that already carries the nifm dependency.
+ *
+ * gethostname is left to libnx: its own body calls gethostid, so it reaches
+ * this through the alias below without needing one of its own.
+ */
+EXTERN(__nx_rt_core__libnx_gethostid);
+
+gethostid = __nx_rt_core__libnx_gethostid;
