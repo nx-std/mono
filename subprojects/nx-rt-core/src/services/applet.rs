@@ -218,15 +218,25 @@ pub fn exit() {
     drop(singleton);
 }
 
-/// Updates cached applet state in response to a received [`AppletMessage`].
+/// Acts on a message the system posted, and reports whether the program lives on.
 ///
-/// Mirrors libnx `appletProcessMessage` for the cache-refresh paths: when the
-/// system signals that focus/operation/performance mode changed, re-query the
-/// authoritative value and update the cache.
-pub fn process_message(msg: AppletMessage) {
+/// Two things happen here. A message that says a system-wide value moved
+/// (focus, operation mode, performance mode) is answered by re-reading that
+/// value into the cache, so the accessors keep handing back something current.
+/// A message that asks the program to stop is answered by saying so, which is
+/// the only way the caller's loop learns to end.
+pub fn process_message(msg: AppletMessage) -> MainLoop {
+    // Answered before the session is looked for, because it is the one message
+    // that is about the program rather than about the system's state: a program
+    // still has to stop when it is asked to, whether or not it holds a session
+    // to refresh anything from.
+    if msg == AppletMessage::ExitRequest {
+        return MainLoop::Exit;
+    }
+
     let guard = state().read();
     let Some(singleton) = guard.as_ref().map(AppletState::singleton) else {
-        return;
+        return MainLoop::Continue;
     };
 
     let csg = singleton.common_state_getter();
@@ -252,6 +262,23 @@ pub fn process_message(msg: AppletMessage) {
         }
         _ => {}
     }
+
+    MainLoop::Continue
+}
+
+/// Whether a program keeps running once a message has been acted on.
+///
+/// The verdict is the whole reason a program pumps messages at all, so it is
+/// returned rather than recorded: a caller that drops it has written a loop the
+/// system cannot stop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use]
+pub enum MainLoop {
+    /// Nothing in the message asks the program to stop.
+    Continue,
+
+    /// The system asked the program to exit, and expects it to.
+    Exit,
 }
 
 // Each `as_<role>` is public API of the shared applet manager: the
