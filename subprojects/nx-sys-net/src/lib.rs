@@ -165,6 +165,7 @@ pub use self::{
         Readiness,
         Selector,
         Token,
+        Waker,
     },
     socket::{
         Error,

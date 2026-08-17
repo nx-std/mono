@@ -20,10 +20,19 @@
 //! numbers a bitmap would be keyed by are the service's own, which no caller of this crate holds.
 //! `Poll` carries one entry per socket, so the correspondence between what was asked and what was
 //! answered survives without a caller having to reconstruct it.
+//!
+//! ## Ending a wait that nothing is going to end on its own
+//!
+//! A wait ends when a socket becomes ready or the timeout runs out, and an event loop that wants to
+//! be told about anything else -- work handed to it, a shutdown, a socket it should start watching
+//! -- is asked from a thread that is not the one waiting. [`Waker`] is the second thread's way in:
+//! it holds one end of a channel whose other end is inside the selector, and sending on it ends the
+//! wait. What that channel is made of, and why, is on [`Waker`] itself.
 
 mod event;
 mod interest;
 mod selector;
+mod wake;
 
 pub use self::{
     event::{
@@ -39,5 +48,10 @@ pub use self::{
         ReregisterError,
         SelectError,
         Selector,
+    },
+    wake::{
+        OpenWakerError,
+        WakeError,
+        Waker,
     },
 };

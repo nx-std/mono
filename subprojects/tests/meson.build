@@ -425,6 +425,8 @@ src = files(
     'suites/net/socket/test_0015_a_refused_connect_over_loopback_reports_econnrefused.c',
     'suites/net/socket/test_0016_a_blocked_poll_returns_when_another_thread_sends.c',
     'suites/net/socket/test_0017_poll_accepts_a_set_of_many_sockets.c',
+    'suites/net/socket/test_0018_a_self_addressed_datagram_channel_ends_a_blocked_poll.c',
+    'suites/net/socket/test_0019_draining_the_wake_channel_leaves_it_quiet.c',
     'suites/net/main.c',
 )
 elf = executable(name + '.elf', src,

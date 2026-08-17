@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <poll.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -154,6 +156,80 @@ static inline int net_connect_loopback(uint16_t port) {
     }
 
     return fd;
+}
+
+/**
+ * @brief Opens the datagram channel a blocked wait is woken through.
+ *
+ * The same channel the Rust waker opens, assembled out of the same calls: a
+ * datagram socket bound to an unassigned loopback port and made non-blocking so
+ * it can be drained, and a second socket connected to whichever port the bind
+ * was given. There is no pipe and no event descriptor on this platform, so a
+ * pair of sockets talking to each other is what an event loop is woken by.
+ *
+ * `*receiver` is the end a wait watches and `*sender` the end a wake is sent on.
+ *
+ * Returns 0, or -1 with `errno` left by whichever call failed and both output
+ * descriptors set to -1.
+ */
+static inline int net_wake_channel(int* receiver, int* sender) {
+    *receiver = -1;
+    *sender = -1;
+
+    const int listening = socket(AF_INET, SOCK_DGRAM, 0);
+    if (listening < 0) {
+        return -1;
+    }
+
+    // Port zero, because which port the channel gets does not matter: both ends
+    // are in this process, and the sender is told the assigned one below.
+    struct sockaddr_in unassigned;
+    net_loopback_addr(&unassigned, 0);
+    if (bind(listening, (struct sockaddr*)&unassigned, sizeof(unassigned)) != 0) {
+        net_close(listening);
+        return -1;
+    }
+    if (net_set_nonblocking(listening) != 0) {
+        net_close(listening);
+        return -1;
+    }
+
+    struct sockaddr_in assigned;
+    socklen_t assigned_len = sizeof(assigned);
+    if (getsockname(listening, (struct sockaddr*)&assigned, &assigned_len) != 0) {
+        net_close(listening);
+        return -1;
+    }
+
+    const int waking = socket(AF_INET, SOCK_DGRAM, 0);
+    if (waking < 0) {
+        net_close(listening);
+        return -1;
+    }
+    if (connect(waking, (struct sockaddr*)&assigned, sizeof(assigned)) != 0) {
+        net_close(waking);
+        net_close(listening);
+        return -1;
+    }
+
+    *receiver = listening;
+    *sender = waking;
+    return 0;
+}
+
+/**
+ * @brief Whether a wait asked about `fd` right now would report it readable.
+ *
+ * A poll with no timeout at all, so it answers from what is already there
+ * rather than waiting for anything to arrive.
+ */
+static inline bool net_is_readable(int fd) {
+    struct pollfd entry;
+    entry.fd = fd;
+    entry.events = POLLIN;
+    entry.revents = 0;
+
+    return poll(&entry, 1, 0) == 1 && (entry.revents & POLLIN) != 0;
 }
 
 /**

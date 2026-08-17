@@ -144,6 +144,25 @@ test_rc_t test_0016_a_blocked_poll_returns_when_another_thread_sends(void);
 test_rc_t test_0017_poll_accepts_a_set_of_many_sockets(void);
 
 /**
+ * @brief Test that a channel a socket addresses to itself ends a blocked wait.
+ *
+ * The wake channel the Rust selector is woken through: bound to an unassigned
+ * loopback port and addressed by what `getsockname` answered. There is no pipe
+ * and no event descriptor on this platform, so this is what an event loop here
+ * is woken by, and test 0016 says nothing about whether it can be assembled.
+ */
+test_rc_t test_0018_a_self_addressed_datagram_channel_ends_a_blocked_poll(void);
+
+/**
+ * @brief Test that a drained wake channel stops reporting itself ready.
+ *
+ * The channel is level-triggered like every other socket a wait is given, so a
+ * wake left in it after the wait it ended returns the wait after that one too,
+ * and an event loop woken once spins forever.
+ */
+test_rc_t test_0019_draining_the_wake_channel_leaves_it_quiet(void);
+
+/**
  * Test suite for the BSD socket surface.
  */
 static void net_socket_suite(void) {
@@ -216,5 +235,13 @@ static void net_socket_suite(void) {
     TEST_CASE(
         "Test 0017: poll_accepts_a_set_of_many_sockets",
         test_0017_poll_accepts_a_set_of_many_sockets
+    )
+    TEST_CASE(
+        "Test 0018: a_self_addressed_datagram_channel_ends_a_blocked_poll",
+        test_0018_a_self_addressed_datagram_channel_ends_a_blocked_poll
+    )
+    TEST_CASE(
+        "Test 0019: draining_the_wake_channel_leaves_it_quiet",
+        test_0019_draining_the_wake_channel_leaves_it_quiet
     )
 }
