@@ -39,6 +39,7 @@ pub use nx_rt_core::services::applet::{
     get_self_controller,
     get_window_controller,
     init,
+    main_loop,
     message_event_handle,
     poll_message,
     process_message,

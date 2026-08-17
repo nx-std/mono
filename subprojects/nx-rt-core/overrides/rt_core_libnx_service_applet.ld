@@ -12,6 +12,22 @@
  * __nx_applet_type) are deliberately NOT aliased here — each entry crate
  * (nx-rt-hbapp, nx-rt-nso) owns those.
  *
+ * The message pump is aliased as all three of its symbols — appletMainLoop and
+ * the appletGetMessage / appletProcessMessage it is composed of — so that no
+ * part of a pass runs against libnx's own globals. Those stay zeroed once
+ * appletInitialize is overridden, and the C appletProcessMessage calls
+ * diagAbortWithResult when the refresh it does with them fails, so a pass that
+ * reached it would take the process down rather than report anything.
+ *
+ * Aliasing the whole pump rather than its halves also keeps this independent of
+ * whether libnx's appletMainLoop would have reached the halves: it is not
+ * called at all.
+ *
+ * Aliasing appletProcessMessage replaces the applet hook dispatch with nothing:
+ * a program that registered an appletHook callback still gets a successful
+ * registration and a callback that never runs. The C implementation is replaced
+ * whole or not at all, so there is no half of it to leave behind.
+ *
  * The `libapplet*` launcher surface is aliased here for the same reason: every
  * function in libnx's applets/libapplet.c dispatches through the same zeroed
  * g_appletILibraryAppletCreator once appletInitialize is overridden.
@@ -32,6 +48,9 @@ EXTERN(__nx_rt_core__libnx_applet_get_message_event);
 EXTERN(__nx_rt_core__libnx_applet_set_focus_handling_mode);
 EXTERN(__nx_rt_core__libnx_applet_set_out_of_focus_suspending_enabled);
 EXTERN(__nx_rt_core__libnx_applet_receive_message);
+EXTERN(__nx_rt_core__libnx_applet_main_loop);
+EXTERN(__nx_rt_core__libnx_applet_get_message);
+EXTERN(__nx_rt_core__libnx_applet_process_message);
 EXTERN(__nx_rt_core__libnx_applet_set_operation_mode_changed_notification);
 EXTERN(__nx_rt_core__libnx_applet_set_performance_mode_changed_notification);
 EXTERN(__nx_rt_core__libnx_applet_get_applet_resource_user_id);
@@ -48,6 +67,9 @@ appletGetMessageEvent = __nx_rt_core__libnx_applet_get_message_event;
 appletSetFocusHandlingMode = __nx_rt_core__libnx_applet_set_focus_handling_mode;
 appletSetOutOfFocusSuspendingEnabled = __nx_rt_core__libnx_applet_set_out_of_focus_suspending_enabled;
 appletReceiveMessage = __nx_rt_core__libnx_applet_receive_message;
+appletMainLoop = __nx_rt_core__libnx_applet_main_loop;
+appletGetMessage = __nx_rt_core__libnx_applet_get_message;
+appletProcessMessage = __nx_rt_core__libnx_applet_process_message;
 appletSetOperationModeChangedNotification = __nx_rt_core__libnx_applet_set_operation_mode_changed_notification;
 appletSetPerformanceModeChangedNotification = __nx_rt_core__libnx_applet_set_performance_mode_changed_notification;
 appletGetAppletResourceUserId = __nx_rt_core__libnx_applet_get_applet_resource_user_id;
