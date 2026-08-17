@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -47,6 +48,62 @@ static inline int net_close(int fd) {
         close(fd);
     }
     return -1;
+}
+
+/**
+ * @brief Marks a descriptor non-blocking, leaving its other status flags alone.
+ *
+ * Reads the flags before writing them back, so the one flag this sets is the
+ * only one it changes.
+ *
+ * Returns 0, or -1 with `errno` left by whichever call failed.
+ */
+static inline int net_set_nonblocking(int fd) {
+    const int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
+        return -1;
+    }
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+/**
+ * @brief Reads the error waiting on a socket, clearing it.
+ *
+ * Where the outcome of a non-blocking connect arrives: the connect itself
+ * reports only that it started, and the verdict is collected here once the
+ * socket has been reported ready.
+ *
+ * Returns the error number, zero when the socket has none, or -1 when the
+ * option could not be read at all — which no error number collides with,
+ * because they are all positive.
+ */
+static inline int net_pending_error(int fd) {
+    int pending = 0;
+    socklen_t len = sizeof(pending);
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &pending, &len) < 0) {
+        return -1;
+    }
+    return pending;
+}
+
+/**
+ * @brief Creates a non-blocking TCP socket.
+ *
+ * Non-blocking before anything else happens to it, so the first call it makes
+ * is already subject to the flag.
+ *
+ * Returns the descriptor, or -1 with `errno` left by whichever call failed.
+ */
+static inline int net_nonblocking_socket(void) {
+    const int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        return -1;
+    }
+    if (net_set_nonblocking(fd) < 0) {
+        return net_close(fd);
+    }
+
+    return fd;
 }
 
 /**

@@ -102,6 +102,48 @@ test_rc_t test_0011_getpeername_reports_the_connected_peer(void);
 test_rc_t test_0012_shutdown_ends_the_peer_receive(void);
 
 /**
+ * @brief Test that a non-blocking connect over loopback finishes in the call.
+ *
+ * Pins where the answer arrives, which over loopback is the connect itself:
+ * both ends are this console, so there is no in-flight state to be told about
+ * later and no `EINPROGRESS` to wait out.
+ */
+test_rc_t test_0013_nonblocking_connect_over_loopback_completes_inline(void);
+
+/**
+ * @brief Test that a wait reports a connected socket writable.
+ *
+ * The half of readiness every other case here leaves untested. A caller that
+ * can only be told about readable sockets has to send blind.
+ */
+test_rc_t test_0014_poll_reports_a_connected_socket_writable(void);
+
+/**
+ * @brief Test that a refused connect over loopback says so in the call.
+ *
+ * The failure half of test 0013, and the same answer: the refusal comes back
+ * from the connect rather than waiting on the socket to be collected.
+ */
+test_rc_t test_0015_a_refused_connect_over_loopback_reports_econnrefused(void);
+
+/**
+ * @brief Test that a blocked `poll` returns when another thread sends.
+ *
+ * Times the wait rather than only checking what it reported: a wait that cannot
+ * be ended before its timeout is one an event loop cannot be woken out of.
+ */
+test_rc_t test_0016_a_blocked_poll_returns_when_another_thread_sends(void);
+
+/**
+ * @brief Test that one wait can be asked about a set of many sockets.
+ *
+ * Every other case here polls one socket. A caller watching a connection table
+ * passes the whole set on every wait, so the size it will accept is a limit on
+ * what can be built over it.
+ */
+test_rc_t test_0017_poll_accepts_a_set_of_many_sockets(void);
+
+/**
  * Test suite for the BSD socket surface.
  */
 static void net_socket_suite(void) {
@@ -154,5 +196,25 @@ static void net_socket_suite(void) {
     TEST_CASE(
         "Test 0012: shutdown_ends_the_peer_receive",
         test_0012_shutdown_ends_the_peer_receive
+    )
+    TEST_CASE(
+        "Test 0013: nonblocking_connect_over_loopback_completes_inline",
+        test_0013_nonblocking_connect_over_loopback_completes_inline
+    )
+    TEST_CASE(
+        "Test 0014: poll_reports_a_connected_socket_writable",
+        test_0014_poll_reports_a_connected_socket_writable
+    )
+    TEST_CASE(
+        "Test 0015: a_refused_connect_over_loopback_reports_econnrefused",
+        test_0015_a_refused_connect_over_loopback_reports_econnrefused
+    )
+    TEST_CASE(
+        "Test 0016: a_blocked_poll_returns_when_another_thread_sends",
+        test_0016_a_blocked_poll_returns_when_another_thread_sends
+    )
+    TEST_CASE(
+        "Test 0017: poll_accepts_a_set_of_many_sockets",
+        test_0017_poll_accepts_a_set_of_many_sockets
     )
 }

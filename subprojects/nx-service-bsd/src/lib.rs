@@ -583,7 +583,8 @@ impl BsdService {
     ///
     /// # Errors
     ///
-    /// As [`Self::select`].
+    /// As [`Self::select`], plus [`CommandError::UncountableSet`] for a set
+    /// longer than the command's count can state. Nothing is sent in that case.
     pub fn poll(
         &self,
         fds: &mut [PollFd],
