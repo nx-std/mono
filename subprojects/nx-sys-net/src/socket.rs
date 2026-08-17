@@ -23,6 +23,7 @@ use nx_service_bsd::{
     Protocol,
     RecvFlags,
     SendFlags,
+    Shutdown,
     SockOpt,
     SockType,
     SocketFd,
@@ -137,6 +138,29 @@ impl Socket {
         command(|svc| svc.connect(self.fd, &raw))
     }
 
+    /// Takes the error waiting on the socket, clearing it.
+    ///
+    /// How a connection attempt that did not finish inside [`Self::connect`] reports its outcome:
+    /// the socket becomes writable either way, so a caller that only watched the readiness cannot
+    /// tell an established connection from a refused one. This is the question that tells them
+    /// apart, and reading it is what clears it, so the answer is delivered once.
+    ///
+    /// `None` means the socket has nothing pending, which for a connect that has completed means
+    /// it succeeded.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::bind`]. A failure here is the *option read* failing, and says nothing about
+    /// whether the socket had an error waiting.
+    pub fn take_error(&self) -> Result<Option<PosixError>, Error> {
+        let pending: i32 = command(|svc| svc.get_sock_opt(self.fd, SockOpt::Error))?;
+        if pending == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(PosixError::from(pending)))
+    }
+
     /// Marks the socket as accepting connections.
     ///
     /// # Errors
@@ -144,6 +168,27 @@ impl Socket {
     /// As [`Self::bind`].
     pub fn listen(&self, backlog: i32) -> Result<(), Error> {
         command(|svc| svc.listen(self.fd, backlog))
+    }
+
+    /// The address this socket is bound to.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::bind`], plus [`Error::InvalidAddress`] when the service reports an address this
+    /// layer cannot decode.
+    pub fn local_addr(&self) -> Result<SocketAddr, Error> {
+        let raw = command(|svc| svc.get_sock_name(self.fd))?;
+        addr::decode(&raw).map_err(Error::InvalidAddress)
+    }
+
+    /// The address of the peer this socket is connected to.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::local_addr`]; the service refuses the request on a socket that is not connected.
+    pub fn peer_addr(&self) -> Result<SocketAddr, Error> {
+        let raw = command(|svc| svc.get_peer_name(self.fd))?;
+        addr::decode(&raw).map_err(Error::InvalidAddress)
     }
 
     /// Takes the next connection off the queue.
@@ -175,6 +220,18 @@ impl Socket {
     /// reports one of them rather than blocking.
     pub fn recv(&self, buf: &mut [u8]) -> Result<usize, Error> {
         command(|svc| svc.recv(self.fd, buf, RecvFlags::empty()))
+    }
+
+    /// Reads into `buf` without consuming what it read.
+    ///
+    /// The next receive sees the same bytes again. What a caller uses to decide how to handle a
+    /// connection from its first bytes without having to hold them itself.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::recv`].
+    pub fn peek(&self, buf: &mut [u8]) -> Result<usize, Error> {
+        command(|svc| svc.recv(self.fd, buf, RecvFlags::PEEK))
     }
 
     /// Receives into `buf`, reporting how much arrived and who sent it.
@@ -210,6 +267,34 @@ impl Socket {
         command(|svc| svc.send_to(self.fd, buf, SendFlags::empty(), &raw))
     }
 
+    /// Ends transfer in one or both directions, leaving the socket open.
+    ///
+    /// Distinct from closing: the descriptor stays valid, and a peer told that sending is over
+    /// reads it as the end of the stream rather than as a connection that vanished. What a caller
+    /// does to say "I am done sending" while still reading the reply.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::bind`]; the service refuses the request on a socket that is not connected.
+    pub fn shutdown(&self, how: Shutdown) -> Result<(), Error> {
+        command(|svc| svc.shutdown(self.fd, how))
+    }
+
+    /// Produces a second socket onto the same connection.
+    ///
+    /// The service issues a descriptor of its own, so the two are separate owners closing separate
+    /// descriptors, and the connection lasts until both are gone.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::bind`]; the service refuses when this client holds no free descriptors.
+    pub fn try_clone(&self) -> Result<Self, Error> {
+        let duplicate = command(|svc| svc.duplicate_socket(self.fd))?;
+
+        // SAFETY: the command just issued this descriptor and nothing else has taken it on.
+        Ok(Self::from_raw_unchecked(duplicate))
+    }
+
     /// Sets whether operations return rather than waiting.
     ///
     /// Reads the current flags before writing them back, so the one flag this changes is the only
@@ -239,6 +324,31 @@ impl Socket {
     pub fn set_reuse_address(&self, reuse: bool) -> Result<(), Error> {
         let enabled: i32 = reuse.into();
         command(|svc| svc.set_sock_opt(self.fd, SockOpt::ReuseAddr, &enabled))
+    }
+
+    /// Sets whether a small write is sent at once rather than held back to be coalesced.
+    ///
+    /// What a caller sending small messages that expect a reply needs: without it the stack waits
+    /// for more to send, and the wait is only ended by the reply that cannot arrive until the
+    /// message does.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::bind`]; the option is answered by TCP, so the service refuses it on a socket
+    /// that is not a stream.
+    pub fn set_nodelay(&self, nodelay: bool) -> Result<(), Error> {
+        let enabled: i32 = nodelay.into();
+        command(|svc| svc.set_sock_opt(self.fd, SockOpt::TcpNoDelay, &enabled))
+    }
+
+    /// Whether a small write is sent at once.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_nodelay`].
+    pub fn nodelay(&self) -> Result<bool, Error> {
+        let enabled: i32 = command(|svc| svc.get_sock_opt(self.fd, SockOpt::TcpNoDelay))?;
+        Ok(enabled != 0)
     }
 
     /// Closes the socket, reporting what the service said.
