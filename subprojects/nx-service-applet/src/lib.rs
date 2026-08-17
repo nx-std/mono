@@ -112,6 +112,7 @@
 //! | 13 | `SetFocusHandlingMode` | ✅ | Configure suspension behavior |
 //! | 16 | `SetOutOfFocusSuspendingEnabled` | ✅ | Enable/disable out-of-focus suspension |
 //! | 40 | `CreateManagedDisplayLayer` | | Create a display layer |
+//! | 68 | `SetAutoSleepDisabled` | ✅ | Hold off the console's automatic sleep |
 //!
 //! ## [`WindowController`] — "Manage my display"
 //!
@@ -352,6 +353,7 @@ pub use self::{
         GetWindowControllerError,
         NotifyRunningError,
         OpenProxyError,
+        SetAutoSleepDisabledError,
         SetFocusHandlingModeError,
         SetOperationModeChangedNotificationError,
         SetOutOfFocusSuspendingEnabledError,
@@ -902,6 +904,25 @@ impl<'d> SelfController<'d> {
         enabled: bool,
     ) -> Result<(), SetOutOfFocusSuspendingEnabledError> {
         cmif::set_out_of_focus_suspending_enabled(self.object, enabled)
+    }
+
+    /// Sets whether the console's automatic sleep is disabled (HOS 5.0.0+).
+    ///
+    /// Disabling it holds off the sleep the idle timer would otherwise trigger,
+    /// and it stays held until this is called again with `false`.
+    ///
+    /// # Version contract
+    ///
+    /// The underlying command (cmd 68) was introduced in HOS 5.0.0. Callers are
+    /// responsible for HOS version-gating; this primitive does not check.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the command does not reach the system or the system refuses
+    /// it, in which case the previous setting still stands.
+    #[inline]
+    pub fn set_auto_sleep_disabled(&self, disabled: bool) -> Result<(), SetAutoSleepDisabledError> {
+        cmif::set_auto_sleep_disabled(self.object, disabled)
     }
 
     /// Enables or disables operation mode change notifications.

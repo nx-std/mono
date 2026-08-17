@@ -131,6 +131,9 @@ pub const CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED: u32 = 16;
 /// Command ID for CreateManagedDisplayLayer (ISelfController)
 pub const CMD_SC_CREATE_MANAGED_DISPLAY_LAYER: u32 = 40;
 
+/// Command ID for SetAutoSleepDisabled (ISelfController, 5.0.0+)
+pub const CMD_SC_SET_AUTO_SLEEP_DISABLED: u32 = 68;
+
 /// Command ID for GetAppletResourceUserId (IWindowController)
 pub const CMD_WC_GET_APPLET_RESOURCE_USER_ID: u32 = 1;
 
