@@ -24,6 +24,7 @@ use nx_service_applet::{
     AppletType,
     CommonStateGetter,
     LibraryAppletCreator,
+    ReceiveMessageError,
     SelfController,
     WindowController,
     aruid::Aruid,
@@ -35,7 +36,10 @@ use nx_std_sync::{
         RwLockReadGuard,
     },
 };
-use nx_svc::process::Handle as ProcessHandle;
+use nx_svc::{
+    process::Handle as ProcessHandle,
+    sync::WaitSyncError,
+};
 
 mod handle;
 mod init;
@@ -216,6 +220,70 @@ pub fn exit() {
     // `Proxy<R>` is RAII; dropping `singleton` closes every IPC handle in
     // reverse acquisition order via `Drop`.
     drop(singleton);
+}
+
+/// Takes the next message the system has posted, if one is waiting.
+///
+/// Polls rather than blocks: a program pumps this from a loop that has other
+/// things to do between messages, so a call with nothing waiting reports that
+/// and returns.
+///
+/// # Errors
+///
+/// Returns [`PollMessageError::NotConnected`] when no applet session is open,
+/// so there is no queue to take from. The other variants mean the queue could
+/// not be read this time; none of them consumes a message, so the caller loses
+/// nothing by trying again on its next pass.
+pub fn poll_message() -> Result<Option<AppletMessage>, PollMessageError> {
+    let guard = state().read();
+    let Some(singleton) = guard.as_ref().map(AppletState::singleton) else {
+        return Err(PollMessageError::NotConnected);
+    };
+
+    // The event says something arrived; it does not say what, and this wait
+    // does not clear it. The system leaves it signalled, so once anything has
+    // ever arrived every poll gets past here and the queue below is what
+    // actually reports empty. Clearing it here instead would open a window
+    // between the clear and the read in which an arriving message signals
+    // nothing and is noticed only when the next one happens to follow it.
+    match nx_svc::sync::wait_synchronization(
+        singleton.cache().message_event.as_handle(),
+        Some(core::time::Duration::ZERO),
+    ) {
+        Ok(()) => {}
+        // Nothing is waiting, which is what most passes of a loop find.
+        Err(WaitSyncError::TimedOut) => return Ok(None),
+        Err(err) => return Err(PollMessageError::Wait(err)),
+    }
+
+    singleton
+        .common_state_getter()
+        .receive_message()
+        .map_err(PollMessageError::Receive)
+}
+
+/// Errors returned by [`poll_message`].
+#[derive(Debug, thiserror::Error)]
+pub enum PollMessageError {
+    /// No applet session is open.
+    ///
+    /// Occurs when a program polls before the applet bring-up has run, or
+    /// after it has been torn down. There is no queue, so nothing was taken.
+    #[error("no applet session is open")]
+    NotConnected,
+
+    /// The message event could not be waited on.
+    ///
+    /// The queue was not read, so any message waiting on it is still waiting.
+    #[error("failed to wait on the applet message event")]
+    Wait(#[source] WaitSyncError),
+
+    /// The system refused the request for the waiting message.
+    ///
+    /// The event said a message had arrived and the queue would not hand it
+    /// over. It is still queued: nothing is consumed by a refused request.
+    #[error("failed to receive the waiting message")]
+    Receive(#[source] ReceiveMessageError),
 }
 
 /// Acts on a message the system posted, and reports whether the program lives on.

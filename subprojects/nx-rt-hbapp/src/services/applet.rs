@@ -19,6 +19,7 @@ pub use nx_rt_core::services::applet::{
     LibraryAppletHandle,
     MainLoop,
     OverlayAppletHandle,
+    PollMessageError,
     SelfControllerRef,
     SystemAppletHandle,
     SystemApplicationHandle,
@@ -39,6 +40,7 @@ pub use nx_rt_core::services::applet::{
     get_window_controller,
     init,
     message_event_handle,
+    poll_message,
     process_message,
 };
 use nx_svc::process::Handle as ProcessHandle;
