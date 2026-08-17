@@ -485,16 +485,16 @@ impl SocketFd {
     }
 }
 
-impl From<nx_service_bsd::BsdSockFd> for SocketFd {
+impl From<nx_service_bsd::SocketFd> for SocketFd {
     /// Names a socket the socket service issued as the descriptor a request registers.
     ///
     /// Infallible, and no assertion is made: the two types carry the same invariant, so the proof
     /// arrives with the value rather than being supplied at the call.
-    fn from(fd: nx_service_bsd::BsdSockFd) -> Self {
-        // SAFETY: `BsdSockFd`'s own invariant is that it names a descriptor the socket service
-        // issued, and it is non-negative because that crate rejects the service's failure return
-        // before ever building one. Both halves of this constructor's precondition therefore hold
-        // by the argument's type.
+    fn from(fd: nx_service_bsd::SocketFd) -> Self {
+        // SAFETY: `nx_service_bsd::SocketFd`'s own invariant is that it names a descriptor the
+        // socket service issued, and it is non-negative because that crate rejects the service's
+        // failure return before ever building one. Both halves of this constructor's precondition
+        // therefore hold by the argument's type.
         Self::from_raw_unchecked(fd.to_raw())
     }
 }

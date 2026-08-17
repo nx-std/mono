@@ -15,7 +15,12 @@
 //! The C driver reaches the same conclusion and says so in a comment. This follows it.
 
 use alloc::vec::Vec;
-use core::ffi::c_int;
+use core::{
+    ffi::c_int,
+    time::Duration,
+};
+
+use nx_service_bsd::PollEvents;
 
 use super::{
     abi::{
@@ -29,19 +34,6 @@ use super::{
     errno,
 };
 use crate::session;
-
-/// There is data to read.
-const POLLIN: i16 = 0x0001;
-/// There is urgent data to read.
-const POLLPRI: i16 = 0x0002;
-/// Writing will not block.
-const POLLOUT: i16 = 0x0004;
-/// An error occurred.
-const POLLERR: i16 = 0x0008;
-/// The peer hung up.
-const POLLHUP: i16 = 0x0010;
-/// The descriptor is not open.
-const POLLNVAL: i16 = 0x0020;
 
 /// Waits for readiness across a descriptor array.
 ///
@@ -62,10 +54,22 @@ pub unsafe extern "C" fn __nx_sys_net__poll(
         // has nothing that could become ready, so it reports that nothing did.
         return 0;
     }
+    // `nfds_t` is unsigned and the answer is an `int`, so a set past `int` has no count this call
+    // could report. Refused here rather than truncated, which would answer a different question.
+    if c_int::try_from(nfds).is_err() {
+        return errno::fail(errno::EINVAL);
+    }
 
+    // A negative timeout waits indefinitely, which the layer below spells as no timeout at all.
+    let wait = match u64::try_from(timeout) {
+        Ok(millis) => Some(Duration::from_millis(millis)),
+        Err(_) => None,
+    };
+
+    // Exact: `nfds_t` is 32-bit unsigned and `usize` is 64-bit on this target.
     // SAFETY: the caller guarantees `nfds` valid entries at `fds`.
     let entries = unsafe { core::slice::from_raw_parts_mut(fds, nfds as usize) };
-    poll_entries(entries, timeout)
+    poll_entries(entries, wait)
 }
 
 /// Waits for readiness across three descriptor sets.
@@ -93,43 +97,43 @@ pub unsafe extern "C" fn __nx_sys_net__select(
     // asked for it so the answer can be put back where the caller will look.
     let mut entries: Vec<PollFd> = Vec::new();
     for number in 0..nfds {
-        let mut events = 0i16;
+        let mut events = PollEvents::empty();
         // SAFETY: the caller guarantees each non-null pointer refers to a readable set.
         if unsafe { set_contains(readfds, number) } {
-            events |= POLLIN;
+            events |= PollEvents::IN;
         }
         // SAFETY: as above.
         if unsafe { set_contains(writefds, number) } {
-            events |= POLLOUT;
+            events |= PollEvents::OUT;
         }
         // SAFETY: as above.
         if unsafe { set_contains(exceptfds, number) } {
-            events |= POLLPRI;
+            events |= PollEvents::PRI;
         }
 
-        if events != 0 {
+        if !events.is_empty() {
             entries.push(PollFd {
                 // Bounded by `nfds`, which was refused above unless it is at most `FD_SETSIZE`.
                 fd: number as c_int,
-                events,
+                events: events.bits(),
                 revents: 0,
             });
         }
     }
 
-    let timeout_ms = if timeout.is_null() {
+    let wait = if timeout.is_null() {
         // Wait indefinitely, which is what a null timeout means.
-        -1
+        None
     } else {
         // SAFETY: the caller guarantees a readable value at a non-null pointer.
         let spec = unsafe { *timeout };
-        match to_millis(spec) {
-            Some(ms) => ms,
+        match to_duration(spec) {
+            Some(duration) => Some(duration),
             None => return errno::fail(errno::EINVAL),
         }
     };
 
-    let ready = poll_entries(&mut entries, timeout_ms);
+    let ready = poll_entries(&mut entries, wait);
     if ready < 0 {
         return ready;
     }
@@ -150,22 +154,25 @@ pub unsafe extern "C" fn __nx_sys_net__select(
         let number = entry.fd as usize;
         let mut named = false;
 
+        let asked = PollEvents::from_bits_retain(entry.events);
+        let reported = PollEvents::from_bits_retain(entry.revents);
+
         // An error, a hangup or an invalid descriptor is reported to whichever sets asked about
         // it, because C has no set of its own for them and a caller must not wait forever on a
         // descriptor that will never be ready.
-        let failed = entry.revents & (POLLERR | POLLHUP | POLLNVAL) != 0;
+        let failed = reported.intersects(PollEvents::ERR | PollEvents::HUP | PollEvents::NVAL);
 
-        if entry.events & POLLIN != 0 && (entry.revents & POLLIN != 0 || failed) {
+        if asked.contains(PollEvents::IN) && (reported.contains(PollEvents::IN) || failed) {
             // SAFETY: the caller guarantees a writable set behind a non-null pointer.
             unsafe { insert_into_set(readfds, number) };
             named = true;
         }
-        if entry.events & POLLOUT != 0 && (entry.revents & POLLOUT != 0 || failed) {
+        if asked.contains(PollEvents::OUT) && (reported.contains(PollEvents::OUT) || failed) {
             // SAFETY: as above.
             unsafe { insert_into_set(writefds, number) };
             named = true;
         }
-        if entry.events & POLLPRI != 0 && entry.revents & POLLPRI != 0 {
+        if asked.contains(PollEvents::PRI) && reported.contains(PollEvents::PRI) {
             // SAFETY: as above.
             unsafe { insert_into_set(exceptfds, number) };
             named = true;
@@ -184,12 +191,13 @@ pub unsafe extern "C" fn __nx_sys_net__select(
 /// An entry naming something that is not a socket is not an error for the call as a whole: C says
 /// it comes back with `POLLNVAL` set, and the remaining entries are waited on as asked. That is
 /// why the translation collects a side list rather than returning early.
-fn poll_entries(entries: &mut [PollFd], timeout: c_int) -> c_int {
-    /// Byte width of one `pollfd` on the wire.
-    const WIRE_ENTRY_SIZE: usize = size_of::<PollFd>();
-
+///
+/// Both callers bound `entries` to what a `c_int` can count, which is what makes the returned count
+/// representable: `poll` refuses a larger `nfds`, and `select` cannot name more than `FD_SETSIZE`
+/// descriptors.
+fn poll_entries(entries: &mut [PollFd], timeout: Option<Duration>) -> c_int {
     // The entries the service will actually be asked about, and where each came from.
-    let mut wire: Vec<PollFd> = Vec::with_capacity(entries.len());
+    let mut wire: Vec<nx_service_bsd::PollFd> = Vec::with_capacity(entries.len());
     let mut origin: Vec<usize> = Vec::with_capacity(entries.len());
 
     for (index, entry) in entries.iter_mut().enumerate() {
@@ -202,33 +210,23 @@ fn poll_entries(entries: &mut [PollFd], timeout: c_int) -> c_int {
 
         match descriptor::resolve(entry.fd) {
             Ok(sock) => {
-                wire.push(PollFd {
-                    fd: sock.to_raw(),
-                    events: entry.events,
-                    revents: 0,
-                });
+                wire.push(nx_service_bsd::PollFd::new(
+                    sock,
+                    PollEvents::from_bits_retain(entry.events),
+                ));
                 origin.push(index);
             }
-            Err(_) => entry.revents = POLLNVAL,
+            Err(_) => entry.revents = PollEvents::NVAL.bits(),
         }
     }
 
     if wire.is_empty() {
         // Every entry was already answered, so there is nothing to wait for. Report how many.
-        // Bounded by `entries.len()`, which is the caller's own `nfds`.
+        // Bounded by `entries.len()`, which both callers keep within a `c_int`.
         return entries.iter().filter(|e| e.revents != 0).count() as c_int;
     }
 
-    // SAFETY: `PollFd` is `repr(C)` with no padding of its own, so its byte image is exactly what
-    // the service reads and writes.
-    let bytes = unsafe {
-        core::slice::from_raw_parts_mut(
-            wire.as_mut_ptr().cast::<u8>(),
-            wire.len() * WIRE_ENTRY_SIZE,
-        )
-    };
-
-    let count = match session::with_service(|svc| svc.poll(bytes, origin.len() as u64, timeout)) {
+    let count = match session::with_service(|svc| svc.poll(&mut wire, timeout)) {
         Err(_) => return errno::fail(errno::EBADF),
         Ok(Err(err)) => return errno::report(err),
         Ok(Ok(count)) => count,
@@ -236,31 +234,33 @@ fn poll_entries(entries: &mut [PollFd], timeout: c_int) -> c_int {
 
     // Copy each answer back to the entry it came from.
     for (answered, &index) in wire.iter().zip(origin.iter()) {
-        entries[index].revents = answered.revents;
+        entries[index].revents = answered.revents().bits();
     }
 
     // The service counted only the entries it was given; the ones refused during translation are
     // ready too, in the sense C means, so they are added here.
-    // Bounded by `entries.len()`, as above.
-    let refused = entries.iter().filter(|e| e.revents == POLLNVAL).count() as c_int;
-    count + refused
+    let refused = entries
+        .iter()
+        .filter(|e| e.revents == PollEvents::NVAL.bits())
+        .count();
+
+    // The two terms partition `entries`, so their sum is bounded by its length, which both callers
+    // keep within a `c_int`.
+    (count + refused) as c_int
 }
 
-/// Converts a `select` timeout into the milliseconds `poll` takes.
+/// Converts a `select` timeout into the wait the layer below takes.
 ///
-/// Returns `None` for a negative component, which C rejects.
-fn to_millis(timeout: TimeVal) -> Option<c_int> {
-    if timeout.tv_sec < 0 || timeout.tv_usec < 0 {
-        return None;
-    }
+/// Returns `None` for a negative component, which C rejects. A wait too long to express is clamped
+/// rather than refused: the caller asked to wait a long time and gets the longest there is.
+fn to_duration(timeout: TimeVal) -> Option<Duration> {
+    let seconds = u64::try_from(timeout.tv_sec).ok()?;
+    let micros = u64::try_from(timeout.tv_usec).ok()?;
 
-    // Round a sub-millisecond remainder up, so that a caller asking for a short wait gets one
-    // rather than a poll that returns immediately. Written out rather than using `div_ceil`,
-    // which is still unstable for signed integers.
-    let usec_millis = timeout.tv_usec.checked_add(999)? / 1000;
-    let millis = timeout.tv_sec.checked_mul(1000)?.checked_add(usec_millis)?;
+    let seconds = Duration::from_secs(seconds);
+    let micros = Duration::from_micros(micros);
 
-    Some(c_int::try_from(millis).unwrap_or(c_int::MAX))
+    Some(seconds.checked_add(micros).unwrap_or(Duration::MAX))
 }
 
 /// Whether a set names `number`, treating a null set as naming nothing.

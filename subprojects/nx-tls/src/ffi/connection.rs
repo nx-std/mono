@@ -73,7 +73,7 @@ pub unsafe extern "C" fn __nx_tls__sslConnectionSetSocketDescriptor(
         return result::not_initialized();
     };
 
-    let Ok(sockfd) = SocketFd::try_from(sockfd) else {
+    let Some(sockfd) = SocketFd::from_raw(sockfd) else {
         return result::bad_input();
     };
 
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn __nx_tls__sslConnectionSetDtlsSocketDescriptor(
         return result::not_initialized();
     };
 
-    let Ok(sockfd) = SocketFd::try_from(sockfd) else {
+    let Some(sockfd) = SocketFd::from_raw(sockfd) else {
         return result::bad_input();
     };
 

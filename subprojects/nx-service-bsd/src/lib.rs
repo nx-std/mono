@@ -40,6 +40,7 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
+use core::time::Duration;
 
 use nx_service_sm::SmService;
 use nx_sf::{
@@ -61,6 +62,7 @@ pub mod config;
 mod fd;
 pub mod posix;
 mod proto;
+pub mod readiness;
 mod session;
 pub mod sockaddr;
 pub mod transfer;
@@ -84,12 +86,16 @@ pub use crate::{
         SessionCount,
         SessionCountError,
     },
-    fd::BsdSockFd,
+    fd::SocketFd,
     posix::PosixError,
     proto::{
         Command,
         SERVICE_NAME_SYSTEM,
         SERVICE_NAME_USER,
+    },
+    readiness::{
+        PollEvents,
+        PollFd,
     },
     sockaddr::{
         AddrTooLongError,
@@ -135,12 +141,7 @@ impl BsdService {
     /// [`PosixError::AddressFamilyNotSupported`] for a combination the service does
     /// not implement, [`PosixError::ProcessFdLimit`] when this client holds no free
     /// descriptors.
-    pub fn socket(
-        &self,
-        domain: i32,
-        type_: i32,
-        protocol: i32,
-    ) -> Result<BsdSockFd, CommandError> {
+    pub fn socket(&self, domain: i32, type_: i32, protocol: i32) -> Result<SocketFd, CommandError> {
         let g = self.pool.acquire();
         cmif::socket(g.session(), domain, type_, protocol)
     }
@@ -157,7 +158,7 @@ impl BsdService {
         domain: i32,
         type_: i32,
         protocol: i32,
-    ) -> Result<BsdSockFd, CommandError> {
+    ) -> Result<SocketFd, CommandError> {
         let g = self.pool.acquire();
         cmif::socket_exempt(g.session(), domain, type_, protocol)
     }
@@ -168,7 +169,7 @@ impl BsdService {
     /// [`CommandError::Service`] carrying [`PosixError::NotFound`] for a path the
     /// service does not know, or [`PosixError::PermissionDenied`] for one it will
     /// not open to this client.
-    pub fn open(&self, path: &Path, flags: i32) -> Result<BsdSockFd, CommandError> {
+    pub fn open(&self, path: &Path, flags: i32) -> Result<SocketFd, CommandError> {
         let g = self.pool.acquire();
         cmif::open(g.session(), path, flags)
     }
@@ -179,7 +180,7 @@ impl BsdService {
     /// [`CommandError::Service`] carrying [`PosixError::AddressInUse`] when another
     /// socket already holds the address, or [`PosixError::AddressNotAvailable`]
     /// when it belongs to no local interface.
-    pub fn bind(&self, sockfd: BsdSockFd, addr: &RawSockAddr) -> Result<(), CommandError> {
+    pub fn bind(&self, sockfd: SocketFd, addr: &RawSockAddr) -> Result<(), CommandError> {
         let g = self.pool.acquire();
         cmif::bind(g.session(), sockfd, addr)
     }
@@ -192,7 +193,7 @@ impl BsdService {
     /// writability rather than treating it as a failure — or
     /// [`PosixError::ConnectionRefused`], [`PosixError::TimedOut`],
     /// [`PosixError::NetworkUnreachable`] when the peer cannot be reached.
-    pub fn connect(&self, sockfd: BsdSockFd, addr: &RawSockAddr) -> Result<(), CommandError> {
+    pub fn connect(&self, sockfd: SocketFd, addr: &RawSockAddr) -> Result<(), CommandError> {
         let g = self.pool.acquire();
         cmif::connect(g.session(), sockfd, addr)
     }
@@ -202,7 +203,7 @@ impl BsdService {
     ///
     /// [`CommandError::Service`] carrying [`PosixError::InvalidArgument`] when the
     /// socket is not one that can accept connections.
-    pub fn listen(&self, sockfd: BsdSockFd, backlog: i32) -> Result<(), CommandError> {
+    pub fn listen(&self, sockfd: SocketFd, backlog: i32) -> Result<(), CommandError> {
         let g = self.pool.acquire();
         cmif::listen(g.session(), sockfd, backlog)
     }
@@ -216,7 +217,7 @@ impl BsdService {
     /// is non-blocking and no connection is queued, or
     /// [`PosixError::ConnectionAborted`] when the queued connection died before it
     /// could be handed over.
-    pub fn accept(&self, sockfd: BsdSockFd) -> Result<(BsdSockFd, RawSockAddr), CommandError> {
+    pub fn accept(&self, sockfd: SocketFd) -> Result<(SocketFd, RawSockAddr), CommandError> {
         let g = self.pool.acquire();
         cmif::accept(g.session(), sockfd)
     }
@@ -226,7 +227,7 @@ impl BsdService {
     ///
     /// [`CommandError::Service`] carrying [`PosixError::BadFd`] for a descriptor the
     /// service does not recognise.
-    pub fn get_sock_name(&self, sockfd: BsdSockFd) -> Result<RawSockAddr, CommandError> {
+    pub fn get_sock_name(&self, sockfd: SocketFd) -> Result<RawSockAddr, CommandError> {
         let g = self.pool.acquire();
         cmif::get_sock_name(g.session(), sockfd)
     }
@@ -236,7 +237,7 @@ impl BsdService {
     ///
     /// [`CommandError::Service`] carrying [`PosixError::NotConnected`] when the
     /// socket has no peer.
-    pub fn get_peer_name(&self, sockfd: BsdSockFd) -> Result<RawSockAddr, CommandError> {
+    pub fn get_peer_name(&self, sockfd: SocketFd) -> Result<RawSockAddr, CommandError> {
         let g = self.pool.acquire();
         cmif::get_peer_name(g.session(), sockfd)
     }
@@ -246,7 +247,7 @@ impl BsdService {
     ///
     /// [`CommandError::Service`] carrying [`PosixError::NotConnected`] when the
     /// socket has nothing left to shut down.
-    pub fn shutdown(&self, sockfd: BsdSockFd, how: Shutdown) -> Result<(), CommandError> {
+    pub fn shutdown(&self, sockfd: SocketFd, how: Shutdown) -> Result<(), CommandError> {
         let g = self.pool.acquire();
         cmif::shutdown(g.session(), sockfd, how)
     }
@@ -272,7 +273,7 @@ impl BsdService {
     /// ended under it. A closed connection is a zero byte count, not an error.
     pub fn recv(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         buf: &mut [u8],
         flags: RecvFlags,
     ) -> Result<usize, CommandError> {
@@ -286,7 +287,7 @@ impl BsdService {
     /// As [`Self::recv`].
     pub fn recv_from(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         buf: &mut [u8],
         flags: RecvFlags,
     ) -> Result<(usize, RawSockAddr), CommandError> {
@@ -303,7 +304,7 @@ impl BsdService {
     /// [`PosixError::MessageTooLong`] for a datagram larger than the path allows.
     pub fn send(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         buf: &[u8],
         flags: SendFlags,
     ) -> Result<usize, CommandError> {
@@ -318,7 +319,7 @@ impl BsdService {
     /// `dest_addr` names no destination.
     pub fn send_to(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         buf: &[u8],
         flags: SendFlags,
         dest_addr: &RawSockAddr,
@@ -337,7 +338,7 @@ impl BsdService {
     /// firmware older than `[7.0.0]`, otherwise as [`Self::recv`].
     pub fn recv_mmsg(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         buf: &mut [u8],
         vlen: i32,
         flags: RecvFlags,
@@ -358,7 +359,7 @@ impl BsdService {
     /// firmware older than `[7.0.0]`, otherwise as [`Self::send`].
     pub fn send_mmsg(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         buf: &mut [u8],
         vlen: i32,
         flags: SendFlags,
@@ -371,7 +372,7 @@ impl BsdService {
     /// # Errors
     ///
     /// As [`Self::recv`].
-    pub fn read(&self, fd: BsdSockFd, buf: &mut [u8]) -> Result<usize, CommandError> {
+    pub fn read(&self, fd: SocketFd, buf: &mut [u8]) -> Result<usize, CommandError> {
         let g = self.pool.acquire();
         cmif::read(g.session(), fd, buf)
     }
@@ -380,7 +381,7 @@ impl BsdService {
     /// # Errors
     ///
     /// As [`Self::send`].
-    pub fn write(&self, fd: BsdSockFd, buf: &[u8]) -> Result<usize, CommandError> {
+    pub fn write(&self, fd: SocketFd, buf: &[u8]) -> Result<usize, CommandError> {
         let g = self.pool.acquire();
         cmif::write(g.session(), fd, buf)
     }
@@ -400,7 +401,7 @@ impl BsdService {
     /// value.
     pub fn get_sock_opt<T>(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         level: i32,
         optname: i32,
     ) -> Result<T, CommandError>
@@ -422,7 +423,7 @@ impl BsdService {
     /// As [`Self::get_sock_opt`].
     pub fn get_sock_opt_bytes(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         level: i32,
         optname: i32,
         optval: &mut [u8],
@@ -441,7 +442,7 @@ impl BsdService {
     /// As [`Self::get_sock_opt`].
     pub fn set_sock_opt_bytes(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         level: i32,
         optname: i32,
         optval: &[u8],
@@ -456,7 +457,7 @@ impl BsdService {
     /// As [`Self::get_sock_opt`].
     pub fn set_sock_opt<T>(
         &self,
-        sockfd: BsdSockFd,
+        sockfd: SocketFd,
         level: i32,
         optname: i32,
         optval: &T,
@@ -476,7 +477,7 @@ impl BsdService {
     ///
     /// [`CommandError::Service`] carrying [`PosixError::BadFd`] for a descriptor the
     /// service does not recognise.
-    pub fn fcntl(&self, fd: BsdSockFd, op: FcntlOp) -> Result<StatusFlags, CommandError> {
+    pub fn fcntl(&self, fd: SocketFd, op: FcntlOp) -> Result<StatusFlags, CommandError> {
         let g = self.pool.acquire();
         cmif::fcntl(g.session(), fd, op)
     }
@@ -490,7 +491,7 @@ impl BsdService {
     /// [`CommandError::Service`] carrying [`PosixError::InvalidArgument`] for a
     /// request the descriptor does not answer, or
     /// [`PosixError::OperationNotSupported`] for one the service does not implement.
-    pub fn ioctl(&self, fd: BsdSockFd, request: i32, data: &mut [u8]) -> Result<i32, CommandError> {
+    pub fn ioctl(&self, fd: SocketFd, request: i32, data: &mut [u8]) -> Result<i32, CommandError> {
         let g = self.pool.acquire();
         cmif::ioctl(g.session(), fd, request, data)
     }
@@ -505,7 +506,7 @@ impl BsdService {
     /// As [`Self::ioctl`].
     pub fn ioctl_with_entries(
         &self,
-        fd: BsdSockFd,
+        fd: SocketFd,
         request: i32,
         header: &mut [u8],
         entries: &mut [u8],
@@ -555,15 +556,24 @@ impl BsdService {
         cmif::select(g.session(), nfds, readfds, writefds, exceptfds, timeout)
     }
 
-    /// Waits for readiness across a descriptor array.
+    /// Waits until one of `fds` is ready, reporting how many are.
     ///
-    /// `fds` carries the C `pollfd` array byte layout.
+    /// Each entry names a socket and what to watch it for, and is written back
+    /// with what the service reported; `None` for `timeout` waits
+    /// indefinitely. An entry naming a socket the service does not recognise
+    /// is answered with [`PollEvents::NVAL`] rather than failing the call, so
+    /// one stale entry does not cost the caller the whole wait.
+    ///
     /// # Errors
     ///
     /// As [`Self::select`].
-    pub fn poll(&self, fds: &mut [u8], nfds: u64, timeout: i32) -> Result<i32, CommandError> {
+    pub fn poll(
+        &self,
+        fds: &mut [PollFd],
+        timeout: Option<Duration>,
+    ) -> Result<usize, CommandError> {
         let g = self.pool.acquire();
-        cmif::poll(g.session(), fds, nfds, timeout)
+        cmif::poll(g.session(), fds, timeout)
     }
 
     /// Produces a second descriptor naming the same socket.
@@ -571,7 +581,7 @@ impl BsdService {
     ///
     /// [`CommandError::Service`] carrying [`PosixError::ProcessFdLimit`] when this
     /// client holds no free descriptors.
-    pub fn duplicate_socket(&self, sockfd: BsdSockFd) -> Result<BsdSockFd, CommandError> {
+    pub fn duplicate_socket(&self, sockfd: SocketFd) -> Result<SocketFd, CommandError> {
         let g = self.pool.acquire();
         cmif::duplicate_socket(g.session(), sockfd)
     }
@@ -579,14 +589,14 @@ impl BsdService {
     /// Releases a descriptor.
     ///
     /// Takes the descriptor by value. That does not prevent a second close —
-    /// [`BsdSockFd`] is `Copy`, and a descriptor is only a number — but it is
+    /// [`SocketFd`] is `Copy`, and a descriptor is only a number — but it is
     /// what lets the layer above hold the descriptor in a type that is not,
     /// and have this be the one call that consumes it.
     /// # Errors
     ///
     /// [`CommandError::Service`] carrying [`PosixError::BadFd`] for a descriptor the
     /// service does not recognise, which is what a double close looks like.
-    pub fn close_fd(&self, fd: BsdSockFd) -> Result<(), CommandError> {
+    pub fn close_fd(&self, fd: SocketFd) -> Result<(), CommandError> {
         let g = self.pool.acquire();
         cmif::close(g.session(), fd)
     }

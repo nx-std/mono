@@ -22,6 +22,7 @@ ffi = []
 extern-state = []
 
 [dependencies]
+bitflags = "2"
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-panic-handler = { version = "0.1.0", path = "../nx-panic-handler" }
 nx-service-bsd = { version = "0.1.0", path = "../nx-service-bsd" }

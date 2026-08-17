@@ -56,8 +56,8 @@ use core::ffi::{
 };
 
 use nx_service_bsd::{
-    BsdSockFd,
     ConfigVersion,
+    SocketFd,
 };
 use nx_service_nifm::ffi::ForeignNifmRequest;
 use nx_sf::{
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_socket_nifm_request_unregister_sock
 fn nifm_socket_descriptor(
     object: Option<ForeignDomainObject<'static>>,
     sockfd: c_int,
-    command: impl FnOnce(&ForeignNifmRequest<'static>, BsdSockFd) -> Result<(), DispatchError>,
+    command: impl FnOnce(&ForeignNifmRequest<'static>, SocketFd) -> Result<(), DispatchError>,
 ) -> c_int {
     // The guards run in the order the C driver applies them: the descriptor is resolved before the
     // service function is called, and that function tests the request before the firmware.

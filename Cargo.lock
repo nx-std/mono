@@ -1688,6 +1688,7 @@ dependencies = [
 name = "nx-sys-net"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "nx-alloc",
  "nx-panic-handler",
  "nx-service-bsd",
