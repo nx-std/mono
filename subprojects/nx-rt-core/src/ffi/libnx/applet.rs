@@ -233,9 +233,13 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_receive_message(msg: *mut u3
         Ok(Some(message)) => {
             // SAFETY: Caller guarantees msg points to valid memory.
             unsafe { *msg = message as u32 };
-            // Refresh cached state for messages that signal a state change
-            // (libnx's `appletProcessMessage` equivalent).
-            applet::process_message(message);
+            // Acting on the message is what refreshes the cached state the
+            // accessors hand back. The verdict it also produces is dropped here
+            // because this entry point has nowhere to put it: its C signature
+            // reports a result and a message and nothing else. Whoever pumps
+            // messages is the one that has to stop, and it learns to from
+            // `appletMainLoop`, not from here.
+            let _ = applet::process_message(message);
             0
         }
         // No message available: propagate libnx's "queue empty" result code so

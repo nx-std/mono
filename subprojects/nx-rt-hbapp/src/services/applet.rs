@@ -17,6 +17,7 @@ pub use nx_rt_core::services::applet::{
     ConnectError,
     LibraryAppletCreatorRef,
     LibraryAppletHandle,
+    MainLoop,
     OverlayAppletHandle,
     SelfControllerRef,
     SystemAppletHandle,
