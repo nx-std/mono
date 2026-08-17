@@ -38,14 +38,14 @@
 //! This arrangement is why `read()`, `write()` and `close()` need nothing from this crate's C
 //! surface: they are ordinary descriptor operations, so the table dispatches them into
 //! [`device::SocketFile`] like any other file. Only the calls that are *not* descriptor
-//! operations — `send`, `bind`, `listen`, and the rest of the BSD surface — go through the map
+//! operations - `send`, `bind`, `listen`, and the rest of the BSD surface - go through the map
 //! explicitly.
 //!
 //! ## Where the session lives
 //!
 //! Every command needs a connected [`nx_service_bsd::BsdService`], and no C caller passes one. So
 //! the crate holds one process-wide, established by [`driver::initialize`] and released by
-//! [`driver::exit`] — the lifecycle the C `socketInitialize`/`socketExit` pair exposes. Unlike the
+//! [`driver::exit`], the lifecycle the C `socketInitialize`/`socketExit` pair exposes. Unlike the
 //! resolver's session, it is not connected lazily on first use: the C contract is that a program
 //! initializes the socket driver before calling anything, and a lazy connect would paper over the
 //! omission with a config nobody chose.
@@ -99,7 +99,7 @@
 //! The two agree only below 35, so a code copied from the wire into an `errno` slot reports the
 //! wrong failure. [`nx_service_bsd`] therefore hands up a named [`nx_service_bsd::PosixError`] and
 //! leaves the number to whoever knows which numbering their caller reads. This crate is that
-//! layer, and the table is in [`ffi::errno`] — with the C surface, because a number is the only
+//! layer, and the table is in [`ffi::errno`], with the C surface, because a number is the only
 //! thing a C caller can be told, and nothing above the C boundary needs one.
 //!
 //! ## What the version field is, and why it defaults low
@@ -159,10 +159,12 @@ pub use self::{
         initialize,
     },
     readiness::{
+        Event,
+        Events,
         Interest,
         Readiness,
-        Watch,
-        poll,
+        Selector,
+        Token,
     },
     socket::{
         Error,
