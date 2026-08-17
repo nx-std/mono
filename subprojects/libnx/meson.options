@@ -27,6 +27,13 @@ option(
 )
 
 option(
+    'use_nx_romfs',
+    type : 'feature', value : 'auto',
+    description : 'Override all libnx romfs functions with nx-romfs functions',
+    yield : true
+)
+
+option(
     'use_nx_rt',
     type : 'feature', value : 'auto',
     description : 'Override libnx runtime functions with nx-rt',
