@@ -40,9 +40,18 @@ use crate::{
 ///
 /// A registration that survives its socket by less than a reissue is reported with
 /// [`Readiness::INVALID`], which a caller may treat as the signal to deregister it.
+///
+/// ## The wake channel is not one of the registrations
+///
+/// [`crate::Waker`] gives a selector a channel another thread can end its wait through, and that
+/// channel is held apart from the registered sockets: it is not counted by [`Self::len`], cannot be
+/// deregistered, and goes when the selector does. What it shares with a registration is the token
+/// it reports under, which is why that token is one a caller reserves.
 #[derive(Debug, Default)]
 pub struct Selector {
     registered: Vec<Registration>,
+    /// The receiving end of the wake channel, once a waker has been opened against this selector.
+    wake: Option<WakeChannel>,
     /// The set the last wait sent, kept so a wait in a loop allocates nothing after the first.
     /// Rebuilt from `registered` on every wait rather than maintained alongside it, because an
     /// interest that changed between waits has to reach the service on the next one.
@@ -54,6 +63,7 @@ impl Selector {
     pub const fn new() -> Self {
         Self {
             registered: Vec::new(),
+            wake: None,
             scratch: Vec::new(),
         }
     }
@@ -174,16 +184,35 @@ impl Selector {
         self.registered.is_empty()
     }
 
+    /// Whether a wait on this selector can be ended by a [`crate::Waker`].
+    ///
+    /// False until one has been opened against it, which is also what makes opening a second one
+    /// refusable rather than something that quietly unseats the first.
+    #[inline]
+    pub fn is_wakeable(&self) -> bool {
+        self.wake.is_some()
+    }
+
+    /// Takes on the receiving end of a wake channel, to be reported under `token`.
+    ///
+    /// The caller checks [`Self::is_wakeable`] first: a channel attached over an existing one would
+    /// close the socket the earlier waker sends to. Nothing here enforces that, because the one
+    /// caller is [`crate::Waker::open`], which is where the refusal a user sees is raised.
+    pub(super) fn attach_wake(&mut self, socket: Socket, token: Token) {
+        self.wake = Some(WakeChannel { socket, token });
+    }
+
     /// Waits until one of the registered sockets is ready, reporting them in `events`.
     ///
     /// `events` is cleared first, so what it holds afterwards is this wait's answer and nothing
     /// carried over. `None` for `timeout` waits indefinitely; a timeout that expires with nothing
     /// ready leaves `events` empty rather than failing.
     ///
-    /// A wait with nothing registered reports nothing and returns at once. It is deliberately not
-    /// a sleep: the service reads an empty set as one, and a caller waiting on no sockets did not
-    /// ask to sleep. An event loop that needs its wait to block regardless keeps something
-    /// registered to be woken through.
+    /// A wait with nothing registered and no wake channel reports nothing and returns at once. It
+    /// is deliberately not a sleep: the service reads an empty set as one, and a caller waiting on
+    /// no sockets did not ask to sleep. A selector with a [`crate::Waker`] against it always has
+    /// the channel in its set, so its waits block whether or not anything is registered, which is
+    /// what an event loop with no connections yet needs.
     ///
     /// # Errors
     ///
@@ -199,11 +228,19 @@ impl Selector {
     ) -> Result<(), SelectError> {
         events.clear();
 
-        if self.registered.is_empty() {
+        if self.registered.is_empty() && self.wake.is_none() {
             return Ok(());
         }
 
+        // The wake channel goes in first when there is one, so it holds the first answer and the
+        // registrations follow in the order they were made.
         self.scratch.clear();
+        if let Some(wake) = &self.wake {
+            self.scratch.push(PollFd::new(
+                wake.socket.service_fd(),
+                Interest::READABLE.into(),
+            ));
+        }
         self.scratch.extend(
             self.registered
                 .iter()
@@ -214,9 +251,25 @@ impl Selector {
             .map_err(|_| SelectError::NotConnected)?
             .map_err(SelectError::Service)?;
 
+        let mut answers = self.scratch.as_slice();
+
+        if let Some(wake) = &self.wake
+            && let Some((answered, registered_answers)) = answers.split_first()
+        {
+            let readiness = Readiness::from(answered.revents());
+            if !readiness.is_empty() {
+                // Before the caller is told, so that a wake collected here does not also wake the
+                // wait after this one. The channel is level-triggered like every other socket in
+                // the set: what is left in it is ready again immediately.
+                drain(&wake.socket);
+                events.push(Event::new(wake.token, readiness));
+            }
+            answers = registered_answers;
+        }
+
         // The set was built from the registrations in order and the service answers in place, so
         // position is what pairs an answer with the registration that asked for it.
-        for (registration, answered) in self.registered.iter().zip(self.scratch.iter()) {
+        for (registration, answered) in self.registered.iter().zip(answers) {
             let readiness = Readiness::from(answered.revents());
             if !readiness.is_empty() {
                 events.push(Event::new(registration.token, readiness));
@@ -240,6 +293,16 @@ struct Registration {
     fd: SocketFd,
     token: Token,
     interest: Interest,
+}
+
+/// The receiving end of a wake channel, and the token a wake is reported under.
+///
+/// Unlike a [`Registration`] this owns its socket, because nothing else holds it: the waker keeps
+/// the sending end and a caller never sees either.
+#[derive(Debug)]
+struct WakeChannel {
+    socket: Socket,
+    token: Token,
 }
 
 /// Errors returned by [`Selector::register`].
@@ -290,6 +353,23 @@ pub enum SelectError {
     Service(#[source] CommandError),
 }
 
+/// Empties the wake channel of everything that has arrived in it.
+///
+/// A wake is one datagram, so a burst of them is a burst of datagrams, and reading one would leave
+/// the rest to report the channel ready again on the next wait. This reads until there are none
+/// left, which on the non-blocking socket the waker opened is the receive that finds the channel
+/// empty.
+///
+/// That receive's failure is what ends the loop and is discarded: an empty channel and a channel
+/// that can no longer be read mean the same thing here, which is that there is nothing more to take
+/// out of it.
+fn drain(socket: &Socket) {
+    // A wake carries one byte and nothing reads what it carries. A datagram longer than this is
+    // truncated to it and discarded, which is the right handling for something nobody sent.
+    let mut discarded = [0u8; 1];
+    while socket.recv(&mut discarded).is_ok() {}
+}
+
 #[cfg(test)]
 mod tests {
     use nx_service_bsd::SocketFd;
@@ -297,6 +377,7 @@ mod tests {
     use super::{
         Interest,
         Selector,
+        Socket,
         Token,
     };
 
@@ -467,6 +548,42 @@ mod tests {
             tokens,
             alloc::vec![Token::new(1), Token::new(3)],
             "the survivors should keep the order they were registered in"
+        );
+    }
+
+    #[test]
+    fn is_wakeable_on_a_fresh_selector_is_false() {
+        //* Given
+        let selector = Selector::new();
+
+        //* When
+        let wakeable = selector.is_wakeable();
+
+        //* Then
+        assert!(
+            !wakeable,
+            "a selector nothing has been attached to must not claim a wake channel"
+        );
+    }
+
+    #[test]
+    fn attach_wake_makes_the_selector_wakeable_without_registering_anything() {
+        //* Given
+        let mut selector = Selector::new();
+
+        //* When
+        // SAFETY: the descriptor names nothing, and the socket is never sent a command; the
+        // close its drop attempts is against a driver these tests never connect.
+        selector.attach_wake(Socket::from_raw_unchecked(fd(3)), Token::new(1));
+
+        //* Then
+        assert!(
+            selector.is_wakeable(),
+            "an attached channel should be what makes a selector wakeable"
+        );
+        assert!(
+            selector.is_empty(),
+            "the wake channel is not a registration and must not be counted as one"
         );
     }
 
