@@ -52,6 +52,7 @@
 
 use core::ffi::{
     c_int,
+    c_long,
     c_void,
 };
 
@@ -59,7 +60,11 @@ use nx_service_bsd::{
     ConfigVersion,
     SocketFd,
 };
-use nx_service_nifm::ffi::ForeignNifmRequest;
+use nx_service_nifm::{
+    NifmServiceType,
+    connect_cmif,
+    ffi::ForeignNifmRequest,
+};
 use nx_sf::{
     error::{
         LibnxError,
@@ -88,6 +93,11 @@ use crate::{
     },
     services::sm,
 };
+
+/// The address a console answers with when it is on no network.
+///
+/// `INADDR_LOOPBACK`, in the host order the C caller reads it in.
+const LOOPBACK_ADDRESS: c_long = 0x7F00_0001;
 
 /// Brings the socket driver up.
 ///
@@ -182,6 +192,51 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_socket_nifm_request_unregister_sock
         sockfd,
         ForeignNifmRequest::unregister_socket_descriptor,
     )
+}
+
+/// Reports the address the console is currently reachable at.
+///
+/// Corresponds to `gethostid()` in `sys/unistd.h`. A console with no network
+/// answers the loopback address, which is what a caller with nothing better to
+/// say reports as "not connected".
+///
+/// The session it asks through is opened and closed around the question. The
+/// answer changes whenever the console joins or leaves a network, so there is
+/// nothing here worth keeping between calls.
+///
+/// # Safety
+///
+/// No special requirements beyond typical FFI safety.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_gethostid() -> c_long {
+    // Every failure below answers with loopback rather than reporting: the C
+    // signature has no way to say "no answer", and a caller asking where it can
+    // be reached is better served by the address that always works than by an
+    // address that is not the console's.
+    let Ok(sm) = sm::session() else {
+        return LOOPBACK_ADDRESS;
+    };
+
+    let Ok(mut nifm) = connect_cmif(&sm, NifmServiceType::User) else {
+        return LOOPBACK_ADDRESS;
+    };
+
+    // The command that opens the general-service sub-interface was renumbered
+    // in HOS 3.0.0, so which one to send is a property of the running firmware,
+    // which this crate holds.
+    let opened = if hos_version::get() >= HosVersion::new(3, 0, 0) {
+        nifm.open_general_service()
+    } else {
+        nifm.open_general_service_legacy()
+    };
+    if opened.is_err() {
+        return LOOPBACK_ADDRESS;
+    }
+
+    match nifm.get_current_ip_address() {
+        Ok(addr) => c_long::from(addr.as_u32()),
+        Err(_) => LOOPBACK_ADDRESS,
+    }
 }
 
 /// Runs one of the network-interface request's two socket-descriptor commands.
