@@ -17,18 +17,22 @@ project('nx', 'c',
 use_nx = get_option('use_nx')
 
 use_nx_alloc = get_option('use_nx_alloc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_fsdev = get_option('use_nx_fsdev').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_rand = get_option('use_nx_rand').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_romfs = get_option('use_nx_romfs').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_rt = get_option('use_nx_rt').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_std_sync = get_option('use_nx_std_sync').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_svc = get_option('use_nx_svc').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sys_mem = get_option('use_nx_sys_mem').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sys_sync = get_option('use_nx_sys_sync').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sys_thread = get_option('use_nx_sys_thread').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_sys_fd = get_option('use_nx_sys_fd').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sys_thread_tls = get_option('use_nx_sys_thread_tls').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_time = get_option('use_nx_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_sf = get_option('use_nx_sf').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_apm = get_option('use_nx_service_apm').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_applet = get_option('use_nx_service_applet').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
+use_nx_service_fs = get_option('use_nx_service_fs').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_hid = get_option('use_nx_service_hid').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_set = get_option('use_nx_service_set').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
 use_nx_service_time = get_option('use_nx_service_time').enable_auto_if(use_nx.enabled()).disable_auto_if(use_nx.disabled())
@@ -48,6 +52,36 @@ if use_nx_service_time.enabled() and use_nx_time.disabled()
     )
 endif
 
+# `use_nx_romfs` implies `use_nx_fsdev`: the read-only device is dispatched through the filesystem
+# device, so a romfs mount reached from C has nothing to dispatch through without it.
+use_nx_fsdev = use_nx_fsdev.enable_auto_if(use_nx_romfs.enabled())
+
+# Both devices sit on the descriptor table and read their bytes through the fsp-srv client, so
+# either one turns those two on.
+use_nx_sys_fd = use_nx_sys_fd.enable_auto_if(use_nx_romfs.enabled() or use_nx_fsdev.enabled())
+use_nx_service_fs = use_nx_service_fs.enable_auto_if(use_nx_romfs.enabled() or use_nx_fsdev.enabled())
+
+if use_nx_romfs.enabled() and use_nx_fsdev.disabled()
+    error(
+        'use_nx_romfs requires use_nx_fsdev: the read-only device is registered with the '
+        + 'filesystem device and cannot be reached without it.',
+    )
+endif
+
+if (use_nx_romfs.enabled() or use_nx_fsdev.enabled()) and use_nx_sys_fd.disabled()
+    error(
+        'use_nx_romfs and use_nx_fsdev require use_nx_sys_fd: a device is reached by resolving '
+        + 'a path against the descriptor table.',
+    )
+endif
+
+if (use_nx_romfs.enabled() or use_nx_fsdev.enabled()) and use_nx_service_fs.disabled()
+    error(
+        'use_nx_romfs and use_nx_fsdev require use_nx_service_fs: both read their bytes '
+        + 'through the fsp-srv client.',
+    )
+endif
+
 #---------------------------------------------------------------------------------
 # Dependencies
 #---------------------------------------------------------------------------------
@@ -56,19 +90,22 @@ deps_override_link_args = []
 
 # nx-std
 if (use_nx.enabled()
-    or use_nx_alloc.enabled() or use_nx_rand.enabled() or use_nx_rt.enabled() or use_nx_std_sync.enabled()
-    or use_nx_svc.enabled() or use_nx_sys_mem.enabled() or use_nx_sys_sync.enabled() or use_nx_sys_thread.enabled() or use_nx_sys_thread_tls.enabled()
+    or use_nx_alloc.enabled() or use_nx_fsdev.enabled() or use_nx_rand.enabled() or use_nx_romfs.enabled() or use_nx_rt.enabled() or use_nx_std_sync.enabled()
+    or use_nx_svc.enabled() or use_nx_sys_fd.enabled() or use_nx_sys_mem.enabled() or use_nx_sys_sync.enabled() or use_nx_sys_thread.enabled() or use_nx_sys_thread_tls.enabled()
     or use_nx_time.enabled() or use_nx_sf.enabled()
-    or use_nx_service_apm.enabled() or use_nx_service_applet.enabled() or use_nx_service_hid.enabled() or use_nx_service_nv.enabled() or use_nx_service_set.enabled() or use_nx_service_time.enabled() or use_nx_service_sm.enabled() or use_nx_service_vi.enabled())
+    or use_nx_service_apm.enabled() or use_nx_service_applet.enabled() or use_nx_service_fs.enabled() or use_nx_service_hid.enabled() or use_nx_service_nv.enabled() or use_nx_service_set.enabled() or use_nx_service_time.enabled() or use_nx_service_sm.enabled() or use_nx_service_vi.enabled())
 
     nx_std_proj = subproject(
         'nx-std',
         default_options : {
             'use_nx_alloc' : '@0@'.format(use_nx_alloc),
+            'use_nx_fsdev' : '@0@'.format(use_nx_fsdev),
             'use_nx_rand' : '@0@'.format(use_nx_rand),
+            'use_nx_romfs' : '@0@'.format(use_nx_romfs),
             'use_nx_rt' : '@0@'.format(use_nx_rt),
             'use_nx_std_sync' : '@0@'.format(use_nx_std_sync),
             'use_nx_svc' : '@0@'.format(use_nx_svc),
+            'use_nx_sys_fd' : '@0@'.format(use_nx_sys_fd),
             'use_nx_sys_mem' : '@0@'.format(use_nx_sys_mem),
             'use_nx_sys_sync' : '@0@'.format(use_nx_sys_sync),
             'use_nx_sys_thread' : '@0@'.format(use_nx_sys_thread),
@@ -77,6 +114,7 @@ if (use_nx.enabled()
             'use_nx_sf' : '@0@'.format(use_nx_sf),
             'use_nx_service_apm' : '@0@'.format(use_nx_service_apm),
             'use_nx_service_applet' : '@0@'.format(use_nx_service_applet),
+            'use_nx_service_fs' : '@0@'.format(use_nx_service_fs),
             'use_nx_service_hid' : '@0@'.format(use_nx_service_hid),
             'use_nx_service_set' : '@0@'.format(use_nx_service_set),
             'use_nx_service_time' : '@0@'.format(use_nx_service_time),
