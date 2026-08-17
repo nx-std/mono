@@ -18,10 +18,18 @@
 //!
 //! This module is gated behind the `ffi` + `service-applet` Cargo features.
 
-use nx_sf::error::ToResultCode as _;
+use nx_sf::error::{
+    LibnxError,
+    ToResultCode as _,
+    libnx_error,
+};
 use nx_svc::raw::INVALID_HANDLE;
 
 use crate::{
+    env::hos_version::{
+        self,
+        HosVersion,
+    },
     ffi::common::GENERIC_ERROR,
     services::applet,
 };
@@ -340,4 +348,34 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_create_managed_display_layer
         }
         Err(_) => GENERIC_ERROR,
     }
+}
+
+/// Sets whether the console's automatic sleep is disabled.
+///
+/// Corresponds to `appletSetAutoSleepDisabled()` in `applet.h`. The command does
+/// not exist before HOS 5.0.0, so on older firmware the call is refused here
+/// rather than sent to a system that has nothing to answer it with.
+///
+/// # Safety
+///
+/// No special requirements beyond typical FFI safety.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_applet_set_auto_sleep_disabled(disabled: bool) -> u32 {
+    // The command was introduced by a firmware and simply does not exist before
+    // it, so what decides here is whether the system has it to answer with. The
+    // version is a run-constant the entry crate stores once during environment
+    // setup, so nothing it is compared against could have moved since.
+    if hos_version::get() < HosVersion::new(5, 0, 0) {
+        return libnx_error(LibnxError::IncompatSysVer);
+    }
+
+    let Some(sc) = applet::get_self_controller() else {
+        return GENERIC_ERROR;
+    };
+
+    if let Err(err) = sc.get().set_auto_sleep_disabled(disabled) {
+        return err.to_rc();
+    }
+
+    0
 }

@@ -65,6 +65,7 @@ use crate::{
         CMD_OPEN_SYSTEM_APPLICATION_PROXY,
         CMD_SC_CREATE_MANAGED_DISPLAY_LAYER,
         CMD_SC_GET_LIBRARY_APPLET_LAUNCHABLE_EVENT,
+        CMD_SC_SET_AUTO_SLEEP_DISABLED,
         CMD_SC_SET_FOCUS_HANDLING_MODE,
         CMD_SC_SET_OPERATION_MODE_CHANGED_NOTIFICATION,
         CMD_SC_SET_OUT_OF_FOCUS_SUSPENDING_ENABLED,
@@ -532,6 +533,41 @@ pub struct SetOutOfFocusSuspendingEnabledError(#[source] pub DispatchError);
 
 #[cfg(feature = "ffi")]
 impl nx_sf::error::ToResultCode for SetOutOfFocusSuspendingEnabledError {
+    fn to_rc(self) -> nx_sf::error::ResultCode {
+        self.0.to_rc()
+    }
+}
+
+/// Sets whether the console's automatic sleep is disabled (ISelfController, 5.0.0+).
+///
+/// # Errors
+///
+/// Fails when the command does not reach the system or the system refuses it,
+/// in which case the previous setting still stands.
+pub fn set_auto_sleep_disabled(
+    self_controller: DomainObjectRef<'_>,
+    disabled: bool,
+) -> Result<(), SetAutoSleepDisabledError> {
+    let input: u8 = disabled.into();
+
+    let mut buf = nx_sys_thread_tls::ipc_buffer();
+
+    self_controller
+        .dispatch(CMD_SC_SET_AUTO_SLEEP_DISABLED)
+        .in_raw(core::slice::from_ref(&input))
+        .send(&mut buf)
+        .map_err(SetAutoSleepDisabledError)?;
+
+    Ok(())
+}
+
+/// Error returned by [`set_auto_sleep_disabled`].
+#[derive(Debug, thiserror::Error)]
+#[error("failed to dispatch request")]
+pub struct SetAutoSleepDisabledError(#[source] pub DispatchError);
+
+#[cfg(feature = "ffi")]
+impl nx_sf::error::ToResultCode for SetAutoSleepDisabledError {
     fn to_rc(self) -> nx_sf::error::ResultCode {
         self.0.to_rc()
     }

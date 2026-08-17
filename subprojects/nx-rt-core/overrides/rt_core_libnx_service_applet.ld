@@ -37,6 +37,7 @@ EXTERN(__nx_rt_core__libnx_applet_set_performance_mode_changed_notification);
 EXTERN(__nx_rt_core__libnx_applet_get_applet_resource_user_id);
 EXTERN(__nx_rt_core__libnx_applet_acquire_foreground_rights);
 EXTERN(__nx_rt_core__libnx_applet_create_managed_display_layer);
+EXTERN(__nx_rt_core__libnx_applet_set_auto_sleep_disabled);
 
 appletExit = __nx_rt_core__libnx_applet_exit;
 appletGetOperationMode = __nx_rt_core__libnx_applet_get_operation_mode;
@@ -52,6 +53,7 @@ appletSetPerformanceModeChangedNotification = __nx_rt_core__libnx_applet_set_per
 appletGetAppletResourceUserId = __nx_rt_core__libnx_applet_get_applet_resource_user_id;
 appletAcquireForegroundRights = __nx_rt_core__libnx_applet_acquire_foreground_rights;
 appletCreateManagedDisplayLayer = __nx_rt_core__libnx_applet_create_managed_display_layer;
+appletSetAutoSleepDisabled = __nx_rt_core__libnx_applet_set_auto_sleep_disabled;
 
 /* Library applet launcher (applets/libapplet.c) */
 EXTERN(__nx_rt_core__libnx_libapplet_args_create);
