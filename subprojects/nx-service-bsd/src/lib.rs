@@ -60,11 +60,13 @@ use nx_sys_mem::tmem::{
 mod cmif;
 pub mod config;
 mod fd;
+pub mod option;
 pub mod posix;
 mod proto;
 pub mod readiness;
 mod session;
 pub mod sockaddr;
+pub mod socket;
 pub mod transfer;
 
 pub use crate::{
@@ -87,6 +89,7 @@ pub use crate::{
         SessionCountError,
     },
     fd::SocketFd,
+    option::SockOpt,
     posix::PosixError,
     proto::{
         Command,
@@ -100,6 +103,11 @@ pub use crate::{
     sockaddr::{
         AddrTooLongError,
         RawSockAddr,
+    },
+    socket::{
+        Domain,
+        Protocol,
+        SockType,
     },
     transfer::{
         RecvFlags,
@@ -141,9 +149,19 @@ impl BsdService {
     /// [`PosixError::AddressFamilyNotSupported`] for a combination the service does
     /// not implement, [`PosixError::ProcessFdLimit`] when this client holds no free
     /// descriptors.
-    pub fn socket(&self, domain: i32, type_: i32, protocol: i32) -> Result<SocketFd, CommandError> {
+    pub fn socket(
+        &self,
+        domain: Domain,
+        type_: SockType,
+        protocol: Protocol,
+    ) -> Result<SocketFd, CommandError> {
         let g = self.pool.acquire();
-        cmif::socket(g.session(), domain, type_, protocol)
+        cmif::socket(
+            g.session(),
+            domain.to_raw(),
+            type_.to_raw(),
+            protocol.to_raw(),
+        )
     }
 
     /// Creates a socket exempt from the system's socket accounting.
@@ -155,12 +173,17 @@ impl BsdService {
     /// may not create exempt sockets.
     pub fn socket_exempt(
         &self,
-        domain: i32,
-        type_: i32,
-        protocol: i32,
+        domain: Domain,
+        type_: SockType,
+        protocol: Protocol,
     ) -> Result<SocketFd, CommandError> {
         let g = self.pool.acquire();
-        cmif::socket_exempt(g.session(), domain, type_, protocol)
+        cmif::socket_exempt(
+            g.session(),
+            domain.to_raw(),
+            type_.to_raw(),
+            protocol.to_raw(),
+        )
     }
 
     /// Opens a path in the service's own namespace.
@@ -399,17 +422,12 @@ impl BsdService {
     /// for an option the level does not define, or
     /// [`PosixError::InvalidArgument`] when `T` is smaller than the option's
     /// value.
-    pub fn get_sock_opt<T>(
-        &self,
-        sockfd: SocketFd,
-        level: i32,
-        optname: i32,
-    ) -> Result<T, CommandError>
+    pub fn get_sock_opt<T>(&self, sockfd: SocketFd, opt: SockOpt) -> Result<T, CommandError>
     where
         T: zerocopy::FromBytes + zerocopy::Immutable + zerocopy::IntoBytes,
     {
         let g = self.pool.acquire();
-        cmif::get_sock_opt(g.session(), sockfd, level, optname)
+        cmif::get_sock_opt(g.session(), sockfd, opt.level(), opt.name())
     }
 
     /// Reads a socket option into `optval`, returning how many bytes it holds.
@@ -458,15 +476,14 @@ impl BsdService {
     pub fn set_sock_opt<T>(
         &self,
         sockfd: SocketFd,
-        level: i32,
-        optname: i32,
+        opt: SockOpt,
         optval: &T,
     ) -> Result<(), CommandError>
     where
         T: zerocopy::Immutable + zerocopy::IntoBytes,
     {
         let g = self.pool.acquire();
-        cmif::set_sock_opt(g.session(), sockfd, level, optname, optval)
+        cmif::set_sock_opt(g.session(), sockfd, opt.level(), opt.name(), optval)
     }
 
     /// Reads or replaces a descriptor's status flags.

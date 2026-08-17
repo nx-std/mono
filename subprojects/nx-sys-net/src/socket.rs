@@ -17,10 +17,14 @@ use core::{
 
 use nx_service_bsd::{
     CommandError,
+    Domain,
     FcntlOp,
     PosixError,
+    Protocol,
     RecvFlags,
     SendFlags,
+    SockOpt,
+    SockType,
     SocketFd,
     StatusFlags,
 };
@@ -101,12 +105,10 @@ impl Socket {
     ///
     /// As [`Self::open`].
     pub fn open_raw(domain: Domain, ty: SockType) -> Result<Self, Error> {
-        // The protocol is left for the service to choose. Each of the two types this crate names
+        // The protocol is left for the service to choose. Each of the types this crate hands out
         // has exactly one protocol under these families, so naming it would only add a way to
         // disagree with the type.
-        const DEFAULT_PROTOCOL: i32 = 0;
-
-        let created = command(|svc| svc.socket(domain as i32, ty as i32, DEFAULT_PROTOCOL))?;
+        let created = command(|svc| svc.socket(domain, ty, Protocol::Default))?;
 
         // SAFETY: the command just issued this descriptor and nothing else has taken it on.
         Ok(Self::from_raw_unchecked(created))
@@ -235,13 +237,8 @@ impl Socket {
     ///
     /// As [`Self::bind`].
     pub fn set_reuse_address(&self, reuse: bool) -> Result<(), Error> {
-        /// Socket-level options, as the BSD headers number them.
-        const SOL_SOCKET: i32 = 0xffff;
-        /// `SO_REUSEADDR`.
-        const SO_REUSEADDR: i32 = 0x0004;
-
         let enabled: i32 = reuse.into();
-        command(|svc| svc.set_sock_opt(self.fd, SOL_SOCKET, SO_REUSEADDR, &enabled))
+        command(|svc| svc.set_sock_opt(self.fd, SockOpt::ReuseAddr, &enabled))
     }
 
     /// Closes the socket, reporting what the service said.
@@ -331,32 +328,6 @@ pub enum CloseFailed {
     /// The service refused the close
     #[error("The service failed to close the socket")]
     Service(#[source] CommandError),
-}
-
-/// The address family a socket carries.
-///
-/// Each variant's discriminant is the family's own number, so `domain as i32` is what the command
-/// takes. The service descends from a BSD stack, which numbers IPv6 28 rather than the 10 a Linux
-/// table would give.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
-pub enum Domain {
-    /// IPv4 (`AF_INET`).
-    Ipv4 = 2,
-    /// IPv6 (`AF_INET6`).
-    Ipv6 = 28,
-}
-
-/// What a socket carries, and with what guarantees.
-///
-/// Each variant's discriminant is the type's own number, so `ty as i32` is what the command takes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
-pub enum SockType {
-    /// A reliable byte stream (`SOCK_STREAM`, TCP).
-    Stream = 1,
-    /// Connectionless datagrams (`SOCK_DGRAM`, UDP).
-    Dgram = 2,
 }
 
 /// Runs one command against the driver's session, flattening the two ways it can fail.

@@ -9,7 +9,12 @@ use core::ffi::{
     c_void,
 };
 
-use nx_service_bsd::Shutdown;
+use nx_service_bsd::{
+    Domain,
+    Protocol,
+    Shutdown,
+    SockType,
+};
 use zerocopy::IntoBytes as _;
 
 use super::{
@@ -33,7 +38,11 @@ use crate::{
 /// Creates a socket.
 #[unsafe(no_mangle)]
 pub extern "C" fn __nx_sys_net__socket(domain: c_int, type_: c_int, protocol: c_int) -> c_int {
-    create(|svc| svc.socket(domain, type_, protocol))
+    let spec = match SocketSpec::parse(domain, type_, protocol) {
+        Ok(spec) => spec,
+        Err(err) => return err,
+    };
+    create(|svc| svc.socket(spec.domain, spec.type_, spec.protocol))
 }
 
 /// Creates a socket exempt from the system's socket accounting.
@@ -43,7 +52,44 @@ pub extern "C" fn __nx_sys_net__socketExempt(
     type_: c_int,
     protocol: c_int,
 ) -> c_int {
-    create(|svc| svc.socket_exempt(domain, type_, protocol))
+    let spec = match SocketSpec::parse(domain, type_, protocol) {
+        Ok(spec) => spec,
+        Err(err) => return err,
+    };
+    create(|svc| svc.socket_exempt(spec.domain, spec.type_, spec.protocol))
+}
+
+/// The three numbers `socket` takes, once they have been read as what they name.
+///
+/// C hands over three bare `int`s and the command below takes three distinct types, so the reading
+/// happens here, at the boundary, rather than being repeated by each export. Refusing an
+/// unrecognised value here rather than sending it is the same answer the service would give, with
+/// one round trip saved and no chance of a number reaching the wire that this crate cannot name.
+struct SocketSpec {
+    domain: Domain,
+    type_: SockType,
+    protocol: Protocol,
+}
+
+impl SocketSpec {
+    /// Reads the three numbers, reporting the error number C expects for whichever is unrecognised.
+    fn parse(domain: c_int, type_: c_int, protocol: c_int) -> Result<Self, c_int> {
+        let Ok(domain) = Domain::try_from(domain) else {
+            return Err(errno::fail(errno::EAFNOSUPPORT));
+        };
+        let Ok(type_) = SockType::try_from(type_) else {
+            return Err(errno::fail(errno::ESOCKTNOSUPPORT));
+        };
+        let Ok(protocol) = Protocol::try_from(protocol) else {
+            return Err(errno::fail(errno::EPROTONOSUPPORT));
+        };
+
+        Ok(Self {
+            domain,
+            type_,
+            protocol,
+        })
+    }
 }
 
 /// Assigns a local address to a socket.
