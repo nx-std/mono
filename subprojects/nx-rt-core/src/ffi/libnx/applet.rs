@@ -30,9 +30,17 @@ use crate::{
         self,
         HosVersion,
     },
+    error::ToResultCode as _,
     ffi::common::GENERIC_ERROR,
     services::applet,
 };
+
+/// The result code the Application Manager reports for an empty message queue.
+///
+/// A caller testing for "nothing waiting" compares against this, so the two
+/// entry points that can find an empty queue report the same value rather than
+/// each spelling it out.
+const NO_MESSAGE: u32 = 0x680;
 
 /// Closes the applet service connection.
 ///
@@ -242,10 +250,87 @@ pub unsafe extern "C" fn __nx_rt_core__libnx_applet_receive_message(msg: *mut u3
             let _ = applet::process_message(message);
             0
         }
-        // No message available: propagate libnx's "queue empty" result code so
-        // callers (e.g. `appletReceiveMessage` consumers) can distinguish empty
-        // from success the same way they would against libnx.
-        Ok(None) => 0x680,
+        Ok(None) => NO_MESSAGE,
+        Err(err) => err.to_rc(),
+    }
+}
+
+/// Takes one pass of a program's message pump, and reports whether it lives on.
+///
+/// Corresponds to `appletMainLoop()` in `applet.h`. Returns `false` once the
+/// system has asked the program to close, which is what ends a
+/// `while (appletMainLoop())`.
+///
+/// # Safety
+///
+/// No special requirements beyond typical FFI safety.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_applet_main_loop() -> bool {
+    match applet::main_loop() {
+        applet::MainLoop::Continue => true,
+        applet::MainLoop::Exit => false,
+    }
+}
+
+/// Acts on a message the system posted, and reports whether the program lives on.
+///
+/// Corresponds to `appletProcessMessage()` in `applet.h`.
+///
+/// # Hooks are not called
+///
+/// The C implementation this replaces also dispatched the `appletHook`
+/// callbacks a program may have registered. This does not, and a program that
+/// registered one is not told: the registration call still succeeds and the
+/// callback never runs. Nothing here can restore that half — the C
+/// implementation is replaced whole or not at all.
+///
+/// # Safety
+///
+/// No special requirements beyond typical FFI safety.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_applet_process_message(msg: u32) -> bool {
+    let Some(message) = nx_service_applet::AppletMessage::from_raw(msg) else {
+        // The queue hands over whatever it holds, including values this
+        // runtime attaches no meaning to. Acting on nothing is not a reason to
+        // stop, so such a message leaves the program running.
+        return true;
+    };
+
+    match applet::process_message(message) {
+        applet::MainLoop::Continue => true,
+        applet::MainLoop::Exit => false,
+    }
+}
+
+/// Takes the next message the system has posted, if one is waiting.
+///
+/// Corresponds to `appletGetMessage()` in `applet.h`. Where that aborted the
+/// process when the queue refused to hand over a message it had announced, this
+/// reports the refusal: nothing is consumed by a refused request, so the caller
+/// loses one pass of its loop rather than the program.
+///
+/// # Safety
+///
+/// `msg` must be null or point to writable memory for a `u32`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __nx_rt_core__libnx_applet_get_message(msg: *mut u32) -> u32 {
+    if msg.is_null() {
+        return libnx_error(LibnxError::BadInput);
+    }
+
+    match applet::poll_message() {
+        Ok(Some(message)) => {
+            // SAFETY: `msg` was tested for null above, and the caller guarantees
+            // a non-null one points to memory writable for a `u32`, which is
+            // what is written through it here. The pointer is not retained.
+            unsafe { *msg = message as u32 };
+            0
+        }
+        // Nothing was waiting, which is what most passes of a loop find. The
+        // poll does not say which half found nothing — the event or the queue
+        // behind it — and a caller has no use for the difference, so both
+        // arrive as the code an empty queue reports.
+        Ok(None) => NO_MESSAGE,
         Err(err) => err.to_rc(),
     }
 }

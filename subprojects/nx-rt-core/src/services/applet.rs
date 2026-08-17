@@ -29,6 +29,8 @@ use nx_service_applet::{
     WindowController,
     aruid::Aruid,
 };
+#[cfg(feature = "ffi")]
+use nx_sf::error::ToResultCode as _;
 use nx_std_sync::{
     once_lock::OnceLock,
     rwlock::{
@@ -36,6 +38,8 @@ use nx_std_sync::{
         RwLockReadGuard,
     },
 };
+#[cfg(feature = "ffi")]
+use nx_svc::error::ToResultCode as _;
 use nx_svc::{
     process::Handle as ProcessHandle,
     sync::WaitSyncError,
@@ -222,6 +226,22 @@ pub fn exit() {
     drop(singleton);
 }
 
+/// Takes one pass of a program's message pump, and reports whether it lives on.
+///
+/// One pass takes whatever message is waiting and acts on it. A program calls
+/// this from the top of its own loop and stops when it reports
+/// [`MainLoop::Exit`], which is how the system's request to close reaches a
+/// program that is otherwise busy with its own work.
+pub fn main_loop() -> MainLoop {
+    match poll_message() {
+        Ok(Some(msg)) => process_message(msg),
+        // Nothing was waiting, or the queue could not be read this time.
+        // Neither is the system asking the program to stop, and a pump that
+        // ended on a queue it could not read would end on a transient.
+        Ok(None) | Err(_) => MainLoop::Continue,
+    }
+}
+
 /// Takes the next message the system has posted, if one is waiting.
 ///
 /// Polls rather than blocks: a program pumps this from a loop that has other
@@ -284,6 +304,19 @@ pub enum PollMessageError {
     /// over. It is still queued: nothing is consumed by a refused request.
     #[error("failed to receive the waiting message")]
     Receive(#[source] ReceiveMessageError),
+}
+
+#[cfg(feature = "ffi")]
+impl crate::error::ToResultCode for PollMessageError {
+    fn to_rc(self) -> crate::error::ResultCode {
+        match self {
+            Self::NotConnected => {
+                crate::error::libnx_error(crate::error::LibnxError::NotInitialized)
+            }
+            Self::Wait(err) => err.to_rc(),
+            Self::Receive(err) => err.to_rc(),
+        }
+    }
 }
 
 /// Acts on a message the system posted, and reports whether the program lives on.
