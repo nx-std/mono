@@ -398,14 +398,16 @@ const_assert_eq!(size_of::<SelectIn>(), 32);
 #[derive(Debug, Clone, Copy, zerocopy::IntoBytes, zerocopy::Immutable)]
 pub(crate) struct PollIn {
     /// How many `pollfd` entries the accompanying buffer holds. `nfds_t` is
-    /// `unsigned long`, which is 64-bit on this target.
-    pub nfds: u64,
+    /// `unsigned int` on this target, so the field is 32 bits wide and the
+    /// timeout follows it immediately. Widening it costs the timeout: the
+    /// service reads that field from the next four bytes either way, and those
+    /// bytes are the high half of a 64-bit count, which is zero for every set
+    /// anyone can name. A wait asked for in that shape is answered at once.
+    pub nfds: u32,
     /// Milliseconds to wait; negative waits indefinitely.
     pub timeout: i32,
-    /// Alignment padding closing the struct.
-    pub _pad: u32,
 }
-const_assert_eq!(size_of::<PollIn>(), 16);
+const_assert_eq!(size_of::<PollIn>(), 8);
 
 /// Input payload for `RecvMMsg`.
 #[repr(C)]

@@ -263,6 +263,10 @@ fn read_service_response(
 /// can fail are the same for all of them, and every command can produce all
 /// three. The `command` field is what says which one was in flight, so
 /// sharing costs no detail.
+///
+/// [`Self::UncountableSet`] is the exception the sharing does not cover: only a
+/// command that derives a wire count from a caller's slice can produce it, and
+/// [`Command::Poll`] is the only one that does.
 #[derive(Debug, thiserror::Error)]
 pub enum CommandError {
     /// The request never reached the service.
@@ -306,6 +310,19 @@ pub enum CommandError {
         /// The condition it reported.
         #[source]
         source: PosixError,
+    },
+
+    /// The set was too long to state in the count the command carries.
+    ///
+    /// Nothing was sent. Truncating the count instead would ask the service to
+    /// wait on a prefix of the set, and answer as though that were the whole of
+    /// it.
+    #[error("{command} was given {len} entries, more than its count can state")]
+    UncountableSet {
+        /// The command that could not state its set.
+        command: Command,
+        /// How many entries it was given.
+        len: usize,
     },
 }
 
@@ -1193,14 +1210,22 @@ pub(crate) fn poll(
     let command = Command::Poll;
     let mut ipc_buf = nx_sys_thread_tls::ipc_buffer();
 
+    // The count and the buffer are separate fields on the wire and the service
+    // trusts the count, so both are taken from the one slice rather than passed
+    // in separately, which is what kept them from disagreeing. A set too long to
+    // count in the wire's own width is refused rather than truncated: a smaller
+    // count over the same buffer is a request to wait on a prefix, which is not
+    // what the caller asked and not something it would be told happened.
+    let Ok(nfds) = u32::try_from(fds.len()) else {
+        return Err(CommandError::UncountableSet {
+            command,
+            len: fds.len(),
+        });
+    };
+
     let payload = PollIn {
-        // The count and the buffer are separate fields on the wire and the
-        // service trusts the count, so both are taken from the one slice
-        // rather than passed in separately, which is what kept them from
-        // disagreeing. Exact: `usize` is 64-bit on this target.
-        nfds: fds.len() as u64,
+        nfds,
         timeout: timeout_millis(timeout),
-        _pad: 0,
     };
     // `fds` is both read and written by the kernel - the wire shape - so
     // it is attached once through `add_inout_auto_buffer` instead of aliasing

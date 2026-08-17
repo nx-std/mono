@@ -74,6 +74,12 @@ pub fn report(err: CommandError) -> c_int {
             LAST_RESULT.set(source.to_rc());
             set_errno(EPIPE);
         }
+        // Nothing was sent and no service was involved, so there is no result code to record. The
+        // set was larger than the command can count, which is what C calls an invalid argument.
+        CommandError::UncountableSet { .. } => {
+            LAST_RESULT.set(0);
+            set_errno(EINVAL);
+        }
     }
 
     -1

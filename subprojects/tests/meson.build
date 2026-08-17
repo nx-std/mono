@@ -420,6 +420,11 @@ src = files(
     'suites/net/socket/test_0010_sockopt_round_trips_a_value.c',
     'suites/net/socket/test_0011_getpeername_reports_the_connected_peer.c',
     'suites/net/socket/test_0012_shutdown_ends_the_peer_receive.c',
+    'suites/net/socket/test_0013_nonblocking_connect_over_loopback_completes_inline.c',
+    'suites/net/socket/test_0014_poll_reports_a_connected_socket_writable.c',
+    'suites/net/socket/test_0015_a_refused_connect_over_loopback_reports_econnrefused.c',
+    'suites/net/socket/test_0016_a_blocked_poll_returns_when_another_thread_sends.c',
+    'suites/net/socket/test_0017_poll_accepts_a_set_of_many_sockets.c',
     'suites/net/main.c',
 )
 elf = executable(name + '.elf', src,
