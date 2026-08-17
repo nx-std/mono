@@ -144,6 +144,15 @@ pub mod socket;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
+// What a socket is made of is the service's vocabulary, not this crate's, so the types come from
+// the client rather than being restated here. Re-exported so a caller opening a socket needs only
+// this crate.
+pub use nx_service_bsd::{
+    Domain,
+    Protocol,
+    SockType,
+};
+
 pub use self::{
     driver::{
         exit,
@@ -156,9 +165,7 @@ pub use self::{
         poll,
     },
     socket::{
-        Domain,
         Error,
-        SockType,
         Socket,
     },
 };
