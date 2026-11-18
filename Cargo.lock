@@ -199,7 +199,7 @@ dependencies = [
 [[package]]
 name = "nx-object"
 version = "0.1.0"
-source = "git+https://github.com/nx-std/nx-object.git?rev=d9b2c686b5dc133fdfb6d497b93c7269749c5f09#d9b2c686b5dc133fdfb6d497b93c7269749c5f09"
+source = "git+https://github.com/nx-std/nx-object.git?rev=03911eeb01673841ee458b2dd1314219fded8e4e#03911eeb01673841ee458b2dd1314219fded8e4e"
 dependencies = [
  "static_assertions",
  "thiserror",
