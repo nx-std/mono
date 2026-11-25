@@ -15,7 +15,7 @@ bench = false
 ffi = []
 
 [dependencies]
-miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
+miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
 nx-alloc = { version = "0.1.0", path = "../nx-alloc", features = ["global-allocator"] }
 nx-cpu = { version = "0.1.0", path = "../nx-cpu" }
 nx-object = { workspace = true, features = ["nro"] }
